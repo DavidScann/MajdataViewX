@@ -66,8 +66,9 @@ public class SlideDrop : NoteLongDrop
 
         if (startiming <= 0f)
         {
-            var alpha = startiming * (speed / 3) + 1f;
-            alpha = alpha > 1f ? 1f : alpha;
+            var alpha = startiming * (speed / 3.9269f) + 1f;
+            //alpha *= 0.85f;
+            alpha = alpha > 0.6f ? 0.6f : alpha;
             alpha = alpha < 0f ? 0f : alpha;
             setSlideBarAlpha(alpha);
             if (star_slide.activeSelf) 

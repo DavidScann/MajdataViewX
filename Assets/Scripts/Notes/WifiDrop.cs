@@ -123,7 +123,7 @@ public class WifiDrop : NoteLongDrop
         if (!canSVAffect) startiming = realStar;
         if (startiming <= 0f)
         {
-            var alpha = startiming * (speed / 3) + 1f;
+            var alpha = startiming * (speed / 3.9269f) + 1f;
             alpha = alpha > 1f ? 1f : alpha;
             alpha = alpha < 0f ? 0f : alpha;
             setSlideBarAlpha(alpha);
