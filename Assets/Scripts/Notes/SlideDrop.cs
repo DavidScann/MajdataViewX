@@ -33,6 +33,10 @@ public class SlideDrop : NoteLongDrop
 
     public int sortIndex;
 
+    public float fadeInTime;
+
+    public float fullFadeInTime;
+
     public List<int> areaStep = new List<int>();
     public bool smoothSlideAnime = false;
 
@@ -53,11 +57,19 @@ public class SlideDrop : NoteLongDrop
     private void Start()
     {
         timeProvider = GameObject.Find("AudioTimeProvider").GetComponent<AudioTimeProvider>();
+
+        // 计算Slide淡入时机
+        // 在8.0速时应当提前300ms显示Slide
+        fadeInTime = -3.926913f / speed ;
+        // Slide完全淡入时机
+        // 正常情况下应为负值；速度过高将忽略淡入
+        fullFadeInTime = Math.Min(fadeInTime + 0.2f,0);
     }
 
     // Update is called once per frame
     private void Update()
     {
+        // Slide淡入期间，不透明度从0到0.55耗时200ms
         var startiming = timeProvider.AudioTime - timeStar;
         if (canSVAffect)
         {
@@ -66,18 +78,20 @@ public class SlideDrop : NoteLongDrop
 
         if (startiming <= 0f)
         {
-            var alpha = startiming * (speed / 3.9269f) + 1f;
-            //alpha *= 0.85f;
-            alpha = alpha > 0.6f ? 0.6f : alpha;
-            alpha = alpha < 0f ? 0f : alpha;
-            setSlideBarAlpha(alpha);
-            if (star_slide.activeSelf) 
-            { 
-                star_slide.SetActive(false);
-                spriteRenderer_star.color = new Color(1, 1, 1, 0);
-                foreach (var anim in animators) anim.enabled = false;
-                startShining = false;
+            if(fullFadeInTime == 0 || startiming >= fullFadeInTime)
+                setSlideBarAlpha(0.65f);
+            if (startiming < fadeInTime)
+                setSlideBarAlpha(0);
+            else
+            {
+                var alpha = Math.Min((1 - ((startiming - fullFadeInTime) / -0.2f)),1) * 0.55f;
+                setSlideBarAlpha(alpha);
             }
+            //var alpha = startiming * (speed / 3.9269f) + 1f;
+            //alpha *= 0.85f;
+            //alpha = alpha > 0.6f ? 0.6f : alpha;
+            //alpha = alpha < 0f ? 0f : alpha;
+            //setSlideBarAlpha(alpha);
             return;
         }
 

@@ -34,6 +34,10 @@ public class WifiDrop : NoteLongDrop
 
     public int sortIndex;
 
+    public float fadeInTime;
+
+    public float fullFadeInTime;
+
     public List<int> areaStep = new List<int>();
     public bool smoothSlideAnime = false;
 
@@ -55,6 +59,13 @@ public class WifiDrop : NoteLongDrop
 
     private void Start()
     {
+        // 计算Slide淡入时机
+        // 在8.0速时应当提前300ms显示Slide
+        fadeInTime = -3.926913f / speed;
+        // Slide完全淡入时机
+        // 正常情况下应为负值；速度过高将忽略淡入
+        fullFadeInTime = Math.Min(fadeInTime + 0.2f, 0);
+
         timeProvider = GameObject.Find("AudioTimeProvider").GetComponent<AudioTimeProvider>();
         var notes = GameObject.Find("Notes").transform;
         for (var i = 0; i < star_slide.Length; i++)
@@ -118,25 +129,24 @@ public class WifiDrop : NoteLongDrop
     // Update is called once per frame
     private void Update()
     {
-        var startiming = timeProvider.ScrollDist - timeProvider.GetPositionAtTime(timeStart);
-        var realStar = timeProvider.AudioTime - timeStart;
-        if (!canSVAffect) startiming = realStar;
+        // Wifi Slide淡入期间，不透明度从0到1耗时200ms
+        var startiming = timeProvider.AudioTime - timeStart;
         if (startiming <= 0f)
         {
-            var alpha = startiming * (speed / 3.9269f) + 1f;
-            alpha = alpha > 1f ? 1f : alpha;
-            alpha = alpha < 0f ? 0f : alpha;
-            setSlideBarAlpha(alpha);
-            foreach (var star in star_slide)
+            if (fullFadeInTime == 0 || startiming >= fullFadeInTime)
+                setSlideBarAlpha(1);
+            if (startiming < fadeInTime)
+                setSlideBarAlpha(0);
+            else
             {
-                if (star.activeSelf)
-                {
-                    star.SetActive(false);
-                    star.GetComponent<SpriteRenderer>().color = new Color(1f, 1f, 1f, 0f);
-                    foreach (var anim in animators) anim.enabled = false;
-                    startShining = false;
-                }
+                var alpha = Math.Min((1 - ((startiming - fullFadeInTime) / -0.2f)), 1);
+                setSlideBarAlpha(alpha);
             }
+            //var alpha = startiming * (speed / 3.9269f) + 1f;
+            //alpha *= 0.85f;
+            //alpha = alpha > 0.6f ? 0.6f : alpha;
+            //alpha = alpha < 0f ? 0f : alpha;
+            //setSlideBarAlpha(alpha);
             return;
         }
 
