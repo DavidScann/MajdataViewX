@@ -175,6 +175,7 @@ public class HoldDrop : NoteLongDrop
                 distance = 4.8f;
                 //holdEffect.SetActive(true);
                 PlayHoldEffect();
+                startHoldShine();
             }
             else if (holdDistance < 1.225f && distance < 4.8f) // 头未到达 尾未出现
             {
@@ -185,6 +186,7 @@ public class HoldDrop : NoteLongDrop
                 distance = 4.8f;
                 //holdEffect.SetActive(true);
                 PlayHoldEffect();
+                startHoldShine();
 
                 holdEndRender.enabled = true;
             }
@@ -212,11 +214,7 @@ public class HoldDrop : NoteLongDrop
     {
         var endTime = time + LastFor;
         GameObject.Find("NoteEffects").GetComponent<NoteEffectManager>().ResetEffect(startPosition);
-        holdEffect.SetActive(true);
-
-        if (LastFor <= 0.3)
-            return;
-        else if (!holdAnimStart && timeProvider.AudioTime - time > 0.1)//忽略开头6帧与结尾12帧
+        if (!holdAnimStart && timeProvider.AudioTime - time > 0.1)
         {            
             holdAnimStart = true;
             animator.runtimeAnimatorController = HoldShine;
@@ -230,6 +228,11 @@ public class HoldDrop : NoteLongDrop
                 sprRenderer.sprite = holdOnSpr;
 
         }
+    }
+    void PlayHoldEffect()
+    {
+        if (timeProvider.AudioTime - time > 0.1) holdEffect.SetActive(true);
+        else holdEffect.SetActive(false); 
     }
 
     private Vector3 getPositionFromDistance(float distance)
