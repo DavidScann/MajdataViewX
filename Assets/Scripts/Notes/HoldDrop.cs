@@ -210,7 +210,7 @@ public class HoldDrop : NoteLongDrop
     private void startHoldShine()
     {
         GameObject.Find("NoteEffects").GetComponent<NoteEffectManager>().ResetEffect(startPosition);
-        if (!holdAnimStart && timeProvider.AudioTime - time > 0.1)
+        if (!holdAnimStart)
         {            
             holdAnimStart = true;
             animator.runtimeAnimatorController = HoldShine;
