@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using static UnityEditor.PlayerSettings;
 
 public class HoldDrop : NoteLongDrop
 {
@@ -144,6 +145,7 @@ public class HoldDrop : NoteLongDrop
             Destroy(tapLine);
             Destroy(holdEffect);
             Destroy(gameObject);
+            return;
         }
 
 
@@ -205,8 +207,9 @@ public class HoldDrop : NoteLongDrop
 
     private void startHoldShine()
     {
+        GameObject.Find("NoteEffects").GetComponent<NoteEffectManager>().ResetEffect(startPosition);
         if (!holdAnimStart)
-        {
+        {            
             holdAnimStart = true;
             animator.runtimeAnimatorController = HoldShine;
             animator.enabled = true;
