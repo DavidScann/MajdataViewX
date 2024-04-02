@@ -128,6 +128,7 @@ MonoBehaviour:
   exEffectTap: {r: 0.6745098, g: 0.98440695, b: 1, a: 1}
   exEffectEach: {r: 1, g: 0.9943893, b: 0.4669811, a: 1}
   exEffectBreak: {r: 1, g: 0.99607843, b: 0.46666667, a: 1}
+  breakMaterial: {fileID: 2100000, guid: 6cea13e5ba8275446be27a38daed20c7, type: 2}
 --- !u!1 &5847727196508993278
 GameObject:
   m_ObjectHideFlags: 0

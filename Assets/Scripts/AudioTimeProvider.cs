@@ -39,7 +39,12 @@ public class AudioTimeProvider : MonoBehaviour
             ScrollDist = GetPositionAtTime(AudioTime);
         }
     }
+    public float GetFrame()
+    {
+        var _audioTime = AudioTime * 1000;
 
+        return _audioTime / 16.6667f;
+    }
     public void SetStartTime(long _ticks, float _offset, float _speed, bool _isRecord = false)
     {
         ticks = _ticks;
