@@ -56,6 +56,9 @@ internal class SimaiNote
 
     public int startPosition = 1; //键位（1-8）
     public char touchArea = ' ';
+
+    public string kSkin = "";
+    public string kWav = "";
 }
 
 internal class EditRequestjson
