@@ -10,11 +10,9 @@ public class WifiDrop : NoteLongDrop
     public Sprite[] normalSlide = new Sprite[11];
     public Sprite[] eachSlide = new Sprite[11];
     public Sprite[] breakSlide = new Sprite[11];
-    public Sprite[] mineSlide = new Sprite[11];
     public Sprite normalStar;
     public Sprite eachStar;
     public Sprite breakStar;
-    public Sprite mineStar;
 
     public RuntimeAnimatorController slideShine;
 
@@ -27,7 +25,6 @@ public class WifiDrop : NoteLongDrop
     public float speed;
     public bool isEach;
     public bool isBreak;
-    public bool isMine;
     public bool isGroupPart;
     public bool isGroupPartEnd;
     public bool canSVAffect;
@@ -64,8 +61,7 @@ public class WifiDrop : NoteLongDrop
         {
             star_slide[i] = Instantiate(star_slidePrefab, notes);
             spriteRenderer_star[i] = star_slide[i].GetComponent<SpriteRenderer>();
-            if (isMine) spriteRenderer_star[i].sprite = mineStar;
-            else if (isEach) spriteRenderer_star[i].sprite = eachStar;
+            if (isEach) spriteRenderer_star[i].sprite = eachStar;
             else if (isBreak) spriteRenderer_star[i].sprite = breakStar;
             else spriteRenderer_star[i].sprite = normalStar;
             star_slide[i].transform.rotation = Quaternion.Euler(0, 0, -22.5f * (8 + i + 2 * (startPosition - 1)));
@@ -95,11 +91,7 @@ public class WifiDrop : NoteLongDrop
         {
             var sr = slideBars[i].GetComponent<SpriteRenderer>();
 
-            if (isMine)
-            {
-                sr.sprite = mineSlide[i];
-            }
-            else if (isBreak)
+            if (isBreak)
             {
                 sr.sprite = breakSlide[i];
                 var anim = slideBars[i].AddComponent<Animator>();
@@ -207,8 +199,7 @@ public class WifiDrop : NoteLongDrop
                 {
                     if (realPro > 1)
                     {
-                        if (isMine) GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>().mineCount++;
-                        else if (isBreak)
+                        if (isBreak)
                             GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>().breakCount++;
                         else
                             GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>().slideCount++;

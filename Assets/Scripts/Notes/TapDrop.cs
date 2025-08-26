@@ -12,7 +12,6 @@ public class TapDrop : NoteDrop
     public bool isEach;
     public bool isBreak;
     public bool isEX;
-    public bool isMine;
     public bool isFakeStarRotate;
     public bool canSVAffect;
 
@@ -20,11 +19,9 @@ public class TapDrop : NoteDrop
     public Sprite eachSpr;
     public Sprite breakSpr;
     public Sprite exSpr;
-    public Sprite mineSpr;
 
     public Sprite eachLine;
     public Sprite breakLine;
-    public Sprite mineLine;
 
     public RuntimeAnimatorController BreakShine;
 
@@ -67,19 +64,14 @@ public class TapDrop : NoteDrop
         spriteRenderer.sprite = normalSpr;
         exSpriteRender.sprite = exSpr;
 
-        if (isEX && !isMine) exSpriteRender.color = exEffectTap;
-        if (isEach && !isMine)
+        if (isEX) exSpriteRender.color = exEffectTap;
+        if (isEach)
         {
             spriteRenderer.sprite = eachSpr;
             lineSpriteRender.sprite = eachLine;
             if (isEX) exSpriteRender.color = exEffectEach;
         }
-        if (isMine)
-        {
-            spriteRenderer.sprite = mineSpr;
-            lineSpriteRender.sprite = mineLine;
-        }
-        if (isBreak && !isMine)
+        if (isBreak)
         {
             spriteRenderer.sprite = breakSpr;
             lineSpriteRender.sprite = breakLine;
@@ -126,8 +118,7 @@ public class TapDrop : NoteDrop
         if (realtime > 0)
         {
             GameObject.Find("NoteEffects").GetComponent<NoteEffectManager>().PlayEffect(startPosition, isBreak);
-            if (isMine) ObjectCounter.mineCount++;
-            else if (isBreak) ObjectCounter.breakCount++;
+            if (isBreak) ObjectCounter.breakCount++;
             else ObjectCounter.tapCount++;
 
             Destroy(tapLine);

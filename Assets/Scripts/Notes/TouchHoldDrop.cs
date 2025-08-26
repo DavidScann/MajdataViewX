@@ -6,7 +6,6 @@ public class TouchHoldDrop : NoteLongDrop
     // public float LastFor = 1f;
     public float speed = 1;
     public bool isFirework;
-    public bool isMine;
     public bool isEach;
     public bool canSVAffect;
 
@@ -54,19 +53,12 @@ public class TouchHoldDrop : NoteLongDrop
             fansSprite[i].sortingOrder += noteSortOrder;
         }
 
-        if (isMine)
-        {
-            for (var i = 0; i < 4; i++) fansSprite[i].sprite = TouchHoldMineSprite[i];
-            fansSprite[5].sprite = TouchHoldMineSprite[4]; // TouchHold Border
-            fansSprite[4].sprite = TouchPointMineSprite;
-        }
-        else
-        {
-            for (var i = 0; i < 4; i++) fansSprite[i].sprite = TouchHoldSprite[i];
-            fansSprite[5].sprite = TouchHoldSprite[4]; // TouchHold Border
-            if(isEach) fansSprite[4].sprite = TouchPointEachSprite;
-            else fansSprite[4].sprite = TouchPointSprite;
-        }
+
+        for (var i = 0; i < 4; i++) fansSprite[i].sprite = TouchHoldSprite[i];
+        fansSprite[5].sprite = TouchHoldSprite[4]; // TouchHold Border
+        if(isEach) fansSprite[4].sprite = TouchPointEachSprite;
+        else fansSprite[4].sprite = TouchPointSprite;
+
 
         SetfanColor(new Color(1f, 1f, 1f, 0f));
         mask.enabled = false;
@@ -91,8 +83,7 @@ public class TouchHoldDrop : NoteLongDrop
         if (timing > LastFor)
         {
             Instantiate(tapEffect, transform.position, transform.rotation);
-            if(isMine) GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>().mineCount++;
-            else GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>().holdCount++;
+            GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>().holdCount++;
             if (isFirework)
             {
                 fireworkEffect.SetTrigger("Fire");

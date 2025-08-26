@@ -7,7 +7,6 @@ public class TouchDrop : NoteDrop
     public char areaPosition;
     public bool isEach;
     public bool isFirework;
-    public bool isMine;
     public bool canSVAffect;
 
     public int startPosition;
@@ -20,16 +19,13 @@ public class TouchDrop : NoteDrop
 
     public Sprite fanNormalSprite;
     public Sprite fanEachSprite;
-    public Sprite fanMineSprite;
 
     public Sprite pointNormalSprite;
     public Sprite pointEachSprite;
-    public Sprite pointMineSprite;
 
     public Sprite justSprite;
 
     public Sprite[] multTouchNormalSprite = new Sprite[2];
-    public Sprite[] multTouchMineSprite = new Sprite[2];
     public Sprite[] multTouchEachSprite = new Sprite[2];
 
     public GameObject[] fans;
@@ -66,15 +62,7 @@ public class TouchDrop : NoteDrop
             fansSprite[i] = fans[i].GetComponent<SpriteRenderer>();
             fansSprite[i].sortingOrder += noteSortOrder;
         }
-
-        if (isMine)
-        {
-            SetfanSprite(fanMineSprite);
-            fansSprite[4].sprite = pointMineSprite;
-            fansSprite[5].sprite = multTouchMineSprite[0];
-            fansSprite[6].sprite = multTouchMineSprite[1];
-        }
-        else if (isEach)
+        if (isEach)
         {
             SetfanSprite(fanEachSprite);
             fansSprite[4].sprite = pointEachSprite;
@@ -119,8 +107,7 @@ public class TouchDrop : NoteDrop
         {
             multTouchHandler.cancelTouch(this);
             Instantiate(tapEffect, transform.position, transform.rotation);
-            if(isMine) GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>().mineCount++;
-            else GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>().touchCount++;
+            GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>().touchCount++;
             if (isFirework)
             {
                 fireworkEffect.SetTrigger("Fire");

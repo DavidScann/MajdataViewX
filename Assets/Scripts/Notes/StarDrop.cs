@@ -13,23 +13,19 @@ public class StarDrop : NoteDrop
     public bool isDouble;
     public bool isEX;
     public bool isNoHead;
-    public bool isMine;
     public bool canSVAffect;
 
     public Sprite tapSpr;
     public Sprite eachSpr;
     public Sprite breakSpr;
     public Sprite exSpr;
-    public Sprite mineSpr;
 
     public Sprite tapSpr_Double;
     public Sprite eachSpr_Double;
     public Sprite breakSpr_Double;
     public Sprite exSpr_Double;
-    public Sprite mineSpr_Double;
 
     public Sprite eachLine;
-    public Sprite mineLine;
     public Sprite breakLine;
 
     public RuntimeAnimatorController BreakShine;
@@ -70,20 +66,15 @@ public class StarDrop : NoteDrop
         {
             exSpriteRender.sprite = exSpr_Double;
             spriteRenderer.sprite = tapSpr_Double;
-            if (isMine)
-            {
-                lineSpriteRender.sprite = mineLine;
-                spriteRenderer.sprite = mineSpr_Double;
-            }
-            if (isEX && !isMine) exSpriteRender.color = exEffectTap;
-            if (isEach && !isMine)
+            if (isEX) exSpriteRender.color = exEffectTap;
+            if (isEach)
             {
                 lineSpriteRender.sprite = eachLine;
                 spriteRenderer.sprite = eachSpr_Double;
                 if (isEX) exSpriteRender.color = exEffectEach;
             }
 
-            if (isBreak && !isMine)
+            if (isBreak)
             {
                 lineSpriteRender.sprite = breakLine;
                 spriteRenderer.sprite = breakSpr_Double;
@@ -98,20 +89,15 @@ public class StarDrop : NoteDrop
         {
             exSpriteRender.sprite = exSpr;
             spriteRenderer.sprite = tapSpr;
-            if (isMine)
-            {
-                lineSpriteRender.sprite = mineLine;
-                spriteRenderer.sprite = mineSpr;
-            }
-            if (isEX && !isMine) exSpriteRender.color = exEffectTap;
-            if (isEach && !isMine)
+            if (isEX) exSpriteRender.color = exEffectTap;
+            if (isEach)
             {
                 lineSpriteRender.sprite = eachLine;
                 spriteRenderer.sprite = eachSpr;
                 if (isEX) exSpriteRender.color = exEffectEach;
             }
 
-            if (isBreak && !isMine)
+            if (isBreak)
             {
                 lineSpriteRender.sprite = breakLine;
                 spriteRenderer.sprite = breakSpr;
@@ -166,9 +152,7 @@ public class StarDrop : NoteDrop
             if (!isNoHead)
             {
                 GameObject.Find("NoteEffects").GetComponent<NoteEffectManager>().PlayEffect(startPosition, isBreak);
-                if (isMine) ObjectCounter.mineCount++;
-                else if (isBreak) ObjectCounter.breakCount++;
-                else if (isMine) ObjectCounter.mineCount++;
+                if (isBreak) ObjectCounter.breakCount++;
                 else ObjectCounter.tapCount++;
             }
 

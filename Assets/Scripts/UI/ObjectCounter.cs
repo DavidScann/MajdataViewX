@@ -1,7 +1,7 @@
 ﻿using System;
 using UnityEngine;
 using UnityEngine.UI;
-//mine-finished
+
 public class ObjectCounter : MonoBehaviour
 {
     public Color AchievementDudColor; // = new Color32(63, 127, 176, 255);
@@ -14,14 +14,12 @@ public class ObjectCounter : MonoBehaviour
     public int slideCount;
     public int touchCount;
     public int breakCount;
-    public int mineCount;
 
     public int tapSum;
     public int holdSum;
     public int slideSum;
     public int touchSum;
     public int breakSum;
-    public int mineSum;
 
     private Text rate;
     private Text statusAchievement;
@@ -66,7 +64,7 @@ public class ObjectCounter : MonoBehaviour
 
     private void UpdateMainOutput()
     {
-        var comboValue = tapCount + holdCount + slideCount + touchCount + breakCount + mineCount;
+        var comboValue = tapCount + holdCount + slideCount + touchCount + breakCount;
         var scoreSSSValue = FiSumScore();
         int[] scoreValues =
         {
@@ -122,17 +120,16 @@ public class ObjectCounter : MonoBehaviour
         var comboN = tapCount + holdCount + slideCount + touchCount + breakCount;
 
         table.text = string.Format(
-            "TAP: {0} / {6}\n" +
-            "HOD: {1} / {7}\n" +
-            "SLD: {2} / {8}\n" +
-            "TOH: {3} / {9}\n" +
-            "BRK: {4} / {10}\n" +
-            "MIN: {5} / {11}\n" +
-            "ALL: {12} / {13}",
-            tapCount, holdCount, slideCount, touchCount, breakCount, mineCount,
-            tapSum, holdSum, slideSum, touchSum, breakSum, mineSum,
+            "TAP: {0} / {5}\n" +
+            "HOD: {1} / {6}\n" +
+            "SLD: {2} / {7}\n" +
+            "TOH: {3} / {8}\n" +
+            "BRK: {4} / {9}\n" +
+            "ALL: {10} / {11}",
+            tapCount, holdCount, slideCount, touchCount, breakCount,
+            tapSum, holdSum, slideSum, touchSum, breakSum,
             comboN,
-            tapSum + holdSum + slideSum + touchSum + breakSum + mineSum
+            tapSum + holdSum + slideSum + touchSum + breakSum
         );
 
         rate.text = string.Format(
@@ -215,37 +212,37 @@ public class ObjectCounter : MonoBehaviour
 
     private int FiSumScore()
     {
-        return tapSum * 500 + holdSum * 1000 + slideSum * 1500 + touchSum * 500 + breakSum * 2500 + mineSum * 500;
+        return tapSum * 500 + holdSum * 1000 + slideSum * 1500 + touchSum * 500 + breakSum * 2500;
     }
 
     private int FiNowScore()
     {
-        return tapCount * 500 + holdCount * 1000 + slideCount * 1500 + touchCount * 500 + breakCount * 2600 + mineCount * 500;
+        return tapCount * 500 + holdCount * 1000 + slideCount * 1500 + touchCount * 500 + breakCount * 2600;
     }
 
     private int FiNowBreakScore()
     {
-        return tapSum * 500 + holdSum * 1000 + slideSum * 1500 + touchSum * 500 + breakSum * 2500 + breakCount * 100 + mineSum * 500;
+        return tapSum * 500 + holdSum * 1000 + slideSum * 1500 + touchSum * 500 + breakSum * 2500 + breakCount * 100;
     }
 
     private int DxSumScore()
     {
-        return tapSum * 1 + holdSum * 2 + slideSum * 3 + touchSum * 1 + breakSum * 5 + mineSum * 1;
+        return tapSum * 1 + holdSum * 2 + slideSum * 3 + touchSum * 1 + breakSum * 5;
     }
 
     private int DxNowScore()
     {
-        return tapCount * 1 + holdCount * 2 + slideCount * 3 + touchCount * 1 + breakCount * 5 + mineCount * 1;
+        return tapCount * 1 + holdCount * 2 + slideCount * 3 + touchCount * 1 + breakCount * 5;
     }
 
     private int DxExSumScore()
     {
-        return (tapSum + holdSum + slideSum + touchSum + breakSum + mineSum) * 3;
+        return (tapSum + holdSum + slideSum + touchSum + breakSum) * 3;
     }
 
     private int DxExNowScore()
     {
-        return (tapCount + holdCount + slideCount + touchCount + breakCount + mineCount) * 3;
+        return (tapCount + holdCount + slideCount + touchCount + breakCount) * 3;
     }
 
     private int DeDxNowScore()

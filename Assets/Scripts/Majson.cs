@@ -38,12 +38,12 @@ internal class SimaiNote
     public double holdTime = 0d;
     public bool isBreak = false;
     public bool isEx = false;
-    public bool isMine = false;
+    public bool isMute = false;
     public bool isFakeRotate = false;
     public bool isForceStar = false;
     public bool isHanabi = false;
     public bool isSlideBreak = false;
-    public bool isSlideMine = false;
+    public bool isSlideMute = false;
     public bool isSlideNoHead = false;
     public bool canSVAffect = true;
 

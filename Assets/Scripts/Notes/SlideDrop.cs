@@ -11,7 +11,6 @@ public class SlideDrop : NoteLongDrop
     public Sprite spriteNormal;
     public Sprite spriteEach;
     public Sprite spriteBreak;
-    public Sprite spriteMine;
     public RuntimeAnimatorController slideShine;
 
     public bool isMirror;
@@ -19,7 +18,6 @@ public class SlideDrop : NoteLongDrop
     public bool isSpecialFlip; // fixes known star problem
     public bool isEach;
     public bool isBreak;
-    public bool isMine;
     public bool canSVAffect;
     public bool isGroupPart;
     public GameObject slideOK;
@@ -150,9 +148,7 @@ public class SlideDrop : NoteLongDrop
                     if (realPro > 1)
                     {
                         // 只有组内最后一个Slide完成 才会显示判定条并增加总数
-                        if (isMine)
-                            GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>().mineCount++;
-                        else if (isBreak)
+                        if (isBreak)
                             GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>().breakCount++;
                         else
                             GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>().slideCount++;
@@ -259,11 +255,7 @@ public class SlideDrop : NoteLongDrop
             sr.color = new Color(1f, 1f, 1f, 0f);
             sr.sortingOrder += sortIndex;
             sr.sortingLayerName = "Slide";
-            if (isMine)
-            {
-                sr.sprite = spriteMine;
-            }
-            else if (isBreak)
+            if (isBreak)
             {
                 sr.sprite = spriteBreak;
                 var anim = gm.AddComponent<Animator>();

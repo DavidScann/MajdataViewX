@@ -7,7 +7,6 @@ public class HoldDrop : NoteLongDrop
 
     public bool isEach;
     public bool isEX;
-    public bool isMine;
     public bool isBreak;
     public bool canSVAffect;
 
@@ -15,14 +14,11 @@ public class HoldDrop : NoteLongDrop
     public Sprite eachSpr;
     public Sprite exSpr;
     public Sprite breakSpr;
-    public Sprite mineSpr;
 
     public Sprite eachLine;
     public Sprite breakLine;
-    public Sprite mineLine;
 
     public Sprite holdEachEnd;
-    public Sprite holdMineEnd;
     public Sprite holdBreakEnd;
 
     public RuntimeAnimatorController HoldShine;
@@ -76,12 +72,6 @@ public class HoldDrop : NoteLongDrop
         animator = anim;
 
         if (isEX) exSpriteRender.color = exEffectTap;
-        if (isMine)
-        {
-            spriteRenderer.sprite = mineSpr;
-            lineSpriteRender.sprite = mineLine;
-            holdEndRender.sprite = holdMineEnd;
-        }
         if (isEach)
         {
             spriteRenderer.sprite = eachSpr;
@@ -147,9 +137,7 @@ public class HoldDrop : NoteLongDrop
         if (holdReal > 0)
         {
             GameObject.Find("NoteEffects").GetComponent<NoteEffectManager>().PlayEffect(startPosition, isBreak);
-            if (isMine)
-                GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>().mineCount++;
-            else if (isBreak)
+            if (isBreak)
                 GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>().breakCount++;
             else
                 GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>().holdCount++;
