@@ -58,12 +58,18 @@ public class TouchHoldDrop : NoteLongDrop
 
         for (var i = 0; i < 4; i++) fansSprite[i].sprite = TouchHoldSprite[i];
         fansSprite[5].sprite = TouchHoldSprite[4]; // TouchHold Border
-        fansSprite[4].sprite = TouchPointSprite;
+
+        if (isEach) fansSprite[4].sprite = TouchPointEachSprite;
+        else fansSprite[4].sprite = TouchPointSprite;
 
         transform.position = GetAreaPos(startPosition, areaPosition);
 
 
         SetfanColor(new Color(1f, 1f, 1f, 0f));
+
+
+        mask.backSortingOrder = fansSprite[5].sortingOrder - 1;
+        mask.frontSortingOrder = fansSprite[5].sortingOrder;
         mask.enabled = false;
     }
 
