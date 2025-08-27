@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Threading.Tasks;
@@ -12,6 +13,8 @@ public class HttpHandler : MonoBehaviour
     private Task listen;
     private string request = "";
 
+    public GameObject CustomLayerVideoPrefab;
+    List<GameObject> clvs = new List<GameObject>();
 
     private void Start()
     {
@@ -52,6 +55,8 @@ public class HttpHandler : MonoBehaviour
 
             bgManager.LoadBGFromPath(new FileInfo(data.jsonPath).DirectoryName, data.audioSpeed);
             bgCover.color = new Color(0f, 0f, 0f, data.backgroundCover);
+
+            CLVInit(Directory.GetParent(data.jsonPath).FullName, data.audioSpeed);
         }
 
         if (data.control == EditorControlMethod.OpStart)
@@ -69,6 +74,8 @@ public class HttpHandler : MonoBehaviour
             bgManager.LoadBGFromPath(new FileInfo(data.jsonPath).DirectoryName, data.audioSpeed);
             bgCover.color = new Color(0f, 0f, 0f, data.backgroundCover);
             bgManager.PlaySongDetail();
+
+            CLVInit(Directory.GetParent(data.jsonPath).FullName, data.audioSpeed);
         }
 
         if (data.control == EditorControlMethod.Record)
@@ -92,12 +99,15 @@ public class HttpHandler : MonoBehaviour
             bgCover.color = new Color(0f, 0f, 0f, data.backgroundCover);
             bgManager.PlaySongDetail();
             GameObject.Find("CanvasButtons").SetActive(false);
+
+            CLVInit(Directory.GetParent(data.jsonPath).FullName, data.audioSpeed);
         }
 
         if (data.control == EditorControlMethod.Pause)
         {
             timeProvider.isStart = false;
             bgManager.PauseVideo();
+            foreach (var clv in clvs) if (clv.TryGetComponent<CLVManager>(out var manager)) manager.PauseVideo();
         }
 
         if (data.control == EditorControlMethod.Stop)
@@ -105,15 +115,53 @@ public class HttpHandler : MonoBehaviour
             screenRecorder.StopRecording();
             timeProvider.ResetStartTime();
             SceneManager.LoadScene(1);
+            clvs.Clear();
         }
 
         if (data.control == EditorControlMethod.Continue)
         {
             timeProvider.SetStartTime(data.startAt, data.startTime, data.audioSpeed);
             bgManager.ContinueVideo(data.audioSpeed);
+            foreach (var clv in clvs) if (clv.TryGetComponent<CLVManager>(out var manager)) manager.ContinueVideo(data.audioSpeed);
         }
 
         request = "";
+    }
+
+    private void CLVInit(string chartPath, float dataSpeed)
+    {
+        var files = Directory.GetFiles(
+            chartPath,
+            "*.mp4",
+            SearchOption.TopDirectoryOnly);
+        foreach (var layer in SortingLayer.layers)
+        {
+            foreach (var file in files)
+            {
+                try
+                {
+                    if (int.TryParse(Path.GetFileNameWithoutExtension(file).Split('_')[2], out int sortingOrder))
+                    {
+                        var bg_path = Path.Combine(chartPath, "pv_" + layer.name + "_" + sortingOrder + ".mp4");
+                        if (File.Exists(bg_path))
+                        {
+                            var GOvideo = Instantiate(CustomLayerVideoPrefab);
+                            var sr = GOvideo.GetComponent<SpriteRenderer>();
+                            sr.sortingLayerID = layer.id;
+                            sr.sortingOrder = sortingOrder;
+                            var manager = GOvideo.GetComponent<CLVManager>();
+                            manager.playSpeed = dataSpeed;
+                            manager.LoadFromPath(bg_path);
+                            clvs.Add(GOvideo);
+                        }
+                    }
+                }
+                catch (Exception)
+                {
+                    continue;
+                }
+            }
+        }
     }
 
     private void OnDestroy()

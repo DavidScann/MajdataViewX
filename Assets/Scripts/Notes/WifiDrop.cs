@@ -260,7 +260,8 @@ public class WifiDrop : NoteLongDrop,IFlasher
                 star_slide[i].transform.localScale = new Vector3(1.5f, 1.5f, 1.5f);
             }
 
-            if(realtime > 0f) for (var i = 0; i < slideAreaIndex; i++) slideBars[i].SetActive(false);
+            try { if (realtime > 0f) for (var i = 0; i < slideAreaIndex; i++) slideBars[i].SetActive(false); }
+            catch { }
         }
     }
     public bool CanShine() => canShine;

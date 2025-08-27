@@ -118,5 +118,7 @@ public class ScreenRecorder : MonoBehaviour
 
         timeProvider.isStart = false;
         bgManager.PauseVideo();
+        var clvs = GameObject.FindGameObjectsWithTag("CustomLayerVideo");
+        foreach (var clv in clvs) if (clv.TryGetComponent<CLVManager>(out var manager)) manager.PauseVideo();
     }
 }
