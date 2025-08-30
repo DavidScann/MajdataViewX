@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using static UnityEditor.PlayerSettings;
 
 public class NoteEffectManager : MonoBehaviour
 {
@@ -7,7 +8,6 @@ public class NoteEffectManager : MonoBehaviour
     private readonly Animator[] judgeAnimators = new Animator[8];
     private readonly GameObject[] judgeEffects = new GameObject[8];
     private readonly Animator[] tapAnimators = new Animator[8];
-
     private readonly GameObject[] tapEffects = new GameObject[8];
 
     // Start is called before the first frame update
@@ -45,13 +45,21 @@ public class NoteEffectManager : MonoBehaviour
                 customSkin.JudgeText_Normal;
             judgeEffect.transform.GetChild(0).GetChild(1).gameObject.GetComponent<SpriteRenderer>().sprite =
                 customSkin.JudgeText_Break;
+            judgeEffect.transform.GetChild(0).GetChild(2).gameObject.GetComponent<SpriteRenderer>().sprite =
+                customSkin.JudgeText_Miss;
         }
     }
 
     // Update is called once per frame
-    public void PlayEffect(int position, bool isBreak)
+    public void PlayEffect(int position, bool isBreak, bool isMiss)
     {
         var pos = position - 1;
+        tapAnimators[pos].speed = 0.9f;
+        if (isMiss)
+        {
+            judgeAnimators[pos].SetTrigger("miss");
+            return;
+        }
         tapEffects[pos].SetActive(true);
         if (isBreak)
         {

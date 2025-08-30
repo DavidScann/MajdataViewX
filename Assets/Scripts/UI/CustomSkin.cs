@@ -31,8 +31,11 @@ public class CustomSkin : MonoBehaviour
     public Sprite Hold_Ex;
     public Sprite Hold_Break;
     public Sprite Hold_Break_On;
+    public Sprite Hold_Off;
 
     public Sprite[] Just = new Sprite[6];
+    public Sprite[] Miss = new Sprite[6];
+    public Sprite JudgeText_Miss;
     public Sprite JudgeText_Normal;
     public Sprite JudgeText_Break;
 
@@ -45,6 +48,7 @@ public class CustomSkin : MonoBehaviour
     public Sprite[] TouchBorder_Each = new Sprite[2];
 
     public Sprite[] TouchHold = new Sprite[5];
+    public Sprite TouchHoldBorderMiss;
 
     public Texture2D test;
     private SpriteRenderer Outline;
@@ -94,6 +98,10 @@ public class CustomSkin : MonoBehaviour
             Hold_On = SpriteLoader.LoadSpriteFromFile(path + "/hold_on.png", border);
         else
             Hold_On = Hold;
+        if (File.Exists(Path.Combine(path, "hold_off.png")))
+            Hold_Off = SpriteLoader.LoadSpriteFromFile(path + "/hold_off.png", border);
+        else
+            Hold_Off = Hold;
 
         if (File.Exists(Path.Combine(path, "hold_each_on.png")))
             Hold_Each_On = SpriteLoader.LoadSpriteFromFile(path + "/hold_each_on.png", border);
@@ -112,6 +120,14 @@ public class CustomSkin : MonoBehaviour
         Just[4] = SpriteLoader.LoadSpriteFromFile(path + "/just_str_l.png");
         Just[5] = SpriteLoader.LoadSpriteFromFile(path + "/just_wifi_d.png");
 
+        Miss[0] = SpriteLoader.LoadSpriteFromFile(path + "/miss_curv_r.png");
+        Miss[1] = SpriteLoader.LoadSpriteFromFile(path + "/miss_str_r.png");
+        Miss[2] = SpriteLoader.LoadSpriteFromFile(path + "/miss_wifi_u.png");
+        Miss[3] = SpriteLoader.LoadSpriteFromFile(path + "/miss_curv_l.png");
+        Miss[4] = SpriteLoader.LoadSpriteFromFile(path + "/miss_str_l.png");
+        Miss[5] = SpriteLoader.LoadSpriteFromFile(path + "/miss_wifi_d.png");
+
+        JudgeText_Miss = SpriteLoader.LoadSpriteFromFile(path + "/judge_text_miss.png");
         JudgeText_Normal = SpriteLoader.LoadSpriteFromFile(path + "/judge_text_normal.png");
         JudgeText_Break = SpriteLoader.LoadSpriteFromFile(path + "/judge_text_break.png");
 
@@ -132,6 +148,7 @@ public class CustomSkin : MonoBehaviour
             TouchHold[i] = SpriteLoader.LoadSpriteFromFile(path + "/touchhold_" + i + ".png");
         }
         TouchHold[4] = SpriteLoader.LoadSpriteFromFile(path + "/touchhold_border.png");
+        TouchHoldBorderMiss = SpriteLoader.LoadSpriteFromFile(path + "/touchhold_border_miss.png");
         Debug.Log(test);
     }
 

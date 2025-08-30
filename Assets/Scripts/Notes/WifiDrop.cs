@@ -1,6 +1,7 @@
 ﻿using Assets.Scripts.Interfaces;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 public class WifiDrop : NoteLongDrop,IFlasher
@@ -165,6 +166,7 @@ public class WifiDrop : NoteLongDrop,IFlasher
         }
     }
 
+    bool processed = false;
     // Update is called once per frame
     private void Update()
     {
@@ -226,8 +228,14 @@ public class WifiDrop : NoteLongDrop,IFlasher
             var realPro = (LastFor - realtime) / LastFor;
             realPro = 1f - realPro;
             if (!canSVAffect) process = realPro;
-            if (process > 1)
-                DestroySelf();
+            if (process >= 1 && !processed)
+            {
+                if (isUnplayable)
+                    DestroySelfMiss();
+                else
+                    DestroySelf();
+                processed = true;
+            }
 
             var pos = (slideBars.Count) * process;
             // Slide的箭头消失到哪里
@@ -241,7 +249,7 @@ public class WifiDrop : NoteLongDrop,IFlasher
                 slideAreaIndex = areaStep[(int)(process * (areaStep.Count - 1))];
             }
             var lastIndex = 9;
-            if (isGroupPartEnd && !smoothSlideAnime && pos >= lastIndex)
+            if (isGroupPartEnd && !smoothSlideAnime && pos >= lastIndex && !isUnplayable)
             {
                 var waitTime = LastFor * slideConst / 1.3;
                 if (arriveTime == -1)
@@ -255,15 +263,40 @@ public class WifiDrop : NoteLongDrop,IFlasher
             for (var i = 0; i < star_slide.Length; i++)
             {
                 spriteRenderer_star[i].color = Color.white;
+                if (process > 1) process = 1;
                 star_slide[i].transform.position =
                     (SlidePositionEnd[i] - SlidePositionStart) * process + SlidePositionStart; //TODO add some runhua
                 star_slide[i].transform.localScale = new Vector3(1.5f, 1.5f, 1.5f);
             }
 
-            try { if (realtime > 0f) for (var i = 0; i < slideAreaIndex; i++) slideBars[i].SetActive(false); }
+            try { if (realtime > 0f && !isUnplayable) for (var i = 0; i < slideAreaIndex; i++) slideBars[i].SetActive(false); }
             catch { }
         }
     }
+
+    private void DestroySelfMiss()
+    {
+        Invoke(nameof(waitMiss), 0.6f);
+    }
+    void waitMiss()
+    {
+        if (isBreak)
+            GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>().breakCount++;
+        else
+            GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>().slideCount++;
+
+        CustomSkin customSkin = GameObject.Find("Outline").GetComponent<CustomSkin>();
+        if (slideOK != null)
+        {
+            slideOK.GetComponent<SpriteRenderer>().sprite = customSkin.Miss[customSkin.Just.ToList().IndexOf(slideOK.GetComponent<SpriteRenderer>().sprite)];
+            slideOK.SetActive(true);
+        }
+
+        for (var i = 0; i < star_slide.Length; i++)
+            Destroy(star_slide[i]);
+        Destroy(gameObject);
+    }
+
     public bool CanShine() => canShine;
     void DestroySelf()
     {

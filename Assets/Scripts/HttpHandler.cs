@@ -135,7 +135,7 @@ public class HttpHandler : MonoBehaviour
     {
         var files = Directory.GetFiles(
             chartPath,
-            "*.mp4",
+            "*.mov",
             SearchOption.TopDirectoryOnly);
         foreach (var layer in SortingLayer.layers)
         {
@@ -145,7 +145,7 @@ public class HttpHandler : MonoBehaviour
                 {
                     if (int.TryParse(Path.GetFileNameWithoutExtension(file).Split('_')[2], out int sortingOrder))
                     {
-                        var bg_path = Path.Combine(chartPath, "pv_" + layer.name + "_" + sortingOrder + ".mp4");
+                        var bg_path = Path.Combine(chartPath, "pv_" + layer.name + "_" + sortingOrder + ".mov");
                         if (File.Exists(bg_path))
                         {
                             var GOvideo = Instantiate(CustomLayerVideoPrefab);

@@ -156,7 +156,7 @@ public class StarDrop : NoteDrop
         {
             if (!isNoHead)
             {
-                GameObject.Find("NoteEffects").GetComponent<NoteEffectManager>().PlayEffect(startPosition, isBreak);
+                GameObject.Find("NoteEffects").GetComponent<NoteEffectManager>().PlayEffect(startPosition, isBreak, isUnplayable);
                 if (isBreak) ObjectCounter.breakCount++;
                 else ObjectCounter.tapCount++;
             }

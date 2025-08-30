@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using UnityEngine;
 using static UnityEngine.EventSystems.EventTrigger;
 
@@ -68,6 +69,8 @@ public class SlideDrop : NoteLongDrop,IFlasher
 
     public int endPosition;
 
+    public GameObject parentSlide;
+
     private void Start()
     {
         timeProvider = GameObject.Find("AudioTimeProvider").GetComponent<AudioTimeProvider>();        
@@ -91,6 +94,7 @@ public class SlideDrop : NoteLongDrop,IFlasher
 
     }
 
+    bool processed = false;
     // Update is called once per frame
     private void Update()
     {
@@ -121,7 +125,8 @@ public class SlideDrop : NoteLongDrop,IFlasher
         //    }
         //}
 
-        star_slide.SetActive(true);
+        if (star_slide != null)
+            star_slide.SetActive(true); //作为子星星时物体保留但星星去掉，下同
 
         var timing = timeProvider.ScrollDist - timeProvider.GetPositionAtTime(time);
         var realtime = timeProvider.AudioTime - time;
@@ -147,15 +152,22 @@ public class SlideDrop : NoteLongDrop,IFlasher
             }
 
             spriteRenderer_star.color = new Color(1, 1, 1, alpha);
-            star_slide.transform.localScale = new Vector3(alpha + 0.5f, alpha + 0.5f, alpha + 0.5f);
-            star_slide.transform.position = slidePositions[0];
+
+            if (star_slide != null)
+            {
+                star_slide.transform.localScale = new Vector3(alpha + 0.5f, alpha + 0.5f, alpha + 0.5f);
+                star_slide.transform.position = slidePositions[0];
+            }
             applyStarRotation(slideRotations[0]);
         }
 
         if (timing > 0f)
-        {            
-            spriteRenderer_star.color = Color.white;
-            star_slide.transform.localScale = new Vector3(1.5f, 1.5f, 1.5f);
+        {
+            if (star_slide != null)
+            {
+                spriteRenderer_star.color = Color.white;
+                star_slide.transform.localScale = new Vector3(1.5f, 1.5f, 1.5f);
+            }
 
             var lastScroll = timeProvider.GetPositionAtTime(time + LastFor) - timeProvider.GetPositionAtTime(time);
             var process = (lastScroll - timing) / LastFor;
@@ -166,8 +178,15 @@ public class SlideDrop : NoteLongDrop,IFlasher
             {
                 process = realPro;
             }
-            if (process > 1)
-                DestroySelf();
+
+            if (process > 1 && !processed)
+            {
+                if (isUnplayable)
+                    DestroySelfMiss();
+                else 
+                    DestroySelf();
+                processed = true;
+            }
 
             //print(process);
             var pos = (slidePositions.Count - 1) * process;
@@ -193,19 +212,19 @@ public class SlideDrop : NoteLongDrop,IFlasher
             try
             {
                 var lastIndex = (areaStep[areaStep.Count - 1] + areaStep[areaStep.Count - 2]) / 2;
-                if (isGroupPartEnd && !smoothSlideAnime && pos >= lastIndex)
+                if (isGroupPartEnd && !smoothSlideAnime && pos >= lastIndex && !isUnplayable)
                 {
                     var waitTime = LastFor * slideConst / 1.3;
                     if (arriveTime == -1)
                         arriveTime = timeProvider.AudioTime;
-                    else if (timeProvider.AudioTime >= arriveTime +  waitTime)
+                    else if (timeProvider.AudioTime >= arriveTime + waitTime)
                         DestroySelf();
                     else
                         foreach (var bar in slideBars)
                             bar.SetActive(false);
                 }
-                star_slide.transform.position = (slidePositions[index + 1] - slidePositions[index]) * (pos - index) +
-                                                slidePositions[index];
+                if (star_slide != null)
+                    star_slide.transform.position = (slidePositions[index + 1] - slidePositions[index]) * (pos - index) + slidePositions[index];
                 //star_slide.transform.rotation = slideRotations[index];
                 var delta = Mathf.DeltaAngle(slideRotations[index + 1].eulerAngles.z,
                     slideRotations[index].eulerAngles.z) * (pos - index);
@@ -216,7 +235,7 @@ public class SlideDrop : NoteLongDrop,IFlasher
                             slideRotations[index + 1].eulerAngles.z, delta)
                     )
                 );
-                if (realtime > 0f) for (var i = 0; i < slideAreaIndex; i++) slideBars[i].SetActive(false);
+                if (realtime > 0f && !isUnplayable) for (var i = 0; i < slideAreaIndex; i++) slideBars[i].SetActive(false);
             }
             catch
             {
@@ -242,12 +261,48 @@ public class SlideDrop : NoteLongDrop,IFlasher
         }
         else
         {
-            // 如果不是组内最后一个 那么也要将判定条删掉
+            // 如果不是组内最后一个 将判定条删掉
             Destroy(slideOK);
         }
 
         Destroy(star_slide);
         Destroy(gameObject);
+    }
+
+    void DestroySelfMiss()
+    {
+        if (isGroupPartEnd)
+        {
+            Invoke(nameof(waitMiss), 0.6f);
+        }
+        else
+        {
+            // 如果不是组内最后一个 将判定条删掉
+            Destroy(slideOK);
+            Destroy(star_slide);
+        }
+    }
+    void waitMiss()
+    {
+        // 只有组内最后一个Slide完成 才会显示判定条并增加总数
+        if (isBreak)
+            GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>().breakCount++;
+        else
+            GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>().slideCount++;
+
+        CustomSkin customSkin = GameObject.Find("Outline").GetComponent<CustomSkin>();
+        if (slideOK != null)
+        {
+            slideOK.GetComponent<SpriteRenderer>().sprite = customSkin.Miss[customSkin.Just.ToList().IndexOf(slideOK.GetComponent<SpriteRenderer>().sprite)];
+            slideOK.SetActive(true);
+        }
+
+        Destroy(star_slide);
+        Destroy(gameObject);
+    }
+    private void OnDestroy()
+    {
+        Destroy(parentSlide); // 长星星一并销毁
     }
     public bool CanShine() => canShine;
     private void OnEnable()

@@ -16,6 +16,7 @@ public class TouchHoldDrop : NoteLongDrop
     public Sprite[] TouchHoldMineSprite = new Sprite[5];
     public Sprite TouchPointSprite;
     public Sprite TouchPointEachSprite;
+    public Sprite TouchHoldBorderMiss;
 
     public GameObject[] fans;
     public SpriteMask mask;
@@ -57,7 +58,8 @@ public class TouchHoldDrop : NoteLongDrop
 
 
         for (var i = 0; i < 4; i++) fansSprite[i].sprite = TouchHoldSprite[i];
-        fansSprite[5].sprite = TouchHoldSprite[4]; // TouchHold Border
+        if (isUnplayable) fansSprite[5].sprite = TouchHoldBorderMiss;
+        else fansSprite[5].sprite = TouchHoldSprite[4]; // TouchHold Border
 
         if (isEach) fansSprite[4].sprite = TouchPointEachSprite;
         else fansSprite[4].sprite = TouchPointSprite;
@@ -91,13 +93,17 @@ public class TouchHoldDrop : NoteLongDrop
         }
         if (timing > LastFor)
         {
-            Instantiate(tapEffect, transform.position, transform.rotation);
-            GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>().holdCount++;
-            if (isFirework)
+            if (!isUnplayable)
             {
-                fireworkEffect.SetTrigger("Fire");
-                firework.transform.position = transform.position;
+                Instantiate(tapEffect, transform.position, transform.rotation);
+                if (isFirework)
+                {
+                    fireworkEffect.SetTrigger("Fire");
+                    firework.transform.position = transform.position;
+                }
             }
+
+            GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>().holdCount++;
 
             Destroy(holdEffect);
             Destroy(gameObject);
@@ -123,7 +129,7 @@ public class TouchHoldDrop : NoteLongDrop
         }
 
         if (float.IsNaN(distance)) distance = 0f;
-        if (distance == 0f && realDistance == 0f) 
+        if (distance == 0f && realDistance == 0f && !isUnplayable) 
         {
             holdEffect.SetActive(true);
             holdEffect.transform.position = transform.position;

@@ -45,6 +45,7 @@ internal class SimaiNote
     public bool isSlideBreak = false;
     public bool isSlideMute = false;
     public bool isSlideNoHead = false;
+    public bool isUnplayable = false;
     public bool canSVAffect = true;
 
     public string noteContent; //used for star explain
@@ -52,7 +53,6 @@ internal class SimaiNote
 
     public double slideStartTime = 0d;
     public double slideTime = 0d;
-    public double lastSlideTime = 0d;
 
     public int startPosition = 1; //键位（1-8）
     public char touchArea = ' ';

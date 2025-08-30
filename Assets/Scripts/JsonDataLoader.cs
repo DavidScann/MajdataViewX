@@ -272,10 +272,10 @@ public class JsonDataLoader : MonoBehaviour
                         {
                             if (string.IsNullOrEmpty(note.kSkin))
                             {
-                                NDCompo.normalSpr = customSkin.Star;
-                                NDCompo.eachSpr = customSkin.Star_Each;
-                                NDCompo.breakSpr = customSkin.Star_Break;
-                                NDCompo.exSpr = customSkin.Star_Ex;
+                                NDCompo.normalSpr = customSkin.Tap;
+                                NDCompo.breakSpr = customSkin.Tap_Break;
+                                NDCompo.eachSpr = customSkin.Tap_Each;
+                                NDCompo.exSpr = customSkin.Tap_Ex;
                             }
                             else
                             {
@@ -291,6 +291,7 @@ public class JsonDataLoader : MonoBehaviour
                         if (timing.noteList.Count > 1) NDCompo.isEach = true;
                         NDCompo.isBreak = note.isBreak;
                         NDCompo.isEX = note.isEx;
+                        NDCompo.isUnplayable = note.isUnplayable;
                         NDCompo.canSVAffect = note.canSVAffect;
                         NDCompo.time = (float)timing.time;
                         NDCompo.startPosition = note.startPosition;
@@ -315,6 +316,7 @@ public class JsonDataLoader : MonoBehaviour
                             NDCompo.exSpr = customSkin.Hold_Ex;
                             NDCompo.breakSpr = customSkin.Hold_Break;
                             NDCompo.breakHoldOnSpr = customSkin.Hold_Break_On;
+                            NDCompo.holdOffSpr = customSkin.Hold_Off;
                         }
                         else
                         {
@@ -325,6 +327,7 @@ public class JsonDataLoader : MonoBehaviour
                             NDCompo.exSpr = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, note.kSkin.Insert(note.kSkin.Length - 4, "_ex")));
                             NDCompo.breakSpr = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, note.kSkin.Insert(note.kSkin.Length - 4, "_break")));
                             NDCompo.breakHoldOnSpr = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, note.kSkin.Insert(note.kSkin.Length - 4, "_break_on")));
+                            NDCompo.holdOffSpr = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, note.kSkin.Insert(note.kSkin.Length - 4, "_off")));
                         }
 
                         NDCompo.HoldShine = HoldShine;
@@ -337,6 +340,7 @@ public class JsonDataLoader : MonoBehaviour
                         NDCompo.speed = noteSpeed * timing.HSpeed;
                         NDCompo.isEX = note.isEx;
                         NDCompo.isBreak = note.isBreak;
+                        NDCompo.isUnplayable = note.isUnplayable;
                         NDCompo.canSVAffect = note.canSVAffect;
                     }
 
@@ -366,6 +370,7 @@ public class JsonDataLoader : MonoBehaviour
                             Array.Copy(customSkin.TouchHold, NDCompo.TouchHoldSprite, 5);
                             NDCompo.TouchPointSprite = customSkin.TouchPoint;
                             NDCompo.TouchPointEachSprite = customSkin.TouchPoint_Each;
+                            NDCompo.TouchHoldBorderMiss = customSkin.TouchHoldBorderMiss;
                         }
                         else
                         {
@@ -379,7 +384,9 @@ public class JsonDataLoader : MonoBehaviour
                             Array.Copy(touchHold, NDCompo.TouchHoldSprite, 5);
                             NDCompo.TouchPointSprite = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, note.kSkin.Insert(note.kSkin.Length - 4, "_point")));
                             NDCompo.TouchPointEachSprite = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, note.kSkin.Insert(note.kSkin.Length - 4, "_point_each")));
+                            NDCompo.TouchHoldBorderMiss = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, note.kSkin.Insert(note.kSkin.Length - 4, "_border_miss")));
                         }
+                        NDCompo.isUnplayable = note.isUnplayable;
                         NDCompo.canSVAffect = note.canSVAffect;
                     }
 
@@ -423,6 +430,7 @@ public class JsonDataLoader : MonoBehaviour
                             NDCompo.isEach = true;
                         NDCompo.speed = touchSpeed * timing.HSpeed;
                         NDCompo.isFirework = note.isHanabi;
+                        NDCompo.isUnplayable = note.isUnplayable;
                         NDCompo.canSVAffect = note.canSVAffect;
                     }
 
@@ -673,6 +681,7 @@ public class JsonDataLoader : MonoBehaviour
             o.isSlideNoHead = true;
             o.canSVAffect = note.canSVAffect;
             o.kSkin = note.kSkin;
+            o.isUnplayable = note.isUnplayable;
         });
         subSlide[0].isSlideNoHead = note.isSlideNoHead;
         //double wholetime = 0;
@@ -802,6 +811,7 @@ public class JsonDataLoader : MonoBehaviour
         NDCompo.rotateSpeed = (float)note.slideTime;
         NDCompo.isEX = note.isEx;
         NDCompo.isBreak = note.isBreak;
+        NDCompo.isUnplayable = note.isUnplayable;
 
         var slideWifi = Instantiate(slidePrefab[SLIDE_PREFAB_MAP["wifi"]], notes.transform);
         slideWifi.SetActive(false);
@@ -880,6 +890,7 @@ public class JsonDataLoader : MonoBehaviour
         WifiCompo.canSVAffect = note.canSVAffect;
         WifiCompo.isGroupPart = isGroupPart;
         WifiCompo.isGroupPartEnd = isGroupPartEnd;
+        WifiCompo.isUnplayable = note.isUnplayable;
         //WifiCompo.lastSlideTime = note.lastSlideTime;
 
         NDCompo.isNoHead = note.isSlideNoHead;
@@ -899,6 +910,7 @@ public class JsonDataLoader : MonoBehaviour
         slideLayer += 5;
     }
 
+    GameObject lastSlide = null;
     private void InstantiateStar(SimaiTimingPoint timing, SimaiNote note, bool isGroupPart, bool isGroupPartEnd)
     {
         var GOnote = Instantiate(starPrefab, notes.transform);
@@ -938,6 +950,7 @@ public class JsonDataLoader : MonoBehaviour
         NDCompo.rotateSpeed = (float)note.slideTime;
         NDCompo.isEX = note.isEx;
         NDCompo.isBreak = note.isBreak;
+        NDCompo.isUnplayable = note.isUnplayable;
         NDCompo.canSVAffect = note.canSVAffect;
 
         string slideShape = detectShapeFromText(note.noteContent);
@@ -1003,6 +1016,7 @@ public class JsonDataLoader : MonoBehaviour
         }
 
         SliCompo.isBreak = note.isSlideBreak;
+        SliCompo.isUnplayable = note.isUnplayable;
         SliCompo.canSVAffect = note.canSVAffect;
         SliCompo.isGroupPart = isGroupPart;
         SliCompo.isGroupPartEnd = isGroupPartEnd;
@@ -1041,6 +1055,10 @@ public class JsonDataLoader : MonoBehaviour
         //SliCompo.sortIndex = -7000 + (int)((lastNoteTime - timing.time) * -100) + sort * 5;
         SliCompo.sortIndex = slideLayer++;
         slideLayer += 5;
+
+        if (lastSlide != null)
+            lastSlide.GetComponent<SlideDrop>().parentSlide = slide;
+        lastSlide = slide;
     }
 
     private bool detectJustType(string content,out int endPos)

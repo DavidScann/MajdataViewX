@@ -18,6 +18,7 @@ public class HoldDrop : NoteLongDrop
     public Sprite exSpr;
     public Sprite breakSpr;
     public Sprite breakHoldOnSpr;
+    public Sprite holdOffSpr;
 
     public Sprite eachLine;
     public Sprite breakLine;
@@ -143,7 +144,8 @@ public class HoldDrop : NoteLongDrop
         }
         if (holdReal > 0)
         {
-            GameObject.Find("NoteEffects").GetComponent<NoteEffectManager>().PlayEffect(startPosition, isBreak);
+            if (isUnplayable) GameObject.Find("NoteEffects").GetComponent<NoteEffectManager>().PlayEffect(startPosition, isBreak, true);
+            else GameObject.Find("NoteEffects").GetComponent<NoteEffectManager>().PlayEffect(startPosition, isBreak, false);
             if (isBreak)
                 GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>().breakCount++;
             else
@@ -184,7 +186,10 @@ public class HoldDrop : NoteLongDrop
                 holdDistance = 1.225f;
                 distance = 4.8f;
                 //holdEffect.SetActive(true);
-                PlayHoldEffect();
+                if (isUnplayable)
+                    spriteRenderer.sprite = holdOffSpr;
+                else 
+                    PlayHoldEffect();
             }
             else if (holdDistance < 1.225f && distance < 4.8f) // 头未到达 尾未出现
             {
@@ -194,7 +199,10 @@ public class HoldDrop : NoteLongDrop
             {
                 distance = 4.8f;
                 //holdEffect.SetActive(true);
-                PlayHoldEffect();
+                if (isUnplayable)
+                    spriteRenderer.sprite = holdOffSpr;
+                else
+                    PlayHoldEffect();
 
                 holdEndRender.enabled = true;
             }

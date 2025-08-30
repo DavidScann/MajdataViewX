@@ -4,6 +4,7 @@ public class NoteDrop : MonoBehaviour
 {
     public float time;
     public int noteSortOrder;
+    public bool isUnplayable;
 }
 
 public class NoteLongDrop : NoteDrop

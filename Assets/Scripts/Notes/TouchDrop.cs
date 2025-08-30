@@ -84,6 +84,7 @@ public class TouchDrop : NoteDrop
         SetfanColor(new Color(1f, 1f, 1f, 0f));
     }
 
+    bool processed = false;
     // Update is called once per frame
     private void Update()
     {
@@ -103,18 +104,25 @@ public class TouchDrop : NoteDrop
             pow = realPow; 
             distance = realDistance;
         }
-        if (realtime > 0.05f)
+        if (realtime > 0.05f && !processed)
         {
-            multTouchHandler.cancelTouch(this);
-            Instantiate(tapEffect, transform.position, transform.rotation);
             GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>().touchCount++;
-            if (isFirework)
+            if (isUnplayable)
             {
-                fireworkEffect.SetTrigger("Fire");
-                firework.transform.position = transform.position;
+                Destroy(gameObject, 0.316667f);
             }
-
-            Destroy(gameObject);
+            else
+            {
+                multTouchHandler.cancelTouch(this);
+                Instantiate(tapEffect, transform.position, transform.rotation);
+                if (isFirework)
+                {
+                    fireworkEffect.SetTrigger("Fire");
+                    firework.transform.position = transform.position;
+                }
+                Destroy(gameObject);
+            }
+            processed = true;
         }
         else if(timing > 0.05f)
         {

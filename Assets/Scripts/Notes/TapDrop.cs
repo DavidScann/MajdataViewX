@@ -121,7 +121,8 @@ public class TapDrop : NoteDrop
 
         if (realtime > 0)
         {
-            GameObject.Find("NoteEffects").GetComponent<NoteEffectManager>().PlayEffect(startPosition, isBreak);
+            if (isUnplayable) GameObject.Find("NoteEffects").GetComponent<NoteEffectManager>().PlayEffect(startPosition, isBreak, true);
+            else GameObject.Find("NoteEffects").GetComponent<NoteEffectManager>().PlayEffect(startPosition, isBreak, false);
             if (isBreak) ObjectCounter.breakCount++;
             else ObjectCounter.tapCount++;
 
