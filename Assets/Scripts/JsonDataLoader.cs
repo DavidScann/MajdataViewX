@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+﻿using Assets.Scripts.Notes;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -18,6 +19,7 @@ public class JsonDataLoader : MonoBehaviour
     public GameObject starPrefab;
     public GameObject touchHoldPrefab;
     public GameObject touchPrefab;
+    public GameObject cmdPrefab;
     public GameObject eachLine;
     public GameObject starLine;
     public GameObject notes;
@@ -297,8 +299,7 @@ public class JsonDataLoader : MonoBehaviour
                         NDCompo.startPosition = note.startPosition;
                         NDCompo.speed = noteSpeed * timing.HSpeed;
                     }
-
-                    if (note.noteType == SimaiNoteType.Hold)
+                    else if (note.noteType == SimaiNoteType.Hold)
                     {
                         var GOnote = Instantiate(holdPrefab, notes.transform);
                         var NDCompo = GOnote.GetComponent<HoldDrop>();
@@ -343,8 +344,7 @@ public class JsonDataLoader : MonoBehaviour
                         NDCompo.isUnplayable = note.isUnplayable;
                         NDCompo.canSVAffect = note.canSVAffect;
                     }
-
-                    if (note.noteType == SimaiNoteType.TouchHold)
+                    else if (note.noteType == SimaiNoteType.TouchHold)
                     {
                         var GOnote = Instantiate(touchHoldPrefab, notes.transform);
                         var NDCompo = GOnote.GetComponent<TouchHoldDrop>();
@@ -389,8 +389,7 @@ public class JsonDataLoader : MonoBehaviour
                         NDCompo.isUnplayable = note.isUnplayable;
                         NDCompo.canSVAffect = note.canSVAffect;
                     }
-
-                    if (note.noteType == SimaiNoteType.Touch)
+                    else if (note.noteType == SimaiNoteType.Touch)
                     {
                         var GOnote = Instantiate(touchPrefab, notes.transform);
                         var NDCompo = GOnote.GetComponent<TouchDrop>();
@@ -433,13 +432,50 @@ public class JsonDataLoader : MonoBehaviour
                         NDCompo.isUnplayable = note.isUnplayable;
                         NDCompo.canSVAffect = note.canSVAffect;
                     }
-
-                    if (note.noteType == SimaiNoteType.Slide)
+                    else if (note.noteType == SimaiNoteType.Slide)
                     {
                         string kPattern = @"k""([^""]+\.png)""(?:'([^']+\.wav)')?|k'([^']+\.wav)'"; // k"*.png" or k'*.wav' or k"*.png"'*.wav'
                         note.noteContent = Regex.Replace(note.noteContent, kPattern, "");
                         InstantiateStarGroup(timing, note, i, lastNoteTime); // 星星组
-                    } 
+                    }
+                    else if (note.noteType == SimaiNoteType.NoneOrCmd)
+                    {
+                        string[] cmd = note.noteContent[2..].ToLower().Split('.');
+                        if (cmd[0] == "data")
+                        {
+                            var GOnote = Instantiate(cmdPrefab);
+                            var NDCompo = GOnote.GetComponent<CmdDrop>();
+                            NDCompo.time = (float)timing.time;
+                            if (cmd.Length > 2 && int.TryParse(cmd[2], out int result))
+                                NDCompo.times = result;
+                            else NDCompo.times = 1;
+                            ObjectCounter oc = GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>();
+                            switch (cmd[1])
+                            {
+                                case "tap":
+                                    NDCompo.Handler = () => { oc.tapCount++; };
+                                    break;
+                                case "hod":
+                                case "hold":
+                                    NDCompo.Handler = () => { oc.holdCount++; };
+                                    break;
+                                case "sld":
+                                case "slide":
+                                    NDCompo.Handler = () => { oc.slideCount++; };
+                                    break;
+                                case "toh":
+                                case "touch":
+                                    NDCompo.Handler = () => { oc.touchCount++; };
+                                    break;
+                                case "brk":
+                                case "break":
+                                    NDCompo.Handler = () => { oc.breakCount++; };
+                                    break;
+                                default:
+                                    break;
+                            }
+                        }
+                    }
                 }
 
                 var eachNotes = timing.noteList.FindAll(o =>

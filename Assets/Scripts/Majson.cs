@@ -30,7 +30,8 @@ internal enum SimaiNoteType
     Slide,
     Hold,
     Touch,
-    TouchHold
+    TouchHold,
+    NoneOrCmd
 }
 
 internal class SimaiNote
