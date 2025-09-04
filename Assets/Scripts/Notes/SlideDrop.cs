@@ -71,9 +71,12 @@ public class SlideDrop : NoteLongDrop,IFlasher
 
     public GameObject parentSlide;
 
+    private ObjectCounter ObjectCounter;
+
     private void Start()
     {
-        timeProvider = GameObject.Find("AudioTimeProvider").GetComponent<AudioTimeProvider>();        
+        timeProvider = GameObject.Find("AudioTimeProvider").GetComponent<AudioTimeProvider>();
+        ObjectCounter = GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>();
         // 计算Slide淡入时机
         // 在8.0速时应当提前300ms显示Slide
         fadeInTime = -3.926913f / speed ;
@@ -90,8 +93,6 @@ public class SlideDrop : NoteLongDrop,IFlasher
             slideBars.Last().transform
             .rotation
             .eulerAngles + new Vector3(0f, 0f, 18f)));
-
-
     }
 
     bool processed = false;
@@ -254,9 +255,10 @@ public class SlideDrop : NoteLongDrop,IFlasher
         {
             // 只有组内最后一个Slide完成 才会显示判定条并增加总数
             if (isBreak)
-                GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>().breakCount++;
+                ObjectCounter.breakCount++;
             else
-                GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>().slideCount++;
+                ObjectCounter.slideCount++;
+            ObjectCounter.cpSum++;
             slideOK.SetActive(true);
         }
         else
@@ -286,9 +288,10 @@ public class SlideDrop : NoteLongDrop,IFlasher
     {
         // 只有组内最后一个Slide完成 才会显示判定条并增加总数
         if (isBreak)
-            GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>().breakCount++;
+            ObjectCounter.breakCount++;
         else
-            GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>().slideCount++;
+            ObjectCounter.slideCount++;
+        ObjectCounter.missSum++;
 
         CustomSkin customSkin = GameObject.Find("Outline").GetComponent<CustomSkin>();
         if (slideOK != null)

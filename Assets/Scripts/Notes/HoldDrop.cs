@@ -50,6 +50,8 @@ public class HoldDrop : NoteLongDrop
 
     private AudioTimeProvider timeProvider;
 
+    private ObjectCounter ObjectCounter;
+
     private void Start()
     {
         var notes = GameObject.Find("Notes").transform;
@@ -64,6 +66,7 @@ public class HoldDrop : NoteLongDrop
 
         timeProvider = GameObject.Find("AudioTimeProvider").GetComponent<AudioTimeProvider>();
         spriteRenderer = GetComponent<SpriteRenderer>();
+        ObjectCounter = GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>();
 
         holdEndRender = transform.GetChild(1).GetComponent<SpriteRenderer>();
 
@@ -144,12 +147,22 @@ public class HoldDrop : NoteLongDrop
         }
         if (holdReal > 0)
         {
-            if (isUnplayable) GameObject.Find("NoteEffects").GetComponent<NoteEffectManager>().PlayEffect(startPosition, isBreak, true);
-            else GameObject.Find("NoteEffects").GetComponent<NoteEffectManager>().PlayEffect(startPosition, isBreak, false);
-            if (isBreak)
-                GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>().breakCount++;
+            if (isUnplayable)
+            {
+                GameObject.Find("NoteEffects").GetComponent<NoteEffectManager>().PlayEffect(startPosition, isBreak, true);
+                ObjectCounter.missSum++;
+            }
             else
-                GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>().holdCount++;
+            {
+                GameObject.Find("NoteEffects").GetComponent<NoteEffectManager>().PlayEffect(startPosition, isBreak, false);
+                ObjectCounter.cpSum++;
+            }
+            if (isBreak)
+                ObjectCounter.breakCount++;
+            else
+                ObjectCounter.holdCount++;
+
+
             Destroy(tapLine);
             Destroy(holdEffect);
             Destroy(gameObject);

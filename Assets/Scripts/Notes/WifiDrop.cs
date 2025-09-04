@@ -67,6 +67,8 @@ public class WifiDrop : NoteLongDrop,IFlasher
 
     private AudioTimeProvider timeProvider;
 
+    private ObjectCounter ObjectCounter;
+
     private void Start()
     {
         // 计算Slide淡入时机
@@ -81,6 +83,7 @@ public class WifiDrop : NoteLongDrop,IFlasher
         fadeInAnimator.SetTrigger("wifi");
 
         timeProvider = GameObject.Find("AudioTimeProvider").GetComponent<AudioTimeProvider>();
+        ObjectCounter = GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>();
         var notes = GameObject.Find("Notes").transform;
         for (var i = 0; i < star_slide.Length; i++)
         {
@@ -281,9 +284,10 @@ public class WifiDrop : NoteLongDrop,IFlasher
     void waitMiss()
     {
         if (isBreak)
-            GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>().breakCount++;
+            ObjectCounter.breakCount++;
         else
-            GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>().slideCount++;
+            ObjectCounter.slideCount++;
+        ObjectCounter.missSum++;
 
         CustomSkin customSkin = GameObject.Find("Outline").GetComponent<CustomSkin>();
         if (slideOK != null)
@@ -308,9 +312,10 @@ public class WifiDrop : NoteLongDrop,IFlasher
         if (isGroupPartEnd)
         {
             if (isBreak)
-                GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>().breakCount++;
+                ObjectCounter.breakCount++;
             else
-                GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>().slideCount++;
+                ObjectCounter.slideCount++;
+            ObjectCounter.cpSum++;
             slideOK.SetActive(true);
         }
 

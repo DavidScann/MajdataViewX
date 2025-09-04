@@ -223,6 +223,7 @@ public class JsonDataLoader : MonoBehaviour
         CountNoteSum(loadedData);
 
         var lastNoteTime = loadedData.timingList.Last().time;
+        float lastBPM = 0;
 
         foreach (var timing in loadedData.timingList)
             try
@@ -237,6 +238,18 @@ public class JsonDataLoader : MonoBehaviour
                 {
                     CountNoteCount(timing.noteList);
                     continue;
+                }
+                if (timing.currentBpm != lastBPM)
+                {
+                    var GOnote = Instantiate(cmdPrefab);
+                    var NDCompo = GOnote.GetComponent<CmdDrop>();
+                    NDCompo.time = (float)timing.time;
+                    NDCompo.times = 1;
+                    NDCompo.Handler = () =>
+                    {
+                        GameObject.Find("objBPM").GetComponent<Text>().text = Math.Truncate(timing.currentBpm).ToString();
+                    };
+                    lastBPM = timing.currentBpm;
                 }
 
                 for (var i = 0; i < timing.noteList.Count; i++)
@@ -449,6 +462,7 @@ public class JsonDataLoader : MonoBehaviour
                             if (cmd.Length > 2 && int.TryParse(cmd[2], out int result))
                                 NDCompo.times = result;
                             else NDCompo.times = 1;
+
                             ObjectCounter oc = GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>();
                             switch (cmd[1])
                             {
@@ -473,6 +487,29 @@ public class JsonDataLoader : MonoBehaviour
                                     break;
                                 default:
                                     break;
+                            }
+                        }
+                        else if (cmd[0] == "ui")
+                        {
+                            var GOnote = Instantiate(cmdPrefab);
+                            var NDCompo = GOnote.GetComponent<CmdDrop>();
+                            NDCompo.time = (float)timing.time;
+
+                            if (cmd[1] == "bpmrange")
+                            {
+                                NDCompo.times = 1;
+                                NDCompo.Handler = () =>
+                                {
+                                    GameObject.Find("objBPMRange").GetComponent<Text>().text = $"{cmd[2]} - {cmd[3]}";
+                                };
+                            }
+                            else if (cmd[1] == "meter")
+                            {
+                                NDCompo.times = 1;
+                                NDCompo.Handler = () =>
+                                {
+                                    GameObject.Find("objMeter").GetComponent<Text>().text = $"{cmd[2]}\n{cmd[3]}";
+                                };
                             }
                         }
                     }
@@ -796,7 +833,10 @@ public class JsonDataLoader : MonoBehaviour
             if (note.noteContent.Contains('w')) //wifi
                 InstantiateWifi(timing, subSlide[i], i != 0, i == subSlide.Count - 1);
             else
-                InstantiateStar(timing, subSlide[i], i != 0, i == subSlide.Count - 1);
+            {
+                GameObject lastSlide = null;
+                InstantiateStar(timing, subSlide[i], i != 0, i == subSlide.Count - 1, ref lastSlide);
+            }
     }
 
     private void InstantiateWifi(SimaiTimingPoint timing, SimaiNote note, bool isGroupPart, bool isGroupPartEnd)
@@ -946,8 +986,7 @@ public class JsonDataLoader : MonoBehaviour
         slideLayer += 5;
     }
 
-    GameObject lastSlide = null;
-    private void InstantiateStar(SimaiTimingPoint timing, SimaiNote note, bool isGroupPart, bool isGroupPartEnd)
+    private void InstantiateStar(SimaiTimingPoint timing, SimaiNote note, bool isGroupPart, bool isGroupPartEnd, ref GameObject lastSlide)
     {
         var GOnote = Instantiate(starPrefab, notes.transform);
         var NDCompo = GOnote.GetComponent<StarDrop>();

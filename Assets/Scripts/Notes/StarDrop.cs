@@ -159,6 +159,8 @@ public class StarDrop : NoteDrop
                 GameObject.Find("NoteEffects").GetComponent<NoteEffectManager>().PlayEffect(startPosition, isBreak, isUnplayable);
                 if (isBreak) ObjectCounter.breakCount++;
                 else ObjectCounter.tapCount++;
+                if (isUnplayable) ObjectCounter.missSum++;
+                else ObjectCounter.cpSum++;
             }
 
             Destroy(tapLine);
@@ -182,7 +184,7 @@ public class StarDrop : NoteDrop
         }
         else
         {
-            if (!slide.activeSelf && realDistance > 1.225f) slide.SetActive(true);
+            if (slide != null && !slide.activeSelf && realDistance > 1.225f) slide.SetActive(true);
             var pos = getPositionFromDistance(distance);
             transform.position = pos;
             transform.localScale = new Vector3(1f, 1f);

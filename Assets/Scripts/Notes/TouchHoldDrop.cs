@@ -28,6 +28,7 @@ public class TouchHoldDrop : NoteLongDrop
     private float moveDuration;
 
     private AudioTimeProvider timeProvider;
+    private ObjectCounter ObjectCounter;
 
     private float wholeDuration;
 
@@ -46,6 +47,7 @@ public class TouchHoldDrop : NoteLongDrop
         holdEffect.SetActive(false);
 
         timeProvider = GameObject.Find("AudioTimeProvider").GetComponent<AudioTimeProvider>();
+        ObjectCounter = GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>();
 
         firework = GameObject.Find("FireworkEffect");
         fireworkEffect = firework.GetComponent<Animator>();
@@ -101,9 +103,11 @@ public class TouchHoldDrop : NoteLongDrop
                     fireworkEffect.SetTrigger("Fire");
                     firework.transform.position = transform.position;
                 }
+                ObjectCounter.cpSum++;
             }
+            else ObjectCounter.missSum++;
 
-            GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>().holdCount++;
+            ObjectCounter.holdCount++;
 
             Destroy(holdEffect);
             Destroy(gameObject);

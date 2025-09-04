@@ -1,4 +1,5 @@
 ﻿using System;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -21,21 +22,28 @@ public class ObjectCounter : MonoBehaviour
     public int touchSum;
     public int breakSum;
 
-    private Text rate;
-    private Text statusAchievement;
+    public int cpSum;
+    public int missSum;
 
+    private Text table;
+    private Text judgement;
+    private TextMeshProUGUI rate;
+    private Text combo;
+
+    private Text statusAchievement;
     private Text statusCombo;
     private Text statusDXScore;
     private Text statusScore;
-    private Text table;
 
     private EditorComboIndicator textMode = EditorComboIndicator.Combo;
 
     // Start is called before the first frame update
     private void Start()
     {
-        table = GameObject.Find("ObjectCount").GetComponent<Text>();
-        rate = GameObject.Find("ObjectRate").GetComponent<Text>();
+        table = GameObject.Find("objCount").GetComponent<Text>();
+        rate = GameObject.Find("MobjRate").GetComponent<TextMeshProUGUI>();
+        combo = GameObject.Find("objCombo").GetComponent<Text>();
+        judgement = GameObject.Find("objJudgement").GetComponent<Text>();
 
         statusCombo = GameObject.Find("ComboText").GetComponent<Text>();
         statusScore = GameObject.Find("ScoreText").GetComponent<Text>();
@@ -120,26 +128,28 @@ public class ObjectCounter : MonoBehaviour
         var comboN = tapCount + holdCount + slideCount + touchCount + breakCount;
 
         table.text = string.Format(
-            "TAP: {0} / {5}\n" +
-            "HOD: {1} / {6}\n" +
-            "SLD: {2} / {7}\n" +
-            "TOH: {3} / {8}\n" +
-            "BRK: {4} / {9}\n" +
-            "ALL: {10} / {11}",
+            "{0} / {5}\n" +
+            "{1} / {6}\n" +
+            "{2} / {7}\n" +
+            "{3} / {8}\n" +
+            "{4} / {9}\n" +
+            "{10} / {11}",
             tapCount, holdCount, slideCount, touchCount, breakCount,
             tapSum, holdSum, slideSum, touchSum, breakSum,
             comboN,
             tapSum + holdSum + slideSum + touchSum + breakSum
         );
 
+        var rateValue = Math.Truncate(((float)DxNowScore() / DxSumScore() * 100 + BreakRate()) * 10000) / 10000;
         rate.text = string.Format(
-            "FiNALE  Rate:\n" +
-            "{0:000.00}   %\n" +
-            "DELUXE Rate:\n" +
-            "{1:000.0000} % ",
-            Math.Truncate((float)FiNowScore() / FiSumScore() * 10000) / 100,
-            Math.Truncate(((float)DxNowScore() / DxSumScore() * 100 + BreakRate()) * 10000) / 10000
+            "<size=7.5>{0}</size>.{1:D4} <size=3>%</size>",
+            Math.Truncate(rateValue),
+            (int)((rateValue - Math.Truncate(rateValue)) * 1000)
         );
+
+        combo.text = (tapCount + holdCount + slideCount + touchCount + breakCount).ToString();
+
+        judgement.text = $"{cpSum}\n0\n0\n0\n{missSum}";
     }
 
     private void UpdateState()

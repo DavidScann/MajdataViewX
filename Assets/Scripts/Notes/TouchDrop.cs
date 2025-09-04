@@ -41,6 +41,8 @@ public class TouchDrop : NoteDrop
 
     private AudioTimeProvider timeProvider;
 
+    private ObjectCounter ObjectCounter;
+
     private float wholeDuration;
 
     // Start is called before the first frame update
@@ -53,6 +55,7 @@ public class TouchDrop : NoteDrop
         var notes = GameObject.Find("Notes").transform;
         timeProvider = GameObject.Find("AudioTimeProvider").GetComponent<AudioTimeProvider>();
         multTouchHandler = GameObject.Find("MultTouchHandler").GetComponent<MultTouchHandler>();
+        ObjectCounter = GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>();
 
         firework = GameObject.Find("FireworkEffect");
         fireworkEffect = firework.GetComponent<Animator>();
@@ -106,13 +109,16 @@ public class TouchDrop : NoteDrop
         }
         if (realtime > 0.05f && !processed)
         {
-            GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>().touchCount++;
+            ObjectCounter.touchCount++;
+            
             if (isUnplayable)
             {
+                ObjectCounter.missSum++;
                 Destroy(gameObject, 0.316667f);
             }
             else
             {
+                ObjectCounter.cpSum++;
                 multTouchHandler.cancelTouch(this);
                 Instantiate(tapEffect, transform.position, transform.rotation);
                 if (isFirework)
