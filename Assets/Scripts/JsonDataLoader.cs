@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -508,7 +509,7 @@ public class JsonDataLoader : MonoBehaviour
                                 NDCompo.times = 1;
                                 NDCompo.Handler = () =>
                                 {
-                                    GameObject.Find("objMeter").GetComponent<Text>().text = $"{cmd[2]}\n{cmd[3]}";
+                                    GameObject.Find("objMeter").GetComponent<TextMeshProUGUI>().text = $"{cmd[2]}\n{cmd[3]}";
                                 };
                             }
                         }

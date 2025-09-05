@@ -25,8 +25,8 @@ public class ObjectCounter : MonoBehaviour
     public int cpSum;
     public int missSum;
 
-    private Text table;
-    private Text judgement;
+    TextMeshProUGUI[] counts = new TextMeshProUGUI[6];
+    TextMeshProUGUI[] judgement = new TextMeshProUGUI[2];
     private TextMeshProUGUI rate;
     private Text combo;
 
@@ -40,10 +40,10 @@ public class ObjectCounter : MonoBehaviour
     // Start is called before the first frame update
     private void Start()
     {
-        table = GameObject.Find("objCount").GetComponent<Text>();
-        rate = GameObject.Find("MobjRate").GetComponent<TextMeshProUGUI>();
+        counts = GameObject.Find("objCount").GetComponentsInChildren<TextMeshProUGUI>();
+        rate = GameObject.Find("objRate").GetComponent<TextMeshProUGUI>();
         combo = GameObject.Find("objCombo").GetComponent<Text>();
-        judgement = GameObject.Find("objJudgement").GetComponent<Text>();
+        judgement = GameObject.Find("objJudgement").GetComponentsInChildren<TextMeshProUGUI>();
 
         statusCombo = GameObject.Find("ComboText").GetComponent<Text>();
         statusScore = GameObject.Find("ScoreText").GetComponent<Text>();
@@ -127,18 +127,13 @@ public class ObjectCounter : MonoBehaviour
     {
         var comboN = tapCount + holdCount + slideCount + touchCount + breakCount;
 
-        table.text = string.Format(
-            "{0} / {5}\n" +
-            "{1} / {6}\n" +
-            "{2} / {7}\n" +
-            "{3} / {8}\n" +
-            "{4} / {9}\n" +
-            "{10} / {11}",
-            tapCount, holdCount, slideCount, touchCount, breakCount,
-            tapSum, holdSum, slideSum, touchSum, breakSum,
-            comboN,
-            tapSum + holdSum + slideSum + touchSum + breakSum
-        );
+        counts[0].text = $"{tapCount} / {tapSum}";
+        counts[1].text = $"{holdCount} / {holdSum}";
+        counts[2].text = $"{slideCount} / {slideSum}";
+        counts[3].text = $"{touchCount} / {touchSum}";
+        counts[4].text = $"{breakCount} / {breakSum}";
+        counts[5].text = $"{comboN} / {tapSum + holdSum + slideSum + touchSum + breakSum}";
+
 
         var rateValue = Math.Truncate(((float)DxNowScore() / DxSumScore() * 100 + BreakRate()) * 10000) / 10000;
         rate.text = string.Format(
@@ -149,7 +144,9 @@ public class ObjectCounter : MonoBehaviour
 
         combo.text = (tapCount + holdCount + slideCount + touchCount + breakCount).ToString();
 
-        judgement.text = $"{cpSum}\n0\n0\n0\n{missSum}";
+        //第一个是三个0
+        judgement[1].text = cpSum.ToString();
+        judgement[2].text = missSum.ToString();
     }
 
     private void UpdateState()
