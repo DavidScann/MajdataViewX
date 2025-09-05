@@ -1035,7 +1035,7 @@ public class JsonDataLoader : MonoBehaviour
             {
                 SliCompo.isEach = true;
                 slide_star.GetComponent<SpriteRenderer>().sprite = string.IsNullOrEmpty(note.kSkin) ?
-            customSkin.Star : SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, note.kSkin.Insert(note.kSkin.Length - 4, "_each")));
+            customSkin.Star_Each : SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, note.kSkin.Insert(note.kSkin.Length - 4, "_each")));
             }
 
             var count = timing.noteList.FindAll(//找同头的
@@ -1058,7 +1058,7 @@ public class JsonDataLoader : MonoBehaviour
         SliCompo.isGroupPartEnd = isGroupPartEnd;
         //SliCompo.lastSlideTime = note.lastSlideTime;
         if (note.isSlideBreak) slide_star.GetComponent<SpriteRenderer>().sprite = string.IsNullOrEmpty(note.kSkin) ?
-            customSkin.Star : SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, note.kSkin.Insert(note.kSkin.Length - 4, "_break")));
+            customSkin.Star_Break : SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, note.kSkin.Insert(note.kSkin.Length - 4, "_break")));
 
         NDCompo.isNoHead = note.isSlideNoHead;
         NDCompo.time = (float)timing.time;
