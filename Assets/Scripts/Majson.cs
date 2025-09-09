@@ -9,6 +9,7 @@ internal class Majson
     public string level = "1";
     public List<SimaiTimingPoint> timingList = new();
     public string title = "default";
+    public ChartMode mode = ChartMode.Deluxe;
 }
 
 internal class SimaiTimingPoint
@@ -22,6 +23,12 @@ internal class SimaiTimingPoint
     public int rawTextPositionX;
     public int rawTextPositionY;
     public double time;
+}
+
+public enum ChartMode
+{
+    Standard,
+    Deluxe
 }
 
 internal enum SimaiNoteType

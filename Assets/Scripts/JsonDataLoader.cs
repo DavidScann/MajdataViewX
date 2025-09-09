@@ -4,9 +4,11 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
 using TMPro;
 using UnityEngine;
+using UnityEngine.TextCore.Text;
 using UnityEngine.UI;
 
 public class JsonDataLoader : MonoBehaviour
@@ -37,7 +39,24 @@ public class JsonDataLoader : MonoBehaviour
     public Text artistText;
     public Text designText;
     public RawImage cardImage;
+
     public Color[] diffColors = new Color[7];
+
+    public TextMeshProUGUI levelTextM;
+    public Text titleTextM;
+    public Text artistTextM;
+    public Text designTextM;
+    public Text bpmTextM;
+    public SpriteRenderer cardImageM;
+    public SpriteRenderer LvBackgroundM;
+    public SpriteRenderer TabM;
+    public GameObject[] Modes = new GameObject[2];
+
+    public Sprite[] cardImagesM = new Sprite[8];
+    public Sprite[] LvBackgroundsM = new Sprite[8];
+    public Sprite[] TabsM = new Sprite[8];
+    public Texture2D[] MLevelsM = new Texture2D[8];
+
     private CustomSkin customSkin;
     private AudioTimeProvider timeProvider;
 
@@ -214,12 +233,56 @@ public class JsonDataLoader : MonoBehaviour
     {
         var loadedData = JsonConvert.DeserializeObject<Majson>(json);
 
+        //旧
         diffText.text = loadedData.difficulty;
         levelText.text = loadedData.level;
         titleText.text = loadedData.title;
         artistText.text = loadedData.artist;
         designText.text = loadedData.designer;
         cardImage.color = diffColors[loadedData.diffNum];
+
+        //新：乌蒙的UI
+        levelTextM.spriteAsset.spriteSheet = MLevelsM[loadedData.diffNum];
+        levelTextM.spriteAsset.material.SetTexture("_MainTex", MLevelsM[loadedData.diffNum]);
+        //levelTextM.spriteAsset.UpdateLookupTables();
+        //levelTextM.ForceMeshUpdate();
+        StringBuilder sb = new("<sprite=14>");
+        foreach (var item in loadedData.level)
+        {
+            if (int.TryParse(item.ToString(), out int lv))
+                sb.Append($"<sprite={lv}>");
+            else
+            {
+                switch (item)
+                {
+                    case '+':
+                        sb.Append("<sprite=10>");
+                        break;
+                    case '-':
+                        sb.Append("<sprite=11>");
+                        break;
+                    case ',':
+                        sb.Append("<sprite=12>");
+                        break;
+                    case '.':
+                        sb.Append("<sprite=13>");
+                        break;
+                }
+            }
+        }
+        levelTextM.text = sb.ToString();
+        
+
+
+        titleTextM.text = loadedData.title;
+        artistTextM.text = loadedData.artist;
+        designTextM.text = loadedData.designer;
+        //bpmTextMS.text
+        cardImageM.sprite = cardImagesM[loadedData.diffNum];
+        LvBackgroundM.sprite = LvBackgroundsM[loadedData.diffNum];
+        TabM.sprite = TabsM[loadedData.diffNum];
+        Modes[0].SetActive(loadedData.mode == ChartMode.Standard);
+        Modes[1].SetActive(loadedData.mode == ChartMode.Deluxe);
 
         CountNoteSum(loadedData);
 

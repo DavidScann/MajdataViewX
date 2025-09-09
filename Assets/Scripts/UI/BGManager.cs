@@ -10,10 +10,12 @@ public class BGManager : MonoBehaviour
     private AudioTimeProvider provider;
 
     private RawImage rawImage;
+    private SpriteRenderer rawImageM;
 
     // Update is called once per frame
     private float smoothRDelta;
     private GameObject SongDetail;
+    private GameObject SongDetailM;
     private SpriteRenderer spriteRender;
 
     private VideoPlayer videoPlayer;
@@ -26,9 +28,12 @@ public class BGManager : MonoBehaviour
         spriteRender = GetComponent<SpriteRenderer>();
         videoPlayer = GetComponent<VideoPlayer>();
         rawImage = GameObject.Find("Jacket").GetComponent<RawImage>();
+        rawImageM = GameObject.Find("JacketM").GetComponent<SpriteRenderer>();
         provider = GameObject.Find("AudioTimeProvider").GetComponent<AudioTimeProvider>();
         SongDetail = GameObject.Find("CanvasSongDetail");
+        SongDetailM = GameObject.Find("CanvasSongDetailMaimai");
         SongDetail.SetActive(false);
+        SongDetailM.SetActive(false);
     }
 
     private void Update()
@@ -56,7 +61,7 @@ public class BGManager : MonoBehaviour
 
     public void PlaySongDetail()
     {
-        SongDetail.SetActive(true);
+        SongDetailM.SetActive(true);
     }
 
     public void PauseVideo()
@@ -74,39 +79,37 @@ public class BGManager : MonoBehaviour
 
     public void LoadBGFromPath(string path, float speed)
     {
-        var pictureName = new[] { "Cover", "bg" };
+        var pictureName = "bg";
+        var pictureNameM = "bgM";
         var pictureExt = new[] { ".png", ".jpg", ".jpeg" };
 
-        var videoName = new[] { "pv.mp4", "mv.mp4", "bg.mp4" };
-
-        foreach (var name in pictureName)
+        var videoName = "pv.mp4";
+        foreach (var ext in pictureExt)
         {
-            var finished = false;
-            foreach (var ext in pictureExt)
-                if (File.Exists(path + "/" + name + ext))
-                {
-                    StartCoroutine(loadPic(path + "/" + name + ext));
-                    finished = true;
-                    break;
-                }
-
-            if (finished) break;
+            if (File.Exists(path + "/" + pictureName + ext))
+            {
+                StartCoroutine(loadPic(path + "/" + pictureName + ext));
+                break;
+            }
+            else if (File.Exists(path + "/" + pictureNameM + ext))
+            {
+                StartCoroutine(loadPic(path + "/" + pictureNameM + ext, true));
+                break;
+            }
         }
 
-        foreach (var name in videoName)
-        {
-            if (!File.Exists(path + "/" + name)) continue;
-            
-            loadVideo(path + "/" + name, speed);
-            break;
-        }
+        if (File.Exists(path + "/" + videoName)) loadVideo(path + "/" + videoName, speed);
     }
 
-    private IEnumerator loadPic(string path)
+    private IEnumerator loadPic(string path, bool isMaimai = false)
     {
         Sprite sprite;
         yield return sprite = SpriteLoader.LoadSpriteFromFile(path);
-        rawImage.texture = sprite.texture;
+        if (isMaimai)
+        {
+            rawImageM.sprite = sprite;
+        }
+        else rawImage.texture = sprite.texture;
         spriteRender.sprite = sprite;
         var scale = 1080f / sprite.texture.width;
         gameObject.transform.localScale = new Vector3(scale, scale, scale);
