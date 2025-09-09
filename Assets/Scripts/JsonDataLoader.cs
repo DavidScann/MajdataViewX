@@ -517,7 +517,7 @@ public class JsonDataLoader : MonoBehaviour
                     }
                     else if (note.noteType == SimaiNoteType.NoneOrCmd)
                     {
-                        string[] cmd = note.noteContent[2..].ToLower().Split('.');
+                        string[] cmd = note.noteContent[2..].Split('.');
                         if (cmd[0] == "data")
                         {
                             var GOnote = Instantiate(cmdPrefab);

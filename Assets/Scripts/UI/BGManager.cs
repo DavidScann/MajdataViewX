@@ -6,6 +6,8 @@ using UnityEngine.Video;
 
 public class BGManager : MonoBehaviour
 {
+    public bool isMaimai;
+
     private float playSpeed;
     private AudioTimeProvider provider;
 
@@ -34,6 +36,7 @@ public class BGManager : MonoBehaviour
         SongDetailM = GameObject.Find("CanvasSongDetailMaimai");
         SongDetail.SetActive(false);
         SongDetailM.SetActive(false);
+        isMaimai = false;
     }
 
     private void Update()
@@ -61,7 +64,8 @@ public class BGManager : MonoBehaviour
 
     public void PlaySongDetail()
     {
-        SongDetailM.SetActive(true);
+        if (isMaimai) SongDetailM.SetActive(true);
+        else SongDetail.SetActive(true);
     }
 
     public void PauseVideo()
@@ -93,6 +97,7 @@ public class BGManager : MonoBehaviour
             }
             else if (File.Exists(path + "/" + pictureNameM + ext))
             {
+                isMaimai = true;
                 StartCoroutine(loadPic(path + "/" + pictureNameM + ext, true));
                 break;
             }
