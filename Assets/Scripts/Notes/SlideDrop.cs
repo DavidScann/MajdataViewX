@@ -82,10 +82,11 @@ public class SlideDrop : NoteLongDrop,IFlasher
         fadeInTime = -3.926913f / speed ;
         // Slide完全淡入时机
         // 正常情况下应为负值；速度过高将忽略淡入
-        fullFadeInTime = Math.Min(fadeInTime + 0.2f,0);
-        var interval = fullFadeInTime - fadeInTime;
+        //fullFadeInTime = Math.Min(fadeInTime + 0.2f,0);
+        //var interval = fullFadeInTime - fadeInTime;
         fadeInAnimator = this.GetComponent<Animator>();
-        fadeInAnimator.speed = 0.2f / interval; //淡入时机与正解帧间隔小于200ms时，加快淡入动画的播放速度; interval永不为0
+        //fadeInAnimator.speed = 0.2f / interval; //淡入时机与正解帧间隔小于200ms时，加快淡入动画的播放速度; interval永不为0
+        fadeInAnimator.speed = 1f / Math.Abs(fadeInTime); //431旧版效果
         fadeInAnimator.SetTrigger("slide");
 
         slidePositions.Add(GameObject.Find("NoteEffects").transform.GetChild(0).GetChild(endPosition - 1).position);
@@ -99,7 +100,6 @@ public class SlideDrop : NoteLongDrop,IFlasher
     // Update is called once per frame
     private void Update()
     {
-        // Slide淡入期间，不透明度从0到0.55耗时200ms
         var startiming = timeProvider.AudioTime - timeStar;
         if (canSVAffect)
         {

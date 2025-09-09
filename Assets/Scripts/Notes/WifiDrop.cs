@@ -76,10 +76,11 @@ public class WifiDrop : NoteLongDrop,IFlasher
         fadeInTime = -3.926913f / speed;
         // Slide完全淡入时机
         // 正常情况下应为负值；速度过高将忽略淡入
-        fullFadeInTime = Math.Min(fadeInTime + 0.2f, 0);
+        //fullFadeInTime = Math.Min(fadeInTime + 0.2f, 0);
         var interval = fullFadeInTime - fadeInTime;
         fadeInAnimator = this.GetComponent<Animator>();
-        fadeInAnimator.speed = 0.2f / interval; //淡入时机与正解帧间隔小于200ms时，加快淡入动画的播放速度; interval永不为0
+        //fadeInAnimator.speed = 0.2f / interval; //淡入时机与正解帧间隔小于200ms时，加快淡入动画的播放速度; interval永不为0
+        fadeInAnimator.speed = 1f / Math.Abs(fadeInTime); //431旧版效果
         fadeInAnimator.SetTrigger("wifi");
 
         timeProvider = GameObject.Find("AudioTimeProvider").GetComponent<AudioTimeProvider>();
