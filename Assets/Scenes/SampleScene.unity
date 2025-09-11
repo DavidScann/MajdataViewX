@@ -1750,12 +1750,12 @@ SpriteRenderer:
   m_SortingLayerID: 2089748817
   m_SortingLayer: 7
   m_SortingOrder: 1
-  m_Sprite: {fileID: 21300000, guid: fe3d40b1439447547851bd0ca4479020, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 57e4ba8cc7b50424481f0ccbf880b603, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
-  m_Size: {x: 2.84, y: 4.64}
+  m_Size: {x: 4.2, y: 6.36}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
@@ -2370,7 +2370,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 12800000, guid: 4f2a47013c548fd4594fc663a5910166, type: 3}
+    m_Font: {fileID: 12800000, guid: 0c39446fe92ae7c40b877f4bd2c134e4, type: 3}
     m_FontSize: 2
     m_FontStyle: 0
     m_BestFit: 0
@@ -3430,7 +3430,7 @@ MonoBehaviour:
   - {fileID: 942984173}
   - {fileID: 2062320517}
   cardImagesM:
-  - {fileID: 0}
+  - {fileID: 21300000, guid: 57e4ba8cc7b50424481f0ccbf880b603, type: 3}
   - {fileID: 21300000, guid: 6d9b7ea5ef6280b439bbeeaed9c74f82, type: 3}
   - {fileID: 21300000, guid: a6a4755a66895c0468bc3e75773e5b37, type: 3}
   - {fileID: 21300000, guid: 2e90c6ef7d973e14881a70a22eed810a, type: 3}
@@ -3439,7 +3439,7 @@ MonoBehaviour:
   - {fileID: 21300000, guid: 56b444880d4616241975671811616cf7, type: 3}
   - {fileID: 21300000, guid: 4c3d7418ac64ce74aa62a61a707af510, type: 3}
   LvBackgroundsM:
-  - {fileID: 0}
+  - {fileID: 21300000, guid: bdb271285e5ea224aa52af2ccbc144ff, type: 3}
   - {fileID: 21300000, guid: d3b1bc113022c9742840ebf710542c2b, type: 3}
   - {fileID: 21300000, guid: d8cd6fa84bfa1aa4a8194d657030439f, type: 3}
   - {fileID: 21300000, guid: f03b212b8a1571b41888a0dde9daed95, type: 3}
@@ -3448,7 +3448,7 @@ MonoBehaviour:
   - {fileID: 21300000, guid: abff6ca448e19524a9c5ff65e425545e, type: 3}
   - {fileID: 21300000, guid: 59580503e0fe15a4ea9578d31156d37c, type: 3}
   TabsM:
-  - {fileID: 0}
+  - {fileID: 21300000, guid: 92bbf08d954d4d1429869999fe2597e9, type: 3}
   - {fileID: 21300000, guid: 546e33e850bb78c4e9d7809b91540e27, type: 3}
   - {fileID: 21300000, guid: 9e86f459488265245a50b50a899b8d70, type: 3}
   - {fileID: 21300000, guid: 9656dce9662ba2746bdf42a73b03dd8e, type: 3}
@@ -3457,7 +3457,7 @@ MonoBehaviour:
   - {fileID: 21300000, guid: 899e25c10144e3f4399a3428eaf963dc, type: 3}
   - {fileID: 21300000, guid: 47833b07d63347c44896f11578784669, type: 3}
   MLevelsM:
-  - {fileID: 0}
+  - {fileID: 2800000, guid: e7979732461fbe4488425581000d5a23, type: 3}
   - {fileID: 2800000, guid: a0eae58b79963e24c9ecb5e143d56a0d, type: 3}
   - {fileID: 2800000, guid: afc781cab8c1fb24cad647e9d4220247, type: 3}
   - {fileID: 2800000, guid: e4b643957901dd94a97f02dbee84ccc9, type: 3}
@@ -3811,12 +3811,12 @@ SpriteRenderer:
   m_SortingLayerID: 2089748817
   m_SortingLayer: 7
   m_SortingOrder: 2
-  m_Sprite: {fileID: 21300000, guid: f1fa9d155d8f2a547bb3a105c2da1e14, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 92bbf08d954d4d1429869999fe2597e9, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
-  m_Size: {x: 2.84, y: 0.68}
+  m_Size: {x: 4.2, y: 0.96}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
@@ -6279,7 +6279,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 12800000, guid: 4f2a47013c548fd4594fc663a5910166, type: 3}
+    m_Font: {fileID: 12800000, guid: 0c39446fe92ae7c40b877f4bd2c134e4, type: 3}
     m_FontSize: 2
     m_FontStyle: 0
     m_BestFit: 1
@@ -6937,7 +6937,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &942984174
 Transform:
   m_ObjectHideFlags: 0
@@ -8047,7 +8047,7 @@ SpriteRenderer:
   m_SortingLayer: 7
   m_SortingOrder: 200
   m_Sprite: {fileID: 21300000, guid: 4e743e15d3a308a4b8cdaaf5650da783, type: 3}
-  m_Color: {r: 1, g: 1, b: 1, a: 0.7019608}
+  m_Color: {r: 1, g: 1, b: 1, a: 0.2901961}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
@@ -8803,7 +8803,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 12800000, guid: 0c39446fe92ae7c40b877f4bd2c134e4, type: 3}
+    m_Font: {fileID: 12800000, guid: 4f2a47013c548fd4594fc663a5910166, type: 3}
     m_FontSize: 2
     m_FontStyle: 0
     m_BestFit: 0
@@ -12306,12 +12306,12 @@ SpriteRenderer:
   m_SortingLayerID: 2089748817
   m_SortingLayer: 7
   m_SortingOrder: 4
-  m_Sprite: {fileID: 21300000, guid: 68e06f1d53a8e244d83d2a4bdbfb538a, type: 3}
+  m_Sprite: {fileID: 21300000, guid: bdb271285e5ea224aa52af2ccbc144ff, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
-  m_Size: {x: 1.24, y: 0.76}
+  m_Size: {x: 1.8, y: 1.12}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1

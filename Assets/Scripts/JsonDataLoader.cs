@@ -271,9 +271,6 @@ public class JsonDataLoader : MonoBehaviour
             }
         }
         levelTextM.text = sb.ToString();
-        
-
-
         titleTextM.text = loadedData.title;
         artistTextM.text = loadedData.artist;
         designTextM.text = loadedData.designer;
@@ -281,8 +278,11 @@ public class JsonDataLoader : MonoBehaviour
         cardImageM.sprite = cardImagesM[loadedData.diffNum];
         LvBackgroundM.sprite = LvBackgroundsM[loadedData.diffNum];
         TabM.sprite = TabsM[loadedData.diffNum];
-        Modes[0].SetActive(loadedData.mode == ChartMode.Standard);
-        Modes[1].SetActive(loadedData.mode == ChartMode.Deluxe);
+        if (loadedData.diffNum != 6)
+        {
+            Modes[0].SetActive(loadedData.mode == ChartMode.Standard);
+            Modes[1].SetActive(loadedData.mode == ChartMode.Deluxe);
+        }
 
         CountNoteSum(loadedData);
 

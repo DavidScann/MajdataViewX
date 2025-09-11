@@ -112,7 +112,7 @@ public class HoldDrop : NoteLongDrop
         var realtime = timeProvider.AudioTime - time;
         var distance = timing * speed + 4.8f;
         var realDistance = realtime * speed + 4.8f;
-        if(!canSVAffect)
+        if (!canSVAffect)
         {
             timing = realtime;
             distance = realDistance;

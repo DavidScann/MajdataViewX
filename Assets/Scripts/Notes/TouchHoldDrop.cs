@@ -80,20 +80,26 @@ public class TouchHoldDrop : NoteLongDrop
     // Update is called once per frame
     private void Update()
     {
-        var timing = timeProvider.ScrollDist - time;
+        var timing = timeProvider.ScrollDist - timeProvider.GetPositionAtTime(time);
         var realtime = timeProvider.AudioTime - time;
-        //var pow = Mathf.Pow(-timing * speed, 0.1f) - 0.4f;
-        var pow = -Mathf.Exp(8 * (timing * 0.4f / moveDuration) - 0.85f) + 0.42f;
-        var distance = Mathf.Clamp(pow, 0f, 0.4f);
+
+        var fakeLastFor = timeProvider.GetPositionAtTime(time + LastFor) - timeProvider.GetPositionAtTime(time);
+        var fakeMove = timeProvider.GetPositionAtTime(time + moveDuration) - timeProvider.GetPositionAtTime(time);
+
+        //var timing = time;
+        //var pow = Mathf.Pow(-timing * speed, 0.1f)-0.4f;
+        var pow = -Mathf.Exp(8 * (timing * 0.4f / fakeMove) - 0.85f) + 0.42f;
         var realPow = -Mathf.Exp(8 * (realtime * 0.4f / moveDuration) - 0.85f) + 0.42f;
+        var distance = Mathf.Clamp(pow, 0f, 0.4f);
         var realDistance = Mathf.Clamp(realPow, 0f, 0.4f);
-        if(!canSVAffect)
+        if (!canSVAffect)
         {
             timing = realtime;
             pow = realPow; 
             distance = realDistance;
+            fakeLastFor = LastFor;
         }
-        if (timing > LastFor)
+        if (timing > fakeLastFor)
         {
             if (!isUnplayable)
             {
@@ -124,7 +130,7 @@ public class TouchHoldDrop : NoteLongDrop
             fans[5].SetActive(true);
             mask.enabled = true;
             SetfanColor(Color.white);
-            mask.alphaCutoff = Mathf.Clamp(0.91f * (1 - (LastFor - timing) / LastFor), 0f, 1f);
+            mask.alphaCutoff = Mathf.Clamp(0.91f * (1 - (fakeLastFor - timing) / fakeLastFor), 0f, 1f);
         }
         else if(-timing > wholeDuration)
         {
