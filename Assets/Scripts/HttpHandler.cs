@@ -50,7 +50,7 @@ public class HttpHandler : MonoBehaviour
             objectCounter.ComboSetActive(data.comboStatusType);
             loader.LoadJson(File.ReadAllText(data.jsonPath), data.startTime);
             GameObject.Find("Notes").GetComponent<PlayAllPerfect>().enabled = false;
-            GameObject.Find("MultTouchHandler").GetComponent<MultTouchHandler>().clearSlots();
+            multTouchHandler.clearSlots();
             timeProvider.CalcSVPos();
 
             bgManager.LoadBGFromPath(new FileInfo(data.jsonPath).DirectoryName, data.audioSpeed);
@@ -69,7 +69,8 @@ public class HttpHandler : MonoBehaviour
             objectCounter.ComboSetActive(data.comboStatusType);
             loader.LoadJson(File.ReadAllText(data.jsonPath), data.startTime);
             GameObject.Find("Notes").GetComponent<PlayAllPerfect>().enabled = false;
-            GameObject.Find("MultTouchHandler").GetComponent<MultTouchHandler>().clearSlots();
+            GameObject.Find("CanvasButtons").SetActive(false);
+            multTouchHandler.clearSlots();
             timeProvider.CalcSVPos();
 
             bgManager.LoadBGFromPath(new FileInfo(data.jsonPath).DirectoryName, data.audioSpeed);
