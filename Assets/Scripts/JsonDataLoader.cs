@@ -28,6 +28,7 @@ public class JsonDataLoader : MonoBehaviour
     public GameObject notes;
     public GameObject star_slidePrefab;
     public GameObject[] slidePrefab;
+    public GameObject subSVPrefab;
     public Material breakMaterial;
     public RuntimeAnimatorController BreakShine;
     public RuntimeAnimatorController JudgeBreakShine;
@@ -56,6 +57,8 @@ public class JsonDataLoader : MonoBehaviour
     public Sprite[] LvBackgroundsM = new Sprite[8];
     public Sprite[] TabsM = new Sprite[8];
     public Texture2D[] MLevelsM = new Texture2D[8];
+
+    private SubSV[] SubSVList;
 
     private CustomSkin customSkin;
     private AudioTimeProvider timeProvider;
@@ -222,6 +225,7 @@ public class JsonDataLoader : MonoBehaviour
         ObjectCounter = GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>();
         timeProvider = GameObject.Find("AudioTimeProvider").GetComponent<AudioTimeProvider>();
         customSkin = GameObject.Find("Outline").GetComponent<CustomSkin>();
+        SubSVList = timeProvider.SubSVList;
     }
 
     // Update is called once per frame
@@ -244,8 +248,6 @@ public class JsonDataLoader : MonoBehaviour
         //新：乌蒙的UI
         levelTextM.spriteAsset.spriteSheet = MLevelsM[loadedData.diffNum];
         levelTextM.spriteAsset.material.SetTexture("_MainTex", MLevelsM[loadedData.diffNum]);
-        //levelTextM.spriteAsset.UpdateLookupTables();
-        //levelTextM.ForceMeshUpdate();
         StringBuilder sb = new("<sprite=14>");
         foreach (var item in loadedData.level)
         {
@@ -274,7 +276,7 @@ public class JsonDataLoader : MonoBehaviour
         titleTextM.text = loadedData.title;
         artistTextM.text = loadedData.artist;
         designTextM.text = loadedData.designer;
-        //bpmTextMS.text
+        bpmTextM.text = "BPM " + loadedData.wholebpm;
         cardImageM.sprite = cardImagesM[loadedData.diffNum];
         LvBackgroundM.sprite = LvBackgroundsM[loadedData.diffNum];
         TabM.sprite = TabsM[loadedData.diffNum];
@@ -289,13 +291,15 @@ public class JsonDataLoader : MonoBehaviour
         var lastNoteTime = loadedData.timingList.Last().time;
         float lastBPM = 0;
 
+        List<float> bpmlist = new();
+
         foreach (var timing in loadedData.timingList)
             try
             {
-                if (timeProvider.SVList.Count == 0 || timeProvider.SVList[timeProvider.SVList.Count - 1] != timing.SVeloc)
+                if (timeProvider.SVList.Count == 0 || timeProvider.SVList[^1] != timing.SVeloc)
                 {
                     timeProvider.SVList.Add(timing.SVeloc);
-                    UnityEngine.Debug.Log(timing.SVeloc);
+                    Debug.Log(timing.SVeloc);
                     timeProvider.SVTime.Add((float)timing.time);
                 }
                 if (timing.time < ignoreOffset)
@@ -314,6 +318,8 @@ public class JsonDataLoader : MonoBehaviour
                         GameObject.Find("objBPM").GetComponent<Text>().text = Math.Truncate(timing.currentBpm).ToString();
                     };
                     lastBPM = timing.currentBpm;
+
+                    bpmlist.Add(timing.currentBpm);
                 }
 
                 for (var i = 0; i < timing.noteList.Count; i++)
@@ -502,7 +508,7 @@ public class JsonDataLoader : MonoBehaviour
                             NDCompo.multTouchEachSprite[1] = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, note.kSkin.Insert(note.kSkin.Length - 4, "_border_3_each")));
                         }
 
-                        if (timing.noteList.Count > 1) 
+                        if (timing.noteList.Count > 1)
                             NDCompo.isEach = true;
                         NDCompo.speed = touchSpeed * timing.HSpeed;
                         NDCompo.isFirework = note.isHanabi;
@@ -576,6 +582,33 @@ public class JsonDataLoader : MonoBehaviour
                                 };
                             }
                         }
+                        else if (cmd[0] == "sv")
+                        {
+                            float speed = float.Parse(cmd[2] + (cmd.Length == 4 ? '.' + cmd[3] : ""));
+
+                            if (int.TryParse(cmd[1], out int count) && count >= 2 && count < 10)
+                            {
+                                if (SubSVList[count] == null)
+                                {
+                                    var subSV = Instantiate(subSVPrefab).GetComponent<SubSV>();
+                                    SubSVList[count] = subSV;
+                                    if (subSV.SVList.Count == 0 || subSV.SVList[^1] != speed)
+                                    {
+                                        subSV.SVList.Add(speed);
+                                        subSV.SVTime.Add((float)timing.time);
+                                    }
+                                }
+                                else
+                                {
+                                    var subSV = SubSVList[count];
+                                    if (subSV.SVList.Count == 0 || subSV.SVList[^1] != speed)
+                                    {
+                                        subSV.SVList.Add(speed);
+                                        subSV.SVTime.Add((float)timing.time);
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -593,10 +626,13 @@ public class JsonDataLoader : MonoBehaviour
 
                     lineDrop.time = (float)timing.time;
                     lineDrop.speed = noteSpeed * timing.HSpeed;
-                    lineDrop.canSVAffect = false;
+                    lineDrop.canSVAffect = 1;
                     foreach (var eachNote in eachNotes)
                     {
-                        lineDrop.canSVAffect = lineDrop.canSVAffect || eachNote.canSVAffect;
+                        if (eachNote.canSVAffect != 1)
+                        {
+                            lineDrop.canSVAffect = eachNote.canSVAffect;
+                        }
                     }
 
                     endPos = endPos < 0 ? endPos + 8 : endPos;
@@ -616,6 +652,8 @@ public class JsonDataLoader : MonoBehaviour
                     lineDrop.startPosition = startPos;
                     lineDrop.curvLength = endPos - 1;
                 }
+
+                GameObject.Find("objBPMRange").GetComponent<Text>().text = bpmlist.Min() + " - " + bpmlist.Max();
             }
             catch (Exception e)
             {

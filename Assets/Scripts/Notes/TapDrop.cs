@@ -14,7 +14,6 @@ public class TapDrop : NoteDrop
     public bool isBreak;
     public bool isEX;
     public bool isFakeStarRotate;
-    public bool canSVAffect;
 
     public Sprite normalSpr;
     public Sprite eachSpr;
@@ -31,7 +30,6 @@ public class TapDrop : NoteDrop
     public Color exEffectTap;
     public Color exEffectEach;
     public Color exEffectBreak;
-    private Animator animator;
 
     public Material breakMaterial;
 
@@ -97,10 +95,16 @@ public class TapDrop : NoteDrop
         var realtime = timeProvider.AudioTime - time;
         var distance = timing * speed + 4.8f;
         var realDistance = realtime * speed + 4.8f;
-        if(!canSVAffect)
+        if (canSVAffect == 0)
         {
             timing = realtime;
             distance = realDistance;
+        }
+        else if (canSVAffect != 1)
+        {
+            var svProvider = timeProvider.SubSVList[canSVAffect];
+            timing = svProvider.ScrollDist - svProvider.GetPositionAtTime(time);
+            distance = timing * speed + 4.8f;
         }
         var destScale = distance * 0.4f + 0.51f;
         if (destScale < 0f)

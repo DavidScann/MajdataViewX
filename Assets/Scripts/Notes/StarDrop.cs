@@ -15,7 +15,6 @@ public class StarDrop : NoteDrop
     public bool isDouble;
     public bool isEX;
     public bool isNoHead;
-    public bool canSVAffect;
 
     public Sprite tapSpr;
     public Sprite eachSpr;
@@ -126,10 +125,16 @@ public class StarDrop : NoteDrop
         var realtime = timeProvider.AudioTime - time;
         var distance = timing * speed + 4.8f;
         var realDistance = realtime * speed + 4.8f;
-        if (!canSVAffect)
+        if (canSVAffect == 0)
         {
             timing = realtime;
             distance = realDistance;
+        }
+        else if (canSVAffect != 1)
+        {
+            var svProvider = timeProvider.SubSVList[canSVAffect];
+            timing = svProvider.ScrollDist - svProvider.GetPositionAtTime(time);
+            distance = timing * speed + 4.8f;
         }
         var destScale = distance * 0.4f + 0.51f;
         var songSpeed = timeProvider.CurrentSpeed;

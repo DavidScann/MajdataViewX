@@ -22,7 +22,6 @@ public class SlideDrop : NoteLongDrop,IFlasher
     public bool isSpecialFlip; // fixes known star problem
     public bool isEach;
     public bool isBreak;
-    public bool canSVAffect;
     public bool isGroupPart;
     public GameObject slideOK;
     public bool isGroupPartEnd;
@@ -101,16 +100,20 @@ public class SlideDrop : NoteLongDrop,IFlasher
     private void Update()
     {
         var startiming = timeProvider.AudioTime - timeStar;
-        if (canSVAffect)
+        if (canSVAffect == 1)
         {
             startiming = timeProvider.ScrollDist - timeProvider.GetPositionAtTime(timeStar);
         }
-
+        else if (canSVAffect >= 2)
+        {
+            var svProvider = timeProvider.SubSVList[canSVAffect];
+            startiming = svProvider.ScrollDist - svProvider.GetPositionAtTime(timeStar);
+        }
         if (startiming <= 0f)
         {
             if (!fadeInAnimator.enabled && startiming >= fadeInTime)
                 fadeInAnimator.enabled = true;
-            
+
             return;
         }
         fadeInAnimator.enabled = false;
@@ -131,9 +134,14 @@ public class SlideDrop : NoteLongDrop,IFlasher
 
         var timing = timeProvider.ScrollDist - timeProvider.GetPositionAtTime(time);
         var realtime = timeProvider.AudioTime - time;
-        if (!canSVAffect)
+        if (canSVAffect == 0)
         {
             timing = realtime;
+        }
+        else if (canSVAffect != 1)
+        {
+            var svProvider = timeProvider.SubSVList[canSVAffect];
+            timing = svProvider.ScrollDist - svProvider.GetPositionAtTime(time);
         }
 
         if (timing <= 0f)
@@ -175,9 +183,15 @@ public class SlideDrop : NoteLongDrop,IFlasher
             process = 1f - process;
             var realPro = (LastFor - realtime) / LastFor;
             realPro = 1f - realPro;
-            if(!canSVAffect)
+            if (canSVAffect == 0)
             {
                 process = realPro;
+            }
+            else if (canSVAffect != 1)
+            {
+                var svProvider = timeProvider.SubSVList[canSVAffect];
+                lastScroll = svProvider.GetPositionAtTime(time + LastFor) - svProvider.GetPositionAtTime(time);
+                process = (lastScroll - timing) / LastFor;
             }
 
             if (process > 1 && !processed)

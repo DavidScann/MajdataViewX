@@ -30,7 +30,6 @@ public class WifiDrop : NoteLongDrop,IFlasher
     public bool isBreak;
     public bool isGroupPart;
     public bool isGroupPartEnd;
-    public bool canSVAffect;
     //public double lastSlideTime;
 
     public int startPosition = 1;
@@ -200,8 +199,16 @@ public class WifiDrop : NoteLongDrop,IFlasher
 
         var timing = timeProvider.ScrollDist - timeProvider.GetPositionAtTime(time);
         var realtime = timeProvider.AudioTime - time;
-        
-        if (!canSVAffect) timing = realtime;
+
+        if (canSVAffect == 0)
+        {
+            timing = realtime;
+        }
+        else if (canSVAffect != 1)
+        {
+            var svProvider = timeProvider.SubSVList[canSVAffect];
+            timing = svProvider.ScrollDist - svProvider.GetPositionAtTime(time);
+        }
         if (timing <= 0f)
         {
             canShine = true;
@@ -231,7 +238,10 @@ public class WifiDrop : NoteLongDrop,IFlasher
             process = 1f - process;
             var realPro = (LastFor - realtime) / LastFor;
             realPro = 1f - realPro;
-            if (!canSVAffect) process = realPro;
+            if (canSVAffect == 0)
+            {
+                process = realPro;
+            }
             if (process >= 1 && !processed)
             {
                 if (isUnplayable)

@@ -4,7 +4,7 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using UnityEngine;
 
-public class AudioTimeProvider : MonoBehaviour
+public class SubSV : MonoBehaviour
 {
     public float AudioTime; //notes get this value
     public List<float> SVList = new();
@@ -17,16 +17,22 @@ public class AudioTimeProvider : MonoBehaviour
     public float offset;
     public float speed;
 
-    public float startTime;
-    public long ticks;
-
-    public SubSV[] SubSVList = new SubSV[10];
+    private float startTime;
+    private long ticks;
 
     public float CurrentSpeed => isRecord ? Time.timeScale : speed;
 
     private void Start()
     {
-        
+        AudioTimeProvider timeProvider = GameObject.Find("AudioTimeProvider").GetComponent<AudioTimeProvider>();
+        ticks = timeProvider.ticks;
+        offset = timeProvider.offset;
+        AudioTime = timeProvider.AudioTime;
+        isRecord = timeProvider.isRecord;
+        startTime = timeProvider.startTime;
+        speed = timeProvider.speed;
+        isStart = timeProvider.isStart;
+        CalcSVPos();
     }
 
     // Update is called once per frame
@@ -47,30 +53,7 @@ public class AudioTimeProvider : MonoBehaviour
 
         return _audioTime / 16.6667f;
     }
-    public void SetStartTime(long _ticks, float _offset, float _speed, bool _isRecord = false)
-    {
-        ticks = _ticks;
-        offset = _offset;
-        AudioTime = offset;
-        var dateTime = new DateTime(ticks);
-        var seconds = (dateTime - DateTime.Now).TotalSeconds;
-        isRecord = _isRecord;
-        if (_isRecord)
-        {
-            startTime = Time.time + 5;
-            Time.timeScale = _speed;
-            Time.captureFramerate = 60;
-        }
-        else
-        {
-            startTime = Time.realtimeSinceStartup + (float)seconds;
-            speed = _speed;
-            Time.captureFramerate = 0;
-        }
-
-        isStart = true;
-    }
-
+    
     public void ResetStartTime()
     {
         offset = 0f;

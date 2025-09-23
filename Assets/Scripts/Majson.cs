@@ -7,6 +7,7 @@ internal class Majson
     public string difficulty = "EZ";
     public int diffNum = 0;
     public string level = "1";
+    public string wholebpm = "180";
     public List<SimaiTimingPoint> timingList = new();
     public string title = "default";
     public ChartMode mode = ChartMode.Deluxe;
@@ -54,7 +55,7 @@ internal class SimaiNote
     public bool isSlideMute = false;
     public bool isSlideNoHead = false;
     public bool isUnplayable = false;
-    public bool canSVAffect = true;
+    public int canSVAffect = 1;
 
     public string noteContent; //used for star explain
     public SimaiNoteType noteType;

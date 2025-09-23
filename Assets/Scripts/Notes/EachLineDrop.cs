@@ -6,7 +6,7 @@ public class EachLineDrop : MonoBehaviour
     public int startPosition = 1;
     public int curvLength = 1;
     public float speed = 1;
-    public bool canSVAffect;
+    public int canSVAffect;
 
     public Sprite[] curvSprites;
     private SpriteRenderer sr;
@@ -28,9 +28,14 @@ public class EachLineDrop : MonoBehaviour
     {
         var timing = timeProvider.ScrollDist - timeProvider.GetPositionAtTime(time);
         var realtime = timeProvider.AudioTime - time;
-        if(!canSVAffect)
+        if (canSVAffect == 0)
         {
             timing = realtime;
+        }
+        else if (canSVAffect != 1)
+        {
+            var svProvider = timeProvider.SubSVList[canSVAffect];
+            timing = svProvider.ScrollDist - svProvider.GetPositionAtTime(time);
         }
         var distance = timing * speed + 4.8f;
         var destScale = distance * 0.4f + 0.51f;

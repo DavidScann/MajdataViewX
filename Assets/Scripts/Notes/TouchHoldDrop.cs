@@ -7,7 +7,6 @@ public class TouchHoldDrop : NoteLongDrop
     public float speed = 1;
     public bool isFirework;
     public bool isEach;
-    public bool canSVAffect;
 
     public GameObject tapEffect;
     public GameObject holdEffect;
@@ -92,12 +91,23 @@ public class TouchHoldDrop : NoteLongDrop
         var realPow = -Mathf.Exp(8 * (realtime * 0.4f / moveDuration) - 0.85f) + 0.42f;
         var distance = Mathf.Clamp(pow, 0f, 0.4f);
         var realDistance = Mathf.Clamp(realPow, 0f, 0.4f);
-        if (!canSVAffect)
+        if (canSVAffect == 0)
         {
             timing = realtime;
-            pow = realPow; 
+            pow = realPow;
             distance = realDistance;
             fakeLastFor = LastFor;
+        }
+        else if (canSVAffect != 1)
+        {
+            var svProvider = timeProvider.SubSVList[canSVAffect];
+            timing = svProvider.ScrollDist - svProvider.GetPositionAtTime(time);
+
+            fakeLastFor = svProvider.GetPositionAtTime(time + LastFor) - svProvider.GetPositionAtTime(time);
+            fakeMove = svProvider.GetPositionAtTime(time + moveDuration) - svProvider.GetPositionAtTime(time);
+
+            pow = -Mathf.Exp(8 * (timing * 0.4f / fakeMove) - 0.85f) + 0.42f;
+            distance = Mathf.Clamp(pow, 0f, 0.4f);
         }
         if (timing > fakeLastFor)
         {
