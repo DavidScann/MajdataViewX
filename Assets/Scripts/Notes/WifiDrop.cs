@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using UnityEditor.VersionControl;
 using UnityEngine;
 
 public class WifiDrop : NoteLongDrop,IFlasher
@@ -234,7 +235,8 @@ public class WifiDrop : NoteLongDrop,IFlasher
 
         if (timing > 0f)
         {
-            var process = (LastFor - timing) / LastFor;
+            var lastScroll = timeProvider.GetPositionAtTime(time + LastFor) - timeProvider.GetPositionAtTime(time);
+            var process = (lastScroll - timing) / lastScroll;
             process = 1f - process;
             var realPro = (LastFor - realtime) / LastFor;
             realPro = 1f - realPro;
@@ -242,6 +244,13 @@ public class WifiDrop : NoteLongDrop,IFlasher
             {
                 process = realPro;
             }
+            else if (canSVAffect != 1)
+            {
+                var svProvider = timeProvider.SubSVList[canSVAffect];
+                lastScroll = svProvider.GetPositionAtTime(time + LastFor) - svProvider.GetPositionAtTime(time);
+                process = (lastScroll - timing) / lastScroll;
+            }
+
             if (process >= 1 && !processed)
             {
                 if (isUnplayable)

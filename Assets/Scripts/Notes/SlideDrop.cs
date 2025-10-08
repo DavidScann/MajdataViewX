@@ -179,7 +179,7 @@ public class SlideDrop : NoteLongDrop,IFlasher
             }
 
             var lastScroll = timeProvider.GetPositionAtTime(time + LastFor) - timeProvider.GetPositionAtTime(time);
-            var process = (lastScroll - timing) / LastFor;
+            var process = (lastScroll - timing) / lastScroll;
             process = 1f - process;
             var realPro = (LastFor - realtime) / LastFor;
             realPro = 1f - realPro;
@@ -191,7 +191,7 @@ public class SlideDrop : NoteLongDrop,IFlasher
             {
                 var svProvider = timeProvider.SubSVList[canSVAffect];
                 lastScroll = svProvider.GetPositionAtTime(time + LastFor) - svProvider.GetPositionAtTime(time);
-                process = (lastScroll - timing) / LastFor;
+                process = (lastScroll - timing) / lastScroll;
             }
 
             if (process > 1 && !processed)
