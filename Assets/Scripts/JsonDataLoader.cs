@@ -955,6 +955,14 @@ public class JsonDataLoader : MonoBehaviour
         var GOnote = Instantiate(starPrefab, notes.transform);
         var NDCompo = GOnote.GetComponent<StarDrop>();
 
+        var skins = note.kSkin.Split(';');
+
+        var starSkin = skins.Length > 2 ? skins[1] : skins[0];
+        string slideSkin;
+        if (skins.Length == 2) slideSkin = skins[1];
+        else if (skins.Length >= 3) slideSkin = skins[2];
+        else slideSkin = skins[0];
+
         // note的图层顺序
         NDCompo.noteSortOrder = noteSortOrder;
         noteSortOrder -= NOTE_LAYER_COUNT[note.noteType];
@@ -973,15 +981,15 @@ public class JsonDataLoader : MonoBehaviour
         }
         else
         {
-            NDCompo.tapSpr = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, note.kSkin));
-            NDCompo.eachSpr = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, note.kSkin.Insert(note.kSkin.Length - 4, "_each")));
-            NDCompo.breakSpr = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, note.kSkin.Insert(note.kSkin.Length - 4, "_break")));
-            NDCompo.exSpr = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, note.kSkin.Insert(note.kSkin.Length - 4, "_ex")));
+            NDCompo.tapSpr = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, skins[0]));
+            NDCompo.eachSpr = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, skins[0].Insert(skins[0].Length - 4, "_each")));
+            NDCompo.breakSpr = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, skins[0].Insert(skins[0].Length - 4, "_break")));
+            NDCompo.exSpr = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, skins[0].Insert(skins[0].Length - 4, "_ex")));
 
-            NDCompo.tapSpr_Double = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, note.kSkin.Insert(note.kSkin.Length - 4, "_double")));
-            NDCompo.eachSpr_Double = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, note.kSkin.Insert(note.kSkin.Length - 4, "_each_double")));
-            NDCompo.breakSpr_Double = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, note.kSkin.Insert(note.kSkin.Length - 4, "_break_double")));
-            NDCompo.exSpr_Double = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, note.kSkin.Insert(note.kSkin.Length - 4, "_ex_double")));
+            NDCompo.tapSpr_Double = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, skins[0].Insert(skins[0].Length - 4, "_double")));
+            NDCompo.eachSpr_Double = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, skins[0].Insert(skins[0].Length - 4, "_each_double")));
+            NDCompo.breakSpr_Double = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, skins[0].Insert(skins[0].Length - 4, "_break_double")));
+            NDCompo.exSpr_Double = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, skins[0].Insert(skins[0].Length - 4, "_ex_double")));
         }
 
         NDCompo.BreakShine = BreakShine;
@@ -1004,9 +1012,9 @@ public class JsonDataLoader : MonoBehaviour
         }
         else
         {
-            WifiCompo.normalStar = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, note.kSkin));
-            WifiCompo.eachStar = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, note.kSkin.Insert(note.kSkin.Length - 4, "_each")));
-            WifiCompo.breakStar = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, note.kSkin.Insert(note.kSkin.Length - 4, "_break")));
+            WifiCompo.normalStar = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, starSkin));
+            WifiCompo.eachStar = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, starSkin.Insert(starSkin.Length - 4, "_each")));
+            WifiCompo.breakStar = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, starSkin.Insert(starSkin.Length - 4, "_break")));
         }
         WifiCompo.judgeBreakShine = JudgeBreakShine;
         WifiCompo.breakMaterial = breakMaterial;
@@ -1028,9 +1036,9 @@ public class JsonDataLoader : MonoBehaviour
             Sprite[] wifi_break = new Sprite[11];
             for (var j = 0; j < 11; j++)
             {
-                wifi[j] = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, note.kSkin.Insert(note.kSkin.Length - 4, "_" + j)));
-                wifi_each[j] = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, note.kSkin.Insert(note.kSkin.Length - 4, "_each_" + j)));
-                wifi_break[j] = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, note.kSkin.Insert(note.kSkin.Length - 4, "_break_" + j)));
+                wifi[j] = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, slideSkin.Insert(slideSkin.Length - 4, "_" + j)));
+                wifi_each[j] = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, slideSkin.Insert(slideSkin.Length - 4, "_each_" + j)));
+                wifi_break[j] = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, slideSkin.Insert(slideSkin.Length - 4, "_break_" + j)));
             }
 
             Array.Copy(wifi, WifiCompo.normalSlide, 11);
@@ -1097,6 +1105,14 @@ public class JsonDataLoader : MonoBehaviour
         NDCompo.noteSortOrder = noteSortOrder;
         noteSortOrder -= NOTE_LAYER_COUNT[note.noteType];
 
+        var skins = note.kSkin.Split(';');
+
+        var starSkin = skins.Length > 2 ? skins[1] : skins[0];
+        string slideSkin;
+        if (skins.Length == 2) slideSkin = skins[1];
+        else if (skins.Length >= 3) slideSkin = skins[2];
+        else slideSkin = skins[0];
+
         if (string.IsNullOrEmpty(note.kSkin))
         {
             NDCompo.tapSpr = customSkin.Star;
@@ -1111,15 +1127,15 @@ public class JsonDataLoader : MonoBehaviour
         }
         else
         {
-            NDCompo.tapSpr = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, note.kSkin));
-            NDCompo.eachSpr = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, note.kSkin.Insert(note.kSkin.Length - 4, "_each")));
-            NDCompo.breakSpr = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, note.kSkin.Insert(note.kSkin.Length - 4, "_break")));
-            NDCompo.exSpr = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, note.kSkin.Insert(note.kSkin.Length - 4, "_ex")));
+            NDCompo.tapSpr = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, skins[0]));
+            NDCompo.eachSpr = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, skins[0].Insert(skins[0].Length - 4, "_each")));
+            NDCompo.breakSpr = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, skins[0].Insert(skins[0].Length - 4, "_break")));
+            NDCompo.exSpr = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, skins[0].Insert(skins[0].Length - 4, "_ex")));
 
-            NDCompo.tapSpr_Double = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, note.kSkin.Insert(note.kSkin.Length - 4, "_double")));
-            NDCompo.eachSpr_Double = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, note.kSkin.Insert(note.kSkin.Length - 4, "_each_double")));
-            NDCompo.breakSpr_Double = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, note.kSkin.Insert(note.kSkin.Length - 4, "_break_double")));
-            NDCompo.exSpr_Double = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, note.kSkin.Insert(note.kSkin.Length - 4, "_ex_double")));
+            NDCompo.tapSpr_Double = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, skins[0].Insert(skins[0].Length - 4, "_double")));
+            NDCompo.eachSpr_Double = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, skins[0].Insert(skins[0].Length - 4, "_each_double")));
+            NDCompo.breakSpr_Double = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, skins[0].Insert(skins[0].Length - 4, "_break_double")));
+            NDCompo.exSpr_Double = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, skins[0].Insert(skins[0].Length - 4, "_ex_double")));
         }
 
         NDCompo.BreakShine = BreakShine;
@@ -1141,8 +1157,9 @@ public class JsonDataLoader : MonoBehaviour
 
         var slide = Instantiate(slidePrefab[slideIndex], notes.transform);
         var slide_star = Instantiate(star_slidePrefab, notes.transform);
+
         slide_star.GetComponent<SpriteRenderer>().sprite = string.IsNullOrEmpty(note.kSkin) ? 
-            customSkin.Star : SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, note.kSkin));
+            customSkin.Star : SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, starSkin));
         slide_star.SetActive(false);
         slide.SetActive(false);
         NDCompo.slide = slide;
@@ -1156,9 +1173,9 @@ public class JsonDataLoader : MonoBehaviour
         }
         else
         {
-            SliCompo.spriteNormal = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, note.kSkin));
-            SliCompo.spriteEach = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, note.kSkin.Insert(note.kSkin.Length - 4, "_each")));
-            SliCompo.spriteBreak = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, note.kSkin.Insert(note.kSkin.Length - 4, "_break")));
+            SliCompo.spriteNormal = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, slideSkin));
+            SliCompo.spriteEach = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, slideSkin.Insert(slideSkin.Length - 4, "_each")));
+            SliCompo.spriteBreak = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, slideSkin.Insert(slideSkin.Length - 4, "_break")));
         }
         SliCompo.slideShine = BreakShine;
         SliCompo.breakMaterial = breakMaterial;
@@ -1176,7 +1193,7 @@ public class JsonDataLoader : MonoBehaviour
             {
                 SliCompo.isEach = true;
                 slide_star.GetComponent<SpriteRenderer>().sprite = string.IsNullOrEmpty(note.kSkin) ?
-            customSkin.Star_Each : SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, note.kSkin.Insert(note.kSkin.Length - 4, "_each")));
+            customSkin.Star_Each : SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, starSkin.Insert(starSkin.Length - 4, "_each")));
             }
 
             var count = timing.noteList.FindAll(//找同头的
@@ -1199,7 +1216,7 @@ public class JsonDataLoader : MonoBehaviour
         SliCompo.isGroupPartEnd = isGroupPartEnd;
         //SliCompo.lastSlideTime = note.lastSlideTime;
         if (note.isSlideBreak) slide_star.GetComponent<SpriteRenderer>().sprite = string.IsNullOrEmpty(note.kSkin) ?
-            customSkin.Star_Break : SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, note.kSkin.Insert(note.kSkin.Length - 4, "_break")));
+            customSkin.Star_Break : SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, starSkin.Insert(starSkin.Length - 4, "_break")));
 
         NDCompo.isNoHead = note.isSlideNoHead;
         NDCompo.time = (float)timing.time;
