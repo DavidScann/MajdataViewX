@@ -50,7 +50,7 @@ public class JsonDataLoader : MonoBehaviour
     public Text bpmTextM;
     public SpriteRenderer cardImageM;
     public SpriteRenderer LvBackgroundM;
-    public SpriteRenderer TabM;
+    public SpriteRenderer[] TabM = new SpriteRenderer[2];
     public GameObject[] Modes = new GameObject[2];
 
     public Sprite[] cardImagesM = new Sprite[8];
@@ -279,13 +279,23 @@ public class JsonDataLoader : MonoBehaviour
         bpmTextM.text = "BPM " + loadedData.wholebpm;
         cardImageM.sprite = cardImagesM[loadedData.diffNum];
         LvBackgroundM.sprite = LvBackgroundsM[loadedData.diffNum];
-        TabM.sprite = TabsM[loadedData.diffNum];
         if (loadedData.diffNum != 6)
         {
-            Modes[0].SetActive(loadedData.mode == ChartMode.Standard);
-            Modes[1].SetActive(loadedData.mode == ChartMode.Deluxe);
-        }
+            if (loadedData.mode == ChartMode.Standard)
+            {
+                Modes[0].SetActive(true);
+                Modes[1].SetActive(false);
+                TabM[0].sprite = TabsM[loadedData.diffNum];
+            }
+            else
+            {
+                Modes[0].SetActive(false);
+                Modes[1].SetActive(true);
+                TabM[1].sprite = TabsM[loadedData.diffNum];
+            }
 
+        }
+        
         CountNoteSum(loadedData);
 
         var lastNoteTime = loadedData.timingList.Last().time;

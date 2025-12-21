@@ -3427,7 +3427,9 @@ MonoBehaviour:
   bpmTextM: {fileID: 1299637717}
   cardImageM: {fileID: 219022410}
   LvBackgroundM: {fileID: 1850967514}
-  TabM: {fileID: 458874681}
+  TabM:
+  - {fileID: 1810727659}
+  - {fileID: 458874681}
   Modes:
   - {fileID: 942984173}
   - {fileID: 2062320517}
@@ -5583,6 +5585,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   isMaimai: 0
+  chartMode: 0
 --- !u!212 &655536541
 SpriteRenderer:
   m_ObjectHideFlags: 0
@@ -9914,11 +9917,11 @@ RectTransform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 1
   m_Children:
+  - {fileID: 942984174}
+  - {fileID: 2062320518}
   - {fileID: 219022409}
   - {fileID: 1891484477}
   - {fileID: 1850967513}
-  - {fileID: 2062320518}
-  - {fileID: 942984174}
   - {fileID: 5158435}
   - {fileID: 333986175}
   - {fileID: 1880860697}
@@ -13806,8 +13809,8 @@ Transform:
   m_LocalScale: {x: 14, y: 14, z: 14}
   m_ConstrainProportionsScale: 1
   m_Children:
-  - {fileID: 375120754}
   - {fileID: 458874680}
+  - {fileID: 375120754}
   m_Father: {fileID: 1484505786}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!212 &2062320519

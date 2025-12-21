@@ -139,7 +139,7 @@ public class ObjectCounter : MonoBehaviour
         rate.text = string.Format(
             "<size=7.5>{0}</size>.{1:D4} <size=3>%</size>",
             Math.Truncate(rateValue),
-            (int)((rateValue - Math.Truncate(rateValue)) * 1000)
+            (int)((rateValue - Math.Truncate(rateValue)) * 10000)
         );
 
         combo.text = (tapCount + holdCount + slideCount + touchCount + breakCount).ToString();

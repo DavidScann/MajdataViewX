@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
@@ -134,36 +135,44 @@ public class HttpHandler : MonoBehaviour
 
     private void CLVInit(string chartPath, float dataSpeed)
     {
-        var files = Directory.GetFiles(
-            chartPath,
-            "*.mov",
-            SearchOption.TopDirectoryOnly);
-        foreach (var layer in SortingLayer.layers)
+        var layerDict = SortingLayer.layers.ToDictionary(l => l.name, l => l.id);
+        var extensions = new[] { ".mov", ".mp4" };
+
+        var files = Directory.EnumerateFiles(chartPath, "*.*", SearchOption.TopDirectoryOnly)
+            .Where(f => extensions.Contains(Path.GetExtension(f).ToLower()));
+
+        foreach (var filePath in files)
         {
-            foreach (var file in files)
+            try
             {
-                try
+                string fileName = Path.GetFileNameWithoutExtension(filePath);
+                string[] parts = fileName.Split('_');
+
+                // 校验文件名格式是否符合 pv_LayerName_Order
+                if (parts.Length < 3 || parts[0] != "pv") continue;
+
+                string layerName = parts[1];
+                string orderStr = parts[2];
+
+                if (layerDict.TryGetValue(layerName, out int layerId) && int.TryParse(orderStr, out int sortingOrder))
                 {
-                    if (int.TryParse(Path.GetFileNameWithoutExtension(file).Split('_')[2], out int sortingOrder))
-                    {
-                        var bg_path = Path.Combine(chartPath, "pv_" + layer.name + "_" + sortingOrder + ".mov");
-                        if (File.Exists(bg_path))
-                        {
-                            var GOvideo = Instantiate(CustomLayerVideoPrefab);
-                            var sr = GOvideo.GetComponent<SpriteRenderer>();
-                            sr.sortingLayerID = layer.id;
-                            sr.sortingOrder = sortingOrder;
-                            var manager = GOvideo.GetComponent<CLVManager>();
-                            manager.playSpeed = dataSpeed;
-                            manager.LoadFromPath(bg_path);
-                            clvs.Add(GOvideo);
-                        }
-                    }
+                    var GOvideo = Instantiate(CustomLayerVideoPrefab);
+
+                    var sr = GOvideo.GetComponent<SpriteRenderer>();
+                    sr.sortingLayerID = layerId;
+                    sr.sortingOrder = sortingOrder;
+
+                    var manager = GOvideo.GetComponent<CLVManager>();
+                    manager.playSpeed = dataSpeed;
+                    manager.LoadFromPath(filePath);
+
+                    clvs.Add(GOvideo);
                 }
-                catch (Exception)
-                {
-                    continue;
-                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"CLV {filePath} Error: {ex.Message}");
+                continue;
             }
         }
     }
