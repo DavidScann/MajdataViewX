@@ -69,3 +69,6 @@ TagManager:
   - name: Circle
     uniqueID: 4128799799
     locked: 0
+  - name: Debug
+    uniqueID: 822146801
+    locked: 0
