@@ -481,6 +481,7 @@ public class WifiDrop : NoteLongDrop,IFlasher
             {
                 case AutoPlayMode.Enable:
                     if (smoothSlideAnime) HideBar((int)pos + 1);
+                    else HideBar(areaStep[(int)(process * (areaStep.Count - 1))]);
                     DestroySelf();
                     judgeQueues.Clear();
                     return;
@@ -509,6 +510,7 @@ public class WifiDrop : NoteLongDrop,IFlasher
             case AutoPlayMode.Enable:
                 judgeQueues = judgeQueues.Skip((int)(process * (judgeQueues.Count - 1))).ToList();
                 if (smoothSlideAnime) HideBar((int)pos + 1);
+                else HideBar(areaStep[(int)(process * (areaStep.Count - 1))]);
                 break;
             case AutoPlayMode.Random:
                 judgeQueues = judgeQueues.Skip((int)(process * (judgeQueues.Count - 1))).ToList();

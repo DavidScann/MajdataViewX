@@ -753,6 +753,7 @@ public class SlideDrop : NoteLongDrop, IFlasher
             {
                 case AutoPlayMode.Enable:
                     if (smoothSlideAnime) HideBar(index + 1);
+                    else HideBar(areaStep[(int)(process * (areaStep.Count - 1))]);
                     DestroySelf();
                     judgeQueue.Clear();
                     return;
@@ -794,6 +795,7 @@ public class SlideDrop : NoteLongDrop, IFlasher
             case AutoPlayMode.Enable:
                 judgeQueue = judgeQueue.Skip((int)(process * (judgeQueue.Count - 1))).ToList();
                 if (smoothSlideAnime) HideBar(index + 1);
+                else HideBar(areaStep[(int)(process * (areaStep.Count - 1))]);
                 break;
             case AutoPlayMode.Random:
                 judgeQueue = judgeQueue.Skip((int)(process * (judgeQueue.Count - 1))).ToList();
