@@ -192,6 +192,7 @@ public class SlideDrop : NoteLongDrop,IFlasher
                 var svProvider = timeProvider.SubSVList[canSVAffect];
                 lastScroll = svProvider.GetPositionAtTime(time + LastFor) - svProvider.GetPositionAtTime(time);
                 process = (lastScroll - timing) / lastScroll;
+                process = 1f - process;
             }
 
             if (process > 1 && !processed)
@@ -226,7 +227,7 @@ public class SlideDrop : NoteLongDrop,IFlasher
             
             try
             {
-                var lastIndex = (areaStep[areaStep.Count - 1] + areaStep[areaStep.Count - 2]) / 2;
+                var lastIndex = (areaStep[^1] + areaStep[^2]) / 2;
                 if (isGroupPartEnd && !smoothSlideAnime && pos >= lastIndex && !isUnplayable)
                 {
                     var waitTime = LastFor * slideConst / 1.3;

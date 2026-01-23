@@ -8,7 +8,6 @@ using System.Text;
 using System.Text.RegularExpressions;
 using TMPro;
 using UnityEngine;
-using UnityEngine.TextCore.Text;
 using UnityEngine.UI;
 
 public class JsonDataLoader : MonoBehaviour
@@ -58,7 +57,7 @@ public class JsonDataLoader : MonoBehaviour
     public Sprite[] TabsM = new Sprite[8];
     public Texture2D[] MLevelsM = new Texture2D[8];
 
-    private SubSV[] SubSVList;
+    private Dictionary<int, SubSV> SubSVList;
 
     private CustomSkin customSkin;
     private AudioTimeProvider timeProvider;
@@ -293,9 +292,15 @@ public class JsonDataLoader : MonoBehaviour
                 Modes[1].SetActive(true);
                 TabM[1].sprite = TabsM[loadedData.diffNum];
             }
-
         }
-        
+        else
+        {
+            Modes[0].SetActive(false);
+            Modes[1].SetActive(false);
+            TabM[0].gameObject.SetActive(false);
+            TabM[1].gameObject.SetActive(false);
+        }
+
         CountNoteSum(loadedData);
 
         var lastNoteTime = loadedData.timingList.Last().time;
@@ -596,12 +601,11 @@ public class JsonDataLoader : MonoBehaviour
                         {
                             float speed = float.Parse(cmd[2] + (cmd.Length == 4 ? '.' + cmd[3] : ""));
 
-                            if (int.TryParse(cmd[1], out int count) && count >= 2 && count < 10)
+                            if (int.TryParse(cmd[1], out int count) && count >= 2)
                             {
-                                if (SubSVList[count] == null)
+                                if (SubSVList.ContainsKey(count))
                                 {
-                                    var subSV = Instantiate(subSVPrefab).GetComponent<SubSV>();
-                                    SubSVList[count] = subSV;
+                                    var subSV = SubSVList[count];
                                     if (subSV.SVList.Count == 0 || subSV.SVList[^1] != speed)
                                     {
                                         subSV.SVList.Add(speed);
@@ -610,7 +614,8 @@ public class JsonDataLoader : MonoBehaviour
                                 }
                                 else
                                 {
-                                    var subSV = SubSVList[count];
+                                    var subSV = Instantiate(subSVPrefab).GetComponent<SubSV>();
+                                    SubSVList.Add(count, subSV);
                                     if (subSV.SVList.Count == 0 || subSV.SVList[^1] != speed)
                                     {
                                         subSV.SVList.Add(speed);

@@ -20,7 +20,7 @@ public class AudioTimeProvider : MonoBehaviour
     public float startTime;
     public long ticks;
 
-    public SubSV[] SubSVList = new SubSV[10];
+    public Dictionary<int, SubSV> SubSVList = new();
 
     public float CurrentSpeed => isRecord ? Time.timeScale : speed;
 

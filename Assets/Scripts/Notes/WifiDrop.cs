@@ -248,6 +248,7 @@ public class WifiDrop : NoteLongDrop,IFlasher
                 var svProvider = timeProvider.SubSVList[canSVAffect];
                 lastScroll = svProvider.GetPositionAtTime(time + LastFor) - svProvider.GetPositionAtTime(time);
                 process = (lastScroll - timing) / lastScroll;
+                process = 1f - process;
             }
 
             if (process >= 1 && !processed)
