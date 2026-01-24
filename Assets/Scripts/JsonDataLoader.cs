@@ -247,7 +247,11 @@ public class JsonDataLoader : MonoBehaviour
         //新：乌蒙的UI
         levelTextM.spriteAsset.spriteSheet = MLevelsM[loadedData.diffNum];
         levelTextM.spriteAsset.material.SetTexture("_MainTex", MLevelsM[loadedData.diffNum]);
-        StringBuilder sb = new("<sprite=14>");
+        StringBuilder sb = new();
+        if (loadedData.level.Length == 1)
+        {
+            sb.Append("<space=1>");
+        }
         foreach (var item in loadedData.level)
         {
             if (int.TryParse(item.ToString(), out int lv))
