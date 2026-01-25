@@ -56,6 +56,10 @@ public class JsonDataLoader : MonoBehaviour
     public Sprite[] LvBackgroundsM = new Sprite[8];
     public Sprite[] TabsM = new Sprite[8];
     public Texture2D[] MLevelsM = new Texture2D[8];
+    public GameObject QuestionM;
+    public GameObject TabUTGM;
+    public Text UTGTextM;
+    public GameObject TabUTG2pM;
 
     private Dictionary<int, SubSV> SubSVList;
 
@@ -247,7 +251,27 @@ public class JsonDataLoader : MonoBehaviour
         //新：乌蒙的UI
         levelTextM.spriteAsset.spriteSheet = MLevelsM[loadedData.diffNum];
         levelTextM.spriteAsset.material.SetTexture("_MainTex", MLevelsM[loadedData.diffNum]);
+
+        UTGTextM.text = "";
+        TabUTG2pM.SetActive(false); //保证初始状态
+
         StringBuilder sb = new();
+        if (loadedData.level.StartsWith('%'))
+        {
+            var last = loadedData.level.LastIndexOf('%');
+
+            if (last != 0)
+            {
+                UTGTextM.text = loadedData.level[1..last];
+                loadedData.level = loadedData.level[(last + 1)..];
+            }
+
+            if (loadedData.level[0] == '!') //shit!!!此时必定是截掉%%段还有!的情况
+            {
+                TabUTG2pM.SetActive(true);
+                loadedData.level = loadedData.level[1..];
+            }
+        }
         if (loadedData.level.Length == 1)
         {
             sb.Append("<space=1>");
@@ -282,8 +306,13 @@ public class JsonDataLoader : MonoBehaviour
         bpmTextM.text = "BPM " + loadedData.wholebpm;
         cardImageM.sprite = cardImagesM[loadedData.diffNum];
         LvBackgroundM.sprite = LvBackgroundsM[loadedData.diffNum];
+
+        QuestionM.SetActive(loadedData.level.EndsWith('?'));
+        loadedData.level = loadedData.level.Replace("?", "");
+
         if (loadedData.diffNum != 6)
         {
+            TabUTGM.SetActive(false);
             if (loadedData.mode == ChartMode.Standard)
             {
                 Modes[0].SetActive(true);
@@ -303,6 +332,7 @@ public class JsonDataLoader : MonoBehaviour
             Modes[1].SetActive(false);
             TabM[0].gameObject.SetActive(false);
             TabM[1].gameObject.SetActive(false);
+            TabUTGM.SetActive(true);
         }
 
         CountNoteSum(loadedData);
