@@ -12,6 +12,8 @@
 ## 注意/ATTENTION
 该项目仅为个人维护/修改版本，和官方没什么关系（）
 
+下载MaiMuriDX扩展包 / Download MaiMuriDX Extension Package：[MajMuriDX Release](https://github.com/re-poem/MajdataViewX/releases/tag/MajMuriDX)
+
 ## Credits
 
 - Main Programmer:
