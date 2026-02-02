@@ -465,8 +465,8 @@ public class WifiDrop : NoteLongDrop,IFlasher
     void UpdateStar()
     {
         var timing = timeProvider.AudioTime - time;
-        var process = (LastFor - timing) / LastFor;
-        process = 1f - process;
+        var process = 1f - (LastFor - timing) / LastFor;
+        if (LastFor == 0) process = 1;
         var pos = (slideBars.Count - 1) * process;
 
         if (process >= 1)

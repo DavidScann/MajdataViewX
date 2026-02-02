@@ -743,6 +743,7 @@ public class SlideDrop : NoteLongDrop, IFlasher
         star_slide.transform.localScale = new Vector3(1.5f, 1.5f, 1.5f);
 
         var process = MathF.Min((LastFor - GetRemainingTime()) / LastFor, 1);
+        if (LastFor == 0) process = 1;
         var indexProcess = (slidePositions.Count - 1) * process;
         var index = (int)indexProcess;
         var pos = indexProcess - index;
