@@ -691,12 +691,13 @@ public class JsonDataLoader : MonoBehaviour
                         sensorGroups.Add(newGroup);
                     }
                     List<TouchGroup> touchGroups = new();
-                    var memberMapping = members.ToDictionary(x => x.GetSensor());
+                    var groupedMembers = members.GroupBy(x => x.GetSensor());
                     foreach (var group in sensorGroups)
                     {
                         touchGroups.Add(new TouchGroup()
                         {
-                            Members = group.Select(x => memberMapping[x]).ToArray()
+                            Members = group.SelectMany(x => groupedMembers.Where(g => g.Key == x)
+                                                                          .SelectMany(g => g)).ToArray()
                         });
                     }
                     foreach (var member in members)
@@ -740,6 +741,7 @@ public class JsonDataLoader : MonoBehaviour
             {
                 GameObject.Find("ErrText").GetComponent<Text>().text =
                     "在第" + (timing.RawTextPositionY + 1) + "行发现问题：\n" + e.Message;
+                UnityEngine.Debug.LogError(e);
             }
         }
         noteParserTask = null;
