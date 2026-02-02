@@ -10,7 +10,6 @@ public class AudioTimeProvider : MonoBehaviour
     public List<float> SVList = new();
     public List<float> SVTime = new();
     private List<Func<float, float>> positionFunctions = new List<Func<float, float>>();
-    private List<float> segmentStarts = new List<float>();
     public float ScrollDist; //表示当前状况在正常流速且无SC下的时间，没有出现scene control的时候与Audio Time相同
     public bool isStart;
     public bool isRecord;
@@ -85,23 +84,21 @@ public class AudioTimeProvider : MonoBehaviour
         float lastSpeed = 1f;
 
         positionFunctions.Clear();
-        segmentStarts.Clear();
+
+        // 开头必定有一个兜底
+        positionFunctions.Add((t) => t);
+
         if (SVTime.Count == 1 && SVList.Count == 1)
         {
             if (SVTime[0] > 0)
             {
-                positionFunctions.Add((t) => t);
-                segmentStarts.Add(0);
                 lastPosition = SVTime[0];
                 lastTime = SVTime[0];
             }
             positionFunctions.Add((t) => lastPosition + SVList[0] * (t - lastTime));
-            segmentStarts.Add(lastPosition);
             UnityEngine.Debug.Log($"Single Segment Case: Start = {lastPosition}, Speed = {SVList[0]}");
             return;
         }
-        positionFunctions.Add((t) => t);
-        segmentStarts.Add(0);
         for (int i = 0; i < SVTime.Count - 1; i++)
         {
             float segmentDuration = SVTime[i] - lastTime; // 上一个区间的持续时间
@@ -119,17 +116,15 @@ public class AudioTimeProvider : MonoBehaviour
                 return lP + lS * (t - lT);
             };
             positionFunctions.Add(segmentFunction);
-            segmentStarts.Add(lastPosition);
             
         }
-        lastPosition += lastSpeed * (SVTime[SVTime.Count - 1] - lastTime);
-        lastTime = SVTime[SVTime.Count - 1];
-        lastSpeed = SVList[SVList.Count - 1];
+        lastPosition += lastSpeed * (SVTime[^1] - lastTime);
+        lastTime = SVTime[^1];
+        lastSpeed = SVList[^1];
         float llP = lastPosition;
         float llS = lastSpeed;
         float llT = lastTime;
         positionFunctions.Add((t) => llP + llS * (t - llT));
-        segmentStarts.Add(lastPosition);
         UnityEngine.Debug.Log($"Segment Case Last: StartTime = {lastTime}, Start = {lastPosition}, Speed = {lastSpeed}");
     }
 
@@ -140,7 +135,7 @@ public class AudioTimeProvider : MonoBehaviour
             return AudioT;
         if (AudioT < SVTime[0])
             return AudioT;
-        if (AudioT >= SVTime[SVTime.Count - 1])
+        if (AudioT >= SVTime[^1])
             return positionFunctions[SVTime.Count](AudioT);
         for (int i = 0; i < SVTime.Count; i++)
         {

@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using MajSimai;
+using System.Collections.Generic;
 
 internal class Majson
 {
@@ -13,61 +14,10 @@ internal class Majson
     public ChartMode mode = ChartMode.Deluxe;
 }
 
-internal class SimaiTimingPoint
-{
-    public float currentBpm;
-    public bool havePlayed;
-    public float HSpeed = 1.0f;
-    public string noteContent;
-    public List<SimaiNote> noteList = new();
-    public float SVeloc = 1.0f;
-    public int rawTextPositionX;
-    public int rawTextPositionY;
-    public double time;
-}
-
 public enum ChartMode
 {
     Standard,
     Deluxe
-}
-
-internal enum SimaiNoteType
-{
-    Tap,
-    Slide,
-    Hold,
-    Touch,
-    TouchHold,
-    NoneOrCmd
-}
-
-internal class SimaiNote
-{
-    public double holdTime = 0d;
-    public bool isBreak = false;
-    public bool isEx = false;
-    public bool isMute = false;
-    public bool isFakeRotate = false;
-    public bool isForceStar = false;
-    public bool isHanabi = false;
-    public bool isSlideBreak = false;
-    public bool isSlideMute = false;
-    public bool isSlideNoHead = false;
-    public bool isUnplayable = false;
-    public int canSVAffect = 1;
-
-    public string noteContent; //used for star explain
-    public SimaiNoteType noteType;
-
-    public double slideStartTime = 0d;
-    public double slideTime = 0d;
-
-    public int startPosition = 1; //键位（1-8）
-    public char touchArea = ' ';
-
-    public string kSkin = "";
-    public string kWav = "";
 }
 
 internal class EditRequestjson
