@@ -55,7 +55,7 @@ public class CustomSkin : MonoBehaviour
     // Start is called before the first frame update
     private void Start()
     {
-        var path = new DirectoryInfo(Application.dataPath).Parent.FullName + "/Skin/";
+        var path = new DirectoryInfo(Application.dataPath).Parent.FullName + "/Skin";
         Outline = gameObject.GetComponent<SpriteRenderer>();
         print(path);
 
