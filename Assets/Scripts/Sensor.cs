@@ -1,5 +1,6 @@
 using Assets.Scripts.Types;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -80,24 +81,29 @@ public class Sensor : MonoBehaviour
             print($"Sensor:{Type} Off");
         }
     }
-    public void Click()
+    public IEnumerator Click()
     {
-        if (Status == SensorStatus.On)
-            return;
-        else if (OnStatusChanged != null)
-        {
-            Status = SensorStatus.On;
-            OnStatusChanged(this, new InputEventArgs()
-            {
-                IsButton = false,
-                Type = Type,
-                OldStatus = SensorStatus.Off,
-                Status = SensorStatus.On
-            });
-            IsJudging = false;
-            print($"Sensor:{Type} Click");
-            Status = SensorStatus.Off;
-        }
+        var guid = Guid.NewGuid();
+        SetOn(guid);
+        yield return null;
+        yield return null; // 等待2帧模拟真实点击
+        SetOff(guid);
+        //if (Status == SensorStatus.On)
+        //    return;
+        //else if (OnStatusChanged != null)
+        //{
+        //    Status = SensorStatus.On;
+        //    OnStatusChanged(this, new InputEventArgs()
+        //    {
+        //        IsButton = false,
+        //        Type = Type,
+        //        OldStatus = SensorStatus.Off,
+        //        Status = SensorStatus.On
+        //    });
+        //    IsJudging = false;
+        //    print($"Sensor:{Type} Click");
+        //    Status = SensorStatus.Off;
+        //}
     }
     // Start is called before the first frame update
     void Start()

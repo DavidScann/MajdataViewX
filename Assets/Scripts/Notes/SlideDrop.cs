@@ -42,13 +42,20 @@ public class SlideDrop : NoteLongDrop, IFlasher
     List<SensorType> boundSensors = new();
     List<Sensor> judgeSensors = new();
     List<Sensor> triggerSensors = new(); // AutoPlay; 标记已触发的Sensor 
-    List<JudgeArea> judgeQueue = new(); // 判定队列
+    public List<JudgeArea> judgeQueue = new(); // 判定队列
     List<JudgeArea> _judgeQueue = new(); // 判定队列
 
     public ConnSlideInfo ConnectInfo { get; set; } = new();
     public bool isFinished { get => judgeQueue.Count == 0; }
-    public bool isPendingFinish { get => judgeQueue.Count == 1; }
-    
+    public bool isPendingFinish { get => judgeQueue.Count == 1 && canBePendingFinish; }
+
+    /// <summary>
+    /// SHIT CODE!!!!!
+    /// 当1>2>3这种情况时，由于满足3区条件，不能跳掉A2区
+    /// 所以不能准备完成，不然会出现>3单独被完成的情况，所以以此来限制
+    /// </summary>
+    bool canBePendingFinish = true;
+
 
     Animator fadeInAnimator;
 
@@ -216,24 +223,25 @@ public class SlideDrop : NoteLongDrop, IFlasher
         }
         if (slideType is "line3" or "line7")// 1-3
         {
-            judgeQueue[1].CanSkip = ConnectInfo.IsConnSlide;
+            //judgeQueue[1].CanSkip = ConnectInfo.IsConnSlide;
             judgeQueue[1].AddArea(judgeSensors[1].Type + 8);
             registerSensors.Add(sManager.GetSensor(judgeSensors[1].Type + 8));
         }
-        else if (slideType == "circle3")// 1^3
-            judgeQueue[1].CanSkip = ConnectInfo.IsConnSlide;
+        //else if (slideType == "circle3")// 1^3
+            //judgeQueue[1].CanSkip = ConnectInfo.IsConnSlide;
         else if (slideType[0] == 'L')// 1V3
         {
-            judgeQueue[1].CanSkip = ConnectInfo.IsConnSlide;
+            //judgeQueue[1].CanSkip = ConnectInfo.IsConnSlide;
             judgeQueue[1].AddArea(judgeSensors[1].Type + 8);
             registerSensors.Add(sManager.GetSensor(judgeSensors[1].Type + 8));
             if (slideType == "L5")// 1V35
             {
-                judgeQueue[3].CanSkip = ConnectInfo.IsConnSlide;
+                //judgeQueue[3].CanSkip = ConnectInfo.IsConnSlide;
                 judgeQueue[3].AddArea(judgeSensors[3].Type + 8);
                 registerSensors.Add(sManager.GetSensor(judgeSensors[3].Type + 8));
             }
         }
+
         if (ConnectInfo.IsConnSlide && ConnectInfo.IsGroupPartEnd)
             judgeQueue.LastOrDefault().SetIsLast();
         else if (ConnectInfo.IsConnSlide)
@@ -249,6 +257,22 @@ public class SlideDrop : NoteLongDrop, IFlasher
         }
 
     }
+
+    public void SetCanSkip(int totalJudgeAreaCount)
+    {
+        if (ConnectInfo.IsConnSlide && totalJudgeAreaCount == 3 && ConnectInfo.IsGroupPartHead)
+        {
+            // 只有类似1>2>3的情况
+            //judgeQueue[1].CanSkip = false; 
+            canBePendingFinish = false;
+        }
+        else if (!ConnectInfo.IsConnSlide && judgeQueue.Count == 3)
+        {
+            // 类似1-3的情况
+            judgeQueue[1].CanSkip = false;
+        }
+    }
+
     /// <summary>
     /// Connection Slide
     /// <para>强制完成该Slide</para>
@@ -429,8 +453,18 @@ public class SlideDrop : NoteLongDrop, IFlasher
     /// </summary>
     public void Check()
     {
-        if (isFinished || !canCheck)
+        if (!canCheck)
             return;
+        if (isFinished)
+        {
+            //if (ConnectInfo.Parent != null) //防止类似1>2>3这种情况直接被完成了然后父Slide还卡在那
+            //{
+            //    if (!ConnectInfo.ParentFinished)
+            //        ConnectInfo.Parent.GetComponent<SlideDrop>().ForceFinish();
+            //}
+            //1>2>3不能通过跳区直接完成，这一段作废
+            return;
+        }
         else if (isChecking)
             return;
         else if (InputManager.Mode is AutoPlayMode.Enable or AutoPlayMode.Random)
@@ -438,7 +472,7 @@ public class SlideDrop : NoteLongDrop, IFlasher
         isChecking = true;
         if (ConnectInfo.Parent != null && judgeQueue.Count < _judgeQueue.Count)
         {
-            if(!ConnectInfo.ParentFinished)
+            if (!ConnectInfo.ParentFinished)
                 ConnectInfo.Parent.GetComponent<SlideDrop>().ForceFinish();
         }
 
@@ -447,21 +481,21 @@ public class SlideDrop : NoteLongDrop, IFlasher
 
         if (judgeQueue.Count >= 2)
             second = judgeQueue[1];
-            var fType = first.GetSensorTypes();
-            foreach (var t in fType)
-            {
-                var sensor = sManager.GetSensor(t);
-                first.Judge(t, sensor.Status);
-            }
+        var fType = first.GetSensorTypes();
+        foreach (var t in fType)
+        {
+            var sensor = sManager.GetSensor(t);
+            first.Judge(t, sensor.Status);
+        }
 
         if (second is not null && (first.CanSkip || first.On))
         {
-                var sType = second.GetSensorTypes();
-                foreach (var t in sType)
-                {
-                    var sensor = sManager.GetSensor(t);
-                    second.Judge(t, sensor.Status);
-                }
+            var sType = second.GetSensorTypes();
+            foreach (var t in sType)
+            {
+                var sensor = sManager.GetSensor(t);
+                second.Judge(t, sensor.Status);
+            }
 
             if (second.IsFinished)
             {

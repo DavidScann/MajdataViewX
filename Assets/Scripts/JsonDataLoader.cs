@@ -480,7 +480,7 @@ public class JsonDataLoader : MonoBehaviour
                 cardImage.color = diffColors[loadedData.diffNum];
 
                 CountNoteSum(loadedData);
-                var lastNoteTime = loadedData.timingList.Last().Timing;
+                var lastNoteTime = loadedData.timingList.Count > 0 ? loadedData.timingList.Last().Timing : 0d;
 
                 noteParserTask = StartCoroutine(LoadNotes(loadedData.timingList, ignoreOffset, lastNoteTime));
 
@@ -1044,6 +1044,7 @@ public class JsonDataLoader : MonoBehaviour
         List<SlideDrop> subSlides = new();
         float totalLen = (float)subSlide.Select(x => x.SlideTime).Sum();
         float totalSlideLen = 0;
+        int totalJudgeAreaCount = 0;
         for (var i = 0; i <= subSlide.Count - 1; i++)
         {
             bool isConn = subSlide.Count != 1;
@@ -1073,8 +1074,13 @@ public class JsonDataLoader : MonoBehaviour
         {
             s.Initialize();
             totalSlideLen += s.GetSlideLength();
+            totalJudgeAreaCount += s.judgeQueue.Count;
         });
-        subSlides.ForEach(s => s.ConnectInfo.TotalSlideLen = totalSlideLen);
+        totalJudgeAreaCount -= (subSlides.Count - 1);
+        subSlides.ForEach(s => {
+            s.ConnectInfo.TotalSlideLen = totalSlideLen;
+            s.SetCanSkip(totalJudgeAreaCount);
+        });
     }
 
     private GameObject InstantiateWifi(SimaiTimingPoint timing, SimaiNote note)

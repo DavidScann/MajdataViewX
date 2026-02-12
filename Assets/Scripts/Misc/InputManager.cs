@@ -139,9 +139,9 @@ public class InputManager : MonoBehaviour
     public void ClickSensor(SensorType target)
     {
         var sensor = GetSensor(target);
-        if (sensor is null)
+        if (sensor == null)
             throw new Exception($"{target} Sensor not found.");
-        sensor.Click();
+        StartCoroutine(sensor.Click());
     }
 
     public void SetBusy(InputEventArgs args)
