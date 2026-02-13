@@ -1096,7 +1096,8 @@ public class JsonDataLoader : MonoBehaviour
 
         var GOnote = Instantiate(starPrefab, notes.transform);
         var NDCompo = GOnote.GetComponent<StarDrop>();
-        noteManager.AddNote(GOnote, noteIndex[note.StartPosition]++);
+        if(!note.IsSlideNoHead)
+            noteManager.AddNote(GOnote, noteIndex[note.StartPosition]++);
 
 
         // note的图层顺序
