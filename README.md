@@ -1,7 +1,8 @@
 <div align="center">
-  <img src="https://user-images.githubusercontent.com/51612155/226972003-1928ce4d-56ce-497d-b958-d6aec38a602c.png" width="120px" />
+  <img src="https://github.com/user-attachments/assets/383a065e-b9a4-40b6-a06f-720857de883c" width="160px" />
   
   <h1>MajdataView&Edit X</h1>
+
   
   ![MajdataX Prisy](https://img.shields.io/badge/MajdataX-Prisy-50469C)
   [![GitHub Release](https://img.shields.io/github/v/release/re-poem/MajdataViewX?include_prereleases&sort=semver&display_name=release&label=version)](https://github.com/re-poem/MajdataViewX/releases)
@@ -28,6 +29,14 @@
 
 使用设置菜单 / Please use the setting menu 
 
+## 相关链接 / Related Links
+
+- MajdataX 的 QQ 群聊：361736398 (更快地反馈问题)
+- Majdata 系 [官方Discord](https://discord.com/invite/AcWgZN7j6K)
+- [Majdata Net](https://majdata.net/)
+- [MajdataPlay](https://github.com/TeamMajdata/MajdataPlay_Build)
+- 真·下一代谱面编辑器-[MajdataEdit-Neo](https://github.com/LingFeng-bbben/MajdataEdit-Neo)
+
 <br/>
 <br/>
 
@@ -37,6 +46,7 @@
 
 - [中文 Wiki](https://github.com/LingFeng-bbben/MajdataView/wiki)
 - [English Guide On Charting](https://rentry.co/maiguide#making-the-chart)
+- [X新功能Wiki](https://github.com/re-poem/MajdataViewX/wiki)
 
 ## 分支说明 / Branch Description
 
@@ -53,6 +63,7 @@
 2. 部分语法规则较为宽松，可以在 Majdata 中运行的谱面可能无法在其他软件中（如 maipad、simai、Astro）运行
 3. 软件渲染可能不支持 3:00 以上的歌，可以缩小下面的预览图解决（很难修！！）
 4. 使用内置录屏时，请确保 view 的分辨率是偶数。点击之后可能会有较长卡顿，请耐心等待。
+5. 进行铺面共享时，请不要一次性更改太多内容，比如Ctrl+A+BackSpace()，会导致谱面同步延迟甚至失败
 
 > 其他问题见 [MajdataX 的 issue 页面](https://github.com/re-poem/MajdataViewX/issues) 或者 **[提交 Issue](https://github.com/re-poem/MajdataViewX/issues/new)**
 
@@ -66,7 +77,7 @@
 - **[bbben](https://github.com/LingFeng-bbben)**
 - **[Moying-moe](https://github.com/Moying-moe/maimaiMuriDetector)**
 - **[Lezi](https://github.com/LeZi9916)**
-- **RE_POEM** ([Bilibili](https://space.bilibili.com/3546731771857347))
+- **RE_POEM**
 
 ### Contributors
 
