@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.WebSockets;
 using System.Text;
 using System.Text.RegularExpressions;
 using TMPro;
@@ -751,6 +752,80 @@ public class JsonDataLoader : MonoBehaviour
                                 {
                                     GameObject.Find("objMeter").GetComponent<TextMeshProUGUI>().text = $"{cmd[2]}\n{cmd[3]}";
                                 };
+                            }
+                        }
+                        else if (cmd[0] == "scene")
+                        {
+                            var GOnote = Instantiate(cmdPrefab);
+                            var NDCompo = GOnote.GetComponent<CmdDrop>();
+                            NDCompo.time = (float)timing.time;
+
+                            if (cmd[1] == "border")
+                            {
+                                if (cmd[2] == "hide")
+                                {
+                                    NDCompo.times = 1;
+                                    NDCompo.Handler = () =>
+                                    {
+                                        GameObject.Find("RawImageR").SetActive(false);
+                                        GameObject.Find("RawImageL").SetActive(false);
+                                        GameObject.Find("RawImageT").SetActive(false);
+                                        GameObject.Find("RawImageB").SetActive(false);
+                                        GameObject.Find("1080Circle_Rev").SetActive(false);
+                                    };
+                                }
+                                else if (cmd[2] == "show")
+                                {
+                                    NDCompo.times = 1;
+                                    NDCompo.Handler = () =>
+                                    {
+                                        GameObject.Find("RawImageR").SetActive(true);
+                                        GameObject.Find("RawImageL").SetActive(true);
+                                        GameObject.Find("RawImageT").SetActive(true);
+                                        GameObject.Find("RawImageB").SetActive(true);
+                                        GameObject.Find("1080Circle_Rev").SetActive(true);
+                                    };
+                                }
+                            }
+                            else if (cmd[1] == "circle")
+                            {
+                                if (cmd[2] == "reset")
+                                {
+                                    NDCompo.times = 1;
+                                    NDCompo.Handler = () =>
+                                    {
+                                        Camera.main.transform.SetPositionAndRotation(new Vector3(0, 0, -10), Quaternion.identity);
+                                        Camera.main.orthographicSize = 5;
+                                    };
+                                }
+                                else if (float.TryParse(cmd[3] + (cmd.Length == 5 ? '.' + cmd[4] : ""), out var value))
+                                {
+                                    var pos = Camera.main.transform.position;
+                                    if (cmd[2] == "x")
+                                    {
+                                        NDCompo.times = 1;
+                                        NDCompo.Handler = () =>
+                                            Camera.main.transform.position = new Vector3(-value, pos.y, pos.z);
+                                    }
+                                    else if (cmd[2] == "y")
+                                    {
+                                        NDCompo.times = 1;
+                                        NDCompo.Handler = () =>
+                                            Camera.main.transform.position = new Vector3(pos.x, -value, pos.z);
+                                    }
+                                    else if (cmd[2] == "rot")
+                                    {
+                                        NDCompo.times = 1;
+                                        NDCompo.Handler = () =>
+                                            Camera.main.transform.Rotate(new Vector3(0, 0, value));
+                                    }
+                                    else if (cmd[2] == "scale")
+                                    {
+                                        NDCompo.times = 1;
+                                        NDCompo.Handler = () =>
+                                            Camera.main.orthographicSize = 5 / value;
+                                    }
+                                }
                             }
                         }
                         else if (cmd[0] == "sv")
