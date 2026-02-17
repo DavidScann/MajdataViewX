@@ -1,9 +1,11 @@
 ﻿using Assets.Scripts.Interfaces;
+using Assets.Scripts.Notes;
 using Assets.Scripts.Types;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using static UnityEngine.Networking.UnityWebRequest;
 #nullable enable
 public class SlideDrop : NoteLongDrop, IFlasher
 {
@@ -13,6 +15,7 @@ public class SlideDrop : NoteLongDrop, IFlasher
     public Sprite spriteNormal;
     public Sprite spriteEach;
     public Sprite spriteBreak;
+    public Sprite spriteMine;
     public RuntimeAnimatorController slideShine;
     public RuntimeAnimatorController judgeBreakShine;
     public GameObject parent;
@@ -21,6 +24,7 @@ public class SlideDrop : NoteLongDrop, IFlasher
     public bool isJustR;
     public bool isSpecialFlip; // fixes known star problem
     public bool isBreak;
+
 
     public float timeStart;
 
@@ -160,6 +164,12 @@ public class SlideDrop : NoteLongDrop, IFlasher
             sr.color = new Color(1f, 1f, 1f, 0f);
             sr.sortingOrder = sortIndex--;
             sr.sortingLayerName = "Slide";
+
+            sr.sprite = spriteNormal; //注意赋值顺序
+            if (isEach)
+            {
+                sr.sprite = spriteEach;
+            }
             if (isBreak)
             {
                 sr.sprite = spriteBreak;
@@ -172,13 +182,9 @@ public class SlideDrop : NoteLongDrop, IFlasher
                 //anim.enabled = false;
                 //animators.Add(anim);
             }
-            else if (isEach)
+            if (isMine)
             {
-                sr.sprite = spriteEach;
-            }
-            else
-            {
-                sr.sprite = spriteNormal;
+                sr.sprite = spriteMine;
             }
         }
 
@@ -299,7 +305,6 @@ public class SlideDrop : NoteLongDrop, IFlasher
         var allSensors = judgeQueue.SelectMany(x => x.GetSensorTypes())
                                    .GroupBy(x => x)
                                    .Select(x => x.Key);
-        var a = judgeQueue.Select(x => x.GetSensorTypes()).ToList();
         inputManager = GameObject.Find("Input").GetComponent<InputManager>();
         boundSensors.AddRange(allSensors);
         foreach (var sensor in allSensors)
@@ -362,6 +367,7 @@ public class SlideDrop : NoteLongDrop, IFlasher
         if (timing > 0)
             Running();
 
+        //此处对mine音符的处理：一进judge就判定为miss并销毁，能进too late就判为perfect
         if (ConnectInfo.IsConnSlide)
         {
             if(ConnectInfo.IsGroupPartEnd && isFinished)
@@ -380,7 +386,9 @@ public class SlideDrop : NoteLongDrop, IFlasher
             Judge();
         }
         else if (timeProvider.AudioTime - forceJudgeTiming >= 0)
+        {
             TooLateJudge();
+        }
     }
     // Update is called once per frame
     private void Update()
@@ -457,12 +465,12 @@ public class SlideDrop : NoteLongDrop, IFlasher
             return;
         if (isFinished)
         {
-            //if (ConnectInfo.Parent != null) //防止类似1>2>3这种情况直接被完成了然后父Slide还卡在那
+            //if (ConnectInfo.Parent != null) //防止类似1>2>3这种情况2>3能判定为被完成了然后父Slide还卡在那
             //{
             //    if (!ConnectInfo.ParentFinished)
             //        ConnectInfo.Parent.GetComponent<SlideDrop>().ForceFinish();
             //}
-            //1>2>3不能通过跳区直接完成，这一段作废
+            //1>2>3不能通过跳区直接完成了，这一段作废
             return;
         }
         else if (isChecking)
@@ -537,7 +545,7 @@ public class SlideDrop : NoteLongDrop, IFlasher
     /// </summary>
     void Running()
     {
-        if (star_slide == null)
+        if (star_slide == null || isMine)
             return;
         else if (InputManager.Mode is AutoPlayMode.Enable or AutoPlayMode.Random or AutoPlayMode.Disable)
             return;
@@ -573,6 +581,14 @@ public class SlideDrop : NoteLongDrop, IFlasher
     /// </summary>
     void Judge()
     {
+        if (isMine)
+        {
+            JudgeResult = JudgeType.Perfect; //走一路反转
+            SetJust();
+            isJudged = true;
+            DestroySelf();
+            return;
+        }
         if (!ConnectInfo.IsGroupPartEnd && ConnectInfo.IsConnSlide)
             return;
         var starTiming = timeStart + (time - timeStart) * 0.75;
@@ -620,7 +636,7 @@ public class SlideDrop : NoteLongDrop, IFlasher
                     judge = JudgeType.Perfect;
             }            
             print($"Slide diff : {MathF.Round(diff * 1000,2)} ms");
-            judgeResult = judge ?? JudgeType.Miss;
+            JudgeResult = judge ?? JudgeType.Miss;
             SetJust();
             isJudged = true;
         }
@@ -631,7 +647,7 @@ public class SlideDrop : NoteLongDrop, IFlasher
     }
     void SetJust()
     {
-        switch (judgeResult)
+        switch (JudgeResult)
         {
             case JudgeType.FastGreat2:
             case JudgeType.FastGreat1:
@@ -648,6 +664,9 @@ public class SlideDrop : NoteLongDrop, IFlasher
             case JudgeType.LateGreat2:
             case JudgeType.LateGreat:
                 slideOK.GetComponent<LoadJustSprite>().setLateGr();
+                break;
+            case JudgeType.Miss:
+                slideOK.GetComponent<LoadJustSprite>().setMiss();
                 break;
 
         }
@@ -686,6 +705,13 @@ public class SlideDrop : NoteLongDrop, IFlasher
     /// </summary>
     void TooLateJudge()
     {
+        if (isMine)
+        {
+            JudgeResult = JudgeType.Miss; //走一路反转
+            isJudged = true;
+            DestroySelf();
+            return;
+        }
         if (judgeQueue.Count == 1)
             slideOK.GetComponent<LoadJustSprite>().setLateGd();
         else
@@ -700,7 +726,6 @@ public class SlideDrop : NoteLongDrop, IFlasher
     /// <param name="onlyStar"></param>
     void DestroySelf(bool onlyStar = false)
     {
-        
         if (onlyStar)
         { 
             Destroy(star_slide);
@@ -743,17 +768,17 @@ public class SlideDrop : NoteLongDrop, IFlasher
             switch(InputManager.Mode)
             {
                 case AutoPlayMode.Enable:
-                    judgeResult = JudgeType.Perfect;
+                    JudgeResult = JudgeType.Perfect;
                     SetJust();
                     break;
                 case AutoPlayMode.Random:
-                    judgeResult = (JudgeType)UnityEngine.Random.Range(1, 14);
+                    JudgeResult = (JudgeType)UnityEngine.Random.Range(1, 14);
                     SetJust();
                     break;
             }
             // 只有组内最后一个Slide完成 才会显示判定条并增加总数
-            objectCounter.ReportResult(this, judgeResult, isBreak);
-            if (isBreak && judgeResult == JudgeType.Perfect)
+            objectCounter.ReportResult(this, JudgeResult, isBreak);
+            if (isBreak && JudgeResult == JudgeType.Perfect)
                 slideOK.GetComponent<Animator>().runtimeAnimatorController = judgeBreakShine;
             slideOK.SetActive(true);
         }

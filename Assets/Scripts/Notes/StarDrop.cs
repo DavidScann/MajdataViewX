@@ -15,6 +15,7 @@ public class StarDrop : TapBase
     public Sprite eachSpr_Double;
     public Sprite breakSpr_Double;
     public Sprite exSpr_Double;
+    public Sprite mineSpr_Double;
 
     public GameObject slide;
     private void Start()
@@ -25,20 +26,24 @@ public class StarDrop : TapBase
         {
             exSpriteRender.sprite = exSpr_Double;
             spriteRenderer.sprite = tapSpr_Double;
-            if (isEX) exSpriteRender.color = exEffectTap;
+            if (isEX)
+            {
+                exSpriteRender.color = exEffectTap;
+            }
             if (isEach)
             {
-                lineSpriteRender.sprite = eachLine;
                 spriteRenderer.sprite = eachSpr_Double;
                 if (isEX) exSpriteRender.color = exEffectEach;
             }
-
             if (isBreak)
             {
-                lineSpriteRender.sprite = breakLine;
                 spriteRenderer.sprite = breakSpr_Double;
                 if (isEX) exSpriteRender.color = exEffectBreak;
                 spriteRenderer.material = breakMaterial;
+            }
+            if (isMine)
+            {
+                spriteRenderer.sprite = mineSpr;
             }
         }
         else
@@ -48,14 +53,12 @@ public class StarDrop : TapBase
             if (isEX) exSpriteRender.color = exEffectTap;
             if (isEach)
             {
-                lineSpriteRender.sprite = eachLine;
                 spriteRenderer.sprite = eachSpr;
                 if (isEX) exSpriteRender.color = exEffectEach;
             }
 
             if (isBreak)
             {
-                lineSpriteRender.sprite = breakLine;
                 spriteRenderer.sprite = breakSpr;
                 if (isEX) exSpriteRender.color = exEffectBreak;
                 spriteRenderer.material = breakMaterial;

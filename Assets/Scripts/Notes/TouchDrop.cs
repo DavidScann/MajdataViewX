@@ -1,4 +1,5 @@
 ﻿using Assets.Scripts;
+using Assets.Scripts.Notes;
 using Assets.Scripts.Types;
 using System;
 using Unity.Burst.Intrinsics;
@@ -6,6 +7,8 @@ using UnityEngine;
 #nullable enable
 public class TouchDrop : TouchBase
 {
+    public bool isBreak;
+
     public GameObject justEffect;
 
     public GameObject multTouchEffect2;
@@ -13,14 +16,17 @@ public class TouchDrop : TouchBase
 
     public Sprite fanNormalSprite;
     public Sprite fanEachSprite;
+    public Sprite fanMineSprite;
 
     public Sprite pointNormalSprite;
     public Sprite pointEachSprite;
+    public Sprite pointMineSprite;
 
     public Sprite justSprite;
 
     public Sprite[] multTouchNormalSprite = new Sprite[2];
     public Sprite[] multTouchEachSprite = new Sprite[2];
+    public Sprite[] multTouchMineSprite = new Sprite[2];
 
     public GameObject[] fans;
     private readonly SpriteRenderer[] fansSprite = new SpriteRenderer[7];
@@ -57,6 +63,11 @@ public class TouchDrop : TouchBase
             fansSprite[i].sortingOrder += noteSortOrder;
         }
 
+        SetfanSprite(fanNormalSprite);
+        fansSprite[4].sprite = pointNormalSprite;
+        fansSprite[5].sprite = multTouchNormalSprite[0];
+        fansSprite[6].sprite = multTouchNormalSprite[1];
+
         if (isEach)
         {
             SetfanSprite(fanEachSprite);
@@ -64,12 +75,12 @@ public class TouchDrop : TouchBase
             fansSprite[5].sprite = multTouchEachSprite[0];
             fansSprite[6].sprite = multTouchEachSprite[1];
         }
-        else
+        if (isMine)
         {
-            SetfanSprite(fanNormalSprite);
-            fansSprite[4].sprite = pointNormalSprite;
-            fansSprite[5].sprite = multTouchNormalSprite[0];
-            fansSprite[6].sprite = multTouchNormalSprite[1];
+            SetfanSprite(fanMineSprite);
+            fansSprite[4].sprite = pointMineSprite;
+            fansSprite[5].sprite = multTouchMineSprite[0];
+            fansSprite[6].sprite = multTouchMineSprite[1];
         }
 
         justEffect.GetComponent<SpriteRenderer>().sprite = justSprite;
@@ -119,14 +130,14 @@ public class TouchDrop : TouchBase
                 if (GroupInfo.Percent > 0.5f && GroupInfo.JudgeResult != null)
                 {
                     isJudged = true;
-                    judgeResult = (JudgeType)GroupInfo.JudgeResult;
+                    JudgeResult = (JudgeType)GroupInfo.JudgeResult;
                     Destroy(gameObject);
                 }
             }
         }
         else if (!isJudged)
         {
-            judgeResult = JudgeType.Miss;
+            JudgeResult = JudgeType.Miss;
             isJudged = true;
             Destroy(gameObject);
         }
@@ -138,17 +149,18 @@ public class TouchDrop : TouchBase
             switch (InputManager.Mode)
             {
                 case AutoPlayMode.Enable:
-                    judgeResult = JudgeType.Perfect;
+                    JudgeResult = JudgeType.Perfect;
                     isJudged = true;
                     break;
                 case AutoPlayMode.Random:
-                    judgeResult = (JudgeType)UnityEngine.Random.Range(1, 14);
+                    JudgeResult = (JudgeType)UnityEngine.Random.Range(1, 14);
                     isJudged = true;
                     break;
                 case AutoPlayMode.DJAuto:
                     if (isTriggered)
                         return;
-                    inputManager.ClickSensor(GetSensor());
+                    if (!isMine) //mine buda
+                        inputManager.ClickSensor(GetSensor());
                     isTriggered = true;
                     break;
             }
@@ -184,7 +196,7 @@ public class TouchDrop : TouchBase
         else
             result = JudgeType.Miss;
 
-        judgeResult = result;
+        JudgeResult = result;
         isJudged = true;
     }
     // Update is called once per frame
@@ -245,12 +257,12 @@ public class TouchDrop : TouchBase
             return;
         multTouchHandler.cancelTouch(this);
         PlayJudgeEffect();
-        if (GroupInfo is not null && judgeResult != JudgeType.Miss)
-            GroupInfo.JudgeResult = judgeResult;
-        objectCounter.ReportResult(this, judgeResult);
+        if (GroupInfo is not null && JudgeResult != JudgeType.Miss)
+            GroupInfo.JudgeResult = JudgeResult;
+        objectCounter.ReportResult(this, JudgeResult);
         objectCounter.NextTouch(sensor.Type);
 
-        if (isFirework && judgeResult != JudgeType.Miss)
+        if (isFirework && JudgeResult != JudgeType.Miss)
         {
             fireworkEffect.SetTrigger("Fire");
             firework.transform.position = transform.position;
@@ -278,7 +290,7 @@ public class TouchDrop : TouchBase
         flObj.GetChild(0).transform.rotation = GetRoation();
         var anim = obj.GetComponent<Animator>();
         var flAnim = _obj.GetComponent<Animator>();
-        switch(judgeResult)
+        switch(JudgeResult)
         {
             case JudgeType.LateGood:
             case JudgeType.FastGood:
@@ -307,10 +319,10 @@ public class TouchDrop : TouchBase
             default:
                 break;
         }
-        if(judgeResult != JudgeType.Miss)
+        if(JudgeResult != JudgeType.Miss)
             Instantiate(tapEffect, transform.position, transform.rotation);
 
-        GameObject.Find("NoteEffects").GetComponent<NoteEffectManager>().PlayFastLate(_obj,flAnim,judgeResult);
+        GameObject.Find("NoteEffects").GetComponent<NoteEffectManager>().PlayFastLate(_obj,flAnim,JudgeResult);
 
         anim.SetTrigger("touch");
     }

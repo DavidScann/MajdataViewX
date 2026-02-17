@@ -1,4 +1,5 @@
-﻿using Assets.Scripts.Types;
+﻿using Assets.Scripts.Notes;
+using Assets.Scripts.Types;
 using System;
 using UnityEngine;
 #nullable enable
@@ -15,9 +16,7 @@ public class HoldDrop : NoteLongDrop
     public Sprite exSpr;
     public Sprite breakSpr;
     public Sprite breakHoldOnSpr;
-
-    public Sprite eachLine;
-    public Sprite breakLine;
+    public Sprite mineSpr;
 
     public Sprite holdEachEnd;
     public Sprite holdBreakEnd;
@@ -40,6 +39,8 @@ public class HoldDrop : NoteLongDrop
     private SpriteRenderer lineSpriteRender;
 
     private SpriteRenderer spriteRenderer;
+
+    private bool isTouched = false; //for mine judge
 
 
     private void Start()
@@ -72,22 +73,26 @@ public class HoldDrop : NoteLongDrop
         anim.enabled = false;
         animator = anim;
 
-        if (isEX) exSpriteRender.color = exEffectTap;
+        if (isEX)
+        {
+            exSpriteRender.color = exEffectTap;
+        }
         if (isEach)
         {
             spriteRenderer.sprite = eachSpr;
-            lineSpriteRender.sprite = eachLine;
             holdEndRender.sprite = holdEachEnd;
             if (isEX) exSpriteRender.color = exEffectEach;
         }
-
         if (isBreak)
         {
             spriteRenderer.sprite = breakSpr;
-            lineSpriteRender.sprite = breakLine;
             holdEndRender.sprite = holdBreakEnd;
             if (isEX) exSpriteRender.color = exEffectBreak;
             spriteRenderer.material = breakMaterial;
+        }
+        if (isMine)
+        {
+            spriteRenderer.sprite = mineSpr;
         }
 
         spriteRenderer.forceRenderingOff = true;
@@ -123,19 +128,22 @@ public class HoldDrop : NoteLongDrop
                 case AutoPlayMode.Enable:
                     if(!isJudged)
                         objectCounter.NextNote(startPosition);
-                    judgeResult = JudgeType.Perfect;
+                    JudgeResult = JudgeType.Perfect;
                     isJudged = true;
+                    isTouched = true; //算是点到了
                     PlayHoldEffect();
-                    return;
+                    break;
                 case AutoPlayMode.DJAuto:
-                    if (!isJudged)
+                    if (!isJudged && !isMine) //mine buda
                         manager.SetSensorOn(sensor.Type, guid);
                     break;
                 case AutoPlayMode.Random:
                     if (!isJudged)
                     {
                         objectCounter.NextNote(startPosition);
-                        judgeResult = (JudgeType)UnityEngine.Random.Range(1, 14);
+                        JudgeResult = (JudgeType)UnityEngine.Random.Range(1, 14);
+                        if (isMine && JudgeResult == JudgeType.Miss) 
+                            isTouched = true; //反转后为miss必有摸
                         isJudged = true;
                     }
                     PlayHoldEffect();
@@ -148,15 +156,18 @@ public class HoldDrop : NoteLongDrop
 
         if (isJudged) // 头部判定完成后开始累计按压时长
         {
+            if (inputManager.CheckAreaStatus(sensorPos, SensorStatus.On)) isTouched = true;
             if (timing <= 0.1f) // 忽略头部6帧
                 return;
             else if (remainingTime <= 0.2f) // 忽略尾部12帧
                 return;
-            else if (!timeProvider.isStart) // 忽略暂停
+            else if (!timeProvider.isStart || InputManager.Mode is AutoPlayMode.Enable or AutoPlayMode.Random) // 忽略暂停
                 return;
             var on = inputManager.CheckAreaStatus(sensorPos,SensorStatus.On);
             if (on)
+            {
                 PlayHoldEffect();
+            }
             else
             {
                 playerIdleTime += Time.fixedDeltaTime;
@@ -166,7 +177,7 @@ public class HoldDrop : NoteLongDrop
         else if (timing > 0.15f && !isJudged) // 头部Miss
         {
             judgeDiff = 150;
-            judgeResult = JudgeType.Miss;
+            JudgeResult = JudgeType.Miss;
             isJudged = true;
             objectCounter.NextNote(startPosition);
         }
@@ -195,7 +206,6 @@ public class HoldDrop : NoteLongDrop
     }
     void Judge()
     {
-
         const int JUDGE_GOOD_AREA = 150;
         const int JUDGE_GREAT_AREA = 100;
         const int JUDGE_PERFECT_AREA = 50;
@@ -240,7 +250,7 @@ public class HoldDrop : NoteLongDrop
         else
             judgeDiff = diff;
 
-        judgeResult = result;
+        JudgeResult = result;
         isJudged = true;
         PlayHoldEffect();
     }
@@ -335,43 +345,43 @@ public class HoldDrop : NoteLongDrop
         if (HttpHandler.IsReloding)
             return;
         var realityHT = LastFor - 0.3f - (judgeDiff / 1000f);
-        var percent = MathF.Min(1, (realityHT - playerIdleTime) / realityHT);
-        JudgeType result = judgeResult;
+        var percent = Math.Clamp((realityHT - playerIdleTime) / realityHT, 0, 1);
+        JudgeType result = JudgeResult; //头判
         if(realityHT > 0)
         {
             if (percent >= 1f)
             {
-                if(judgeResult == JudgeType.Miss)
+                if(JudgeResult == JudgeType.Miss)
                     result = JudgeType.LateGood;
-                else if (MathF.Abs((int)judgeResult - 7) == 6)
-                    result = (int)judgeResult < 7 ? JudgeType.LateGreat : JudgeType.FastGreat;
+                else if (MathF.Abs((int)JudgeResult - 7) == 6)
+                    result = (int)JudgeResult < 7 ? JudgeType.LateGreat : JudgeType.FastGreat;
                 else
-                    result = judgeResult;
+                    result = JudgeResult;
             }
             else if (percent >= 0.67f)
             {
-                if (judgeResult == JudgeType.Miss)
+                if (JudgeResult == JudgeType.Miss)
                     result = JudgeType.LateGood;
-                else if (MathF.Abs((int)judgeResult - 7) == 6)
-                    result = (int)judgeResult < 7 ? JudgeType.LateGreat : JudgeType.FastGreat;
-                else if (judgeResult == JudgeType.Perfect)
-                    result = (int)judgeResult < 7 ? JudgeType.LatePerfect1 : JudgeType.FastPerfect1;
+                else if (MathF.Abs((int)JudgeResult - 7) == 6)
+                    result = (int)JudgeResult < 7 ? JudgeType.LateGreat : JudgeType.FastGreat;
+                else if (JudgeResult == JudgeType.Perfect)
+                    result = (int)JudgeResult < 7 ? JudgeType.LatePerfect1 : JudgeType.FastPerfect1;
             }
             else if (percent >= 0.33f)
             {
-                if (MathF.Abs((int)judgeResult - 7) >= 6)
-                    result = (int)judgeResult < 7 ? JudgeType.LateGood : JudgeType.FastGood;
+                if (MathF.Abs((int)JudgeResult - 7) >= 6)
+                    result = (int)JudgeResult < 7 ? JudgeType.LateGood : JudgeType.FastGood;
                 else
-                    result = (int)judgeResult < 7 ? JudgeType.LateGreat : JudgeType.FastGreat;
+                    result = (int)JudgeResult < 7 ? JudgeType.LateGreat : JudgeType.FastGreat;
             }
             else if (percent >= 0.05f)
-                result = (int)judgeResult < 7 ? JudgeType.LateGood : JudgeType.FastGood;
+                result = (int)JudgeResult < 7 ? JudgeType.LateGood : JudgeType.FastGood;
             else if (percent >= 0)
             {
-                if (judgeResult == JudgeType.Miss)
+                if (JudgeResult == JudgeType.Miss)
                     result = JudgeType.Miss;
                 else
-                    result = (int)judgeResult < 7 ? JudgeType.LateGood : JudgeType.FastGood;
+                    result = (int)JudgeResult < 7 ? JudgeType.LateGood : JudgeType.FastGood;
             }
         }
 
@@ -387,6 +397,15 @@ public class HoldDrop : NoteLongDrop
             case AutoPlayMode.Disable:
                 break;
         }
+
+        if (isMine) //覆盖掉前面的判定
+        {
+            if (isTouched)
+                result = JudgeType.Miss;
+            else
+                result = JudgeType.Perfect;
+        }
+
         var effectManager = GameObject.Find("NoteEffects").GetComponent<NoteEffectManager>();
         effectManager.PlayEffect(startPosition, isBreak, result);
         effectManager.PlayFastLate(startPosition, result);

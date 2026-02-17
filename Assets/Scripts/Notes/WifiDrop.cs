@@ -1,4 +1,5 @@
 ﻿using Assets.Scripts.Interfaces;
+using Assets.Scripts.Notes;
 using Assets.Scripts.Types;
 using System;
 using System.Collections.Generic;
@@ -6,6 +7,7 @@ using System.Linq;
 using System.Reflection;
 using UnityEditor;
 using UnityEngine;
+using static UnityEngine.Networking.UnityWebRequest;
 #nullable enable
 public class WifiDrop : NoteLongDrop,IFlasher
 {
@@ -15,9 +17,11 @@ public class WifiDrop : NoteLongDrop,IFlasher
     public Sprite[] normalSlide = new Sprite[11];
     public Sprite[] eachSlide = new Sprite[11];
     public Sprite[] breakSlide = new Sprite[11];
+    public Sprite[] mineSlide = new Sprite[11];
     public Sprite normalStar;
     public Sprite eachStar;
     public Sprite breakStar;
+    public Sprite mineStar;
 
     public RuntimeAnimatorController slideShine;
     public RuntimeAnimatorController judgeBreakShine;
@@ -90,10 +94,12 @@ public class WifiDrop : NoteLongDrop,IFlasher
         {
             star_slide[i] = Instantiate(star_slidePrefab, notes);
             spriteRenderer_star[i] = star_slide[i].GetComponent<SpriteRenderer>();
-            
+
+            spriteRenderer_star[i].sprite = normalStar;
             if (isBreak) spriteRenderer_star[i].sprite = breakStar;
-            else if (isEach) spriteRenderer_star[i].sprite = eachStar;
-            else spriteRenderer_star[i].sprite = normalStar;
+            if (isEach) spriteRenderer_star[i].sprite = eachStar;
+            if (isMine) spriteRenderer_star[i].sprite = mineStar;
+            
             star_slide[i].transform.rotation = Quaternion.Euler(0, 0, -22.5f * (8 + i + 2 * (startPosition - 1)));
             //SlidePositionEnd[i] = getPositionFromDistance(4.8f, i + 3 + startPosition);
             star_slide[i].SetActive(false);
@@ -139,6 +145,11 @@ public class WifiDrop : NoteLongDrop,IFlasher
         {
             var sr = slideBars[i].GetComponent<SpriteRenderer>();
 
+            sr.sprite = normalSlide[i]; //注意赋值顺序
+            if (isEach)
+            {
+                sr.sprite = eachSlide[i];
+            }
             if (isBreak)
             {
                 sr.sprite = breakSlide[i];
@@ -148,15 +159,11 @@ public class WifiDrop : NoteLongDrop,IFlasher
                 controller.parent = this;
                 controller.enabled = true;
             }
-            else if (isEach)
+            if (isMine)
             {
-                sr.sprite = eachSlide[i];
+                sr.sprite = mineSlide[i];
             }
-            else
-            {
-                sr.sprite = normalSlide[i];
-            }
-
+                
             sbRender.Add(sr);
             sr.color = new Color(1f, 1f, 1f, 0f);
             sr.sortingOrder = sortIndex--;
@@ -243,6 +250,13 @@ public class WifiDrop : NoteLongDrop,IFlasher
     }
     void TooLateJudge()
     {
+        if (isMine)
+        {
+            JudgeResult = JudgeType.Miss; //走一路反转
+            isJudged = true;
+            DestroySelf();
+            return;
+        }
         if (_judgeQueues.Count == 1)
             slideOK.GetComponent<LoadJustSprite>().setLateGd();
         else
@@ -320,6 +334,14 @@ public class WifiDrop : NoteLongDrop,IFlasher
     }
     void Judge()
     {
+        if (isMine)
+        {
+            JudgeResult = JudgeType.Perfect; //走一路反转
+            SetJust();
+            isJudged = true;
+            DestroySelf();
+            return;
+        }
         var timing = timeProvider.AudioTime - time;
         var starTiming = timeStart + (time - timeStart) * 0.667;
         var pTime = LastFor / areaStep.Last();
@@ -369,7 +391,7 @@ public class WifiDrop : NoteLongDrop,IFlasher
             }
 
             print($"diff : {diff} ms");
-            judgeResult = (JudgeType)judge;
+            JudgeResult = (JudgeType)judge;
             SetJust();
             isJudged = true;
         }
@@ -386,7 +408,7 @@ public class WifiDrop : NoteLongDrop,IFlasher
     }
     void Running()
     {
-        if (InputManager.Mode is AutoPlayMode.Enable or AutoPlayMode.Random or AutoPlayMode.Disable)
+        if (InputManager.Mode is AutoPlayMode.Enable or AutoPlayMode.Random or AutoPlayMode.Disable || isMine)
             return;
         foreach (var star in star_slide)
         {
@@ -521,7 +543,7 @@ public class WifiDrop : NoteLongDrop,IFlasher
     }
     void SetJust()
     {
-        switch (judgeResult)
+        switch (JudgeResult)
         {
             case JudgeType.FastGreat2:
             case JudgeType.FastGreat1:
@@ -539,7 +561,9 @@ public class WifiDrop : NoteLongDrop,IFlasher
             case JudgeType.LateGreat:
                 slideOK.GetComponent<LoadJustSprite>().setLateGr();
                 break;
-
+            case JudgeType.Miss:
+                slideOK.GetComponent<LoadJustSprite>().setMiss();
+                break;
         }
     }
     public bool CanShine() => canShine;
@@ -560,16 +584,16 @@ public class WifiDrop : NoteLongDrop,IFlasher
         switch (InputManager.Mode)
         {
             case AutoPlayMode.Enable:
-                judgeResult = JudgeType.Perfect;
+                JudgeResult = JudgeType.Perfect;
                 SetJust();
                 break;
             case AutoPlayMode.Random:
-                judgeResult = (JudgeType)UnityEngine.Random.Range(1, 14);
+                JudgeResult = (JudgeType)UnityEngine.Random.Range(1, 14);
                 SetJust();
                 break;
         }
-        objectCounter.ReportResult(this, judgeResult, isBreak);
-        if (isBreak && judgeResult == JudgeType.Perfect)
+        objectCounter.ReportResult(this, JudgeResult, isBreak);
+        if (isBreak && JudgeResult == JudgeType.Perfect)
             slideOK.GetComponent<Animator>().runtimeAnimatorController = judgeBreakShine;
         slideOK.SetActive(true);
 

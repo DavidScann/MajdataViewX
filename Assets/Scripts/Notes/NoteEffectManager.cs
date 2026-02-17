@@ -72,7 +72,7 @@ public class NoteEffectManager : MonoBehaviour
     }
 
     // Update is called once per frame
-    public void PlayEffect(int position, bool isBreak,JudgeType judge = JudgeType.Perfect)
+    public void PlayEffect(int position, bool isBreak, JudgeType judge = JudgeType.Perfect)
     {
         var pos = position - 1;
 

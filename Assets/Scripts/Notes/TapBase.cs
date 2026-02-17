@@ -14,9 +14,7 @@ namespace Assets.Scripts.Notes
         public Sprite eachSpr;
         public Sprite breakSpr;
         public Sprite exSpr;
-
-        public Sprite eachLine;
-        public Sprite breakLine;
+        public Sprite mineSpr;
 
         public RuntimeAnimatorController BreakShine;
 
@@ -46,15 +44,13 @@ namespace Assets.Scripts.Notes
 
             spriteRenderer.sortingOrder += noteSortOrder;
             exSpriteRender.sortingOrder += noteSortOrder;
-
-            
         }
         protected void FixedUpdate()
         {
             var timing = GetJudgeTiming();
             if (!isJudged && timing > 0.15f)
             {
-                judgeResult = JudgeType.Miss;
+                JudgeResult = JudgeType.Miss;
                 isJudged = true;
                 Destroy(tapLine);
                 Destroy(gameObject);
@@ -69,17 +65,18 @@ namespace Assets.Scripts.Notes
                 switch(InputManager.Mode)
                 {
                     case AutoPlayMode.Enable:
-                        judgeResult = JudgeType.Perfect;
+                        JudgeResult = JudgeType.Perfect; //此处若为mine会经过反转呈现正常判定
                         isJudged = true;
                         break;
                     case AutoPlayMode.Random:
-                        judgeResult = (JudgeType)UnityEngine.Random.Range(1, 14);
+                        JudgeResult = (JudgeType)UnityEngine.Random.Range(1, 14);
                         isJudged = true;
                         break;
                     case AutoPlayMode.DJAuto:
                         if (isTriggered)
                             return;
-                        inputManager.ClickSensor(sensorPos);
+                        if (!isMine) //mine就不打了
+                            inputManager.ClickSensor(sensorPos);
                         isTriggered = true;
                         break;
                 }
@@ -167,7 +164,6 @@ namespace Assets.Scripts.Notes
         }
         protected void Judge()
         {
-
             const int JUDGE_GOOD_AREA = 150;
             const int JUDGE_GREAT_AREA = 100;
             const int JUDGE_PERFECT_AREA = 50;
@@ -208,7 +204,7 @@ namespace Assets.Scripts.Notes
             if (result != JudgeType.Miss && isEX)
                 result = JudgeType.Perfect;
 
-            judgeResult = result;
+            JudgeResult = result;
             isJudged = true;
         }
         protected virtual void OnDestroy()
@@ -216,10 +212,10 @@ namespace Assets.Scripts.Notes
             if (HttpHandler.IsReloding)
                 return;
             var effectManager = GameObject.Find("NoteEffects").GetComponent<NoteEffectManager>();
-            effectManager.PlayEffect(startPosition, isBreak, judgeResult);
-            effectManager.PlayFastLate(startPosition, judgeResult);
+            effectManager.PlayEffect(startPosition, isBreak, JudgeResult);
+            effectManager.PlayFastLate(startPosition, JudgeResult);
             objectCounter.NextNote(startPosition);
-            objectCounter.ReportResult(this, judgeResult,isBreak);
+            objectCounter.ReportResult(this, JudgeResult,isBreak);
             inputManager.UnbindArea(Check, sensorPos);
         }
     }

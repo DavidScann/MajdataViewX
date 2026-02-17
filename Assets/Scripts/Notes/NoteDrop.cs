@@ -1,3 +1,4 @@
+using Assets.Scripts.Notes;
 using Assets.Scripts.Types;
 using System;
 using System.Diagnostics;
@@ -10,6 +11,7 @@ public class NoteDrop : MonoBehaviour
     public int noteSortOrder;
     public float speed = 7;
     public bool isEach;
+    public bool isMine;
 
     protected AudioTimeProvider timeProvider;
 
@@ -21,9 +23,19 @@ public class NoteDrop : MonoBehaviour
     protected NoteManager noteManager;
     protected Guid guid = Guid.NewGuid();
     protected bool isJudged = false;
-    protected JudgeType judgeResult;
+    protected JudgeType JudgeResult
+    {
+        get => _judgeResult;
+        set
+        {
+            if (isMine) _judgeResult = value.GetMineJudge();
+            else _judgeResult = value;
+        }
+    }
     protected ObjectCounter objectCounter;
-    
+
+    private JudgeType _judgeResult;
+
     /// <summary>
     /// 获取当前时刻距离正解帧的时间长度
     /// </summary>
@@ -64,7 +76,7 @@ public class NoteLongDrop : NoteDrop
     protected virtual void PlayHoldEffect()
     {
         var material = holdEffect.GetComponent<ParticleSystemRenderer>().material;
-        switch (judgeResult)
+        switch (JudgeResult)
         {
             case JudgeType.LatePerfect2:
             case JudgeType.FastPerfect2:

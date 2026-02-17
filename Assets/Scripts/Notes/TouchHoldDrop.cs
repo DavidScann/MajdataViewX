@@ -1,16 +1,20 @@
 ﻿using Assets.Scripts;
+using Assets.Scripts.Notes;
 using Assets.Scripts.Types;
 using System;
 using UnityEngine;
 #nullable enable
 public class TouchHoldDrop : TouchHoldBase
 {
+    public bool isBreak;
+
     public Sprite touchHoldBoard;
     public Sprite touchHoldBoard_Miss;
     public SpriteRenderer boarder;
     public Sprite[] TouchHoldSprite = new Sprite[5];
     public Sprite TouchPointSprite;
     public Sprite TouchPointEachSprite;
+    public Sprite TouchPointMineSprite;
 
     public GameObject[] fans;
 
@@ -23,6 +27,8 @@ public class TouchHoldDrop : TouchHoldBase
     private float moveDuration;
 
     private float wholeDuration;
+
+    private bool isTouched = false;
 
     // Start is called before the first frame update
     private void Start()
@@ -49,15 +55,20 @@ public class TouchHoldDrop : TouchHoldBase
         }
 
         for (var i = 0; i < 4; i++) fansSprite[i].sprite = TouchHoldSprite[i];
+
         fansSprite[5].sprite = TouchHoldSprite[4]; // TouchHold Border
+        fansSprite[4].sprite = TouchPointSprite;
+
         if (isEach)
         {
             fansSprite[4].sprite = TouchPointEachSprite;
         }
-        else
+        if (isMine)
         {
-            fansSprite[4].sprite = TouchPointSprite;
+            fansSprite[4].sprite = TouchPointMineSprite;
+            touchHoldBoard = TouchHoldSprite[4];
         }
+            
 
         transform.position = GetAreaPos(startPosition, areaPosition);
 
@@ -132,7 +143,7 @@ public class TouchHoldDrop : TouchHoldBase
         else
             judgeDiff = diff;
 
-        judgeResult = result;
+        JudgeResult = result;
         isJudged = true;
         PlayHoldEffect();
     }
@@ -155,19 +166,22 @@ public class TouchHoldDrop : TouchHoldBase
                 case AutoPlayMode.Enable:
                     if (!isJudged)
                         objectCounter.NextTouch(GetSensor());
-                    judgeResult = JudgeType.Perfect;
+                    JudgeResult = JudgeType.Perfect;
                     isJudged = true;
+                    isTouched = true;
                     PlayHoldEffect();
                     return;
                 case AutoPlayMode.DJAuto:
-                    if (!isJudged)
+                    if (!isJudged && !isMine)
                         manager.SetSensorOn(sensor.Type, guid);
                     break;
                 case AutoPlayMode.Random:
                     if (!isJudged)
                     {
                         objectCounter.NextTouch(GetSensor());
-                        judgeResult = (JudgeType)UnityEngine.Random.Range(1, 14);
+                        JudgeResult = (JudgeType)UnityEngine.Random.Range(1, 14);
+                        if (isMine && JudgeResult == JudgeType.Miss)
+                            isTouched = true; //反转后为miss必有摸
                         isJudged = true;
                     }
                     PlayHoldEffect();
@@ -180,6 +194,7 @@ public class TouchHoldDrop : TouchHoldBase
 
         if (isJudged)
         {
+            if (inputManager.CheckSensorStatus(GetSensor(), SensorStatus.On)) isTouched = true;
             if (timing <= 0.25f) // 忽略头部15帧
                 return;
             else if (remainingTime <= 0.2f) // 忽略尾部12帧
@@ -189,7 +204,9 @@ public class TouchHoldDrop : TouchHoldBase
 
             var on = inputManager.CheckSensorStatus(GetSensor(), SensorStatus.On);
             if (on)
+            {
                 PlayHoldEffect();
+            }
             else
             {
                 playerIdleTime += Time.fixedDeltaTime;
@@ -199,7 +216,7 @@ public class TouchHoldDrop : TouchHoldBase
         else if (timing > 0.316667f)
         {
             judgeDiff = 316.667f;
-            judgeResult = JudgeType.Miss;
+            JudgeResult = JudgeType.Miss;
             inputManager.UnbindSensor(Check, GetSensor());
             isJudged = true;
             objectCounter.NextTouch(GetSensor());
@@ -276,43 +293,43 @@ public class TouchHoldDrop : TouchHoldBase
         if (HttpHandler.IsReloding)
             return;
         var realityHT = LastFor - 0.45f - (judgeDiff / 1000f);
-        var percent = MathF.Min(1, (realityHT - playerIdleTime) / realityHT);
-        JudgeType result = judgeResult;
-        if (realityHT > 0)
+        var percent = Math.Clamp((realityHT - playerIdleTime) / realityHT, 0, 1);
+        JudgeType result = JudgeResult;
+        if (realityHT > 0) 
         {
             if (percent >= 1f)
             {
-                if (judgeResult == JudgeType.Miss)
+                if (JudgeResult == JudgeType.Miss)
                     result = JudgeType.LateGood;
-                else if (MathF.Abs((int)judgeResult - 7) == 6)
-                    result = (int)judgeResult < 7 ? JudgeType.LateGreat : JudgeType.FastGreat;
+                else if (MathF.Abs((int)JudgeResult - 7) == 6)
+                    result = (int)JudgeResult < 7 ? JudgeType.LateGreat : JudgeType.FastGreat;
                 else
-                    result = judgeResult;
+                    result = JudgeResult;
             }
             else if (percent >= 0.67f)
             {
-                if (judgeResult == JudgeType.Miss)
+                if (JudgeResult == JudgeType.Miss)
                     result = JudgeType.LateGood;
-                else if (MathF.Abs((int)judgeResult - 7) == 6)
-                    result = (int)judgeResult < 7 ? JudgeType.LateGreat : JudgeType.FastGreat;
-                else if (judgeResult == JudgeType.Perfect)
-                    result = (int)judgeResult < 7 ? JudgeType.LatePerfect1 : JudgeType.FastPerfect1;
+                else if (MathF.Abs((int)JudgeResult - 7) == 6)
+                    result = (int)JudgeResult < 7 ? JudgeType.LateGreat : JudgeType.FastGreat;
+                else if (JudgeResult == JudgeType.Perfect)
+                    result = (int)JudgeResult < 7 ? JudgeType.LatePerfect1 : JudgeType.FastPerfect1;
             }
             else if (percent >= 0.33f)
             {
-                if (MathF.Abs((int)judgeResult - 7) >= 6)
-                    result = (int)judgeResult < 7 ? JudgeType.LateGood : JudgeType.FastGood;
+                if (MathF.Abs((int)JudgeResult - 7) >= 6)
+                    result = (int)JudgeResult < 7 ? JudgeType.LateGood : JudgeType.FastGood;
                 else
-                    result = (int)judgeResult < 7 ? JudgeType.LateGreat : JudgeType.FastGreat;
+                    result = (int)JudgeResult < 7 ? JudgeType.LateGreat : JudgeType.FastGreat;
             }
             else if (percent >= 0.05f)
-                result = (int)judgeResult < 7 ? JudgeType.LateGood : JudgeType.FastGood;
+                result = (int)JudgeResult < 7 ? JudgeType.LateGood : JudgeType.FastGood;
             else if (percent >= 0)
             {
-                if (judgeResult == JudgeType.Miss)
+                if (JudgeResult == JudgeType.Miss)
                     result = JudgeType.Miss;
                 else
-                    result = (int)judgeResult < 7 ? JudgeType.LateGood : JudgeType.FastGood;
+                    result = (int)JudgeResult < 7 ? JudgeType.LateGood : JudgeType.FastGood;
             }
         }
 
@@ -327,6 +344,14 @@ public class TouchHoldDrop : TouchHoldBase
             case AutoPlayMode.DJAuto:
             case AutoPlayMode.Disable:
                 break;
+        }
+
+        if (isMine) //覆盖掉前面的判定
+        {
+            if (isTouched)
+                result = JudgeType.Miss;
+            else
+                result = JudgeType.Perfect;
         }
 
         print($"TouchHold: {MathF.Round(percent * 100, 2)}%\nTotal Len : {MathF.Round(realityHT * 1000, 2)}ms");
