@@ -23,15 +23,7 @@ public class NoteDrop : MonoBehaviour
     protected NoteManager noteManager;
     protected Guid guid = Guid.NewGuid();
     protected bool isJudged = false;
-    protected JudgeType JudgeResult
-    {
-        get => _judgeResult;
-        set
-        {
-            if (isMine) _judgeResult = value.GetMineJudge();
-            else _judgeResult = value;
-        }
-    }
+    protected JudgeType judgeResult;
     protected ObjectCounter objectCounter;
 
     private JudgeType _judgeResult;
@@ -76,7 +68,7 @@ public class NoteLongDrop : NoteDrop
     protected virtual void PlayHoldEffect()
     {
         var material = holdEffect.GetComponent<ParticleSystemRenderer>().material;
-        switch (JudgeResult)
+        switch (judgeResult)
         {
             case JudgeType.LatePerfect2:
             case JudgeType.FastPerfect2:

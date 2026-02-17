@@ -123,21 +123,26 @@ public class TouchDrop : TouchBase
     }
     private void FixedUpdate()
     {
-        if (!isJudged && GetJudgeTiming() <= 0.316667f)
+        if (isMine && !isJudged && GetJudgeTiming() >= 0.016666f)
+        {
+            judgeResult = JudgeType.Perfect;
+            isJudged = true;
+        }
+        else if (!isJudged && GetJudgeTiming() <= 0.316667f)
         {
             if (GroupInfo is not null)
             {
                 if (GroupInfo.Percent > 0.5f && GroupInfo.JudgeResult != null)
                 {
                     isJudged = true;
-                    JudgeResult = (JudgeType)GroupInfo.JudgeResult;
+                    judgeResult = (JudgeType)GroupInfo.JudgeResult;
                     Destroy(gameObject);
                 }
             }
         }
         else if (!isJudged)
         {
-            JudgeResult = JudgeType.Miss;
+            judgeResult = JudgeType.Miss;
             isJudged = true;
             Destroy(gameObject);
         }
@@ -149,12 +154,25 @@ public class TouchDrop : TouchBase
             switch (InputManager.Mode)
             {
                 case AutoPlayMode.Enable:
-                    JudgeResult = JudgeType.Perfect;
+                    if (isMine)
+                        judgeResult = JudgeType.Miss;
+                    else
+                        judgeResult = JudgeType.Perfect;
                     isJudged = true;
                     break;
                 case AutoPlayMode.Random:
-                    JudgeResult = (JudgeType)UnityEngine.Random.Range(1, 14);
-                    isJudged = true;
+                    judgeResult = (JudgeType)UnityEngine.Random.Range(1, 14);
+                    if (isMine)
+                    {
+                        if (judgeResult > JudgeType.Perfect) //Fast
+                        {
+                            judgeResult = JudgeType.Miss;
+                        }
+                        else
+                        {
+                            judgeResult = JudgeType.Perfect;
+                        }
+                    }
                     break;
                 case AutoPlayMode.DJAuto:
                     if (isTriggered)
@@ -169,7 +187,6 @@ public class TouchDrop : TouchBase
     }
     void Judge()
     {
-
         const float JUDGE_GOOD_AREA = 316.667f;
         const int JUDGE_GREAT_AREA = 250;
         const int JUDGE_PERFECT_AREA = 200;
@@ -196,7 +213,7 @@ public class TouchDrop : TouchBase
         else
             result = JudgeType.Miss;
 
-        JudgeResult = result;
+        judgeResult = result;
         isJudged = true;
     }
     // Update is called once per frame
@@ -257,12 +274,12 @@ public class TouchDrop : TouchBase
             return;
         multTouchHandler.cancelTouch(this);
         PlayJudgeEffect();
-        if (GroupInfo is not null && JudgeResult != JudgeType.Miss)
-            GroupInfo.JudgeResult = JudgeResult;
-        objectCounter.ReportResult(this, JudgeResult);
+        if (GroupInfo is not null && judgeResult != JudgeType.Miss)
+            GroupInfo.JudgeResult = judgeResult;
+        objectCounter.ReportResult(this, judgeResult);
         objectCounter.NextTouch(sensor.Type);
 
-        if (isFirework && JudgeResult != JudgeType.Miss)
+        if (isFirework && judgeResult != JudgeType.Miss)
         {
             fireworkEffect.SetTrigger("Fire");
             firework.transform.position = transform.position;
@@ -290,7 +307,7 @@ public class TouchDrop : TouchBase
         flObj.GetChild(0).transform.rotation = GetRoation();
         var anim = obj.GetComponent<Animator>();
         var flAnim = _obj.GetComponent<Animator>();
-        switch(JudgeResult)
+        switch(judgeResult)
         {
             case JudgeType.LateGood:
             case JudgeType.FastGood:
@@ -319,10 +336,10 @@ public class TouchDrop : TouchBase
             default:
                 break;
         }
-        if(JudgeResult != JudgeType.Miss)
+        if(judgeResult != JudgeType.Miss)
             Instantiate(tapEffect, transform.position, transform.rotation);
 
-        GameObject.Find("NoteEffects").GetComponent<NoteEffectManager>().PlayFastLate(_obj,flAnim,JudgeResult);
+        GameObject.Find("NoteEffects").GetComponent<NoteEffectManager>().PlayFastLate(_obj,flAnim,judgeResult);
 
         anim.SetTrigger("touch");
     }

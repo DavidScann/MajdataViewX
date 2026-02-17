@@ -48,9 +48,14 @@ namespace Assets.Scripts.Notes
         protected void FixedUpdate()
         {
             var timing = GetJudgeTiming();
-            if (!isJudged && timing > 0.15f)
+            if (isMine && !isJudged && timing >= 0.016666f)
             {
-                JudgeResult = JudgeType.Miss;
+                judgeResult = JudgeType.Perfect;
+                isJudged = true;
+            }
+            else if (!isJudged && timing > 0.15f)
+            {
+                judgeResult = JudgeType.Miss;
                 isJudged = true;
                 Destroy(tapLine);
                 Destroy(gameObject);
@@ -65,23 +70,37 @@ namespace Assets.Scripts.Notes
                 switch(InputManager.Mode)
                 {
                     case AutoPlayMode.Enable:
-                        JudgeResult = JudgeType.Perfect; //此处若为mine会经过反转呈现正常判定
+                        if (isMine)
+                            judgeResult = JudgeType.Miss;
+                        else
+                            judgeResult = JudgeType.Perfect;
                         isJudged = true;
                         break;
                     case AutoPlayMode.Random:
-                        JudgeResult = (JudgeType)UnityEngine.Random.Range(1, 14);
+                        judgeResult = (JudgeType)UnityEngine.Random.Range(1, 14);
+                        if (isMine)
+                        {
+                            if (judgeResult > JudgeType.Perfect) //Fast
+                            {
+                                judgeResult = JudgeType.Miss;
+                            }
+                            else
+                            {
+                                judgeResult = JudgeType.Perfect;
+                            }
+                        }
                         isJudged = true;
                         break;
                     case AutoPlayMode.DJAuto:
                         if (isTriggered)
-                            return;
-                        if (!isMine) //mine就不打了
+                            break;
+                        //mine就不打了
+                        if (!isMine) 
                             inputManager.ClickSensor(sensorPos);
                         isTriggered = true;
                         break;
                 }
             }
-
         }
         // Update is called once per frame
         protected virtual void Update()
@@ -176,6 +195,13 @@ namespace Assets.Scripts.Notes
             if (isJudged)
                 return;
 
+            if (isMine)
+            {
+                judgeResult = JudgeType.Miss;
+                isJudged = true;
+                return;
+            }
+
             var timing = timeProvider.AudioTime - time;
             var isFast = timing < 0;
             var diff = MathF.Abs(timing * 1000);
@@ -204,7 +230,7 @@ namespace Assets.Scripts.Notes
             if (result != JudgeType.Miss && isEX)
                 result = JudgeType.Perfect;
 
-            JudgeResult = result;
+            judgeResult = result;
             isJudged = true;
         }
         protected virtual void OnDestroy()
@@ -212,10 +238,10 @@ namespace Assets.Scripts.Notes
             if (HttpHandler.IsReloding)
                 return;
             var effectManager = GameObject.Find("NoteEffects").GetComponent<NoteEffectManager>();
-            effectManager.PlayEffect(startPosition, isBreak, JudgeResult);
-            effectManager.PlayFastLate(startPosition, JudgeResult);
+            effectManager.PlayEffect(startPosition, isBreak, judgeResult);
+            effectManager.PlayFastLate(startPosition, judgeResult);
             objectCounter.NextNote(startPosition);
-            objectCounter.ReportResult(this, JudgeResult,isBreak);
+            objectCounter.ReportResult(this, judgeResult,isBreak);
             inputManager.UnbindArea(Check, sensorPos);
         }
     }

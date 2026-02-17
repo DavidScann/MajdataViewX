@@ -352,7 +352,7 @@ public class SlideDrop : NoteLongDrop, IFlasher
         /// LastFor   是Slide的时值
         var timing = timeProvider.AudioTime - time;
         var startTiming = timeProvider.AudioTime - timeStart;
-        var forceJudgeTiming = time + LastFor + 0.6;
+        var forceJudgeTiming = time + LastFor + (isMine ? 0 : 0.6); //mine一到就判
 
         if (ConnectInfo.IsGroupPart)
         {
@@ -583,7 +583,7 @@ public class SlideDrop : NoteLongDrop, IFlasher
     {
         if (isMine)
         {
-            JudgeResult = JudgeType.Perfect; //走一路反转
+            judgeResult = JudgeType.Miss;
             SetJust();
             isJudged = true;
             DestroySelf();
@@ -636,7 +636,7 @@ public class SlideDrop : NoteLongDrop, IFlasher
                     judge = JudgeType.Perfect;
             }            
             print($"Slide diff : {MathF.Round(diff * 1000,2)} ms");
-            JudgeResult = judge ?? JudgeType.Miss;
+            judgeResult = judge ?? JudgeType.Miss;
             SetJust();
             isJudged = true;
         }
@@ -647,7 +647,7 @@ public class SlideDrop : NoteLongDrop, IFlasher
     }
     void SetJust()
     {
-        switch (JudgeResult)
+        switch (judgeResult)
         {
             case JudgeType.FastGreat2:
             case JudgeType.FastGreat1:
@@ -707,7 +707,7 @@ public class SlideDrop : NoteLongDrop, IFlasher
     {
         if (isMine)
         {
-            JudgeResult = JudgeType.Miss; //走一路反转
+            judgeResult = JudgeType.Perfect;
             isJudged = true;
             DestroySelf();
             return;
@@ -768,17 +768,31 @@ public class SlideDrop : NoteLongDrop, IFlasher
             switch(InputManager.Mode)
             {
                 case AutoPlayMode.Enable:
-                    JudgeResult = JudgeType.Perfect;
+                    if (isMine)
+                        judgeResult = JudgeType.Miss;
+                    else
+                        judgeResult = JudgeType.Perfect;
                     SetJust();
                     break;
                 case AutoPlayMode.Random:
-                    JudgeResult = (JudgeType)UnityEngine.Random.Range(1, 14);
+                    judgeResult = (JudgeType)UnityEngine.Random.Range(1, 14);
+                    if (isMine)
+                    {
+                        if (judgeResult != JudgeType.Miss)
+                        { //Too Late Only, 不考虑留一个判定区的那种LateGd，都随机了，能支持就是随机的荣幸
+                            judgeResult = JudgeType.Miss;
+                        }
+                        else
+                        {
+                            judgeResult = JudgeType.Perfect;
+                        }
+                    }
                     SetJust();
                     break;
             }
             // 只有组内最后一个Slide完成 才会显示判定条并增加总数
-            objectCounter.ReportResult(this, JudgeResult, isBreak);
-            if (isBreak && JudgeResult == JudgeType.Perfect)
+            objectCounter.ReportResult(this, judgeResult, isBreak);
+            if (isBreak && judgeResult == JudgeType.Perfect)
                 slideOK.GetComponent<Animator>().runtimeAnimatorController = judgeBreakShine;
             slideOK.SetActive(true);
         }
