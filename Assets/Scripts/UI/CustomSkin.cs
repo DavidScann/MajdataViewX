@@ -48,13 +48,16 @@ public class CustomSkin : MonoBehaviour
 
     public Sprite Touch;
     public Sprite Touch_Each;
+    public Sprite Touch_Break;
     public Sprite Touch_Mine;
     public Sprite TouchPoint;
     public Sprite TouchPoint_Each;
+    public Sprite TouchPoint_Break;
     public Sprite TouchPoint_Mine;
     public Sprite TouchJust;
     public Sprite[] TouchBorder = new Sprite[2];
     public Sprite[] TouchBorder_Each = new Sprite[2];
+    public Sprite[] TouchBorder_Break = new Sprite[2];
     public Sprite[] TouchBorder_Mine = new Sprite[2];
 
     public Sprite[] TouchHold = new Sprite[5];
@@ -179,9 +182,11 @@ public class CustomSkin : MonoBehaviour
 
         Touch = SpriteLoader.LoadSpriteFromFile(path + "/touch.png");
         Touch_Each = SpriteLoader.LoadSpriteFromFile(path + "/touch_each.png");
+        Touch_Break = SpriteLoader.LoadSpriteFromFile(path + "/touch_break.png");
         Touch_Mine = SpriteLoader.LoadSpriteFromFile(path + "/touch_mine.png");
         TouchPoint = SpriteLoader.LoadSpriteFromFile(path + "/touch_point.png");
         TouchPoint_Each = SpriteLoader.LoadSpriteFromFile(path + "/touch_point_each.png");
+        TouchPoint_Break = SpriteLoader.LoadSpriteFromFile(path + "/touch_point_break.png");
         TouchPoint_Mine = SpriteLoader.LoadSpriteFromFile(path + "/touch_point_mine.png");
 
         TouchJust = SpriteLoader.LoadSpriteFromFile(path + "/touch_just.png");
@@ -190,6 +195,8 @@ public class CustomSkin : MonoBehaviour
         TouchBorder[1] = SpriteLoader.LoadSpriteFromFile(path + "/touch_border_3.png");
         TouchBorder_Each[0] = SpriteLoader.LoadSpriteFromFile(path + "/touch_border_2_each.png");
         TouchBorder_Each[1] = SpriteLoader.LoadSpriteFromFile(path + "/touch_border_3_each.png");
+        TouchBorder_Break[0] = SpriteLoader.LoadSpriteFromFile(path + "/touch_border_2_break.png");
+        TouchBorder_Break[1] = SpriteLoader.LoadSpriteFromFile(path + "/touch_border_3_break.png");
         TouchBorder_Mine[0] = SpriteLoader.LoadSpriteFromFile(path + "/touch_border_2_mine.png");
         TouchBorder_Mine[1] = SpriteLoader.LoadSpriteFromFile(path + "/touch_border_3_mine.png");
 

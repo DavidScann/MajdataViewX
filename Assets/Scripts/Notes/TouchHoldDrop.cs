@@ -6,7 +6,7 @@ using UnityEngine;
 #nullable enable
 public class TouchHoldDrop : TouchHoldBase
 {
-    public bool isBreak;
+    public bool isBreak; //Play那边暂时没给这玩意的皮肤做区分，就不做了
 
     public Sprite touchHoldBoard;
     public Sprite touchHoldBoard_Miss;
@@ -14,6 +14,7 @@ public class TouchHoldDrop : TouchHoldBase
     public Sprite[] TouchHoldSprite = new Sprite[5];
     public Sprite TouchPointSprite;
     public Sprite TouchPointEachSprite;
+    public Sprite TouchPointBreakSprite;
     public Sprite TouchPointMineSprite;
 
     public GameObject[] fans;
@@ -62,6 +63,10 @@ public class TouchHoldDrop : TouchHoldBase
         if (isEach)
         {
             fansSprite[4].sprite = TouchPointEachSprite;
+        }
+        if (isBreak)
+        {
+            fansSprite[4].sprite = TouchPointBreakSprite;
         }
         if (isMine)
         {
@@ -369,7 +374,7 @@ public class TouchHoldDrop : TouchHoldBase
         }
 
         print($"TouchHold: {MathF.Round(percent * 100, 2)}%\nTotal Len : {MathF.Round(realityHT * 1000, 2)}ms");
-        objectCounter.ReportResult(this, result);
+        objectCounter.ReportResult(this, result, isBreak);
         if (!isJudged)
             objectCounter.NextTouch(GetSensor());
         if (isFirework && result != JudgeType.Miss)

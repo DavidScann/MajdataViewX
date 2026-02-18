@@ -629,6 +629,7 @@ public class JsonDataLoader : MonoBehaviour
                         NDCompo.startPosition = note.StartPosition;
                         NDCompo.TouchPointSprite = customSkin.TouchPoint;
                         NDCompo.TouchPointEachSprite = customSkin.TouchPoint_Each;
+                        NDCompo.TouchPointBreakSprite = customSkin.TouchPoint_Break;
                         NDCompo.TouchPointMineSprite = customSkin.TouchPoint_Mine;
 
                         if (timing.Notes.Length > 1) NDCompo.isEach = true;
@@ -657,13 +658,16 @@ public class JsonDataLoader : MonoBehaviour
 
                         NDCompo.fanNormalSprite = customSkin.Touch;
                         NDCompo.fanEachSprite = customSkin.Touch_Each;
+                        NDCompo.fanBreakSprite = customSkin.Touch_Break;
                         NDCompo.fanMineSprite = customSkin.Touch_Mine;
                         NDCompo.pointNormalSprite = customSkin.TouchPoint;
                         NDCompo.pointEachSprite = customSkin.TouchPoint_Each;
+                        NDCompo.pointBreakSprite = customSkin.TouchPoint_Break;
                         NDCompo.pointMineSprite = customSkin.TouchPoint_Mine;
                         NDCompo.justSprite = customSkin.TouchJust;
                         Array.Copy(customSkin.TouchBorder, NDCompo.multTouchNormalSprite, 2);
                         Array.Copy(customSkin.TouchBorder_Each, NDCompo.multTouchEachSprite, 2);
+                        Array.Copy(customSkin.TouchBorder_Break, NDCompo.multTouchBreakSprite, 2);
                         Array.Copy(customSkin.TouchBorder_Mine, NDCompo.multTouchMineSprite, 2);
 
                         if (timing.Notes.Length > 1)

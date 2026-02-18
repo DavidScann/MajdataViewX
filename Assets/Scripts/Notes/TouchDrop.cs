@@ -16,16 +16,19 @@ public class TouchDrop : TouchBase
 
     public Sprite fanNormalSprite;
     public Sprite fanEachSprite;
+    public Sprite fanBreakSprite;
     public Sprite fanMineSprite;
 
     public Sprite pointNormalSprite;
     public Sprite pointEachSprite;
+    public Sprite pointBreakSprite;
     public Sprite pointMineSprite;
 
     public Sprite justSprite;
 
     public Sprite[] multTouchNormalSprite = new Sprite[2];
     public Sprite[] multTouchEachSprite = new Sprite[2];
+    public Sprite[] multTouchBreakSprite = new Sprite[2];
     public Sprite[] multTouchMineSprite = new Sprite[2];
 
     public GameObject[] fans;
@@ -74,6 +77,13 @@ public class TouchDrop : TouchBase
             fansSprite[4].sprite = pointEachSprite;
             fansSprite[5].sprite = multTouchEachSprite[0];
             fansSprite[6].sprite = multTouchEachSprite[1];
+        }
+        if (isBreak)
+        {
+            SetfanSprite(fanBreakSprite);
+            fansSprite[4].sprite = pointBreakSprite;
+            fansSprite[5].sprite = multTouchBreakSprite[0];
+            fansSprite[6].sprite = multTouchBreakSprite[1];
         }
         if (isMine)
         {
@@ -276,7 +286,7 @@ public class TouchDrop : TouchBase
         PlayJudgeEffect();
         if (GroupInfo is not null && judgeResult != JudgeType.Miss)
             GroupInfo.JudgeResult = judgeResult;
-        objectCounter.ReportResult(this, judgeResult);
+        objectCounter.ReportResult(this, judgeResult, isBreak);
         objectCounter.NextTouch(sensor.Type);
 
         if (isFirework && judgeResult != JudgeType.Miss)
