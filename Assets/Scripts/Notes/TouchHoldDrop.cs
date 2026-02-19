@@ -67,6 +67,7 @@ public class TouchHoldDrop : TouchHoldBase
         if (isBreak)
         {
             fansSprite[4].sprite = TouchPointBreakSprite;
+            touchHoldBoard = TouchHoldSprite[4];
         }
         if (isMine)
         {

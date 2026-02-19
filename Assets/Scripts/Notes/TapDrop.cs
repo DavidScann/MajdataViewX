@@ -19,16 +19,21 @@ public class TapDrop : TapBase
         {
             spriteRenderer.sprite = eachSpr;
             if (isEX) exSpriteRender.color = exEffectEach;
+            tapLineSpriteRenderer.sprite = eachTapLineSpr;
         }
         if (isBreak)
         {
             spriteRenderer.sprite = breakSpr;
-            if (isEX) exSpriteRender.color = exEffectBreak;
+            tapLineSpriteRenderer.sprite = breakTapLineSpr;
+            if (isEX) { 
+                exSpriteRender.color = exEffectBreak;
+            }
             spriteRenderer.material = breakMaterial;
         }
         if (isMine)
         {
             spriteRenderer.sprite = mineSpr;
+            tapLineSpriteRenderer.sprite = mineTapLineSpr;
         }
 
         spriteRenderer.forceRenderingOff = true;

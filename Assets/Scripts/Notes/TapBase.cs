@@ -18,6 +18,11 @@ namespace Assets.Scripts.Notes
 
         public RuntimeAnimatorController BreakShine;
 
+        public Sprite tapLineSpr;
+        public Sprite eachTapLineSpr;
+        public Sprite mineTapLineSpr;
+        public Sprite breakTapLineSpr;
+        public Sprite starTapLineSpr;
         public GameObject tapLine;
 
         public Color exEffectTap;
@@ -28,6 +33,7 @@ namespace Assets.Scripts.Notes
 
         protected SpriteRenderer exSpriteRender;
         protected SpriteRenderer lineSpriteRender;
+        protected SpriteRenderer tapLineSpriteRenderer;
 
         protected SpriteRenderer spriteRenderer;
         protected void PreLoad()
@@ -38,6 +44,7 @@ namespace Assets.Scripts.Notes
             tapLine.SetActive(false);
             lineSpriteRender = tapLine.GetComponent<SpriteRenderer>();
             spriteRenderer = GetComponent<SpriteRenderer>();
+            tapLineSpriteRenderer = tapLine.GetComponent<SpriteRenderer>();
             exSpriteRender = transform.GetChild(0).GetComponent<SpriteRenderer>();
             timeProvider = GameObject.Find("AudioTimeProvider").GetComponent<AudioTimeProvider>();
             objectCounter = GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>();

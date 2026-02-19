@@ -61,6 +61,7 @@ public class CustomSkin : MonoBehaviour
     public Sprite[] TouchBorder_Mine = new Sprite[2];
 
     public Sprite[] TouchHold = new Sprite[5];
+    public Sprite[] TouchHold_Break = new Sprite[5];
     public Sprite[] TouchHold_Mine = new Sprite[5];
 
     public Texture2D test;
@@ -203,9 +204,11 @@ public class CustomSkin : MonoBehaviour
         for (var i = 0; i < 4; i++)
         {
             TouchHold[i] = SpriteLoader.LoadSpriteFromFile(path + "/touchhold_" + i + ".png");
+            TouchHold_Break[i] = SpriteLoader.LoadSpriteFromFile(path + "/touchhold_" + i + "_break.png");
             TouchHold_Mine[i] = SpriteLoader.LoadSpriteFromFile(path + "/touchhold_" + i + "_mine.png");
         }
         TouchHold[4] = SpriteLoader.LoadSpriteFromFile(path + "/touchhold_border.png");
+        TouchHold_Break[4] = SpriteLoader.LoadSpriteFromFile(path + "/touchhold_border_break.png");
         TouchHold_Mine[4] = SpriteLoader.LoadSpriteFromFile(path + "/touchhold_border_mine.png");
 
         Debug.Log(test);
