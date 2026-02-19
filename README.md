@@ -13,7 +13,8 @@
 # 注意 / ATTENTION
 
 - **该项目为个人维护修改版本() / Community-maintained fork**
-- **扩展包下载** / **Extension Package**： [MajMuriDX Release](https://github.com/re-poem/MajdataViewX/releases/tag/MajMuriDX)
+- **扩展包下载 / Extension Package**： [MajMuriDX Release](https://github.com/re-poem/MajdataViewX/releases/tag/MajMuriDX)
+- **删除包中的ThemeConfig.json来体验新的UI配色！ / Delete the ThemeConfig.json in the package to try the new UI !**
 
 ## 下载 / Download
 
