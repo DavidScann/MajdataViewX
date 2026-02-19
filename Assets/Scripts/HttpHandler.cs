@@ -41,8 +41,10 @@ public class HttpHandler : MonoBehaviour
         var screenRecorder = GameObject.Find("ScreenRecorder").GetComponent<ScreenRecorder>();
         var multTouchHandler = GameObject.Find("MultTouchHandler").GetComponent<MultTouchHandler>();
         var objectCounter = GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>();
+        var effectManager = GameObject.Find("NoteEffects").GetComponent<NoteEffectManager>();
 
-        InputManager.Mode = (AutoPlayMode)(int)data.editorPlayMethod;
+        InputManager.Mode = (AutoPlayMode)data.editorPlayMethod;
+        effectManager.SetDisplayMode(data.judgeDisplayMode);
 
         switch(data.control)
         {

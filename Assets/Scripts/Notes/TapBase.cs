@@ -48,7 +48,7 @@ namespace Assets.Scripts.Notes
         protected void FixedUpdate()
         {
             var timing = GetJudgeTiming();
-            if (isMine && !isJudged && timing >= 0.016666f)
+            if (isMine && !isJudged && timing >= 0.016667f)
             {
                 judgeResult = JudgeType.Perfect;
                 isJudged = true;

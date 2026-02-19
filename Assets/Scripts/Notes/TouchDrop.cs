@@ -133,7 +133,7 @@ public class TouchDrop : TouchBase
     }
     private void FixedUpdate()
     {
-        if (isMine && !isJudged && GetJudgeTiming() >= 0.016666f)
+        if (isMine && !isJudged && GetJudgeTiming() >= 0.016667f)
         {
             judgeResult = JudgeType.Perfect;
             isJudged = true;

@@ -1,4 +1,5 @@
-﻿using MajSimai;
+﻿using Assets.Scripts.Types;
+using MajSimai;
 using System.Collections.Generic;
 
 internal class Majson
@@ -18,6 +19,7 @@ internal class EditRequestjson
     public EditorComboIndicator comboStatusType;
     public EditorPlayMethod editorPlayMethod;
     public EditorControlMethod control;
+    public JudgeDisplayMode judgeDisplayMode;
     public string jsonPath;
     public float noteSpeed;
     public long startAt;

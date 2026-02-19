@@ -3,7 +3,6 @@ using UnityEngine;
 #nullable enable
 public class NoteEffectManager : MonoBehaviour
 {
-    
     public Sprite hex;
     public Sprite star;
     private readonly Animator[] judgeAnimators = new Animator[8];
@@ -19,6 +18,9 @@ public class NoteEffectManager : MonoBehaviour
     private readonly Animator[] fastLateAnims = new Animator[8];
     private readonly GameObject[] fastLateEffects = new GameObject[8];
     Sprite[] judgeText;
+
+    private bool showFL;
+    private bool showLevel;
 
     // Start is called before the first frame update
     private void Start()
@@ -71,9 +73,35 @@ public class NoteEffectManager : MonoBehaviour
         }
     }
 
+    public void SetDisplayMode(JudgeDisplayMode mode)
+    {
+        switch (mode)
+        {
+            case JudgeDisplayMode.None:
+                showFL = showLevel = false;
+                break;
+            case JudgeDisplayMode.FastLate:
+                showFL = true;
+                showLevel = false;
+                break;
+            case JudgeDisplayMode.Level:
+                showFL = false;
+                showLevel = true;
+                break;
+            case JudgeDisplayMode.Both:
+                showFL = showLevel = true;
+                break;
+            default:
+                showFL = showLevel = true;
+                break;
+        }
+    }
+
     // Update is called once per frame
     public void PlayEffect(int position, bool isBreak, JudgeType judge = JudgeType.Perfect)
     {
+        if (!showLevel) return;
+
         var pos = position - 1;
 
         switch (judge)
@@ -151,6 +179,8 @@ public class NoteEffectManager : MonoBehaviour
     /// <param name="judge"></param>
     public void PlayFastLate(int position,JudgeType judge)
     {
+        if (!showFL) return;
+
         var customSkin = GameObject.Find("Outline").GetComponent<CustomSkin>();
         var pos = position - 1;
         if ((int)judge is (0 or 7))
@@ -175,6 +205,8 @@ public class NoteEffectManager : MonoBehaviour
     /// <param name="judge"></param>
     public void PlayFastLate(GameObject obj,Animator anim, JudgeType judge)
     {
+        if (!showFL) return;
+
         var customSkin = GameObject.Find("Outline").GetComponent<CustomSkin>();
         if ((int)judge is (0 or 7))
         {
