@@ -8,6 +8,10 @@ public class TouchHoldDrop : TouchHoldBase
 {
     public bool isBreak; //Play那边暂时没给这玩意的皮肤做区分，就不做了
 
+    public GameObject touchEffect;
+    public GameObject gr_TouchEffect;
+    public GameObject gd_TouchEffect;
+
     public Sprite touchHoldBoard;
     public Sprite touchHoldBoard_Miss;
     public SpriteRenderer boarder;
@@ -392,79 +396,120 @@ public class TouchHoldDrop : TouchHoldBase
         base.PlayHoldEffect();
         boarder.sprite = touchHoldBoard;
     }
-    void PlayJudgeEffect(JudgeType judgeResult)
-    {
-        var obj = Instantiate(judgeEffect, Vector3.zero, transform.rotation);
-        var _obj = Instantiate(judgeEffect, Vector3.zero, transform.rotation);
-        var judgeObj = obj.transform.GetChild(0);
-        var flObj = _obj.transform.GetChild(0);
-
-        if (sensor.Group != SensorGroup.C)
-        {
-            judgeObj.transform.position = GetPosition(-0.46f);
-            flObj.transform.position = GetPosition(-0.92f);
-        }
-        else
-        {
-            judgeObj.transform.position = new Vector3(0, -0.6f, 0);
-            flObj.transform.position = new Vector3(0, -1.08f, 0);
-        }
-
-        flObj.GetChild(0).transform.rotation = GetRoation();
-        judgeObj.GetChild(0).transform.rotation = GetRoation();
-        var anim = obj.GetComponent<Animator>();
-
-        var effects = GameObject.Find("NoteEffects");
-        var flAnim = _obj.GetComponent<Animator>();
-        GameObject effect;
-        switch (judgeResult)
-        {
-            case JudgeType.LateGood:
-            case JudgeType.FastGood:
-                judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = judgeText[1];
-                effect = Instantiate(effects.transform.GetChild(3).GetChild(0), transform.position, transform.rotation).gameObject;
-                effect.SetActive(true);
-                break;
-            case JudgeType.LateGreat:
-            case JudgeType.LateGreat1:
-            case JudgeType.LateGreat2:
-            case JudgeType.FastGreat2:
-            case JudgeType.FastGreat1:
-            case JudgeType.FastGreat:
-                judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = judgeText[2];
-                //transform.Rotate(0, 0f, 30f);
-                effect = Instantiate(effects.transform.GetChild(2).GetChild(0), transform.position, transform.rotation).gameObject;
-                effect.SetActive(true);
-                effect.gameObject.GetComponent<Animator>().SetTrigger("great");
-                break;
-            case JudgeType.LatePerfect2:
-            case JudgeType.FastPerfect2:
-            case JudgeType.LatePerfect1:
-            case JudgeType.FastPerfect1:
-                judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = judgeText[3];
-                transform.Rotate(0, 180f, 90f);
-                Instantiate(tapEffect, transform.position, transform.rotation);
-                break;
-            case JudgeType.Perfect:
-                judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = judgeText[4];
-                transform.Rotate(0, 180f, 90f);
-                Instantiate(tapEffect, transform.position, transform.rotation);
-                break;
-            case JudgeType.Miss:
-                judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = judgeText[0];
-                break;
-            default:
-                break;
-        }
-        //judgeEffect.transform.position = new Vector3(0, -0.6f, 0);
-        GameObject.Find("NoteEffects").GetComponent<NoteEffectManager>().PlayFastLate(_obj, flAnim, judgeResult);
-        anim.SetTrigger("touch");
-    }
+    
     protected override void StopHoldEffect()
     {
         base.StopHoldEffect();
         boarder.sprite = touchHoldBoard_Miss;
     }
+
+    private void PlayJudgeEffect(JudgeType judgeResult)
+    {
+        //show effect
+        if (judgeResult != JudgeType.Miss)
+        {
+            switch (judgeResult)
+            {
+                case JudgeType.LateGood:
+                case JudgeType.FastGood:
+                    Instantiate(gd_TouchEffect, transform.position, transform.rotation);
+                    break;
+                case JudgeType.LateGreat:
+                case JudgeType.LateGreat1:
+                case JudgeType.LateGreat2:
+                case JudgeType.FastGreat2:
+                case JudgeType.FastGreat1:
+                case JudgeType.FastGreat:
+                    Instantiate(gr_TouchEffect, transform.position, transform.rotation);
+                    break;
+                case JudgeType.LatePerfect2:
+                case JudgeType.FastPerfect2:
+                case JudgeType.LatePerfect1:
+                case JudgeType.FastPerfect1:
+                case JudgeType.Perfect:
+                    Instantiate(touchEffect, transform.position, transform.rotation);
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        //show level
+        if (NoteEffectManager.showLevel)
+        {
+            //get obj
+            var obj = Instantiate(judgeEffect, Vector3.zero, transform.rotation);
+            var judgeObj = obj.transform.GetChild(0);
+            if (sensor.Group != SensorGroup.C)
+                judgeObj.transform.position = GetPosition(-0.46f);
+            else
+                judgeObj.transform.position = new Vector3(0, -0.6f, 0);
+            judgeObj.GetChild(0).transform.rotation = GetRoation();
+            var anim = obj.GetComponent<Animator>();
+
+            //show
+            switch (judgeResult)
+            {
+                case JudgeType.LateGood:
+                case JudgeType.FastGood:
+                    judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = judgeText[1];
+                    break;
+                case JudgeType.LateGreat:
+                case JudgeType.LateGreat1:
+                case JudgeType.LateGreat2:
+                case JudgeType.FastGreat2:
+                case JudgeType.FastGreat1:
+                case JudgeType.FastGreat:
+                    judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = judgeText[2];
+                    break;
+                case JudgeType.LatePerfect2:
+                case JudgeType.FastPerfect2:
+                case JudgeType.LatePerfect1:
+                case JudgeType.FastPerfect1:
+                    judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = judgeText[3];
+                    break;
+                case JudgeType.Perfect:
+                    judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = judgeText[4];
+                    break;
+                case JudgeType.Miss:
+                    judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = judgeText[0];
+                    break;
+                default:
+                    break;
+            }
+            anim.SetTrigger("touch");
+        }
+
+        //show fastlate
+        if (NoteEffectManager.showFL)
+        {
+            //get obj
+            var obj = Instantiate(judgeEffect, Vector3.zero, transform.rotation);
+            var flObj = obj.transform.GetChild(0);
+            if (sensor.Group != SensorGroup.C)
+                flObj.transform.position = GetPosition(-0.92f);
+            else
+                flObj.transform.position = new Vector3(0, -1.08f, 0);
+            flObj.GetChild(0).transform.rotation = GetRoation();
+            var flAnim = obj.GetComponent<Animator>();
+
+            //show
+            var customSkin = GameObject.Find("Outline").GetComponent<CustomSkin>();
+            if (judgeResult == JudgeType.Miss || judgeResult == JudgeType.Perfect)
+            {
+                obj.SetActive(false);
+                Destroy(obj);
+                return;
+            }
+            obj.SetActive(true);
+            if (judgeResult > JudgeType.Perfect) //Fast
+                obj.transform.GetChild(0).GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = customSkin.FastText;
+            else
+                obj.transform.GetChild(0).GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = customSkin.LateText;
+            flAnim.SetTrigger("touch");
+        }
+    }
+
     /// <summary>
     /// 获取当前坐标指定距离的坐标
     /// <para>方向：原点</para>

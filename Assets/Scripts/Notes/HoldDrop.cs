@@ -437,7 +437,7 @@ public class HoldDrop : NoteLongDrop
     protected override void PlayHoldEffect()
     {
         base.PlayHoldEffect();
-        GameObject.Find("NoteEffects").GetComponent<NoteEffectManager>().ResetEffect(startPosition);
+        GameObject.Find("NoteEffects").GetComponent<NoteEffectManager>().ResetEffect(startPosition - 1);
         if (LastFor <= 0.3)
             return;
         else if (!holdAnimStart && GetJudgeTiming() >= 0.1f && !isMine)//忽略开头6帧与结尾12帧和mine

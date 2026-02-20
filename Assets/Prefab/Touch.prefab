@@ -49,8 +49,6 @@ SpriteRenderer:
   m_ReflectionProbeUsage: 1
   m_RayTracingMode: 0
   m_RayTraceProcedural: 0
-  m_RayTracingAccelStructBuildFlagsOverride: 0
-  m_RayTracingAccelStructBuildFlags: 1
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -135,8 +133,6 @@ SpriteRenderer:
   m_ReflectionProbeUsage: 1
   m_RayTracingMode: 0
   m_RayTraceProcedural: 0
-  m_RayTracingAccelStructBuildFlagsOverride: 0
-  m_RayTracingAccelStructBuildFlags: 1
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -221,8 +217,6 @@ SpriteRenderer:
   m_ReflectionProbeUsage: 1
   m_RayTracingMode: 0
   m_RayTraceProcedural: 0
-  m_RayTracingAccelStructBuildFlagsOverride: 0
-  m_RayTracingAccelStructBuildFlags: 1
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -307,8 +301,6 @@ SpriteRenderer:
   m_ReflectionProbeUsage: 1
   m_RayTracingMode: 0
   m_RayTraceProcedural: 0
-  m_RayTracingAccelStructBuildFlagsOverride: 0
-  m_RayTracingAccelStructBuildFlags: 1
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -396,30 +388,45 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a6a40a9a473737b4fa998203e032ca79, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  startPosition: 1
   time: 0
   noteSortOrder: 0
   speed: 7
-  areaPosition: 67
   isEach: 0
+  isMine: 0
+  areaPosition: 67
   isFirework: 0
-  startPosition: 1
-  tapEffect: {fileID: 544298055609030963, guid: ce8dca9ef711fc640a1b90ad7fb49838,
+  touchEffect: {fileID: 544298055609030963, guid: 65def33a82408434e937cedc8f299551,
     type: 3}
-  justEffect: {fileID: 3167371521865756101}
+  gr_TouchEffect: {fileID: 544298055609030963, guid: ce8dca9ef711fc640a1b90ad7fb49838,
+    type: 3}
+  gd_TouchEffect: {fileID: 544298055609030963, guid: 476072db08a1c70418af69659770dbd7,
+    type: 3}
   judgeEffect: {fileID: 2214473122963414705, guid: e863ee95f9b63c044a47510ad82daf33,
     type: 3}
-  animController: {fileID: 9100000, guid: 587e5e843c785b14790ad20035f041c5, type: 2}
+  isBreak: 0
+  justEffect: {fileID: 3167371521865756101}
   multTouchEffect2: {fileID: 3167371522247862228}
   multTouchEffect3: {fileID: 3167371522402805961}
   fanNormalSprite: {fileID: 0}
   fanEachSprite: {fileID: 0}
+  fanBreakSprite: {fileID: 0}
+  fanMineSprite: {fileID: 0}
   pointNormalSprite: {fileID: 0}
   pointEachSprite: {fileID: 21300000, guid: dfb43f44e9c0dc7468a44b3e34935741, type: 3}
+  pointBreakSprite: {fileID: 0}
+  pointMineSprite: {fileID: 0}
   justSprite: {fileID: 0}
   multTouchNormalSprite:
   - {fileID: 0}
   - {fileID: 0}
   multTouchEachSprite:
+  - {fileID: 0}
+  - {fileID: 0}
+  multTouchBreakSprite:
+  - {fileID: 0}
+  - {fileID: 0}
+  multTouchMineSprite:
   - {fileID: 0}
   - {fileID: 0}
   fans:
@@ -479,8 +486,6 @@ SpriteRenderer:
   m_ReflectionProbeUsage: 1
   m_RayTracingMode: 0
   m_RayTraceProcedural: 0
-  m_RayTracingAccelStructBuildFlagsOverride: 0
-  m_RayTracingAccelStructBuildFlags: 1
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -565,8 +570,6 @@ SpriteRenderer:
   m_ReflectionProbeUsage: 1
   m_RayTracingMode: 0
   m_RayTraceProcedural: 0
-  m_RayTracingAccelStructBuildFlagsOverride: 0
-  m_RayTracingAccelStructBuildFlags: 1
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -651,8 +654,6 @@ SpriteRenderer:
   m_ReflectionProbeUsage: 1
   m_RayTracingMode: 0
   m_RayTraceProcedural: 0
-  m_RayTracingAccelStructBuildFlagsOverride: 0
-  m_RayTracingAccelStructBuildFlags: 1
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -737,8 +738,6 @@ SpriteRenderer:
   m_ReflectionProbeUsage: 1
   m_RayTracingMode: 0
   m_RayTraceProcedural: 0
-  m_RayTracingAccelStructBuildFlagsOverride: 0
-  m_RayTracingAccelStructBuildFlags: 1
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:

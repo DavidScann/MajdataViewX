@@ -1,8 +1,13 @@
 ﻿using Assets.Scripts.Types;
 using UnityEngine;
+using UnityEngine.UIElements;
+using static UnityEditor.PlayerSettings;
 #nullable enable
 public class NoteEffectManager : MonoBehaviour
 {
+    public static bool showFL;
+    public static bool showLevel;
+
     public Sprite hex;
     public Sprite star;
     private readonly Animator[] judgeAnimators = new Animator[8];
@@ -19,16 +24,15 @@ public class NoteEffectManager : MonoBehaviour
     private readonly GameObject[] fastLateEffects = new GameObject[8];
     Sprite[] judgeText;
 
-    private bool showFL;
-    private bool showLevel;
+    private CustomSkin customSkin;
 
     // Start is called before the first frame update
     private void Start()
     {
         var tapEffectParent = transform.GetChild(0).gameObject;
-        var greatEffectParent = transform.GetChild(2).gameObject;
-        var goodEffectParent = transform.GetChild(3).gameObject;
-        var judgeEffectParent = transform.GetChild(1).gameObject;
+        var greatEffectParent = transform.GetChild(1).gameObject;
+        var goodEffectParent = transform.GetChild(2).gameObject;
+        var judgeEffectParent = transform.GetChild(3).gameObject;
         var flParent = transform.GetChild(4).gameObject;
 
         for (var i = 0; i < 8; i++)
@@ -41,27 +45,23 @@ public class NoteEffectManager : MonoBehaviour
 
             goodEffects[i] = goodEffectParent.transform.GetChild(i).gameObject;
             greatAnimators[i] = goodEffects[i].GetComponent<Animator>();
-            goodEffects[i].SetActive(false);
+            
 
             greatEffects[i] = greatEffectParent.transform.GetChild(i).gameObject;
             greatAnimators[i] = greatEffects[i].GetComponent<Animator>();
-            greatEffects[i].SetActive(false);
+            
 
             tapEffects[i] = tapEffectParent.transform.GetChild(i).gameObject;
             tapAnimators[i] = tapEffects[i].GetComponent<Animator>();
-            tapEffects[i].SetActive(false);
+            
 
+            goodEffects[i].SetActive(false);
+            greatEffects[i].SetActive(false);
+            tapEffects[i].SetActive(false);
         }
 
-        LoadSkin();
-    }
-
-    /// <summary>
-    ///     加载判定文本的皮肤
-    /// </summary>
-    private void LoadSkin()
-    {
-        var customSkin = GameObject.Find("Outline").GetComponent<CustomSkin>();
+        //Load Skin
+        customSkin = GameObject.Find("Outline").GetComponent<CustomSkin>();
         judgeText = customSkin.JudgeText;
 
         foreach (var judgeEffect in judgeEffects)
@@ -96,28 +96,28 @@ public class NoteEffectManager : MonoBehaviour
                 break;
         }
     }
-
-    // Update is called once per frame
     public void PlayEffect(int position, bool isBreak, JudgeType judge = JudgeType.Perfect)
     {
-        if (!showLevel) return;
-
         var pos = position - 1;
+
+        ResetEffect(pos);
 
         switch (judge)
         {
             case JudgeType.LateGood:
             case JudgeType.FastGood:
-                judgeEffects[pos].transform.GetChild(0).GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = judgeText[1];
-                ResetEffect(position);
-                if(isBreak)
+                SetJudgeEffect(pos, judgeText[1]);
+
+                if (isBreak)
                 {
                     tapEffects[pos].SetActive(true);
                     tapAnimators[pos].speed = 0.9f;
                     tapAnimators[pos].SetTrigger("bGood");
                 }
                 else
+                {
                     goodEffects[pos].SetActive(true);
+                }
                 break;
             case JudgeType.LateGreat:
             case JudgeType.LateGreat1:
@@ -125,8 +125,8 @@ public class NoteEffectManager : MonoBehaviour
             case JudgeType.FastGreat2:
             case JudgeType.FastGreat1:
             case JudgeType.FastGreat:
-                judgeEffects[pos].transform.GetChild(0).GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = judgeText[2];
-                ResetEffect(position);
+                SetJudgeEffect(pos, judgeText[2]);
+
                 if (isBreak)
                 {
                     tapEffects[pos].SetActive(true);
@@ -143,8 +143,8 @@ public class NoteEffectManager : MonoBehaviour
             case JudgeType.FastPerfect2:
             case JudgeType.LatePerfect1:
             case JudgeType.FastPerfect1:
-                judgeEffects[pos].transform.GetChild(0).GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = judgeText[3];
-                ResetEffect(position);
+                SetJudgeEffect(pos, judgeText[3]);
+
                 tapEffects[pos].SetActive(true);
                 if (isBreak)
                 {
@@ -153,41 +153,50 @@ public class NoteEffectManager : MonoBehaviour
                 }
                 break;
             case JudgeType.Perfect:
-                judgeEffects[pos].transform.GetChild(0).GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = judgeText[4];
-                ResetEffect(position);
+                SetJudgeEffect(pos, judgeText[4]);
+
                 tapEffects[pos].SetActive(true);
                 if (isBreak)
                 {
                     tapAnimators[pos].speed = 0.9f;
                     tapAnimators[pos].SetTrigger("break");
-                }               
+                }
                 break;
             default:
-                judgeEffects[pos].transform.GetChild(0).GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = judgeText[0];
+                SetJudgeEffect(pos, judgeText[0]);
                 break;
         }
 
-        if (isBreak && judge == JudgeType.Perfect)
-            judgeAnimators[pos].SetTrigger("break");
-        else
-            judgeAnimators[pos].SetTrigger("perfect");
+        //play judge text anim
+        if (showLevel)
+        {
+            if (isBreak && judge == JudgeType.Perfect)
+                judgeAnimators[pos].SetTrigger("break");
+            else
+                judgeAnimators[pos].SetTrigger("perfect");
+        }
     }
-    /// <summary>
-    /// Tap，Hold，Star
-    /// </summary>
-    /// <param name="position"></param>
-    /// <param name="judge"></param>
-    public void PlayFastLate(int position,JudgeType judge)
+
+    private void SetJudgeEffect(int pos, Sprite sprite)
+    {
+        if (!showLevel) return;
+
+        judgeEffects[pos].transform.GetChild(0).GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = sprite;
+    }
+
+    public void PlayFastLate(int position, JudgeType judge)
     {
         if (!showFL) return;
 
-        var customSkin = GameObject.Find("Outline").GetComponent<CustomSkin>();
         var pos = position - 1;
-        if ((int)judge is (0 or 7))
+
+        if (judge == JudgeType.Miss || judge == JudgeType.Perfect)
         {
             fastLateEffects[pos].SetActive(false);
             return;
         }
+
+
         fastLateEffects[pos].SetActive(true);
         bool isFast = (int)judge > 7;
         if(isFast)
@@ -195,38 +204,12 @@ public class NoteEffectManager : MonoBehaviour
         else
             fastLateEffects[pos].transform.GetChild(0).GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = customSkin.LateText;
         fastLateAnims[pos].SetTrigger("perfect");
-
     }
-    /// <summary>
-    /// Touch，TouchHold
-    /// </summary>
-    /// <param name="obj"></param>
-    /// <param name="anim"></param>
-    /// <param name="judge"></param>
-    public void PlayFastLate(GameObject obj,Animator anim, JudgeType judge)
-    {
-        if (!showFL) return;
 
-        var customSkin = GameObject.Find("Outline").GetComponent<CustomSkin>();
-        if ((int)judge is (0 or 7))
-        {
-            obj.SetActive(false);
-            Destroy(obj);
-            return;
-        }
-        obj.SetActive(true);
-        bool isFast = (int)judge > 7;
-        if (isFast)
-            obj.transform.GetChild(0).GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = customSkin.FastText;
-        else
-            obj.transform.GetChild(0).GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = customSkin.LateText;
-        anim.SetTrigger("touch");
-
-    }
-    public void ResetEffect(int position)
+    public void ResetEffect(int pos)
     {
-        tapEffects[position - 1].SetActive(false);
-        greatEffects[position - 1].SetActive(false);
-        goodEffects[position - 1].SetActive(false);
+        tapEffects[pos].SetActive(false);
+        greatEffects[pos].SetActive(false);
+        goodEffects[pos].SetActive(false);
     }
 }

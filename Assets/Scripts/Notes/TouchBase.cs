@@ -8,7 +8,9 @@ namespace Assets.Scripts
         public char areaPosition;
         public bool isFirework;
 
-        public GameObject tapEffect;
+        public GameObject touchEffect;
+        public GameObject gr_TouchEffect;
+        public GameObject gd_TouchEffect;
         public GameObject judgeEffect;
 
 
