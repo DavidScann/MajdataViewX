@@ -3,7 +3,20 @@ guid: 43a4a1be0a3c9af41918c882a121a7f8
 MonoImporter:
   externalObjects: {}
   serializedVersion: 2
-  defaultReferences: []
+  defaultReferences:
+  - tapSpr: {instanceID: 0}
+  - eachSpr: {instanceID: 0}
+  - breakSpr: {instanceID: 0}
+  - exSpr: {instanceID: 0}
+  - mineSpr: {instanceID: 0}
+  - BreakShine: {instanceID: 0}
+  - tapLineSpr: {fileID: 21300000, guid: 3003041b178b9f246b4b465afb8079d3, type: 3}
+  - eachTapLineSpr: {fileID: 21300000, guid: 1a40750ad0e4fb747aeeb83536f52d09, type: 3}
+  - mineTapLineSpr: {fileID: 21300000, guid: d0bb6c8b19c521346b5c8a1070063c54, type: 3}
+  - breakTapLineSpr: {fileID: 21300000, guid: c190fb744a4bc94429a7cbce66f9fa9b, type: 3}
+  - starTapLineSpr: {fileID: 21300000, guid: 8576ec838da5f784e866901901ed374f, type: 3}
+  - tapLine: {instanceID: 0}
+  - breakMaterial: {instanceID: 0}
   executionOrder: 0
   icon: {instanceID: 0}
   userData: 

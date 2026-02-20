@@ -21,9 +21,15 @@ public class HoldDrop : NoteLongDrop
     public Sprite holdEachEnd;
     public Sprite holdBreakEnd;
 
+
     public RuntimeAnimatorController HoldShine;
     public RuntimeAnimatorController BreakShine;
 
+    public Sprite tapLineSpr;
+    public Sprite eachTapLineSpr;
+    public Sprite mineTapLineSpr;
+    public Sprite breakTapLineSpr;
+    public Sprite starTapLineSpr;
     public GameObject tapLine;
 
     public Color exEffectTap;
@@ -80,18 +86,21 @@ public class HoldDrop : NoteLongDrop
         if (isEach)
         {
             spriteRenderer.sprite = eachSpr;
+            lineSpriteRender.sprite = eachTapLineSpr;
             holdEndRender.sprite = holdEachEnd;
             if (isEX) exSpriteRender.color = exEffectEach;
         }
         if (isBreak)
         {
             spriteRenderer.sprite = breakSpr;
+            lineSpriteRender.sprite = breakTapLineSpr;
             holdEndRender.sprite = holdBreakEnd;
             if (isEX) exSpriteRender.color = exEffectBreak;
             spriteRenderer.material = breakMaterial;
         }
         if (isMine)
         {
+            lineSpriteRender.sprite = mineTapLineSpr;
             spriteRenderer.sprite = mineSpr;
         }
 
