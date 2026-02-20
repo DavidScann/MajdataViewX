@@ -33,17 +33,20 @@ public class StarDrop : TapBase
             if (isEach)
             {
                 spriteRenderer.sprite = eachSpr_Double;
+                tapLineSpriteRenderer.sprite = eachTapLineSpr;
                 if (isEX) exSpriteRender.color = exEffectEach;
             }
             if (isBreak)
             {
                 spriteRenderer.sprite = breakSpr_Double;
                 if (isEX) exSpriteRender.color = exEffectBreak;
+                tapLineSpriteRenderer.sprite = breakTapLineSpr;
                 spriteRenderer.material = breakMaterial;
             }
             if (isMine)
             {
                 spriteRenderer.sprite = mineSpr;
+                tapLineSpriteRenderer.sprite = mineTapLineSpr;
             }
         }
         else
@@ -54,14 +57,22 @@ public class StarDrop : TapBase
             if (isEach)
             {
                 spriteRenderer.sprite = eachSpr;
+                tapLineSpriteRenderer.sprite = eachTapLineSpr;
                 if (isEX) exSpriteRender.color = exEffectEach;
             }
 
             if (isBreak)
             {
                 spriteRenderer.sprite = breakSpr;
+                tapLineSpriteRenderer.sprite = breakTapLineSpr;
                 if (isEX) exSpriteRender.color = exEffectBreak;
                 spriteRenderer.material = breakMaterial;
+            }
+
+            if (isMine)
+            {
+                spriteRenderer.sprite = mineSpr;
+                tapLineSpriteRenderer.sprite = mineTapLineSpr;
             }
         }
 

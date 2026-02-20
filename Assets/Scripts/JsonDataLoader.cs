@@ -637,6 +637,10 @@ public class JsonDataLoader : MonoBehaviour
                         {
                             Array.Copy(customSkin.TouchHold_Mine, NDCompo.TouchHoldSprite, 5);
                         }
+                        else if (note.IsBreak)
+                        {
+                            Array.Copy(customSkin.TouchHold_Break, NDCompo.TouchHoldSprite, 5);
+                        }
                         else
                         {
                             Array.Copy(customSkin.TouchHold, NDCompo.TouchHoldSprite, 5);

@@ -182,21 +182,25 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c57176cc05c23a743af16831f7ec76ba, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  startPosition: 1
   time: 0
   noteSortOrder: 0
-  startPosition: 1
   speed: 1
   isEach: 0
+  isMine: 0
   isBreak: 0
   isEX: 0
-  isFakeStarRotate: 0
-  normalSpr: {fileID: 0}
+  tapSpr: {fileID: 0}
   eachSpr: {fileID: 21300000, guid: 5a2c3c94c8c3e2848803c02965b1c832, type: 3}
   breakSpr: {fileID: 21300000, guid: eab54b673ac7b824f91b1f8bf900b69e, type: 3}
   exSpr: {fileID: 0}
-  eachLine: {fileID: 21300000, guid: 1a40750ad0e4fb747aeeb83536f52d09, type: 3}
-  breakLine: {fileID: 21300000, guid: c190fb744a4bc94429a7cbce66f9fa9b, type: 3}
+  mineSpr: {fileID: 0}
   BreakShine: {fileID: 0}
+  tapLineSpr: {fileID: 21300000, guid: 3003041b178b9f246b4b465afb8079d3, type: 3}
+  eachTapLineSpr: {fileID: 21300000, guid: 1a40750ad0e4fb747aeeb83536f52d09, type: 3}
+  mineTapLineSpr: {fileID: 21300000, guid: d0bb6c8b19c521346b5c8a1070063c54, type: 3}
+  breakTapLineSpr: {fileID: 21300000, guid: c190fb744a4bc94429a7cbce66f9fa9b, type: 3}
+  starTapLineSpr: {fileID: 21300000, guid: 8576ec838da5f784e866901901ed374f, type: 3}
   tapLine: {fileID: 8134463029818261665, guid: ed6ad005bb60e9c409c75936f65b7f86, type: 3}
   exEffectTap: {r: 1, g: 0.6745283, b: 0.8829237, a: 1}
   exEffectEach: {r: 1, g: 0.9943893, b: 0.4669811, a: 1}
