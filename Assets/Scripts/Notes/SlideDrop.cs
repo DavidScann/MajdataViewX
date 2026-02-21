@@ -794,7 +794,7 @@ public class SlideDrop : NoteLongDrop, IFlasher
             objectCounter.ReportResult(this, judgeResult, isBreak);
             if (isBreak && judgeResult == JudgeType.Perfect)
                 slideOK.GetComponent<Animator>().runtimeAnimatorController = judgeBreakShine;
-            slideOK.SetActive(true);
+            if (NoteEffectManager.showLevel) slideOK.SetActive(true);
         }
         else
         {

@@ -1,7 +1,6 @@
 ﻿using Assets.Scripts.Types;
 using UnityEngine;
 using UnityEngine.UIElements;
-using static UnityEditor.PlayerSettings;
 #nullable enable
 public class NoteEffectManager : MonoBehaviour
 {
