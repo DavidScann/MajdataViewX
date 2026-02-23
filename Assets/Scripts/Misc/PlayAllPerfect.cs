@@ -18,7 +18,7 @@ public class PlayAllPerfect : MonoBehaviour
     // Update is called once per frame
     private void Update()
     {
-        if (loader is null)
+        if (loader == null)
             return;
         else if (loader.State is not (NoteLoaderStatus.Idle or NoteLoaderStatus.Finished))
             return;

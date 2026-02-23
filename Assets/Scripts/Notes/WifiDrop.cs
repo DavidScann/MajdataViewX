@@ -105,9 +105,10 @@ public class WifiDrop : NoteLongDrop,IFlasher
             star_slide[i].SetActive(false);
         }
 
-        SlidePositionEnd[0] = GameObject.Find("NoteEffects").transform.GetChild(0).GetChild(endPosition - 2 < 0 ? 7 : endPosition - 2).position;// R
-        SlidePositionEnd[1] = GameObject.Find("NoteEffects").transform.GetChild(0).GetChild(endPosition - 1).position;// Center
-        SlidePositionEnd[2] = GameObject.Find("NoteEffects").transform.GetChild(0).GetChild(endPosition >= 8 ? 0 : endPosition).position; // L
+        var ne = GameObject.Find("NoteEffects");
+        SlidePositionEnd[0] = ne.transform.GetChild(0).GetChild(endPosition - 2 < 0 ? 7 : endPosition - 2).position;// R
+        SlidePositionEnd[1] = ne.transform.GetChild(0).GetChild(endPosition - 1).position;// Center
+        SlidePositionEnd[2] = ne.transform.GetChild(0).GetChild(endPosition >= 8 ? 0 : endPosition).position; // L
 
 
         transform.rotation = Quaternion.Euler(0f, 0f, -45f * (startPosition - 1));
@@ -609,7 +610,10 @@ public class WifiDrop : NoteLongDrop,IFlasher
         objectCounter.ReportResult(this, judgeResult, isBreak);
         if (isBreak && judgeResult == JudgeType.Perfect)
             slideOK.GetComponent<Animator>().runtimeAnimatorController = judgeBreakShine;
-        if (NoteEffectManager.showLevel) slideOK.SetActive(true);
+        if (!NoteEffectManager.showLevel) slideOK.GetComponent<SpriteRenderer>().sprite = 
+                Sprite.Create(new Texture2D(0, 0), new Rect(0, 0, 0, 0), new Vector2(0.5f, 0.5f));
+
+        slideOK.SetActive(true);
 
         
         foreach (var sensor in boundSensors)

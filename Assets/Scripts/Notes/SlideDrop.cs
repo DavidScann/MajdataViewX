@@ -794,7 +794,10 @@ public class SlideDrop : NoteLongDrop, IFlasher
             objectCounter.ReportResult(this, judgeResult, isBreak);
             if (isBreak && judgeResult == JudgeType.Perfect)
                 slideOK.GetComponent<Animator>().runtimeAnimatorController = judgeBreakShine;
-            if (NoteEffectManager.showLevel) slideOK.SetActive(true);
+            if (!NoteEffectManager.showLevel) slideOK.GetComponent<SpriteRenderer>().sprite =
+                    Sprite.Create(new Texture2D(0, 0), new Rect(0, 0, 0, 0), new Vector2(0.5f, 0.5f));
+
+            slideOK.SetActive(true);
         }
         else
         {
