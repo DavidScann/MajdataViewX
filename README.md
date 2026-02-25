@@ -14,7 +14,16 @@
 
 - **该项目为个人维护修改版本() / Community-maintained fork**
 - **扩展包下载 / Extension Package**： [MajMuriDX Release](https://github.com/re-poem/MajdataViewX/releases/tag/MajMuriDX)
-- **删除包中的ThemeConfig.json来体验新的UI配色！ / Delete the ThemeConfig.json in the package to try the new UI !**
+- **更改包中的ThemeConfig.json来回退到旧的UI配色！ / Edit the ThemeConfig.json in the package to use the legacy UI !**
+```
+{
+  "LabelForeground": "#FFBDBDBD",
+  "ButtonForeground": "#FFFFFFFF",
+  "HelperForeground": "#FF569CD6",
+  "WindowBackground": "#FF5A6275",
+  "ButtonsBackground": "#99303030"
+}
+```
 
 ## 下载 / Download
 
