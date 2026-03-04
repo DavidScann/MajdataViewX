@@ -758,7 +758,7 @@ public class JsonDataLoader : MonoBehaviour
                         {
                             var GOnote = Instantiate(cmdPrefab);
                             var NDCompo = GOnote.GetComponent<CmdDrop>();
-                            NDCompo.time = (float)timing.time;
+                            NDCompo.time = (float)timing.Timing;
 
                             if (cmd[1] == "border")
                             {
