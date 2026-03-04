@@ -43,7 +43,7 @@ public class HoldDrop : NoteLongDrop
     private SpriteRenderer exSpriteRender;
     private bool holdAnimStart;
     private SpriteRenderer holdEndRender;
-    private SpriteRenderer lineSpriteRender;
+    public SpriteRenderer lineSpriteRender;
 
     private SpriteRenderer spriteRenderer;
 
@@ -51,7 +51,7 @@ public class HoldDrop : NoteLongDrop
 
     private ObjectCounter ObjectCounter;
 
-    private void Start()
+    private void Awake()
     {
         var notes = GameObject.Find("Notes").transform;
         holdEffect = Instantiate(holdEffect, notes);
@@ -60,7 +60,10 @@ public class HoldDrop : NoteLongDrop
         tapLine = Instantiate(tapLine, notes);
         tapLine.SetActive(false);
         lineSpriteRender = tapLine.GetComponent<SpriteRenderer>();
+    }
 
+    private void Start()
+    {
         exSpriteRender = transform.GetChild(0).GetComponent<SpriteRenderer>();
 
         timeProvider = GameObject.Find("AudioTimeProvider").GetComponent<AudioTimeProvider>();

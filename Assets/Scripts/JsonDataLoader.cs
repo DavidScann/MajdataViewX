@@ -448,13 +448,11 @@ public class JsonDataLoader : MonoBehaviour
                                 NDCompo.eachSpr = noteSprite;
                                 NDCompo.breakSpr = noteSprite;
                                 //ex情况下读取_ex作为ex框，直接在路径进行插入省时间
-                                NDCompo.exSpr = SpriteLoader.LoadSpriteFromFile(notePath.Insert(notePath.Length - 4, "_ex"));
+                                NDCompo.exSpr = SpriteLoader.LoadSpriteFromFile(InsertNameSuffix(notePath, "_ex"));
 
                                 if (kSkin.Length > 1)
                                 {
-                                    var kLine = Instantiate(starLine);
-                                    kLine.GetComponent<SpriteRenderer>().sprite = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, kSkin[1]));
-                                    NDCompo.tapLine = kLine;
+                                    NDCompo.lineSpriteRender.sprite = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, kSkin[1]));
                                 }
                                 else
                                 {
@@ -481,13 +479,11 @@ public class JsonDataLoader : MonoBehaviour
                                 NDCompo.normalSpr = noteSprite;
                                 NDCompo.eachSpr = noteSprite;
                                 NDCompo.breakSpr = noteSprite;
-                                NDCompo.exSpr = SpriteLoader.LoadSpriteFromFile(notePath.Insert(notePath.Length - 4, "_ex"));
+                                NDCompo.exSpr = SpriteLoader.LoadSpriteFromFile(InsertNameSuffix(notePath, "_ex"));
 
                                 if (kSkin.Length > 1)
                                 {
-                                    var kLine = Instantiate(starLine);
-                                    kLine.GetComponent<SpriteRenderer>().sprite = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, kSkin[1]));
-                                    NDCompo.tapLine = kLine;
+                                    NDCompo.lineSpriteRender.GetComponent<SpriteRenderer>().sprite = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, kSkin[1]));
                                 }
                             }
 
@@ -530,8 +526,8 @@ public class JsonDataLoader : MonoBehaviour
                             var kSkin = note.KustomSkin.Split(':');
                             var notePath = Path.Combine(kPath, kSkin[0]);
                             var noteSprite = SpriteLoader.LoadSpriteFromFile(notePath);
-                            var onPath = Path.Combine(kPath, kSkin[0].Insert(kSkin[0].Length - 4, "_on"));
-                            var offPath = Path.Combine(kPath, kSkin[0].Insert(kSkin[0].Length - 4, "_off"));
+                            var onPath = Path.Combine(kPath, InsertNameSuffix(kSkin[0], "_on"));
+                            var offPath = Path.Combine(kPath, InsertNameSuffix(kSkin[0], "_off"));
                             if (File.Exists(onPath))
                             {
                                 var onSprite = SpriteLoader.LoadSpriteFromFile(onPath);
@@ -555,14 +551,12 @@ public class JsonDataLoader : MonoBehaviour
                             NDCompo.tapSpr = noteSprite;
                             NDCompo.eachSpr = noteSprite;
                             NDCompo.breakSpr = noteSprite;
-                            NDCompo.exSpr = SpriteLoader.LoadSpriteFromFile(notePath.Insert(notePath.Length - 4, "_ex"));
+                            NDCompo.exSpr = SpriteLoader.LoadSpriteFromFile(InsertNameSuffix(notePath, "_ex"));
 
                             if (kSkin.Length > 1)
                             {
                                 var guideNames = kSkin[1].Split(';');
-                                var kLine = Instantiate(NDCompo.tapLine);
-                                kLine.GetComponent<SpriteRenderer>().sprite = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, guideNames[0]));
-                                NDCompo.tapLine = kLine;
+                                NDCompo.lineSpriteRender.GetComponent<SpriteRenderer>().sprite = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, guideNames[0]));
                                 if (guideNames.Length > 1)
                                 {
                                     var endSprite = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, guideNames[1]));
@@ -616,17 +610,17 @@ public class JsonDataLoader : MonoBehaviour
                         else
                         {
                             Sprite[] touchHold = new Sprite[5];
-                            touchHold[0] = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, note.KustomSkin.Insert(note.KustomSkin.Length - 4, "_0")));
-                            touchHold[1] = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, note.KustomSkin.Insert(note.KustomSkin.Length - 4, "_1")));
-                            touchHold[2] = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, note.KustomSkin.Insert(note.KustomSkin.Length - 4, "_2")));
-                            touchHold[3] = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, note.KustomSkin.Insert(note.KustomSkin.Length - 4, "_3")));
+                            touchHold[0] = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, InsertNameSuffix(note.KustomSkin, "_0")));
+                            touchHold[1] = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, InsertNameSuffix(note.KustomSkin, "_1")));
+                            touchHold[2] = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, InsertNameSuffix(note.KustomSkin, "_2")));
+                            touchHold[3] = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, InsertNameSuffix(note.KustomSkin, "_3")));
                             touchHold[4] = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, note.KustomSkin));
 
                             Array.Copy(touchHold, NDCompo.TouchHoldSprite, 5);
-                            var pointSprite = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, note.KustomSkin.Insert(note.KustomSkin.Length - 4, "_point")));
+                            var pointSprite = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, InsertNameSuffix(note.KustomSkin, "_point")));
                             NDCompo.TouchPointSprite = pointSprite;
                             NDCompo.TouchPointEachSprite = pointSprite;
-                            NDCompo.TouchHoldBorderMiss = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, note.KustomSkin.Insert(note.KustomSkin.Length - 4, "_off")));
+                            NDCompo.TouchHoldBorderMiss = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, InsertNameSuffix(note.KustomSkin, "_off")));
                         }
                         NDCompo.isUnplayable = note.IsUnplayable;
                         NDCompo.canSVAffect = note.UsingSV;
@@ -661,8 +655,8 @@ public class JsonDataLoader : MonoBehaviour
                             if (kSkin.Length > 1)
                             {
                                 var borderPath = Path.Combine(kPath, kSkin[1]);
-                                var border2Sprite = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, borderPath.Insert(borderPath.Length - 4, "_border_2")));
-                                var border3Sprite = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, borderPath.Insert(borderPath.Length - 4, "_border_3")));
+                                var border2Sprite = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, InsertNameSuffix(borderPath, "_border_2")));
+                                var border3Sprite = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, InsertNameSuffix(borderPath, "_border_3")));
                                 NDCompo.multTouchNormalSprite[0] = border2Sprite;
                                 NDCompo.multTouchNormalSprite[1] = border3Sprite;
                                 NDCompo.multTouchEachSprite[0] = border2Sprite;
@@ -678,11 +672,11 @@ public class JsonDataLoader : MonoBehaviour
                             NDCompo.fanNormalSprite = fanSprite;
                             NDCompo.fanEachSprite = fanSprite;
 
-                            var pointSprite = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, notePath.Insert(notePath.Length - 4, "_point")));
+                            var pointSprite = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, InsertNameSuffix(notePath, "_point")));
                             NDCompo.pointNormalSprite = pointSprite;
                             NDCompo.pointEachSprite = pointSprite;
 
-                            NDCompo.justSprite = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, notePath.Insert(notePath.Length - 4, "_just")));
+                            NDCompo.justSprite = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, InsertNameSuffix(notePath, "_just")));
                         }
 
                         if (timing.Notes.Length > 1)
@@ -1204,18 +1198,16 @@ public class JsonDataLoader : MonoBehaviour
             NDCompo.eachSpr = tapSprite;
             NDCompo.breakSpr = tapSprite;
 
-            NDCompo.exSpr = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, tapName.Insert(tapName.Length - 4, "_ex")));
+            NDCompo.exSpr = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, InsertNameSuffix(tapName, "_ex")));
 
             NDCompo.tapSpr_Double = tapSprite;
             NDCompo.eachSpr_Double = tapSprite;
             NDCompo.breakSpr_Double = tapSprite;
 
-            NDCompo.exSpr_Double = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, tapName.Insert(tapName.Length - 4, "_ex")));
+            NDCompo.exSpr_Double = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, InsertNameSuffix(tapName, "_ex")));
             if (kSkin.Length > 1)
             {
-                var kLine = Instantiate(starLine);
-                kLine.GetComponent<SpriteRenderer>().sprite = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, kSkin[1]));
-                NDCompo.tapLine = kLine;
+                NDCompo.lineSpriteRender.GetComponent<SpriteRenderer>().sprite = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, kSkin[1]));
             }
 
             var starSprite = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, starName));
@@ -1226,7 +1218,7 @@ public class JsonDataLoader : MonoBehaviour
             Sprite[] wifi = new Sprite[11];
             for (var j = 0; j < 11; j++)
             {
-                wifi[j] = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, slideName.Insert(slideName.Length - 4, "_" + j)));
+                wifi[j] = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, InsertNameSuffix(slideName, "_" + j)));
             }
 
             Array.Copy(wifi, WifiCompo.normalSlide, 11);
@@ -1362,19 +1354,17 @@ public class JsonDataLoader : MonoBehaviour
             NDCompo.eachSpr = tapSprite;
             NDCompo.breakSpr = tapSprite;
 
-            NDCompo.exSpr = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, tapName.Insert(tapName.Length - 4, "_ex")));
+            NDCompo.exSpr = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, InsertNameSuffix(tapName, "_ex")));
 
             NDCompo.tapSpr_Double = tapSprite;
             NDCompo.eachSpr_Double = tapSprite;
             NDCompo.breakSpr_Double = tapSprite;
 
-            NDCompo.exSpr_Double = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, tapName.Insert(tapName.Length - 4, "_ex")));
+            NDCompo.exSpr_Double = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, InsertNameSuffix(tapName, "_ex")));
 
             if (kSkin.Length > 1)
             {
-                var kLine = Instantiate(starLine);
-                kLine.GetComponent<SpriteRenderer>().sprite = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, kSkin[1]));
-                NDCompo.tapLine = kLine;
+                NDCompo.lineSpriteRender.GetComponent<SpriteRenderer>().sprite = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, kSkin[1]));
             }
 
             var slideSprite = SpriteLoader.LoadSpriteFromFile(Path.Combine(kPath, slideName));
@@ -1770,5 +1760,13 @@ public class JsonDataLoader : MonoBehaviour
         if (key == 7) return 3;
         if (key == 8) return 2;
         throw new Exception("Keys out of range: " + key);
+    }
+
+    private string InsertNameSuffix(string name, string suffix) 
+    {
+        if (name.Length >= 4)
+            return name.Insert(name.Length - 4, suffix);
+        else
+            return "";
     }
 }

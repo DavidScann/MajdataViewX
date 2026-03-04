@@ -1,5 +1,6 @@
 ﻿using System;
 using Unity.Mathematics;
+using UnityEditor.Experimental.GraphView;
 using UnityEngine;
 
 public class StarDrop : NoteDrop
@@ -43,7 +44,7 @@ public class StarDrop : NoteDrop
 
     private bool breakAnimStart;
     private SpriteRenderer exSpriteRender;
-    private SpriteRenderer lineSpriteRender;
+    public SpriteRenderer lineSpriteRender;
 
     private ObjectCounter ObjectCounter;
 
@@ -51,13 +52,17 @@ public class StarDrop : NoteDrop
 
     private AudioTimeProvider timeProvider;
 
-    private void Start()
+    private void Awake()
     {
         var notes = GameObject.Find("Notes").transform;
         tapLine = Instantiate(tapLine, notes);
         tapLine.SetActive(false);
         lineSpriteRender = tapLine.GetComponent<SpriteRenderer>();
         spriteRenderer = GetComponent<SpriteRenderer>();
+    }
+
+    private void Start()
+    {
         exSpriteRender = transform.GetChild(0).GetComponent<SpriteRenderer>();
         timeProvider = GameObject.Find("AudioTimeProvider").GetComponent<AudioTimeProvider>();
         ObjectCounter = GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>();
