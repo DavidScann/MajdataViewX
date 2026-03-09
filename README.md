@@ -64,8 +64,6 @@
 |:---:|:---:|
 | master | 正常分支，release 时的分支，继续维护原汁原味 Majdata Edit&View，[下载](https://github.com/re-poem/MajdataViewX/releases) |
 | yours | 旧版 yours 分支，从 v4.4.0 修改而来，[你知道的](https://www.bilibili.com/video/BV16UYhzdED7/) |
-| mineyours | 新版 yours，融合 MajdataMine 而来 |
-| TRGUI | 你不知道的 |
 
 ## 已知问题 / Known Issues
 
