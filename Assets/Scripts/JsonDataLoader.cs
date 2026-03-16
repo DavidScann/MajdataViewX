@@ -1015,63 +1015,12 @@ public class JsonDataLoader : MonoBehaviour
             throw new Exception("组合星星有错误\nwSLIDE CHAIN ERROR");
         // 此时 flag为2表示每条指定语法 为3表示整体指定语法
 
-        if (specTimeFlag == 3)
-        {
-            // 整体指定语法 使用slideTime来计算
             var tempBarCount = 0;
-            for (var i = 0; i < subSlide.Count; i++)
-            {
-                subSlide[i].SlideStartTime = note.SlideStartTime + (double)tempBarCount / sumBarCount * note.SlideTime;
-                subSlide[i].SlideTime = (double)subBarCount[i] / sumBarCount * note.SlideTime;
-                tempBarCount += subBarCount[i];
-            }
-        }
-        else
+        for (var i = 0; i < subSlide.Count; i++)
         {
-            // 每条指定语法
-
-            // 获取时长的子函数
-            double getTimeFromBeats(string noteText, float currentBpm)
-            {
-                var startIndex = noteText.IndexOf('[');
-                var overIndex = noteText.IndexOf(']');
-                var innerString = noteText.Substring(startIndex + 1, overIndex - startIndex - 1);
-                var timeOneBeat = 1d / (currentBpm / 60d);
-                if (innerString.Count(o => o == '#') == 1)
-                {
-                    var times = innerString.Split('#');
-                    if (times[1].Contains(':'))
-                    {
-                        innerString = times[1];
-                        timeOneBeat = 1d / (double.Parse(times[0]) / 60d);
-                    }
-                    else
-                    {
-                        return double.Parse(times[1]);
-                    }
-                }
-
-                if (innerString.Count(o => o == '#') == 2)
-                {
-                    var times = innerString.Split('#');
-                    return double.Parse(times[2]);
-                }
-
-                var numbers = innerString.Split(':');
-                var divide = int.Parse(numbers[0]);
-                var count = int.Parse(numbers[1]);
-
-
-                return timeOneBeat * 4d / divide * count;
-            }
-
-            double tempSlideTime = 0;
-            for (var i = 0; i < subSlide.Count; i++)
-            {
-                subSlide[i].SlideStartTime = note.SlideStartTime + tempSlideTime;
-                subSlide[i].SlideTime = getTimeFromBeats(subSlide[i].RawContent, timing.Bpm);
-                tempSlideTime += subSlide[i].SlideTime;
-            }
+            subSlide[i].SlideStartTime = note.SlideStartTime + (double)tempBarCount / sumBarCount * note.SlideTime;
+            subSlide[i].SlideTime = (double)subBarCount[i] / sumBarCount * note.SlideTime;
+            tempBarCount += subBarCount[i];
         }
 
         GameObject parent = null;
