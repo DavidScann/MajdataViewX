@@ -72,6 +72,7 @@
 3. 软件渲染可能不支持 3:00 以上的歌，可以缩小下面的预览图解决（很难修！！）
 4. 使用内置录屏时，请确保 view 的分辨率是偶数。点击之后可能会有较长卡顿，请耐心等待。
 5. 进行铺面共享时，请不要一次性更改太多内容，比如Ctrl+A+BackSpace()，会导致谱面同步延迟甚至失败
+6. 在v5.0.0之后的版本，~由于MS的魅力代码~，maj可能会出现无法剪切/复制卡顿等情况，这大概率是因为你后台有远程这种会读取剪贴板的软件造成的，请尝试关掉或调整其设置。
 
 > 其他问题见 [MajdataX 的 issue 页面](https://github.com/re-poem/MajdataViewX/issues) 或者 **[提交 Issue](https://github.com/re-poem/MajdataViewX/issues/new)**
 
