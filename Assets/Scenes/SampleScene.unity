@@ -6038,7 +6038,7 @@ GameObject:
   - component: {fileID: 725517434}
   - component: {fileID: 725517435}
   m_Layer: 0
-  m_Name: pref2
+  m_Name: ref2
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -8465,7 +8465,7 @@ GameObject:
   - component: {fileID: 1143610126}
   - component: {fileID: 1143610127}
   m_Layer: 0
-  m_Name: pref
+  m_Name: ref
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
