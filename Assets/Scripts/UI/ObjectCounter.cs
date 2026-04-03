@@ -14,7 +14,8 @@ public class ObjectCounter : MonoBehaviour
     public Color AchievementSilverColor; // = new Color32(160, 160, 160, 255);
     public Color AchievementGoldColor; // = new Color32(224, 191, 127, 255);
 
-    public bool AllFinished => tapCount == tapSum && 
+    public bool AllFinished => 
+        tapCount == tapSum && 
         holdCount == holdSum && 
         slideCount == slideSum && 
         touchCount == touchSum && 
