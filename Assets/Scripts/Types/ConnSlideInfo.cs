@@ -57,7 +57,7 @@ namespace Assets.Scripts.Types
                 if (Parent == null)
                     return true;
                 else
-                    return Parent.GetComponent<SlideDrop>().isFinished;
+                    return Parent.GetComponent<SlideBase>().isFinished;
             }
         }
         /// <summary>
@@ -70,7 +70,7 @@ namespace Assets.Scripts.Types
                 if (Parent == null)
                     return false;
                 else
-                    return Parent.GetComponent<SlideDrop>().isPendingFinish;
+                    return Parent.GetComponent<SlideBase>().isPendingFinish;
             }
         }
         bool _isGroupPartEnd = false;

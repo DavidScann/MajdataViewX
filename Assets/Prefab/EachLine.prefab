@@ -98,9 +98,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   time: 0
-  startPosition: 1
-  curvLength: 1
-  speed: 1
+  startPosition: 0
+  curvLength: 0
+  speed: 0
   obj1: {fileID: 0}
   obj2: {fileID: 0}
   curvSprites:

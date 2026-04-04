@@ -1,30 +1,35 @@
-using Assets.Scripts.Interfaces;
 using System;
 using UnityEngine;
 #nullable enable
 public class BreakShineController : MonoBehaviour
 {
-    public IFlasher? parent = null;
+    TimeProvider timeProvider;
+    
+    public SlideBase? parent;
 
-    SpriteRenderer spriteRenderer;
-    AudioTimeProvider timeProvider;
-    // Start is called before the first frame update
-    void Start()
+    private SpriteRenderer spriteRenderer;
+    private MaterialPropertyBlock _mpb;
+
+    private void Awake()
     {
+        _mpb = new MaterialPropertyBlock();
+    }
+    
+    private void Start()
+    {
+        timeProvider = Majdata<TimeProvider>.Instance!;
         
-    }
-    // Update is called once per frame
-    void Update()
-    {
-        if(parent is not null && parent.CanShine())
-        {
-            var extra = Math.Max(Mathf.Sin(timeProvider.GetFrame() * 0.17f) * 0.5f, 0);
-            spriteRenderer.material.SetFloat("_Brightness", 0.95f + extra);
-        }
-    }
-    private void OnEnable()
-    {
         spriteRenderer = GetComponent<SpriteRenderer>();
-        timeProvider = GameObject.Find("AudioTimeProvider").GetComponent<AudioTimeProvider>();
+    }
+
+    private void Update()
+    {
+        if (parent == null || !parent.CanShine()) return;
+        
+        var extra = Math.Max(Mathf.Sin(timeProvider.GetFrame() * 0.17f) * 0.5f, 0);
+            
+        spriteRenderer.GetPropertyBlock(_mpb);
+        _mpb.SetFloat("_Brightness", 0.95f + extra);
+        spriteRenderer.SetPropertyBlock(_mpb);
     }
 }

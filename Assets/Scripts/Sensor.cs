@@ -6,7 +6,7 @@ using UnityEngine;
 
 public class Sensor : MonoBehaviour
 {
-    public bool IsJudging { get; set; } = false;
+    public bool IsJudging { get; set; }
     public SensorStatus Status = SensorStatus.Off;
     public SensorType Type;
     public SensorGroup Group 
@@ -27,7 +27,7 @@ public class Sensor : MonoBehaviour
         }
     }
 
-    public event EventHandler<InputEventArgs> OnStatusChanged;//oStatus nStatus
+    public event EventHandler<InputEventArgs> OnStatusChanged; //oStatus nStatus
 
     List<Guid> tasks = new();
     public void SetOn(Guid id)
@@ -45,7 +45,7 @@ public class Sensor : MonoBehaviour
         {
             if (OnStatusChanged != null)
             {
-                OnStatusChanged(this,new InputEventArgs()
+                OnStatusChanged(this, new InputEventArgs()
                 {
                     IsButton = false,
                     Type = Type,
@@ -69,7 +69,7 @@ public class Sensor : MonoBehaviour
             var oStatus = Status;
             if (OnStatusChanged != null)
             {
-                OnStatusChanged(this,new InputEventArgs()
+                OnStatusChanged(this, new InputEventArgs()
                 {
                     IsButton = false,
                     Type = Type,
@@ -86,34 +86,7 @@ public class Sensor : MonoBehaviour
         var guid = Guid.NewGuid();
         SetOn(guid);
         yield return null;
-        yield return null; // 等待2帧模拟真实点击
+        yield return null; //two frame press
         SetOff(guid);
-        //if (Status == SensorStatus.On)
-        //    return;
-        //else if (OnStatusChanged != null)
-        //{
-        //    Status = SensorStatus.On;
-        //    OnStatusChanged(this, new InputEventArgs()
-        //    {
-        //        IsButton = false,
-        //        Type = Type,
-        //        OldStatus = SensorStatus.Off,
-        //        Status = SensorStatus.On
-        //    });
-        //    IsJudging = false;
-        //    print($"Sensor:{Type} Click");
-        //    Status = SensorStatus.Off;
-        //}
-    }
-    // Start is called before the first frame update
-    void Start()
-    {
-        
-    }
-
-    // Update is called once per frame
-    void Update()
-    {
-        
     }
 }

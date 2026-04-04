@@ -3,7 +3,7 @@ using Assets.Scripts.Types;
 #nullable enable
 namespace Assets.Scripts
 {
-    public class TouchBase : NoteDrop
+    public class TouchBase : NoteBase
     {
         public char areaPosition;
         public bool isFirework;

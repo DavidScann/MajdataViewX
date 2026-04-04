@@ -6,8 +6,7 @@ public class DestroySelf : MonoBehaviour
 {
     public bool ifDestroy;
     public bool ifStopRecording;
-
-    // Update is called once per frame
+    
     private void Update()
     {
         if (ifStopRecording) GameObject.Find("ScreenRecorder").GetComponent<ScreenRecorder>().StopRecording();

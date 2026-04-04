@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
-using static NoteEffectManager;
+using static EffectManager;
 
 public class ObjectCounter : MonoBehaviour
 {
@@ -68,6 +68,11 @@ public class ObjectCounter : MonoBehaviour
     Dictionary<JudgeType, int> judgedSlideCount;
     Dictionary<JudgeType, int> judgedBreakCount;
     Dictionary<JudgeType, int> totalJudgedCount;
+
+    private void Awake()
+    {
+        Majdata<ObjectCounter>.Instance = this;
+    }
 
     // Start is called before the first frame update
     private void Start()
@@ -387,7 +392,7 @@ public class ObjectCounter : MonoBehaviour
         accRate[3] = ((totalScore - currentNoteScore.LostScore) / (double)totalScore) * 100 + (currentNoteScore.TotalExtraScore / (double)totalExtraScore);
         accRate[4] = (currentNoteScore.TotalScore / (double)totalScore) * 100 + (currentNoteScore.TotalExtraScore / (double)totalExtraScore);
     }
-    internal void ReportResult(NoteDrop note, JudgeType result,bool isBreak = false)
+    internal void ReportResult(NoteBase note, JudgeType result,bool isBreak = false)
     {
         var noteType = GetNoteType(note);
         switch(noteType)
@@ -492,13 +497,13 @@ public class ObjectCounter : MonoBehaviour
         notes.noteIndex[pos]++;
     }
     internal void NextTouch(SensorType pos) => notes.touchIndex[pos]++;
-    SimaiNoteType GetNoteType(NoteDrop note) => note switch
+    SimaiNoteType GetNoteType(NoteBase note) => note switch
     {
         TapDrop => SimaiNoteType.Tap,
         StarDrop => SimaiNoteType.Tap,
         HoldDrop => SimaiNoteType.Hold,
-        SlideDrop => SimaiNoteType.Slide,
-        WifiDrop => SimaiNoteType.Slide,
+        SlideBase => SimaiNoteType.Slide,
+        WifiBase => SimaiNoteType.Slide,
         TouchHoldDrop => SimaiNoteType.TouchHold,
         TouchDrop => SimaiNoteType.Touch,
         _ => throw new InvalidOperationException()

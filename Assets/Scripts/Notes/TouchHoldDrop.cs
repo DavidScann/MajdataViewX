@@ -48,7 +48,7 @@ public class TouchHoldDrop : TouchHoldBase
         holdEffect = Instantiate(holdEffect, notes);
         holdEffect.SetActive(false);
 
-        timeProvider = GameObject.Find("AudioTimeProvider").GetComponent<AudioTimeProvider>();
+        TimeProvider = GameObject.Find("AudioTimeProvider").GetComponent<TimeProvider>();
 
         firework = GameObject.Find("FireworkEffect");
         fireworkEffect = firework.GetComponent<Animator>();
@@ -96,7 +96,7 @@ public class TouchHoldDrop : TouchHoldBase
                                 .GetComponent<SensorManager>();
         inputManager = GameObject.Find("Input")
                                  .GetComponent<InputManager>();
-        var customSkin = GameObject.Find("Outline").GetComponent<CustomSkin>();
+        var customSkin = GameObject.Find("Outline").GetComponent<SkinManager>();
         judgeText = customSkin.JudgeText;
         inputManager.BindSensor(Check, GetSensor());
     }
@@ -131,7 +131,7 @@ public class TouchHoldDrop : TouchHoldBase
         if (isJudged)
             return;
 
-        var timing = timeProvider.AudioTime - time;
+        var timing = TimeProvider.AudioTime - time;
         var isFast = timing < 0;
         var diff = MathF.Abs(timing * 1000);
         JudgeType result;
@@ -223,7 +223,7 @@ public class TouchHoldDrop : TouchHoldBase
                 return;
             else if (remainingTime <= 0.2f) // 忽略尾部12帧
                 return;
-            else if (!timeProvider.isStart) // 忽略暂停
+            else if (!TimeProvider.isStart) // 忽略暂停
                 return;
 
             var on = inputManager.CheckSensorStatus(GetSensor(), SensorStatus.On);
@@ -436,7 +436,7 @@ public class TouchHoldDrop : TouchHoldBase
         }
 
         //show level
-        if (NoteEffectManager.showLevel)
+        if (EffectManager.showLevel)
         {
             //get obj
             var obj = Instantiate(judgeEffect, Vector3.zero, transform.rotation);
@@ -482,7 +482,7 @@ public class TouchHoldDrop : TouchHoldBase
         }
 
         //show fastlate
-        if (NoteEffectManager.showFL)
+        if (EffectManager.showFL)
         {
             //get obj
             var obj = Instantiate(judgeEffect, Vector3.zero, transform.rotation);
@@ -495,7 +495,7 @@ public class TouchHoldDrop : TouchHoldBase
             var flAnim = obj.GetComponent<Animator>();
 
             //show
-            var customSkin = GameObject.Find("Outline").GetComponent<CustomSkin>();
+            var customSkin = GameObject.Find("Outline").GetComponent<SkinManager>();
             if (judgeResult == JudgeType.Miss || judgeResult == JudgeType.Perfect)
             {
                 obj.SetActive(false);

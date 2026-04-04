@@ -1,8 +1,9 @@
-﻿using Assets.Scripts.Types;
+﻿using System;
+using Assets.Scripts.Types;
 using UnityEngine;
 using UnityEngine.UIElements;
 #nullable enable
-public class NoteEffectManager : MonoBehaviour
+public class EffectManager : MonoBehaviour
 {
     public static bool showFL;
     public static bool showLevel;
@@ -23,9 +24,14 @@ public class NoteEffectManager : MonoBehaviour
     private readonly GameObject[] fastLateEffects = new GameObject[8];
     Sprite[] judgeText;
 
-    private CustomSkin customSkin;
+    private SkinManager skinManager;
 
-    // Start is called before the first frame update
+    private void Awake()
+    {
+        Majdata<EffectManager>.Instance = this;
+    }
+
+
     private void Start()
     {
         var tapEffectParent = transform.GetChild(0).gameObject;
@@ -60,15 +66,15 @@ public class NoteEffectManager : MonoBehaviour
         }
 
         //Load Skin
-        customSkin = GameObject.Find("Outline").GetComponent<CustomSkin>();
-        judgeText = customSkin.JudgeText;
+        skinManager = GameObject.Find("Outline").GetComponent<SkinManager>();
+        judgeText = skinManager.JudgeText;
 
         foreach (var judgeEffect in judgeEffects)
         {
             judgeEffect.transform.GetChild(0).GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite =
-                customSkin.JudgeText[0];
+                skinManager.JudgeText[0];
             judgeEffect.transform.GetChild(0).GetChild(1).gameObject.GetComponent<SpriteRenderer>().sprite =
-                customSkin.JudgeText_Break;
+                skinManager.JudgeText_Break;
         }
     }
 
@@ -199,9 +205,9 @@ public class NoteEffectManager : MonoBehaviour
         fastLateEffects[pos].SetActive(true);
         bool isFast = (int)judge > 7;
         if(isFast)
-             fastLateEffects[pos].transform.GetChild(0).GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = customSkin.FastText;
+             fastLateEffects[pos].transform.GetChild(0).GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = skinManager.FastText;
         else
-            fastLateEffects[pos].transform.GetChild(0).GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = customSkin.LateText;
+            fastLateEffects[pos].transform.GetChild(0).GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = skinManager.LateText;
         fastLateAnims[pos].SetTrigger("perfect");
     }
 

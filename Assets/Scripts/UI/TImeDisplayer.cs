@@ -6,13 +6,13 @@ public class TImeDisplayer : MonoBehaviour
 {
     private Text text;
 
-    private AudioTimeProvider timeProvider;
+    private TimeProvider timeProvider;
 
     // Start is called before the first frame update
     private void Start()
     {
         text = GetComponent<Text>();
-        timeProvider = GameObject.Find("AudioTimeProvider").GetComponent<AudioTimeProvider>();
+        timeProvider = GameObject.Find("AudioTimeProvider").GetComponent<TimeProvider>();
     }
 
     // Update is called once per frame

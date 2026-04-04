@@ -1,5 +1,4 @@
-﻿using Assets.Scripts.Interfaces;
-using Assets.Scripts.Notes;
+﻿using Assets.Scripts.Notes;
 using Assets.Scripts.Types;
 using System;
 using System.Collections.Generic;
@@ -9,7 +8,7 @@ using UnityEditor;
 using UnityEngine;
 using static UnityEngine.Networking.UnityWebRequest;
 #nullable enable
-public class WifiDrop : NoteLongDrop,IFlasher
+public class WifiBase : NoteLongBase
 {
     // Start is called before the first frame update
     public GameObject star_slidePrefab;
@@ -88,7 +87,7 @@ public class WifiDrop : NoteLongDrop,IFlasher
         fadeInAnimator.SetTrigger("wifi");
 
         objectCounter = GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>();
-        timeProvider = GameObject.Find("AudioTimeProvider").GetComponent<AudioTimeProvider>();
+        TimeProvider = GameObject.Find("AudioTimeProvider").GetComponent<TimeProvider>();
         var notes = GameObject.Find("Notes").transform;
         for (var i = 0; i < star_slide.Length; i++)
         {
@@ -214,8 +213,8 @@ public class WifiDrop : NoteLongDrop,IFlasher
         /// time      是Slide启动的时间点
         /// timeStart 是Slide完全显示但未启动
         /// LastFor   是Slide的时值
-        var timing = timeProvider.AudioTime - time;
-        var startTiming = timeProvider.AudioTime - timeStart;
+        var timing = TimeProvider.AudioTime - time;
+        var startTiming = TimeProvider.AudioTime - timeStart;
         var forceJudgeTiming = time + LastFor + (isMine ? 0 : 0.6); //mine头一到就判
 
         if (startTiming >= -0.05f)
@@ -228,7 +227,7 @@ public class WifiDrop : NoteLongDrop,IFlasher
             HideBar(areaStep.LastOrDefault());
             Judge();
         }
-        else if (timeProvider.AudioTime - forceJudgeTiming >= 0)
+        else if (TimeProvider.AudioTime - forceJudgeTiming >= 0)
             TooLateJudge();
     }
     int GetLastIndex()
@@ -343,15 +342,15 @@ public class WifiDrop : NoteLongDrop,IFlasher
             DestroySelf();
             return;
         }
-        var timing = timeProvider.AudioTime - time;
+        var timing = TimeProvider.AudioTime - time;
         var starTiming = timeStart + (time - timeStart) * 0.667;
         var pTime = LastFor / areaStep.Last();
         var judgeTime = time + pTime * (areaStep.LastOrDefault() - 2.1f);// 正解帧
         var stayTime = (time + LastFor) - judgeTime; // 停留时间
         if (!isJudged)
         {
-            arriveTime = timeProvider.AudioTime;
-            var triggerTime = timeProvider.AudioTime;
+            arriveTime = TimeProvider.AudioTime;
+            var triggerTime = TimeProvider.AudioTime;
 
             const float totalInterval = 1.2f; // 秒
             const float nPInterval = 0.4666667f; // Perfect基础区间
@@ -396,9 +395,9 @@ public class WifiDrop : NoteLongDrop,IFlasher
             SetJust();
             isJudged = true;
         }
-        else if (arriveTime < starTiming && timeProvider.AudioTime >= starTiming + stayTime * 0.667)
+        else if (arriveTime < starTiming && TimeProvider.AudioTime >= starTiming + stayTime * 0.667)
             DestroySelf();
-        else if (arriveTime >= starTiming && timeProvider.AudioTime >= arriveTime + stayTime * 0.667)
+        else if (arriveTime >= starTiming && TimeProvider.AudioTime >= arriveTime + stayTime * 0.667)
             DestroySelf();
     }
     void HideBar(int endIndex)
@@ -444,7 +443,7 @@ public class WifiDrop : NoteLongDrop,IFlasher
     private void Update()
     {
         // Wifi Slide淡入期间，不透明度从0到1耗时200ms
-        var startiming = timeProvider.AudioTime - timeStart;
+        var startiming = TimeProvider.AudioTime - timeStart;
         if (startiming <= 0f)
         {
             if (startiming >= -0.05f)
@@ -462,7 +461,7 @@ public class WifiDrop : NoteLongDrop,IFlasher
         foreach (var star in star_slide)
             star.SetActive(true);
 
-        var timing = timeProvider.AudioTime - time;
+        var timing = TimeProvider.AudioTime - time;
         if (timing <= 0f)
         {
             canShine = true;
@@ -487,7 +486,7 @@ public class WifiDrop : NoteLongDrop,IFlasher
     }
     void UpdateStar()
     {
-        var timing = timeProvider.AudioTime - time;
+        var timing = TimeProvider.AudioTime - time;
         var process = 1f - (LastFor - timing) / LastFor;
         if (LastFor == 0) process = 1;
         var pos = (slideBars.Count - 1) * process;
@@ -610,7 +609,7 @@ public class WifiDrop : NoteLongDrop,IFlasher
         objectCounter.ReportResult(this, judgeResult, isBreak);
         if (isBreak && judgeResult == JudgeType.Perfect)
             slideOK.GetComponent<Animator>().runtimeAnimatorController = judgeBreakShine;
-        if (!NoteEffectManager.showLevel) slideOK.GetComponent<SpriteRenderer>().sprite = 
+        if (!EffectManager.showLevel) slideOK.GetComponent<SpriteRenderer>().sprite = 
                 Sprite.Create(new Texture2D(0, 0), new Rect(0, 0, 0, 0), new Vector2(0.5f, 0.5f));
 
         slideOK.SetActive(true);

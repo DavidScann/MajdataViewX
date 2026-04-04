@@ -11,11 +11,6 @@ public class MultTouchHandler : MonoBehaviour
         for (var i = 0; i < 33; i++) touchSlots[i] = new List<TouchDrop>();
     }
 
-    // Update is called once per frame
-    private void Update()
-    {
-    }
-
     private int getAreaIndex(char area, int pos)
     {
         if (area == 'C') return 0;

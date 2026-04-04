@@ -47,7 +47,7 @@ public class ScreenRecorder : MonoBehaviour
 
     private IEnumerator CaptureScreen(string maidata_path)
     {
-        var timeProvider = GameObject.Find("AudioTimeProvider").GetComponent<AudioTimeProvider>();
+        var timeProvider = GameObject.Find("AudioTimeProvider").GetComponent<TimeProvider>();
         var bgManager = GameObject.Find("Background").GetComponent<BGManager>();
         if (Screen.width % 2 != 0 || Screen.height % 2 != 0)
         {

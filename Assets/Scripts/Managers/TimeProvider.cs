@@ -1,7 +1,7 @@
 ﻿using System;
 using UnityEngine;
 
-public class AudioTimeProvider : MonoBehaviour
+public class TimeProvider : MonoBehaviour
 {
     public float AudioTime; //notes get this value
     public bool isStart;
@@ -13,6 +13,11 @@ public class AudioTimeProvider : MonoBehaviour
     private long ticks;
 
     public float CurrentSpeed => isRecord ? Time.timeScale : speed;
+
+    private void Awake()
+    {
+        Majdata<TimeProvider>.Instance = this;
+    }
 
     // Update is called once per frame
     private void Update()

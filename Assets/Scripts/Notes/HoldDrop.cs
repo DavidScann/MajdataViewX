@@ -1,50 +1,23 @@
-﻿using Assets.Scripts.Notes;
-using Assets.Scripts.Types;
+﻿using Assets.Scripts.Types;
 using System;
 using UnityEngine;
 #nullable enable
-public class HoldDrop : NoteLongDrop
+public class HoldDrop : NoteLongBase
 {
+    public bool isEach;
     public bool isEX;
     public bool isBreak;
-
-    public Sprite tapSpr;
-    public Sprite holdOnSpr;
-    public Sprite holdOffSpr;
-    public Sprite eachSpr;
-    public Sprite eachHoldOnSpr;
-    public Sprite exSpr;
-    public Sprite breakSpr;
-    public Sprite breakHoldOnSpr;
-    public Sprite mineSpr;
-
-    public Sprite holdEachEnd;
-    public Sprite holdBreakEnd;
-
-
-    public RuntimeAnimatorController HoldShine;
-    public RuntimeAnimatorController BreakShine;
-
-    public Sprite tapLineSpr;
-    public Sprite eachTapLineSpr;
-    public Sprite mineTapLineSpr;
-    public Sprite breakTapLineSpr;
-    public Sprite starTapLineSpr;
+    public bool isMine;
+    
+    [SerializeField]
     public GameObject tapLine;
-
-    public Color exEffectTap;
-    public Color exEffectEach;
-    public Color exEffectBreak;
+    
     private Animator animator;
-
-    public Material breakMaterial;
-
-    private SpriteRenderer exSpriteRender;
     private bool holdAnimStart;
-    private SpriteRenderer holdEndRender;
     private SpriteRenderer lineSpriteRender;
-
     private SpriteRenderer spriteRenderer;
+    private SpriteRenderer holdEndRender;
+    private SpriteRenderer exSpriteRender;
 
     private bool isTouched = false; //for mine judge
 
@@ -52,58 +25,35 @@ public class HoldDrop : NoteLongDrop
     private void Start()
     {
         var notes = GameObject.Find("Notes").transform;
-        objectCounter = GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>();
-        noteManager = notes.GetComponent<NoteManager>();
+        timeProvider = Majdata<TimeProvider>.Instance!;
+        objectCounter = Majdata<ObjectCounter>.Instance!;
+        noteManager = Majdata<NoteManager>.Instance!;
+        skinManager = Majdata<SkinManager>.Instance!;
+        inputManager = Majdata<InputManager>.Instance!;
+        
         holdEffect = Instantiate(holdEffect, notes);
         holdEffect.SetActive(false);
 
         tapLine = Instantiate(tapLine, notes);
         tapLine.SetActive(false);
+        
+        //TODO: ADD empty Animator to prefab
+        //var anim = gameObject.AddComponent<Animator>();
+        //anim.enabled = false;
+        //animator = anim;
+        animator = GetComponent<Animator>();
+        animator.enabled = false;
+        
         lineSpriteRender = tapLine.GetComponent<SpriteRenderer>();
-
+        spriteRenderer = GetComponent<SpriteRenderer>();
+        holdEndRender = transform.GetChild(1).GetComponent<SpriteRenderer>();
         exSpriteRender = transform.GetChild(0).GetComponent<SpriteRenderer>();
 
-        timeProvider = GameObject.Find("AudioTimeProvider").GetComponent<AudioTimeProvider>();
-        spriteRenderer = GetComponent<SpriteRenderer>();
-
-        holdEndRender = transform.GetChild(1).GetComponent<SpriteRenderer>();
-
         spriteRenderer.sortingOrder += noteSortOrder;
-        exSpriteRender.sortingOrder += noteSortOrder;
         holdEndRender.sortingOrder += noteSortOrder;
+        exSpriteRender.sortingOrder += noteSortOrder;
 
-        spriteRenderer.sprite = tapSpr;
-        exSpriteRender.sprite = exSpr;
-
-        var anim = gameObject.AddComponent<Animator>();
-        anim.enabled = false;
-        animator = anim;
-
-        if (isEX)
-        {
-            exSpriteRender.color = exEffectTap;
-        }
-        if (isEach)
-        {
-            spriteRenderer.sprite = eachSpr;
-            lineSpriteRender.sprite = eachTapLineSpr;
-            holdEndRender.sprite = holdEachEnd;
-            if (isEX) exSpriteRender.color = exEffectEach;
-        }
-        if (isBreak)
-        {
-            spriteRenderer.sprite = breakSpr;
-            lineSpriteRender.sprite = breakTapLineSpr;
-            holdEndRender.sprite = holdBreakEnd;
-            if (isEX) exSpriteRender.color = exEffectBreak;
-            spriteRenderer.material = breakMaterial;
-        }
-        if (isMine)
-        {
-            lineSpriteRender.sprite = mineTapLineSpr;
-            spriteRenderer.sprite = mineSpr;
-        }
-
+        LoadSkin();
         spriteRenderer.forceRenderingOff = true;
         exSpriteRender.forceRenderingOff = true;
         holdEndRender.enabled = false;
@@ -111,13 +61,41 @@ public class HoldDrop : NoteLongDrop
         sensor = GameObject.Find("Sensors")
                                    .transform.GetChild(startPosition - 1)
                                    .GetComponent<Sensor>();
-        manager = GameObject.Find("Sensors")
-                                .GetComponent<SensorManager>();
-        inputManager = GameObject.Find("Input")
-                                 .GetComponent<InputManager>();
-        sensorPos = (SensorType)(startPosition - 1);
-        inputManager.BindArea(Check, sensorPos);
+        inputManager.BindArea(Check, sensor);
     }
+
+    private void LoadSkin()
+    {
+        lineSpriteRender.sprite = skinManager.Line;
+        spriteRenderer.sprite = skinManager.Tap;
+        exSpriteRender.sprite = skinManager.Tap_Ex;
+        holdEndRender.sprite = skinManager.HoldEnd;
+        if (isEX)
+        {
+            exSpriteRender.color = skinManager.Ex;
+        }
+        if (isEach)
+        {
+            spriteRenderer.sprite = skinManager.Hold_Each;
+            lineSpriteRender.sprite = skinManager.Line_Each;
+            holdEndRender.sprite = skinManager.HoldEnd_Each;
+            if (isEX) exSpriteRender.color = skinManager.Ex_Each;
+        }
+        if (isBreak)
+        {
+            spriteRenderer.sprite = skinManager.Hold_Break;
+            lineSpriteRender.sprite = skinManager.Line_Break;
+            holdEndRender.sprite = skinManager.HoldEnd_Break;
+            if (isEX) exSpriteRender.color = skinManager.Ex_Break;
+            spriteRenderer.material = skinManager.BreakMaterial;
+        }
+        if (isMine)
+        {
+            lineSpriteRender.sprite = skinManager.Line_Mine;
+            spriteRenderer.sprite = skinManager.Hold_Mine;
+        }
+    }
+
     private void FixedUpdate()
     {
         var timing = GetJudgeTiming();
@@ -149,7 +127,7 @@ public class HoldDrop : NoteLongDrop
                     break;
                 case AutoPlayMode.DJAuto:
                     if (!isJudged && !isMine) //mine buda
-                        manager.SetSensorOn(sensor.Type, guid);
+                        inputManager.SetSensorOn(sensor, guid);
                     break;
                 case AutoPlayMode.Random:
                     if (!isJudged)
@@ -174,22 +152,23 @@ public class HoldDrop : NoteLongDrop
                     PlayHoldEffect();
                     return;
                 case AutoPlayMode.Disable:
-                    manager.SetSensorOff(sensor.Type, guid);
+                    inputManager.SetSensorOff(sensor, guid);
                     break;
             }
         }
 
         if (isJudged) // 头部判定完成后开始累计按压时长
         {
-            if (inputManager.CheckAreaStatus(sensorPos, SensorStatus.On)) isTouched = true;
+            if (inputManager.CheckAreaStatus(sensor, SensorStatus.On)) isTouched = true;
+            
             if (timing <= 0.1f) // 忽略头部6帧
                 return;
-            else if (remainingTime <= 0.2f) // 忽略尾部12帧
+            if (remainingTime <= 0.2f) // 忽略尾部12帧
                 return;
-            else if (!timeProvider.isStart || InputManager.Mode is AutoPlayMode.Enable or AutoPlayMode.Random) // 忽略暂停
+            if (!timeProvider.isStart || InputManager.Mode is AutoPlayMode.Enable or AutoPlayMode.Random) // 忽略暂停
                 return;
-            var on = inputManager.CheckAreaStatus(sensorPos,SensorStatus.On);
-            if (on)
+            
+            if (inputManager.CheckAreaStatus(sensor,SensorStatus.On))
             {
                 PlayHoldEffect();
             }
@@ -209,27 +188,28 @@ public class HoldDrop : NoteLongDrop
     }
     void Check(object sender, InputEventArgs arg)
     {
-        if (arg.Type != sensor.Type)
+        if (arg.Sensor != sensor)
             return;
-        else if (isJudged || !noteManager.CanJudge(gameObject, startPosition))
+        if (isJudged || !noteManager.CanJudge(gameObject, startPosition))
             return;
-        else if (InputManager.Mode is AutoPlayMode.Enable or AutoPlayMode.Random)
+        if (InputManager.Mode is AutoPlayMode.Enable or AutoPlayMode.Random)
             return;
+        
         if (arg.IsClick)
         {
             if (!inputManager.IsIdle(arg))
                 return;
-            else
-                inputManager.SetBusy(arg);
+            
+            inputManager.SetBusy(arg);
             Judge();
             if (isJudged)
             {
-                inputManager.UnbindArea(Check, sensorPos);
+                inputManager.UnbindArea(Check, sensor);
                 objectCounter.NextNote(startPosition);
             }
         }
     }
-    void Judge() //hold类头判正常检查，在destroy统一处理
+    private void Judge() //hold类头判正常检查，在destroy统一处理
     {
         const int JUDGE_GOOD_AREA = 150;
         const int JUDGE_GREAT_AREA = 100;
@@ -279,7 +259,7 @@ public class HoldDrop : NoteLongDrop
         isJudged = true;
         PlayHoldEffect();
     }
-    // Update is called once per frame
+    
     private void Update()
     {
         var timing = GetJudgeTiming();
@@ -431,7 +411,7 @@ public class HoldDrop : NoteLongDrop
                 result = JudgeType.Perfect;
         }
 
-        var effectManager = GameObject.Find("NoteEffects").GetComponent<NoteEffectManager>();
+        var effectManager = GameObject.Find("NoteEffects").GetComponent<EffectManager>();
         effectManager.PlayEffect(startPosition, isBreak, result);
         effectManager.PlayFastLate(startPosition, result);
         print($"Hold: {MathF.Round(percent * 100,2)}%\nTotal Len : {MathF.Round(realityHT * 1000,2)}ms");
@@ -440,37 +420,42 @@ public class HoldDrop : NoteLongDrop
         if (!isJudged)
             objectCounter.NextNote(startPosition);
 
-        manager.SetSensorOff(sensor.Type, guid);
-        inputManager.UnbindArea(Check, sensorPos);
+        inputManager.SetSensorOff(sensor, guid);
+        inputManager.UnbindArea(Check, sensor);
     }
     protected override void PlayHoldEffect()
     {
         base.PlayHoldEffect();
-        GameObject.Find("NoteEffects").GetComponent<NoteEffectManager>().ResetEffect(startPosition - 1);
+        Majdata<EffectManager>.Instance!.ResetEffect(startPosition - 1);
         if (LastFor <= 0.3)
             return;
-        else if (!holdAnimStart && GetJudgeTiming() >= 0.1f && !isMine)//忽略开头6帧与结尾12帧和mine
+        if (!holdAnimStart && GetJudgeTiming() >= 0.1f && !isMine)//忽略开头6帧与结尾12帧和mine
         {
             holdAnimStart = true;
-            animator.runtimeAnimatorController = HoldShine;
-            animator.enabled = true;
-            var sprRenderer = GetComponent<SpriteRenderer>();
+
             if (isBreak)
-                sprRenderer.sprite = breakHoldOnSpr;
+            {
+                spriteRenderer.sprite = skinManager.Hold_Break_On;
+                animator.runtimeAnimatorController = skinManager.Shine_Break;
+            }
             else if (isEach)
-                sprRenderer.sprite = eachHoldOnSpr;
+            {
+                spriteRenderer.sprite = skinManager.Hold_Each_On;
+                animator.runtimeAnimatorController = skinManager.Shine;
+            }
             else
-                sprRenderer.sprite = holdOnSpr;
+            {
+                spriteRenderer.sprite = skinManager.Hold_On;
+                animator.runtimeAnimatorController = skinManager.Shine;
+            }
+            animator.enabled = true;
         }
     }
     protected override void StopHoldEffect()
     {
         base.StopHoldEffect();
         holdAnimStart = false;
-        animator.runtimeAnimatorController = HoldShine;
         animator.enabled = false;
-        var sprRenderer = GetComponent<SpriteRenderer>();
-        sprRenderer.sprite = holdOffSpr;
+        spriteRenderer.sprite = skinManager.Hold_Off;
     }
-
 }

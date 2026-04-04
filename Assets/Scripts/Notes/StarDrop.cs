@@ -33,20 +33,20 @@ public class StarDrop : TapBase
             if (isEach)
             {
                 spriteRenderer.sprite = eachSpr_Double;
-                tapLineSpriteRenderer.sprite = eachTapLineSpr;
+                lineSpriteRenderer.sprite = eachTapLineSpr;
                 if (isEX) exSpriteRender.color = exEffectEach;
             }
             if (isBreak)
             {
                 spriteRenderer.sprite = breakSpr_Double;
                 if (isEX) exSpriteRender.color = exEffectBreak;
-                tapLineSpriteRenderer.sprite = breakTapLineSpr;
+                lineSpriteRenderer.sprite = breakTapLineSpr;
                 spriteRenderer.material = breakMaterial;
             }
             if (isMine)
             {
                 spriteRenderer.sprite = mineSpr;
-                tapLineSpriteRenderer.sprite = mineTapLineSpr;
+                lineSpriteRenderer.sprite = mineTapLineSpr;
             }
         }
         else
@@ -57,14 +57,14 @@ public class StarDrop : TapBase
             if (isEach)
             {
                 spriteRenderer.sprite = eachSpr;
-                tapLineSpriteRenderer.sprite = eachTapLineSpr;
+                lineSpriteRenderer.sprite = eachTapLineSpr;
                 if (isEX) exSpriteRender.color = exEffectEach;
             }
 
             if (isBreak)
             {
                 spriteRenderer.sprite = breakSpr;
-                tapLineSpriteRenderer.sprite = breakTapLineSpr;
+                lineSpriteRenderer.sprite = breakTapLineSpr;
                 if (isEX) exSpriteRender.color = exEffectBreak;
                 spriteRenderer.material = breakMaterial;
             }
@@ -72,7 +72,7 @@ public class StarDrop : TapBase
             if (isMine)
             {
                 spriteRenderer.sprite = mineSpr;
-                tapLineSpriteRenderer.sprite = mineTapLineSpr;
+                lineSpriteRenderer.sprite = mineTapLineSpr;
             }
         }
 
@@ -96,7 +96,7 @@ public class StarDrop : TapBase
     // Update is called once per frame
     protected override void Update()
     {
-        var songSpeed = timeProvider.CurrentSpeed;
+        var songSpeed = TimeProvider.CurrentSpeed;
         var judgeTiming = GetJudgeTiming();
         var distance = judgeTiming * speed + 4.8f;
         var destScale = distance * 0.4f + 0.51f;
@@ -164,7 +164,7 @@ public class StarDrop : TapBase
             if (isEX) exSpriteRender.forceRenderingOff = false;
         }
 
-        if (timeProvider.isStart && !isFakeStar && rotateSpeed != 0)
+        if (TimeProvider.isStart && !isFakeStar && rotateSpeed != 0)
             transform.Rotate(0f, 0f, -180f * Time.deltaTime * songSpeed / rotateSpeed);
         else if (isFakeStarRotate)
             transform.Rotate(0f, 0f, 400f * Time.deltaTime);  

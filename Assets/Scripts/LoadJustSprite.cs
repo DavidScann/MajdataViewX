@@ -59,7 +59,7 @@ public class LoadJustSprite : MonoBehaviour
     }
     private void refreshSprite()
     {
-        gameObject.GetComponent<SpriteRenderer>().sprite = GameObject.Find("Outline").GetComponent<CustomSkin>()
+        gameObject.GetComponent<SpriteRenderer>().sprite = GameObject.Find("Outline").GetComponent<SkinManager>()
             .Just[_0curv1str2wifi + indexOffset + judgeOffset];
     }
 }

@@ -4,13 +4,13 @@ using UnityEngine;
 public class PlayAllPerfect : MonoBehaviour
 {
     private GameObject Allperfect;
-    private AudioTimeProvider timeProvider;
+    private TimeProvider timeProvider;
     JsonDataLoader loader;
 
     private void Start()
     {
         loader = GameObject.FindAnyObjectByType<JsonDataLoader>();
-        timeProvider = GameObject.Find("AudioTimeProvider").GetComponent<AudioTimeProvider>();
+        timeProvider = GameObject.Find("AudioTimeProvider").GetComponent<TimeProvider>();
         Allperfect = GameObject.Find("CanvasAllPerfect");
         Allperfect.SetActive(false);
     }

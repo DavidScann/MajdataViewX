@@ -1,3 +1,4 @@
+using System;
 using Assets.Scripts.Types;
 using System.Collections.Generic;
 using UnityEngine;
@@ -10,6 +11,12 @@ public class NoteManager : MonoBehaviour
 
     public Dictionary<GameObject, int> touchOrder = new();
     public Dictionary<SensorType, int> touchIndex = new();
+
+    private void Awake()
+    {
+        Majdata<NoteManager>.Instance = this;
+    }
+
     // Start is called before the first frame update
     void Start()
     {

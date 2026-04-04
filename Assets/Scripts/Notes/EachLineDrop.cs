@@ -2,27 +2,30 @@ using UnityEngine;
 #nullable enable
 public class EachLineDrop : MonoBehaviour
 {
+    //managers
+    private TimeProvider timeProvider;
+    
+    //init args
     public float time;
-    public int startPosition = 1;
-    public int curvLength = 1;
-    public float speed = 1;
-
-    public GameObject obj1;
-    public GameObject obj2;
-
-    public Sprite[] curvSprites;
-    private SpriteRenderer sr;
-
-    private AudioTimeProvider timeProvider;
+    public int startPosition;
+    public float speed;
+    
+    public int curvLength;
+    
+    [SerializeField]
+    Sprite[] curvSprites;
+    
+    //own
+    private SpriteRenderer spriteRenderer;
 
     // Start is called before the first frame update
     private void Start()
     {
-        timeProvider = GameObject.Find("AudioTimeProvider").GetComponent<AudioTimeProvider>();
+        timeProvider = Majdata<TimeProvider>.Instance!;
 
-        sr = gameObject.GetComponent<SpriteRenderer>();
-        sr.sprite = curvSprites[curvLength - 1];
-        sr.forceRenderingOff = true;
+        spriteRenderer = GetComponent<SpriteRenderer>();
+        spriteRenderer.sprite = curvSprites[curvLength - 1];
+        spriteRenderer.forceRenderingOff = true;
     }
 
     // Update is called once per frame
@@ -35,7 +38,7 @@ public class EachLineDrop : MonoBehaviour
         if (distance < 1.225f)
         {
             distance = 1.225f;
-            if (destScale > 0.3f) sr.forceRenderingOff = false;
+            if (destScale > 0.3f) spriteRenderer.forceRenderingOff = false;
         }
 
         var lineScale = Mathf.Abs(distance / 4.8f);

@@ -4,40 +4,30 @@ using System;
 using System.Diagnostics;
 using UnityEngine;
 #nullable enable
-public class NoteDrop : MonoBehaviour
+public class NoteBase : MonoBehaviour
 {
-    public int startPosition;
-    public float time;
-    public int noteSortOrder;
-    public float speed = 7;
-    public bool isEach;
-    public bool isMine;
-
-    protected AudioTimeProvider timeProvider;
-
-    public NoteStatus State { get; protected set; } = NoteStatus.Start;
-    protected SensorType sensorPos;
-    protected Sensor sensor;
-    protected SensorManager manager;
-    protected InputManager inputManager;
-    protected NoteManager noteManager;
-    protected Guid guid = Guid.NewGuid();
-    protected bool isJudged = false;
-    protected JudgeType judgeResult;
+    protected TimeProvider timeProvider;
     protected ObjectCounter objectCounter;
+    protected NoteManager noteManager;
+    protected InputManager inputManager;
+    protected SkinManager skinManager;
+    
+    public float time;
+    public int startPosition;
+    public Sensor sensor;
+    public float speed = 7;
+    public int noteSortOrder;
 
+    protected NoteStatus State { get; set; } = NoteStatus.Start;
+    
+    protected Guid guid = Guid.NewGuid();
+    protected JudgeType judgeResult;
+    protected bool isJudged = false;
     private JudgeType _judgeResult;
-
-    /// <summary>
-    /// 获取当前时刻距离正解帧的时间长度
-    /// </summary>
-    /// <returns>
-    /// 当前时刻在正解帧后方，结果为正数
-    /// <para>当前时刻在正解帧前方，结果为负数</para>
-    /// </returns>
+    
     protected float GetJudgeTiming() => timeProvider.AudioTime - time;
     protected Vector3 getPositionFromDistance(float distance) => getPositionFromDistance(distance, startPosition);
-    protected Vector3 getPositionFromDistance(float distance,int position)
+    protected Vector3 getPositionFromDistance(float distance, int position)
     {
         return new Vector3(
             distance * Mathf.Cos((position * -2f + 5f) * 0.125f * Mathf.PI),
@@ -45,25 +35,17 @@ public class NoteDrop : MonoBehaviour
     }
 }
 
-public class NoteLongDrop : NoteDrop
+public class NoteLongBase : NoteBase
 {
     public float LastFor = 1f;
-    public GameObject holdEffect;
-
+    
     protected float playerIdleTime = 0;
-    protected Stopwatch userHold = new();
     protected float judgeDiff = -1;
-
-    protected bool isAutoTrigger = false;
-
-    /// <summary>
-    /// 返回Hold的剩余长度
-    /// </summary>
-    /// <returns>
-    /// Hold剩余长度
-    /// </returns>
+    
+    [SerializeField]
+    public GameObject holdEffect;
+    
     protected float GetRemainingTime() => MathF.Max(LastFor - GetJudgeTiming(),0);
-
 
     protected virtual void PlayHoldEffect()
     {

@@ -7,7 +7,7 @@ using UnityEngine.Video;
 public class BGManager : MonoBehaviour
 {
     private float playSpeed;
-    private AudioTimeProvider provider;
+    private TimeProvider provider;
 
     private RawImage rawImage;
 
@@ -26,7 +26,7 @@ public class BGManager : MonoBehaviour
         spriteRender = GetComponent<SpriteRenderer>();
         videoPlayer = GetComponent<VideoPlayer>();
         rawImage = GameObject.Find("Jacket").GetComponent<RawImage>();
-        provider = GameObject.Find("AudioTimeProvider").GetComponent<AudioTimeProvider>();
+        provider = GameObject.Find("AudioTimeProvider").GetComponent<TimeProvider>();
         SongDetail = GameObject.Find("CanvasSongDetail");
         SongDetail.SetActive(false);
     }
@@ -105,7 +105,7 @@ public class BGManager : MonoBehaviour
     private IEnumerator loadPic(string path)
     {
         Sprite sprite;
-        yield return sprite = SpriteLoader.LoadSpriteFromFile(path);
+        yield return sprite = SpriteLoader.Load(path);
         rawImage.texture = sprite.texture;
         spriteRender.sprite = sprite;
         var scale = 1140f / sprite.texture.width;

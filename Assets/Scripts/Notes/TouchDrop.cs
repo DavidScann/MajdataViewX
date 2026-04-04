@@ -54,7 +54,7 @@ public class TouchDrop : TouchBase
 
         var notes = GameObject.Find("Notes").transform;
         noteManager = notes.GetComponent<NoteManager>();
-        timeProvider = GameObject.Find("AudioTimeProvider").GetComponent<AudioTimeProvider>();
+        TimeProvider = GameObject.Find("AudioTimeProvider").GetComponent<TimeProvider>();
         multTouchHandler = GameObject.Find("MultTouchHandler").GetComponent<MultTouchHandler>();
         objectCounter = GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>();
         firework = GameObject.Find("FireworkEffect");
@@ -105,7 +105,7 @@ public class TouchDrop : TouchBase
                                 .GetComponent<SensorManager>();
         inputManager = GameObject.Find("Input")
                                  .GetComponent<InputManager>();
-        var customSkin = GameObject.Find("Outline").GetComponent<CustomSkin>();
+        var customSkin = GameObject.Find("Outline").GetComponent<SkinManager>();
         judgeText = customSkin.JudgeText;
         inputManager.BindSensor(Check, GetSensor());
     }
@@ -207,7 +207,7 @@ public class TouchDrop : TouchBase
         if (isJudged)
             return;
 
-        var timing = timeProvider.AudioTime - time;
+        var timing = TimeProvider.AudioTime - time;
         var isFast = timing < 0;
         var diff = MathF.Abs(timing * 1000);
         JudgeType result;
@@ -230,7 +230,7 @@ public class TouchDrop : TouchBase
     // Update is called once per frame
     private void Update()
     {
-        var timing = timeProvider.AudioTime - time;
+        var timing = TimeProvider.AudioTime - time;
 
         //var timing = time;
         //var pow = Mathf.Pow(-timing * speed, 0.1f)-0.4f;
@@ -329,7 +329,7 @@ public class TouchDrop : TouchBase
         }
 
         //show level
-        if (NoteEffectManager.showLevel)
+        if (EffectManager.showLevel)
         {
             //get obj
             var obj = Instantiate(judgeEffect, Vector3.zero, transform.rotation);
@@ -375,7 +375,7 @@ public class TouchDrop : TouchBase
         }
 
         //show fastlate
-        if (NoteEffectManager.showFL)
+        if (EffectManager.showFL)
         {
             //get obj
             var obj = Instantiate(judgeEffect, Vector3.zero, transform.rotation);
@@ -388,7 +388,7 @@ public class TouchDrop : TouchBase
             var flAnim = obj.GetComponent<Animator>();
 
             //show
-            var customSkin = GameObject.Find("Outline").GetComponent<CustomSkin>();
+            var customSkin = GameObject.Find("Outline").GetComponent<SkinManager>();
             if (judgeResult == JudgeType.Miss || judgeResult == JudgeType.Perfect)
             {
                 obj.SetActive(false);

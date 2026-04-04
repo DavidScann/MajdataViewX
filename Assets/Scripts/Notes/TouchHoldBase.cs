@@ -3,7 +3,7 @@ using Assets.Scripts.Types;
 #nullable enable
 namespace Assets.Scripts
 {
-    public class TouchHoldBase : NoteLongDrop
+    public class TouchHoldBase : NoteLongBase
     {
         public char areaPosition;
         public bool isFirework;

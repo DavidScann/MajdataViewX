@@ -29,10 +29,7 @@ public class JsonDataLoader : MonoBehaviour
     public GameObject notes;
     public GameObject star_slidePrefab;
     public GameObject[] slidePrefab;
-    public Material breakMaterial;
-    public RuntimeAnimatorController BreakShine;
-    public RuntimeAnimatorController JudgeBreakShine;
-    public RuntimeAnimatorController HoldShine;
+    
 
     public NoteLoaderStatus State { get; private set; } = NoteLoaderStatus.Idle;
     NoteManager noteManager;
@@ -50,7 +47,7 @@ public class JsonDataLoader : MonoBehaviour
     public Text designText;
     public RawImage cardImage;
     public Color[] diffColors = new Color[7];
-    private CustomSkin customSkin;
+    private SkinManager skinManager;
 
     private ObjectCounter ObjectCounter;
 
@@ -460,7 +457,7 @@ public class JsonDataLoader : MonoBehaviour
     {
         Application.targetFrameRate = 120;
         ObjectCounter = GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>();
-        customSkin = GameObject.Find("Outline").GetComponent<CustomSkin>();
+        skinManager = GameObject.Find("Outline").GetComponent<SkinManager>();
         noteManager = GameObject.Find("Notes").GetComponent<NoteManager>();
     }
 
@@ -537,11 +534,11 @@ public class JsonDataLoader : MonoBehaviour
                         {
                             GOnote = Instantiate(starPrefab, notes.transform);
                             var _NDCompo = GOnote.GetComponent<StarDrop>();
-                            _NDCompo.tapSpr = customSkin.Star;
-                            _NDCompo.eachSpr = customSkin.Star_Each;
-                            _NDCompo.breakSpr = customSkin.Star_Break;
-                            _NDCompo.exSpr = customSkin.Star_Ex;
-                            _NDCompo.mineSpr = customSkin.Star_Mine;
+                            _NDCompo.tapSpr = skinManager.Star;
+                            _NDCompo.eachSpr = skinManager.Star_Each;
+                            _NDCompo.breakSpr = skinManager.Star_Break;
+                            _NDCompo.exSpr = skinManager.Star_Ex;
+                            _NDCompo.mineSpr = skinManager.Star_Mine;
                             _NDCompo.tapLine = starLine;
                             _NDCompo.isFakeStarRotate = note.IsFakeRotate;
                             _NDCompo.isFakeStar = true;
@@ -552,11 +549,11 @@ public class JsonDataLoader : MonoBehaviour
                             GOnote = Instantiate(tapPrefab, notes.transform);
                             NDCompo = GOnote.GetComponent<TapDrop>();
                             //自定义note样式
-                            NDCompo.tapSpr = customSkin.Tap;
-                            NDCompo.breakSpr = customSkin.Tap_Break;
-                            NDCompo.eachSpr = customSkin.Tap_Each;
-                            NDCompo.exSpr = customSkin.Tap_Ex;
-                            NDCompo.mineSpr = customSkin.Tap_Mine;
+                            NDCompo.tapSpr = skinManager.Tap;
+                            NDCompo.breakSpr = skinManager.Tap_Break;
+                            NDCompo.eachSpr = skinManager.Tap_Each;
+                            NDCompo.exSpr = skinManager.Tap_Ex;
+                            NDCompo.mineSpr = skinManager.Tap_Mine;
                         }
                         noteManager.AddNote(GOnote, noteIndex[note.StartPosition]++);
                         // note的图层顺序
@@ -585,18 +582,17 @@ public class JsonDataLoader : MonoBehaviour
                         NDCompo.noteSortOrder = noteSortOrder;
                         noteSortOrder -= NOTE_LAYER_COUNT[note.Type];
 
-                        NDCompo.tapSpr = customSkin.Hold;
-                        NDCompo.holdOnSpr = customSkin.Hold_On;
-                        NDCompo.holdOffSpr = customSkin.Hold_Off;
-                        NDCompo.eachSpr = customSkin.Hold_Each;
-                        NDCompo.eachHoldOnSpr = customSkin.Hold_Each_On;
-                        NDCompo.exSpr = customSkin.Hold_Ex;
-                        NDCompo.breakSpr = customSkin.Hold_Break;
-                        NDCompo.breakHoldOnSpr = customSkin.Hold_Break_On;
-                        NDCompo.mineSpr = customSkin.Hold_Mine;
+                        NDCompo.tapSpr = skinManager.Hold;
+                        NDCompo.holdOnSpr = skinManager.Hold_On;
+                        NDCompo.holdOffSpr = skinManager.Hold_Off;
+                        NDCompo.eachSpr = skinManager.Hold_Each;
+                        NDCompo.eachHoldOnSpr = skinManager.Hold_Each_On;
+                        NDCompo.exSpr = skinManager.Hold_Ex;
+                        NDCompo.breakSpr = skinManager.Hold_Break;
+                        NDCompo.breakHoldOnSpr = skinManager.Hold_Break_On;
+                        NDCompo.mineSpr = skinManager.Hold_Mine;
 
                         NDCompo.HoldShine = HoldShine;
-                        NDCompo.BreakShine = BreakShine;
 
                         if (timing.Notes.Length > 1) NDCompo.isEach = true;
                         NDCompo.time = (float)timing.Timing;
@@ -627,23 +623,23 @@ public class JsonDataLoader : MonoBehaviour
                         NDCompo.isMine = note.IsMine;
                         NDCompo.areaPosition = note.TouchArea;
                         NDCompo.startPosition = note.StartPosition;
-                        NDCompo.TouchPointSprite = customSkin.TouchPoint;
-                        NDCompo.TouchPointEachSprite = customSkin.TouchPoint_Each;
-                        NDCompo.TouchPointBreakSprite = customSkin.TouchPoint_Break;
-                        NDCompo.TouchPointMineSprite = customSkin.TouchPoint_Mine;
+                        NDCompo.TouchPointSprite = skinManager.TouchPoint;
+                        NDCompo.TouchPointEachSprite = skinManager.TouchPoint_Each;
+                        NDCompo.TouchPointBreakSprite = skinManager.TouchPoint_Break;
+                        NDCompo.TouchPointMineSprite = skinManager.TouchPoint_Mine;
 
                         if (timing.Notes.Length > 1) NDCompo.isEach = true;
                         if (note.IsMine)
                         {
-                            Array.Copy(customSkin.TouchHold_Mine, NDCompo.TouchHoldSprite, 5);
+                            Array.Copy(skinManager.TouchHold_Mine, NDCompo.TouchHoldSprite, 5);
                         }
                         else if (note.IsBreak)
                         {
-                            Array.Copy(customSkin.TouchHold_Break, NDCompo.TouchHoldSprite, 5);
+                            Array.Copy(skinManager.TouchHold_Break, NDCompo.TouchHoldSprite, 5);
                         }
                         else
                         {
-                            Array.Copy(customSkin.TouchHold, NDCompo.TouchHoldSprite, 5);
+                            Array.Copy(skinManager.TouchHold, NDCompo.TouchHoldSprite, 5);
                         }
                     }
                     else if (note.Type == SimaiNoteType.Touch)
@@ -660,19 +656,19 @@ public class JsonDataLoader : MonoBehaviour
                         NDCompo.areaPosition = note.TouchArea;
                         NDCompo.startPosition = note.StartPosition;
 
-                        NDCompo.fanNormalSprite = customSkin.Touch;
-                        NDCompo.fanEachSprite = customSkin.Touch_Each;
-                        NDCompo.fanBreakSprite = customSkin.Touch_Break;
-                        NDCompo.fanMineSprite = customSkin.Touch_Mine;
-                        NDCompo.pointNormalSprite = customSkin.TouchPoint;
-                        NDCompo.pointEachSprite = customSkin.TouchPoint_Each;
-                        NDCompo.pointBreakSprite = customSkin.TouchPoint_Break;
-                        NDCompo.pointMineSprite = customSkin.TouchPoint_Mine;
-                        NDCompo.justSprite = customSkin.TouchJust;
-                        Array.Copy(customSkin.TouchBorder, NDCompo.multTouchNormalSprite, 2);
-                        Array.Copy(customSkin.TouchBorder_Each, NDCompo.multTouchEachSprite, 2);
-                        Array.Copy(customSkin.TouchBorder_Break, NDCompo.multTouchBreakSprite, 2);
-                        Array.Copy(customSkin.TouchBorder_Mine, NDCompo.multTouchMineSprite, 2);
+                        NDCompo.fanNormalSprite = skinManager.Touch;
+                        NDCompo.fanEachSprite = skinManager.Touch_Each;
+                        NDCompo.fanBreakSprite = skinManager.Touch_Break;
+                        NDCompo.fanMineSprite = skinManager.Touch_Mine;
+                        NDCompo.pointNormalSprite = skinManager.TouchPoint;
+                        NDCompo.pointEachSprite = skinManager.TouchPoint_Each;
+                        NDCompo.pointBreakSprite = skinManager.TouchPoint_Break;
+                        NDCompo.pointMineSprite = skinManager.TouchPoint_Mine;
+                        NDCompo.justSprite = skinManager.TouchJust;
+                        Array.Copy(skinManager.TouchBorder, NDCompo.multTouchNormalSprite, 2);
+                        Array.Copy(skinManager.TouchBorder_Each, NDCompo.multTouchEachSprite, 2);
+                        Array.Copy(skinManager.TouchBorder_Break, NDCompo.multTouchBreakSprite, 2);
+                        Array.Copy(skinManager.TouchBorder_Mine, NDCompo.multTouchMineSprite, 2);
 
                         if (timing.Notes.Length > 1)
                         {
@@ -1024,7 +1020,7 @@ public class JsonDataLoader : MonoBehaviour
         }
 
         GameObject parent = null;
-        List<SlideDrop> subSlides = new();
+        List<SlideBase> subSlides = new();
         float totalLen = (float)subSlide.Select(x => x.SlideTime).Sum();
         float totalSlideLen = 0;
         int totalJudgeAreaCount = 0;
@@ -1050,7 +1046,7 @@ public class JsonDataLoader : MonoBehaviour
                     Parent = parent
                 };
                 parent = InstantiateStar(timing, subSlide[i], info);
-                subSlides.Add(parent.GetComponent<SlideDrop>());
+                subSlides.Add(parent.GetComponent<SlideBase>());
             }
         }
         subSlides.ForEach(s =>
@@ -1087,17 +1083,17 @@ public class JsonDataLoader : MonoBehaviour
         NDCompo.noteSortOrder = noteSortOrder;
         noteSortOrder -= NOTE_LAYER_COUNT[note.Type];
 
-        NDCompo.tapSpr = customSkin.Star;
-        NDCompo.eachSpr = customSkin.Star_Each;
-        NDCompo.breakSpr = customSkin.Star_Break;
-        NDCompo.exSpr = customSkin.Star_Ex;
-        NDCompo.mineSpr = customSkin.Star_Mine;
+        NDCompo.tapSpr = skinManager.Star;
+        NDCompo.eachSpr = skinManager.Star_Each;
+        NDCompo.breakSpr = skinManager.Star_Break;
+        NDCompo.exSpr = skinManager.Star_Ex;
+        NDCompo.mineSpr = skinManager.Star_Mine;
 
-        NDCompo.tapSpr_Double = customSkin.Star_Double;
-        NDCompo.eachSpr_Double = customSkin.Star_Each_Double;
-        NDCompo.breakSpr_Double = customSkin.Star_Break_Double;
-        NDCompo.exSpr_Double = customSkin.Star_Ex_Double;
-        NDCompo.mineSpr_Double = customSkin.Star_Mine_Double;
+        NDCompo.tapSpr_Double = skinManager.Star_Double;
+        NDCompo.eachSpr_Double = skinManager.Star_Each_Double;
+        NDCompo.breakSpr_Double = skinManager.Star_Break_Double;
+        NDCompo.exSpr_Double = skinManager.Star_Ex_Double;
+        NDCompo.mineSpr_Double = skinManager.Star_Mine_Double;
 
         NDCompo.BreakShine = BreakShine;
 
@@ -1111,12 +1107,12 @@ public class JsonDataLoader : MonoBehaviour
         var slideWifi = Instantiate(slidePrefab[SLIDE_PREFAB_MAP["wifi"]], notes.transform);
         slideWifi.SetActive(false);
         NDCompo.slide = slideWifi;
-        var WifiCompo = slideWifi.GetComponent<WifiDrop>();
+        var WifiCompo = slideWifi.GetComponent<WifiBase>();
 
-        WifiCompo.normalStar = customSkin.Star;
-        WifiCompo.eachStar = customSkin.Star_Each;
-        WifiCompo.breakStar = customSkin.Star_Break;
-        WifiCompo.mineStar = customSkin.Star_Mine;
+        WifiCompo.normalStar = skinManager.Star;
+        WifiCompo.eachStar = skinManager.Star_Each;
+        WifiCompo.breakStar = skinManager.Star_Break;
+        WifiCompo.mineStar = skinManager.Star_Mine;
         WifiCompo.judgeBreakShine = JudgeBreakShine;
         WifiCompo.breakMaterial = breakMaterial;
         WifiCompo.slideShine = BreakShine;
@@ -1125,10 +1121,10 @@ public class JsonDataLoader : MonoBehaviour
         WifiCompo.slideConst = SLIDE_AREA_CONST["wifi"];
         WifiCompo.smoothSlideAnime = smoothSlideAnime;
 
-        Array.Copy(customSkin.Wifi, WifiCompo.normalSlide, 11);
-        Array.Copy(customSkin.Wifi_Each, WifiCompo.eachSlide, 11);
-        Array.Copy(customSkin.Wifi_Break, WifiCompo.breakSlide, 11);
-        Array.Copy(customSkin.Wifi_Mine, WifiCompo.mineSlide, 11);
+        Array.Copy(skinManager.Wifi, WifiCompo.normalSlide, 11);
+        Array.Copy(skinManager.Wifi_Each, WifiCompo.eachSlide, 11);
+        Array.Copy(skinManager.Wifi_Break, WifiCompo.breakSlide, 11);
+        Array.Copy(skinManager.Wifi_Mine, WifiCompo.mineSlide, 11);
 
         if (timing.Notes.Length > 1)
         {
@@ -1184,17 +1180,17 @@ public class JsonDataLoader : MonoBehaviour
         NDCompo.noteSortOrder = noteSortOrder;
         noteSortOrder -= NOTE_LAYER_COUNT[note.Type];
 
-        NDCompo.tapSpr = customSkin.Star;
-        NDCompo.eachSpr = customSkin.Star_Each;
-        NDCompo.breakSpr = customSkin.Star_Break;
-        NDCompo.exSpr = customSkin.Star_Ex;
-        NDCompo.mineSpr = customSkin.Star_Mine;
+        NDCompo.tapSpr = skinManager.Star;
+        NDCompo.eachSpr = skinManager.Star_Each;
+        NDCompo.breakSpr = skinManager.Star_Break;
+        NDCompo.exSpr = skinManager.Star_Ex;
+        NDCompo.mineSpr = skinManager.Star_Mine;
 
-        NDCompo.tapSpr_Double = customSkin.Star_Double;
-        NDCompo.eachSpr_Double = customSkin.Star_Each_Double;
-        NDCompo.breakSpr_Double = customSkin.Star_Break_Double;
-        NDCompo.exSpr_Double = customSkin.Star_Ex_Double;
-        NDCompo.mineSpr_Double = customSkin.Star_Mine_Double;
+        NDCompo.tapSpr_Double = skinManager.Star_Double;
+        NDCompo.eachSpr_Double = skinManager.Star_Each_Double;
+        NDCompo.breakSpr_Double = skinManager.Star_Break_Double;
+        NDCompo.exSpr_Double = skinManager.Star_Ex_Double;
+        NDCompo.mineSpr_Double = skinManager.Star_Mine_Double;
 
         NDCompo.BreakShine = BreakShine;
 
@@ -1216,17 +1212,17 @@ public class JsonDataLoader : MonoBehaviour
 
         var slide = Instantiate(slidePrefab[slideIndex], notes.transform);
         var slide_star = Instantiate(star_slidePrefab, notes.transform);
-        slide_star.GetComponent<SpriteRenderer>().sprite = customSkin.Star;
+        slide_star.GetComponent<SpriteRenderer>().sprite = skinManager.Star;
         slide_star.SetActive(false);
         slide.SetActive(false);
         NDCompo.slide = slide;
-        var SliCompo = slide.AddComponent<SlideDrop>();
+        var SliCompo = slide.AddComponent<SlideBase>();
 
         SliCompo.slideType = slideShape;
-        SliCompo.spriteNormal = customSkin.Slide;
-        SliCompo.spriteEach = customSkin.Slide_Each;
-        SliCompo.spriteBreak = customSkin.Slide_Break;
-        SliCompo.spriteMine = customSkin.Slide_Mine;
+        SliCompo.spriteNormal = skinManager.Slide;
+        SliCompo.spriteEach = skinManager.Slide_Each;
+        SliCompo.spriteBreak = skinManager.Slide_Break;
+        SliCompo.spriteMine = skinManager.Slide_Mine;
         SliCompo.slideShine = BreakShine;
         SliCompo.breakMaterial = breakMaterial;
         SliCompo.judgeBreakShine = JudgeBreakShine;
@@ -1241,7 +1237,7 @@ public class JsonDataLoader : MonoBehaviour
             if (notes.FindAll(o => o.Type == SimaiNoteType.Slide).Count > 1)
             {
                 SliCompo.isEach = true;
-                slide_star.GetComponent<SpriteRenderer>().sprite = customSkin.Star_Each;
+                slide_star.GetComponent<SpriteRenderer>().sprite = skinManager.Star_Each;
             }
 
             var count = notes.FindAll(
@@ -1260,7 +1256,7 @@ public class JsonDataLoader : MonoBehaviour
         SliCompo.ConnectInfo = info;
         SliCompo.isBreak = note.IsSlideBreak;
         SliCompo.isMine = note.IsMineSlide;
-        if (note.IsSlideBreak) slide_star.GetComponent<SpriteRenderer>().sprite = customSkin.Star_Break;
+        if (note.IsSlideBreak) slide_star.GetComponent<SpriteRenderer>().sprite = skinManager.Star_Break;
 
         NDCompo.isNoHead = note.IsSlideNoHead;
         NDCompo.time = (float)timing.Timing;
