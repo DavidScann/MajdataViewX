@@ -1,4 +1,3 @@
-using Assets.Scripts.Types;
 
 namespace Assets.Scripts.Notes
 {

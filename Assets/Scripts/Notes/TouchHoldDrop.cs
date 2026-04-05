@@ -1,39 +1,38 @@
 ﻿using Assets.Scripts;
 using Assets.Scripts.Notes;
-using Assets.Scripts.Types;
 using System;
 using UnityEngine;
 #nullable enable
-public class TouchHoldDrop : TouchHoldBase
+public class TouchHoldDrop : NoteLongBase
 {
-    public bool isBreak; //Play那边暂时没给这玩意的皮肤做区分，就不做了
-
-    public GameObject touchEffect;
-    public GameObject gr_TouchEffect;
-    public GameObject gd_TouchEffect;
-
-    public Sprite touchHoldBoard;
-    public Sprite touchHoldBoard_Miss;
-    public SpriteRenderer boarder;
-    public Sprite[] TouchHoldSprite = new Sprite[5];
-    public Sprite TouchPointSprite;
-    public Sprite TouchPointEachSprite;
-    public Sprite TouchPointBreakSprite;
-    public Sprite TouchPointMineSprite;
-
-    public GameObject[] fans;
-
-    public SpriteMask mask;
-    private readonly SpriteRenderer[] fansSprite = new SpriteRenderer[6];
-    private float displayDuration;
-
+    public char areaPosition;
+    public bool isFirework;
+    
+    [SerializeField]
+    GameObject touchEffect;
+    [SerializeField]
+    GameObject gr_TouchEffect;
+    [SerializeField]
+    GameObject gd_TouchEffect;
+    [SerializeField]
+    GameObject judgeEffect;
+    
+    [SerializeField]
+    GameObject[] fans = new GameObject[6]; //01,02,03,04,point,border
+    [SerializeField]
+    SpriteMask mask;
+    
+    private SpriteRenderer[] fansRenderers = new SpriteRenderer[5];
+    private SpriteRenderer border;
     private GameObject firework;
     private Animator fireworkEffect;
-    private float moveDuration;
-
+    
     private float wholeDuration;
-
-    private bool isTouched = false;
+    private float moveDuration;
+    private float displayDuration;
+    
+    private bool _isTouched = false; //for mine judge
+    private Sprite _borderSprite;
 
     // Start is called before the first frame update
     private void Start()
@@ -42,80 +41,85 @@ public class TouchHoldDrop : TouchHoldBase
         moveDuration = 0.8f * wholeDuration;
         displayDuration = 0.2f * wholeDuration;
 
-        objectCounter = GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>();
         var notes = GameObject.Find("Notes").transform;
-        noteManager = notes.GetComponent<NoteManager>();
+        objectCounter = Majdata<ObjectCounter>.Instance!;
+        noteManager = Majdata<NoteManager>.Instance!;
+        timeProvider = Majdata<TimeProvider>.Instance!;
+        inputManager = Majdata<InputManager>.Instance!;
+        skinManager = Majdata<SkinManager>.Instance!;
+        
         holdEffect = Instantiate(holdEffect, notes);
         holdEffect.SetActive(false);
-
-        TimeProvider = GameObject.Find("AudioTimeProvider").GetComponent<TimeProvider>();
-
+        
         firework = GameObject.Find("FireworkEffect");
         fireworkEffect = firework.GetComponent<Animator>();
-
-        for (var i = 0; i < 6; i++)
+        
+        for (var i = 0; i < 5; i++)
         {
-            fansSprite[i] = fans[i].GetComponent<SpriteRenderer>();
-            fansSprite[i].sortingOrder += noteSortOrder;
+            fansRenderers[i] = fans[i].GetComponent<SpriteRenderer>();
+            fansRenderers[i].sortingOrder += noteSortOrder;
         }
-
-        for (var i = 0; i < 4; i++) fansSprite[i].sprite = TouchHoldSprite[i];
-
-        fansSprite[5].sprite = TouchHoldSprite[4]; // TouchHold Border
-        fansSprite[4].sprite = TouchPointSprite;
-
-        if (isEach)
-        {
-            fansSprite[4].sprite = TouchPointEachSprite;
-        }
-        if (isBreak)
-        {
-            fansSprite[4].sprite = TouchPointBreakSprite;
-            touchHoldBoard = TouchHoldSprite[4];
-        }
-        if (isMine)
-        {
-            fansSprite[4].sprite = TouchPointMineSprite;
-            touchHoldBoard = TouchHoldSprite[4];
-        }
-            
-
+        border = fans[5].GetComponent<SpriteRenderer>();
+        border.sortingOrder += noteSortOrder;
+        
+        LoadSkin();
+        
         transform.position = GetAreaPos(startPosition, areaPosition);
+        
+        SetFanColor(new Color(1f, 1f, 1f, 0f));
 
-
-        SetfanColor(new Color(1f, 1f, 1f, 0f));
-
-        mask.backSortingOrder = fansSprite[5].sortingOrder - 1;
-        mask.frontSortingOrder = fansSprite[5].sortingOrder;
+        mask.backSortingOrder = border.sortingOrder - 1;
+        mask.frontSortingOrder = border.sortingOrder;
         mask.enabled = false;
 
         sensor = GameObject.Find("Sensors")
                                    .transform.GetChild((int)GetSensor())
                                    .GetComponent<Sensor>();
-        manager = GameObject.Find("Sensors")
-                                .GetComponent<SensorManager>();
-        inputManager = GameObject.Find("Input")
-                                 .GetComponent<InputManager>();
-        var customSkin = GameObject.Find("Outline").GetComponent<SkinManager>();
-        judgeText = customSkin.JudgeText;
-        inputManager.BindSensor(Check, GetSensor());
+        inputManager.BindSensor(Check, sensor);
     }
+
+    private void LoadSkin()
+    {
+        for (var i = 0; i < 4; i++) 
+            fansRenderers[i].sprite = skinManager.TouchHold[i];
+        fansRenderers[4].sprite = skinManager.TouchPoint; //point
+        border.sprite = _borderSprite = skinManager.TouchHold_Border;
+        if (isEach)
+        {
+            fansRenderers[4].sprite = skinManager.TouchPoint_Each;
+        }
+        if (isBreak)
+        {
+            for (var i = 0; i < 4; i++) 
+                fansRenderers[i].sprite = skinManager.TouchHold_Break[i];
+            fansRenderers[4].sprite = skinManager.TouchPoint_Break;
+            border.sprite = _borderSprite = skinManager.TouchHold_Border_Break;
+        }
+        if (isMine)
+        {
+            for (var i = 0; i < 4; i++) 
+                fansRenderers[i].sprite = skinManager.TouchHold_Mine[i];
+            fansRenderers[4].sprite = skinManager.TouchPoint_Mine;
+            border.sprite = _borderSprite = skinManager.TouchHold_Border_Mine;
+        }
+    }
+
     void Check(object sender, InputEventArgs arg)
     {
         if (isJudged || !noteManager.CanJudge(gameObject, sensor.Type))
             return;
-        else if (InputManager.Mode is AutoPlayMode.Enable or AutoPlayMode.Random)
+        if (InputManager.Mode is AutoPlayMode.Enable or AutoPlayMode.Random)
             return;
-        else if (arg.IsClick)
+        if (arg.IsClick)
         {
             if (!inputManager.IsIdle(arg))
                 return;
-            else
-                inputManager.SetBusy(arg);
+            
+            inputManager.SetBusy(arg);
             Judge();
             if (isJudged)
             {
-                inputManager.UnbindSensor(Check, GetSensor());
+                inputManager.UnbindSensor(Check, sensor);
                 objectCounter.NextTouch(GetSensor());
             }
         }
@@ -131,7 +135,7 @@ public class TouchHoldDrop : TouchHoldBase
         if (isJudged)
             return;
 
-        var timing = TimeProvider.AudioTime - time;
+        var timing = timeProvider.AudioTime - time;
         var isFast = timing < 0;
         var diff = MathF.Abs(timing * 1000);
         JudgeType result;
@@ -160,7 +164,6 @@ public class TouchHoldDrop : TouchHoldBase
     {
         var remainingTime = GetRemainingTime();
         var timing = GetJudgeTiming();
-        var holdTime = timing - LastFor;
 
         if (remainingTime == 0 && isJudged)
         {
@@ -182,12 +185,12 @@ public class TouchHoldDrop : TouchHoldBase
                         judgeResult = JudgeType.Perfect;
 
                     isJudged = true;
-                    isTouched = true;
+                    _isTouched = true;
                     PlayHoldEffect();
                     return;
-                case AutoPlayMode.DJAuto:
+                case AutoPlayMode.DjAuto:
                     if (!isJudged && !isMine)
-                        manager.SetSensorOn(sensor.Type, guid);
+                        inputManager.SetSensorOn(sensor, guid);
                     break;
                 case AutoPlayMode.Random:
                     if (!isJudged)
@@ -204,29 +207,29 @@ public class TouchHoldDrop : TouchHoldBase
                                 judgeResult = JudgeType.Perfect;
                             }
 
-                            if (judgeResult != JudgeType.Miss) isTouched = true; //必有摸
+                            if (judgeResult != JudgeType.Miss) _isTouched = true; //必有摸
                         }
                         isJudged = true;
                     }
                     PlayHoldEffect();
                     return;
                 case AutoPlayMode.Disable:
-                    manager.SetSensorOff(sensor.Type, guid);
+                default:
                     break;
             }
         }
 
         if (isJudged)
         {
-            if (inputManager.CheckSensorStatus(GetSensor(), SensorStatus.On)) isTouched = true;
+            if (inputManager.CheckSensorStatus(sensor, SensorStatus.On)) _isTouched = true;
             if (timing <= 0.25f) // 忽略头部15帧
                 return;
-            else if (remainingTime <= 0.2f) // 忽略尾部12帧
+            if (remainingTime <= 0.2f) // 忽略尾部12帧
                 return;
-            else if (!TimeProvider.isStart) // 忽略暂停
+            if (!timeProvider.isStart) // 忽略暂停
                 return;
 
-            var on = inputManager.CheckSensorStatus(GetSensor(), SensorStatus.On);
+            var on = inputManager.CheckSensorStatus(sensor, SensorStatus.On);
             if (on)
             {
                 PlayHoldEffect();
@@ -241,7 +244,7 @@ public class TouchHoldDrop : TouchHoldBase
         {
             judgeDiff = 316.667f;
             judgeResult = JudgeType.Miss;
-            inputManager.UnbindSensor(Check, GetSensor());
+            inputManager.UnbindSensor(Check, sensor);
             isJudged = true;
             objectCounter.NextTouch(GetSensor());
         }
@@ -255,7 +258,7 @@ public class TouchHoldDrop : TouchHoldBase
 
         if (-timing <= wholeDuration && -timing > moveDuration)
         {
-            SetfanColor(new Color(1f, 1f, 1f, Mathf.Clamp((wholeDuration + timing) / displayDuration, 0f, 1f)));
+            SetFanColor(new Color(1f, 1f, 1f, Mathf.Clamp((wholeDuration + timing) / displayDuration, 0f, 1f)));
             fans[5].SetActive(false);
             mask.enabled = false;
         }
@@ -263,7 +266,7 @@ public class TouchHoldDrop : TouchHoldBase
         {
             fans[5].SetActive(true);
             mask.enabled = true;
-            SetfanColor(Color.white);
+            SetFanColor(Color.white);
             mask.alphaCutoff = Mathf.Clamp(0.91f * (1 - (LastFor - timing) / LastFor), 0f, 1f);
         }
 
@@ -278,39 +281,6 @@ public class TouchHoldDrop : TouchHoldBase
             var pos = (0.226f + distance) * GetAngle(i);
             fans[i].transform.localPosition = pos;
         }
-    }
-
-    Vector3 GetAreaPos(int index, char area)
-    {
-        /// <summary>
-        /// AreaDistance: 
-        /// C:   0
-        /// E:   3.1
-        /// B:   2.21
-        /// A,D: 4.8
-        /// </summary>
-        if (area == 'C') return Vector3.zero;
-        if (area == 'B')
-        {
-            var angle = (-index * (Mathf.PI / 4)) + ((Mathf.PI * 5) / 8);
-            return new Vector3(Mathf.Cos(angle), Mathf.Sin(angle)) * 2.3f;
-        }
-        if (area == 'A')
-        {
-            var angle = (-index * (Mathf.PI / 4)) + ((Mathf.PI * 5) / 8);
-            return new Vector3(Mathf.Cos(angle), Mathf.Sin(angle)) * 4.1f;
-        }
-        if (area == 'E')
-        {
-            var angle = (-index * (Mathf.PI / 4)) + ((Mathf.PI * 6) / 8);
-            return new Vector3(Mathf.Cos(angle), Mathf.Sin(angle)) * 3.0f;
-        }
-        if (area == 'D')
-        {
-            var angle = (-index * (Mathf.PI / 4)) + ((Mathf.PI * 6) / 8);
-            return new Vector3(Mathf.Cos(angle), Mathf.Sin(angle)) * 4.1f;
-        }
-        return Vector3.zero;
     }
     private void OnDestroy()
     {
@@ -365,14 +335,14 @@ public class TouchHoldDrop : TouchHoldBase
             case AutoPlayMode.Random:
                 result = (JudgeType)UnityEngine.Random.Range(1, 14);
                 break;
-            case AutoPlayMode.DJAuto:
+            case AutoPlayMode.DjAuto:
             case AutoPlayMode.Disable:
                 break;
         }
 
         if (isMine) //覆盖掉前面的判定
         {
-            if (isTouched)
+            if (_isTouched)
                 result = JudgeType.Miss;
             else
                 result = JudgeType.Perfect;
@@ -387,21 +357,20 @@ public class TouchHoldDrop : TouchHoldBase
             fireworkEffect.SetTrigger("Fire");
             firework.transform.position = transform.position;
         }
-        inputManager.UnbindSensor(Check, GetSensor());
-        manager.SetSensorOff(sensor.Type, guid);
+        inputManager.UnbindSensor(Check, sensor);
+        inputManager.SetSensorOff(sensor, guid);
         PlayJudgeEffect(result);
     }
 
     protected override void PlayHoldEffect()
     {
         base.PlayHoldEffect();
-        boarder.sprite = touchHoldBoard;
+        border.sprite = _borderSprite;
     }
-    
     protected override void StopHoldEffect()
     {
         base.StopHoldEffect();
-        boarder.sprite = touchHoldBoard_Miss;
+        border.sprite = skinManager.TouchHold_Border_Miss;
     }
 
     private void PlayJudgeEffect(JudgeType judgeResult)
@@ -445,7 +414,7 @@ public class TouchHoldDrop : TouchHoldBase
                 judgeObj.transform.position = GetPosition(-0.46f);
             else
                 judgeObj.transform.position = new Vector3(0, -0.6f, 0);
-            judgeObj.GetChild(0).transform.rotation = GetRoation();
+            judgeObj.GetChild(0).transform.rotation = GetRotation();
             var anim = obj.GetComponent<Animator>();
 
             //show
@@ -453,7 +422,7 @@ public class TouchHoldDrop : TouchHoldBase
             {
                 case JudgeType.LateGood:
                 case JudgeType.FastGood:
-                    judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = judgeText[1];
+                    judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = skinManager.JudgeText[1];
                     break;
                 case JudgeType.LateGreat:
                 case JudgeType.LateGreat1:
@@ -461,19 +430,19 @@ public class TouchHoldDrop : TouchHoldBase
                 case JudgeType.FastGreat2:
                 case JudgeType.FastGreat1:
                 case JudgeType.FastGreat:
-                    judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = judgeText[2];
+                    judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = skinManager.JudgeText[2];
                     break;
                 case JudgeType.LatePerfect2:
                 case JudgeType.FastPerfect2:
                 case JudgeType.LatePerfect1:
                 case JudgeType.FastPerfect1:
-                    judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = judgeText[3];
+                    judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = skinManager.JudgeText[3];
                     break;
                 case JudgeType.Perfect:
-                    judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = judgeText[4];
+                    judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = skinManager.JudgeText[4];
                     break;
                 case JudgeType.Miss:
-                    judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = judgeText[0];
+                    judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = skinManager.JudgeText[0];
                     break;
                 default:
                     break;
@@ -491,7 +460,7 @@ public class TouchHoldDrop : TouchHoldBase
                 flObj.transform.position = GetPosition(-0.92f);
             else
                 flObj.transform.position = new Vector3(0, -1.08f, 0);
-            flObj.GetChild(0).transform.rotation = GetRoation();
+            flObj.GetChild(0).transform.rotation = GetRotation();
             var flAnim = obj.GetComponent<Animator>();
 
             //show
@@ -524,14 +493,73 @@ public class TouchHoldDrop : TouchHoldBase
         var ratio = MathF.Max(0, d + distance) / d;
         return transform.position * ratio;
     }
+    private Quaternion GetRotation()
+    {
+        if (sensor.Type == SensorArea.C)
+            return Quaternion.Euler(Vector3.zero);
+        var d = Vector3.zero - transform.position;
+        var deg = 180 + Mathf.Atan2(d.x, d.y) * Mathf.Rad2Deg;
+
+        return Quaternion.Euler(new Vector3(0, 0, -deg));
+    }
     private Vector3 GetAngle(int index)
     {
         var angle = Mathf.PI / 4 + index * (Mathf.PI / 2);
         return new Vector3(Mathf.Sin(angle), Mathf.Cos(angle));
     }
 
-    private void SetfanColor(Color color)
+    public SensorArea GetSensor() => GetSensor(areaPosition, startPosition);
+    public static SensorArea GetSensor(char areaPos, int startPos)
     {
-        foreach (var fan in fansSprite) fan.color = color;
+        switch (areaPos)
+        {
+            case 'A':
+                return (SensorArea)(startPos - 1);
+            case 'B':
+                return (SensorArea)(startPos + 7);
+            case 'C':
+                return SensorArea.C;
+            case 'D':
+                return (SensorArea)(startPos + 16);
+            case 'E':
+                return (SensorArea)(startPos + 24);
+            default:
+                return SensorArea.A1;
+        }
+    }
+    Vector3 GetAreaPos(int index, char area)
+    {
+        // AreaDistance: 
+        // C:   0
+        // E:   3.1
+        // B:   2.21
+        // A,D: 4.8
+        if (area == 'C') return Vector3.zero;
+        if (area == 'B')
+        {
+            var angle = (-index * (Mathf.PI / 4)) + ((Mathf.PI * 5) / 8);
+            return new Vector3(Mathf.Cos(angle), Mathf.Sin(angle)) * 2.3f;
+        }
+        if (area == 'A')
+        {
+            var angle = (-index * (Mathf.PI / 4)) + ((Mathf.PI * 5) / 8);
+            return new Vector3(Mathf.Cos(angle), Mathf.Sin(angle)) * 4.1f;
+        }
+        if (area == 'E')
+        {
+            var angle = (-index * (Mathf.PI / 4)) + ((Mathf.PI * 6) / 8);
+            return new Vector3(Mathf.Cos(angle), Mathf.Sin(angle)) * 3.0f;
+        }
+        if (area == 'D')
+        {
+            var angle = (-index * (Mathf.PI / 4)) + ((Mathf.PI * 6) / 8);
+            return new Vector3(Mathf.Cos(angle), Mathf.Sin(angle)) * 4.1f;
+        }
+        return Vector3.zero;
+    }
+    private void SetFanColor(Color color)
+    {
+        foreach (var fan in fansRenderers) fan.color = color;
+        border.color = color;
     }
 }

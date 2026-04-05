@@ -1,5 +1,4 @@
-﻿using Assets.Scripts.Types;
-using MajSimai;
+﻿using MajSimai;
 using System.Collections.Generic;
 
 internal class Majson

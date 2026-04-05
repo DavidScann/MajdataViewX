@@ -1,4 +1,3 @@
-using Assets.Scripts.Types;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -8,7 +7,7 @@ public class Sensor : MonoBehaviour
 {
     public bool IsJudging { get; set; }
     public SensorStatus Status = SensorStatus.Off;
-    public SensorType Type;
+    public SensorArea Type;
     public SensorGroup Group 
     { 
         get
@@ -48,7 +47,7 @@ public class Sensor : MonoBehaviour
                 OnStatusChanged(this, new InputEventArgs()
                 {
                     IsButton = false,
-                    Type = Type,
+                    Sensor = this,
                     OldStatus = oStatus,
                     Status = nStatus
                 });
@@ -72,7 +71,7 @@ public class Sensor : MonoBehaviour
                 OnStatusChanged(this, new InputEventArgs()
                 {
                     IsButton = false,
-                    Type = Type,
+                    Sensor = this,
                     OldStatus = oStatus,
                     Status = nStatus
                 });

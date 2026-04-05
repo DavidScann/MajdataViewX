@@ -1,15 +1,8 @@
-﻿using Assets.Scripts.Types;
-using System;
+﻿using System;
 using UnityEngine;
 #nullable enable
 public class HoldDrop : NoteLongBase
 {
-    public bool isEach;
-    public bool isEX;
-    public bool isBreak;
-    public bool isMine;
-    
-    [SerializeField]
     public GameObject tapLine;
     
     private Animator animator;
@@ -67,10 +60,10 @@ public class HoldDrop : NoteLongBase
     private void LoadSkin()
     {
         lineSpriteRender.sprite = skinManager.Line;
-        spriteRenderer.sprite = skinManager.Tap;
-        exSpriteRender.sprite = skinManager.Tap_Ex;
+        spriteRenderer.sprite = skinManager.Hold;
+        exSpriteRender.sprite = skinManager.Hold_Ex;
         holdEndRender.sprite = skinManager.HoldEnd;
-        if (isEX)
+        if (isEx)
         {
             exSpriteRender.color = skinManager.Ex;
         }
@@ -79,14 +72,14 @@ public class HoldDrop : NoteLongBase
             spriteRenderer.sprite = skinManager.Hold_Each;
             lineSpriteRender.sprite = skinManager.Line_Each;
             holdEndRender.sprite = skinManager.HoldEnd_Each;
-            if (isEX) exSpriteRender.color = skinManager.Ex_Each;
+            if (isEx) exSpriteRender.color = skinManager.Ex_Each;
         }
         if (isBreak)
         {
             spriteRenderer.sprite = skinManager.Hold_Break;
             lineSpriteRender.sprite = skinManager.Line_Break;
             holdEndRender.sprite = skinManager.HoldEnd_Break;
-            if (isEX) exSpriteRender.color = skinManager.Ex_Break;
+            if (isEx) exSpriteRender.color = skinManager.Ex_Break;
             spriteRenderer.material = skinManager.BreakMaterial;
         }
         if (isMine)
@@ -125,7 +118,7 @@ public class HoldDrop : NoteLongBase
                     isTouched = true; //算是点到了
                     PlayHoldEffect();
                     break;
-                case AutoPlayMode.DJAuto:
+                case AutoPlayMode.DjAuto:
                     if (!isJudged && !isMine) //mine buda
                         inputManager.SetSensorOn(sensor, guid);
                     break;
@@ -248,7 +241,7 @@ public class HoldDrop : NoteLongBase
 
         if (result != JudgeType.Miss && isFast)
             result = 14 - result;
-        if (result != JudgeType.Miss && isEX)
+        if (result != JudgeType.Miss && isEx)
             result = JudgeType.Perfect;
         if (isFast)
             judgeDiff = 0;
@@ -272,7 +265,7 @@ public class HoldDrop : NoteLongBase
         }
 
         spriteRenderer.forceRenderingOff = false;
-        if (isEX) exSpriteRender.forceRenderingOff = false;
+        if (isEx) exSpriteRender.forceRenderingOff = false;
 
         spriteRenderer.size = new Vector2(1.22f, 1.4f);
 
@@ -398,7 +391,7 @@ public class HoldDrop : NoteLongBase
             case AutoPlayMode.Random:
                 result = (JudgeType)UnityEngine.Random.Range(1, 14);
                 break;
-            case AutoPlayMode.DJAuto:
+            case AutoPlayMode.DjAuto:
             case AutoPlayMode.Disable:
                 break;
         }

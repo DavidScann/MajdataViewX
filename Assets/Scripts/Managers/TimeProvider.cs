@@ -18,23 +18,20 @@ public class TimeProvider : MonoBehaviour
     {
         Majdata<TimeProvider>.Instance = this;
     }
-
-    // Update is called once per frame
+    
     private void Update()
     {
-        if (isStart)
-        {
-            if (isRecord)
-                AudioTime = Time.time - startTime + offset;
-            else
-                AudioTime = (Time.realtimeSinceStartup - startTime) * speed + offset;
-        }
+        if (!isStart) return;
+        
+        if (isRecord)
+            AudioTime = Time.time - startTime + offset;
+        else
+            AudioTime = (Time.realtimeSinceStartup - startTime) * speed + offset;
     }
+
     public float GetFrame()
     {
-        var _audioTime = AudioTime * 1000;
-
-        return _audioTime / 16.6667f;
+        return AudioTime * 1000 / 16.6667f;
     }
     public void SetStartTime(long _ticks, float _offset, float _speed, bool _isRecord = false)
     {

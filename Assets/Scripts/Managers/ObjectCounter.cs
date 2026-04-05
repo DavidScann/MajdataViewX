@@ -1,11 +1,9 @@
-﻿using Assets.Scripts.Types;
-using MajSimai;
+﻿using MajSimai;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
-using static EffectManager;
 
 public class ObjectCounter : MonoBehaviour
 {
@@ -42,8 +40,7 @@ public class ObjectCounter : MonoBehaviour
     private Text judgeResultCount;
 
     private EditorComboIndicator textMode = EditorComboIndicator.Combo;
-
-    InputManager inputManager;
+    
     NoteManager notes;
 
     double[] accRate = new double[5]
@@ -73,15 +70,13 @@ public class ObjectCounter : MonoBehaviour
     {
         Majdata<ObjectCounter>.Instance = this;
     }
-
-    // Start is called before the first frame update
+    
     private void Start()
     {
-        notes = GameObject.Find("Notes").GetComponent<NoteManager>();
+        notes = Majdata<NoteManager>.Instance!;
         judgeResultCount = GameObject.Find("JudgeResultCount").GetComponent<Text>();
         table = GameObject.Find("ObjectCount").GetComponent<Text>();
         rate = GameObject.Find("ObjectRate").GetComponent<Text>();
-        inputManager = GameObject.Find("Input").GetComponent<InputManager>();
 
         statusCombo = GameObject.Find("ComboText").GetComponent<Text>();
         statusScore = GameObject.Find("ScoreText").GetComponent<Text>();
@@ -496,14 +491,14 @@ public class ObjectCounter : MonoBehaviour
     {
         notes.noteIndex[pos]++;
     }
-    internal void NextTouch(SensorType pos) => notes.touchIndex[pos]++;
+    internal void NextTouch(SensorArea pos) => notes.touchIndex[pos]++;
     SimaiNoteType GetNoteType(NoteBase note) => note switch
     {
         TapDrop => SimaiNoteType.Tap,
         StarDrop => SimaiNoteType.Tap,
         HoldDrop => SimaiNoteType.Hold,
-        SlideBase => SimaiNoteType.Slide,
-        WifiBase => SimaiNoteType.Slide,
+        SlideDrop => SimaiNoteType.Slide,
+        WifiDrop => SimaiNoteType.Slide,
         TouchHoldDrop => SimaiNoteType.TouchHold,
         TouchDrop => SimaiNoteType.Touch,
         _ => throw new InvalidOperationException()

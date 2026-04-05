@@ -1,22 +1,19 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
 
 public class LoadJustSprite : MonoBehaviour
 {
-    public int _0curv1str2wifi;
+    [SerializeField]
+    int _0curv1str2wifi;
+    
+    private int indexOffset;
+    private int judgeOffset = 0;
+    
+    private SpriteRenderer spriteRenderer;
 
-    public int indexOffset;
-    public int judgeOffset = 0;
-
-    // Start is called before the first frame update
-    private void Start()
+    private void Awake()
     {
-        //gameObject.GetComponent<SpriteRenderer>().sprite = GameObject.Find("Outline").GetComponent<CustomSkin>().Just[_0curv1str2wifi + 3];
-        //setR();
-    }
-
-    // Update is called once per frame
-    private void Update()
-    {
+        spriteRenderer = GetComponent<SpriteRenderer>();
     }
 
     public int setR()
@@ -59,7 +56,7 @@ public class LoadJustSprite : MonoBehaviour
     }
     private void refreshSprite()
     {
-        gameObject.GetComponent<SpriteRenderer>().sprite = GameObject.Find("Outline").GetComponent<SkinManager>()
+        spriteRenderer.sprite = Majdata<SkinManager>.Instance!
             .Just[_0curv1str2wifi + indexOffset + judgeOffset];
     }
 }

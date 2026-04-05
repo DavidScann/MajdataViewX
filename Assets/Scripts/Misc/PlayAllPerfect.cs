@@ -1,16 +1,17 @@
-﻿using Assets.Scripts.Types;
-using UnityEngine;
+﻿using UnityEngine;
 #nullable enable
+
 public class PlayAllPerfect : MonoBehaviour
 {
     private GameObject Allperfect;
     private TimeProvider timeProvider;
-    JsonDataLoader loader;
+    DataLoader loader;
 
     private void Start()
     {
-        loader = GameObject.FindAnyObjectByType<JsonDataLoader>();
-        timeProvider = GameObject.Find("AudioTimeProvider").GetComponent<TimeProvider>();
+        loader = Majdata<DataLoader>.Instance!;
+        timeProvider = Majdata<TimeProvider>.Instance!;
+        
         Allperfect = GameObject.Find("CanvasAllPerfect");
         Allperfect.SetActive(false);
     }
@@ -20,8 +21,10 @@ public class PlayAllPerfect : MonoBehaviour
     {
         if (loader == null)
             return;
-        else if (loader.State is not (NoteLoaderStatus.Idle or NoteLoaderStatus.Finished))
+        if (loader.State is not (NoteLoaderStatus.Idle or NoteLoaderStatus.Finished))
             return;
-        else if (timeProvider.isStart && transform.childCount == 0 && Allperfect) Allperfect.SetActive(true);
+        
+        if (timeProvider.isStart && transform.childCount == 0 && Allperfect) 
+            Allperfect.SetActive(true);
     }
 }

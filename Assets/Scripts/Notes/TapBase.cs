@@ -1,16 +1,9 @@
-﻿using Assets.Scripts.Types;
-using System;
+﻿using System;
 using UnityEngine;
 #nullable enable
 
 public class TapBase : NoteBase
 {
-    public bool isEach;
-    public bool isEX;
-    public bool isBreak;
-    public bool isMine;
-    
-    [SerializeField]
     public GameObject tapLine;
     
     protected SpriteRenderer spriteRenderer;
@@ -25,6 +18,8 @@ public class TapBase : NoteBase
         noteManager = Majdata<NoteManager>.Instance!;
         timeProvider = Majdata<TimeProvider>.Instance!;
         objectCounter = Majdata<ObjectCounter>.Instance!;
+        inputManager = Majdata<InputManager>.Instance!;
+        skinManager = Majdata<SkinManager>.Instance!;
         
         tapLine = Instantiate(tapLine, notes);
         tapLine.SetActive(false);
@@ -84,7 +79,7 @@ public class TapBase : NoteBase
 
                     isJudged = true;
                     break;
-                case AutoPlayMode.DJAuto:
+                case AutoPlayMode.DjAuto:
                     if (isTriggered)
                         break;
                     //mine就不打了
@@ -144,7 +139,7 @@ public class TapBase : NoteBase
         }
 
         spriteRenderer.forceRenderingOff = false;
-        if (isEX) exSpriteRender.forceRenderingOff = false;
+        if (isEx) exSpriteRender.forceRenderingOff = false;
         if (isBreak)
         {
             var extra = Math.Max(Mathf.Sin(timeProvider.GetFrame() * 0.17f) * 0.5f, 0);
@@ -223,7 +218,7 @@ public class TapBase : NoteBase
 
         if (result != JudgeType.Miss && isFast)
             result = 14 - result;
-        if (result != JudgeType.Miss && isEX)
+        if (result != JudgeType.Miss && isEx)
             result = JudgeType.Perfect;
 
         judgeResult = result;

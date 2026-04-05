@@ -1,4 +1,3 @@
-using Assets.Scripts.Types;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -75,6 +74,7 @@ public class InputManager : MonoBehaviour
     }
 
     public Button GetButton(Sensor sensor) => buttons[(int)sensor.Type];
+    public Sensor GetSensor(SensorArea sensorArea) => sensors.Find(s => s.Type == sensorArea);
     
     public void BindSensor(EventHandler<InputEventArgs> checker, Sensor sensor)
     {

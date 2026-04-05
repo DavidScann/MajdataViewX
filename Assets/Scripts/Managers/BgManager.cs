@@ -1,39 +1,42 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.IO;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.Video;
 
-public class BGManager : MonoBehaviour
+public class BgManager : MonoBehaviour
 {
-    private float playSpeed;
     private TimeProvider provider;
-
+    
     private RawImage rawImage;
-
-    // Update is called once per frame
-    private float smoothRDelta;
-    private GameObject SongDetail;
+    private GameObject songDetail;
     private SpriteRenderer spriteRender;
-
     private VideoPlayer videoPlayer;
 
+    private float smoothRDelta;
+    private float playSpeed;
     private float originalScaleX;
-    // Start is called before the first frame update
+
+    private void Awake()
+    {
+        Majdata<BgManager>.Instance = this;
+    }
+
     private void Start()
     {
+        provider = Majdata<TimeProvider>.Instance!;
+        
         originalScaleX = gameObject.transform.localScale.x;
         spriteRender = GetComponent<SpriteRenderer>();
         videoPlayer = GetComponent<VideoPlayer>();
         rawImage = GameObject.Find("Jacket").GetComponent<RawImage>();
-        provider = GameObject.Find("AudioTimeProvider").GetComponent<TimeProvider>();
-        SongDetail = GameObject.Find("CanvasSongDetail");
-        SongDetail.SetActive(false);
+        songDetail = GameObject.Find("CanvasSongDetail");
+        songDetail.SetActive(false);
     }
 
     private void Update()
     {
-        //videoPlayer.externalReferenceTime = provider.AudioTime;
         var delta = (float)videoPlayer.clockTime - provider.AudioTime;
         smoothRDelta += (Time.unscaledDeltaTime - smoothRDelta) * 0.01f;
         if (provider.AudioTime < 0) return;
@@ -56,7 +59,7 @@ public class BGManager : MonoBehaviour
 
     public void PlaySongDetail()
     {
-        SongDetail.SetActive(true);
+        songDetail.SetActive(true);
     }
 
     public void PauseVideo()

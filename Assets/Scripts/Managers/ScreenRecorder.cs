@@ -1,4 +1,4 @@
-using Assets.Scripts.Types;
+using System;
 using System.Collections;
 using System.Diagnostics;
 using System.IO;
@@ -8,28 +8,30 @@ using UnityEngine.UI;
 
 public class ScreenRecorder : MonoBehaviour
 {
-    public float CutoffTime;
     public GameObject APObj;
-    JsonDataLoader loader;
+    DataLoader loader;
     ObjectCounter counter;
 
     private bool isRecording;
 
-    // Start is called before the first frame update
-    private void Start()
+    private void Awake()
     {
-        loader = FindAnyObjectByType<JsonDataLoader>();
-        counter = FindAnyObjectByType<ObjectCounter>();
+        Majdata<ScreenRecorder>.Instance = this;
     }
 
-    // Update is called once per frame
+    private void Start()
+    {
+        loader = Majdata<DataLoader>.Instance!;
+        counter = Majdata<ObjectCounter>.Instance!;
+    }
+    
     private void Update()
     {
         if(isRecording)
         {
             if (loader.State is not (NoteLoaderStatus.Idle or NoteLoaderStatus.Finished))
                 return;
-            else if(counter.AllFinished && APObj == null)
+            if(counter.AllFinished && APObj == null)
                 isRecording = false;
         }
     }
@@ -48,7 +50,7 @@ public class ScreenRecorder : MonoBehaviour
     private IEnumerator CaptureScreen(string maidata_path)
     {
         var timeProvider = GameObject.Find("AudioTimeProvider").GetComponent<TimeProvider>();
-        var bgManager = GameObject.Find("Background").GetComponent<BGManager>();
+        var bgManager = GameObject.Find("Background").GetComponent<BgManager>();
         if (Screen.width % 2 != 0 || Screen.height % 2 != 0)
         {
             GameObject.Find("ErrText").GetComponent<Text>().text =

@@ -1,69 +1,46 @@
 ﻿using Assets.Scripts.Notes;
-using Assets.Scripts.Types;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using static UnityEngine.Networking.UnityWebRequest;
 #nullable enable
-public class SlideBase : NoteLongBase
+public class SlideDrop : NoteLongBase, ICanShine
 {
-    public GameObject star_slide;
-    public GameObject parent;
+    public int endPosition;
 
     public bool isMirror;
     public bool isJustR;
     public bool isSpecialFlip; // fixes known star problem
-    public bool isBreak;
-
-
+    
     public float timeStart;
     public int sortIndex;
     public float fadeInTime;
     public float fullFadeInTime;
     
-    
-
-    public List<int> areaStep = new List<int>();
+    public ConnSlideInfo ConnectInfo = new();
+    public List<int> areaStep = new();
     public bool smoothSlideAnime = false;
-
-    public Material breakMaterial;
+    
     public string slideType;
 
     private float arriveTime = -1;
-    private List<SensorType> boundSensors = new();
-    private List<Sensor> judgeSensors = new();
+    private List<Sensor> boundSensors = new();
     private List<Sensor> triggerSensors = new(); // AutoPlay; 标记已触发的Sensor 
-    public List<JudgeArea> judgeQueue = new(); // 判定队列
-    private List<JudgeArea> _judgeQueue = new(); // 判定队列
+    private List<SlideArea> judgeQueue = new(); // 判定队列
+    private List<SlideArea> _judgeQueue = new(); // 判定队列
 
-    public ConnSlideInfo ConnectInfo { get; set; } = new();
-    public bool isFinished { get => judgeQueue.Count == 0; }
-    public bool isPendingFinish { get => judgeQueue.Count == 1 && canBePendingFinish; }
+    public bool isFinished => judgeQueue.Count == 0; 
+    public bool isPendingFinish => judgeQueue.Count == 1;
 
-    /// <summary>
-    /// SHIT CODE!!!!!
-    /// 当1>2>3这种情况时，由于满足3区条件，不能跳掉A2区
-    /// 所以不能准备完成，不然会出现>3单独被完成的情况，所以以此来限制
-    /// </summary>
-    bool canBePendingFinish = true;
-
-
-    Animator fadeInAnimator;
-
+    public GameObject star_slide;
+    private SpriteRenderer starRenderer;
+    
     private readonly List<GameObject> slideBars = new();
-
     private readonly List<Vector3> slidePositions = new();
     private readonly List<Quaternion> slideRotations = new();
+    private Animator fadeInAnimator;
     private GameObject slideOK;
-
-    private SpriteRenderer spriteRenderer_star;
-
-    public int endPosition;
-
-    List<GameObject> sensors = new();
-    
-    List<Sensor> registerSensors = new();
 
     bool canShine = false;
     bool canCheck = false;
@@ -80,9 +57,30 @@ public class SlideBase : NoteLongBase
         if (isInitialized)
             return;
         isInitialized = true;
-        slideOK = transform.GetChild(transform.childCount - 1).gameObject; //slideok is the last one        
-        objectCounter = GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>();
+        
+        objectCounter = Majdata<ObjectCounter>.Instance!;
+        skinManager = Majdata<SkinManager>.Instance!;
+        timeProvider = Majdata<TimeProvider>.Instance!;
+        inputManager = Majdata<InputManager>.Instance!;
+        
+        //star
+        starRenderer = star_slide.GetComponent<SpriteRenderer>();
+        if (isBreak)
+        {
+            starRenderer.material = skinManager.BreakMaterial;
+            starRenderer.material.SetFloat("_Brightness", 0.95f);
+            var controller = star_slide.AddComponent<BreakShineController>();
+            controller.enabled = true;
+        }
 
+        //bars
+        for (var i = 0; i < transform.childCount - 1; i++) 
+            slideBars.Add(transform.GetChild(i).gameObject);
+        
+        //slideok
+        slideOK = transform.GetChild(transform.childCount - 1).gameObject; //slideok is the last one        
+        slideOK.SetActive(false);
+        slideOK.transform.SetParent(transform.parent);
         if (isMirror)
         {
             transform.localScale = new Vector3(-1f, 1f, 1f);
@@ -93,7 +91,6 @@ public class SlideBase : NoteLongBase
         {
             transform.rotation = Quaternion.Euler(0f, 0f, -45f * (startPosition - 1));
         }
-
         if (isJustR)
         {
             if (slideOK.GetComponent<LoadJustSprite>().setR() == 1 && isMirror)
@@ -112,26 +109,16 @@ public class SlideBase : NoteLongBase
                 slideOK.transform.position += new Vector3(Mathf.Sin(angel) * 0.27f, Mathf.Cos(angel) * -0.27f);
             }
         }
-        spriteRenderer_star = star_slide.GetComponent<SpriteRenderer>();
-
-        if (isBreak)
-        {
-            spriteRenderer_star.material = breakMaterial;
-            spriteRenderer_star.material.SetFloat("_Brightness", 0.95f);
-            var controller = star_slide.AddComponent<BreakShineController>();
-            controller.enabled = true;
-        }
-
-        for (var i = 0; i < transform.childCount - 1; i++) slideBars.Add(transform.GetChild(i).gameObject);
-
-        slideOK.SetActive(false);
-        slideOK.transform.SetParent(transform.parent);
+        
+        //bars
         slidePositions.Add(getPositionFromDistance(4.8f));
         foreach (var bars in slideBars)
         {
             slidePositions.Add(bars.transform.position);
             slideRotations.Add(Quaternion.Euler(bars.transform.rotation.eulerAngles + new Vector3(0f, 0f, 18f)));
         }
+        
+        //bars pos
         var endPos = getPositionFromDistance(4.8f, endPosition);
         var x = slidePositions.LastOrDefault() - Vector3.zero;
         var y = endPos - Vector3.zero;
@@ -143,6 +130,8 @@ public class SlideBase : NoteLongBase
         var q = slideRotations.LastOrDefault() * Quaternion.Euler(0, 0, angle);
         slidePositions.Add(endPos);
         slideRotations.Add(q);
+        
+        //bars skin
         foreach (var gm in slideBars)
         {
             var sr = gm.GetComponent<SpriteRenderer>();
@@ -150,30 +139,27 @@ public class SlideBase : NoteLongBase
             sr.sortingOrder = sortIndex--;
             sr.sortingLayerName = "Slide";
 
-            sr.sprite = spriteNormal; //注意赋值顺序
+            sr.sprite = skinManager.Slide; //注意赋值顺序
             if (isEach)
             {
-                sr.sprite = spriteEach;
+                sr.sprite = skinManager.Slide_Each;
             }
             if (isBreak)
             {
-                sr.sprite = spriteBreak;
-                sr.material = breakMaterial;
+                sr.sprite = skinManager.Slide_Break;
+                sr.material = skinManager.BreakMaterial;
                 sr.material.SetFloat("_Brightness", 0.95f);
                 var controller = gm.AddComponent<BreakShineController>();
                 controller.parent = this;
                 controller.enabled = true;
-                //anim.runtimeAnimatorController = slideShine;
-                //anim.enabled = false;
-                //animators.Add(anim);
             }
             if (isMine)
             {
-                sr.sprite = spriteMine;
+                sr.sprite = skinManager.Slide_Mine;
             }
         }
 
-        TimeProvider = GameObject.Find("AudioTimeProvider").GetComponent<TimeProvider>();
+        //bars fadein
         // 计算Slide淡入时机
         // 在8.0速时应当提前300ms显示Slide
         fadeInTime = -3.926913f / speed;
@@ -185,82 +171,71 @@ public class SlideBase : NoteLongBase
         //淡入时机与正解帧间隔小于200ms时，加快淡入动画的播放速度; interval永不为0
         fadeInAnimator.speed = 0.2f / interval;
         fadeInAnimator.SetTrigger("slide");
+        
+        //judgeQueue
+        var table = SlideTables.FindTableByName(slideType);
+        judgeQueue = table.JudgeQueue.ToList();
 
-        var sManagerObj = GameObject.Find("Sensors");
-        var count = sManagerObj.transform.childCount;
-        for (int i = 0; i < count; i++)
-            sensors.Add(sManagerObj.transform.GetChild(i).gameObject);
-        sManager = sManagerObj.GetComponent<SensorManager>();
-
-        GetSensors(sensors.Select(x => x.GetComponent<RectTransform>())
-                                        .ToArray());
-
-        var _slideIndex = areaStep.Skip(1).ToArray();
-        if (_slideIndex.Length != judgeSensors.Count)
-            _slideIndex = null;
-        for (int i = 0; i < judgeSensors.Count; i++)
+        if (ConnectInfo.IsConnSlide)
         {
-            var sensor = judgeSensors[i];
-            int index = 0;
-            if (_slideIndex is null)
-                index = (slideBars.Count / judgeSensors.Count) * (i + 1);
-            else
-                index = _slideIndex[i];
-            judgeQueue.Add(new JudgeArea(
-                new Dictionary<SensorType, bool>
-                {
-                    {sensor.Type, i == judgeSensors.Count - 1 }
-                }, index));
-        }
-        if (slideType is "line3" or "line7")// 1-3
-        {
-            //judgeQueue[1].CanSkip = ConnectInfo.IsConnSlide;
-            judgeQueue[1].AddArea(judgeSensors[1].Type + 8);
-            registerSensors.Add(sManager.GetSensor(judgeSensors[1].Type + 8));
-        }
-        //else if (slideType == "circle3")// 1^3
-            //judgeQueue[1].CanSkip = ConnectInfo.IsConnSlide;         //CanSkip above is set in SetCanSkip
-        else if (slideType[0] == 'L')// 1V3                            //the V is special
-        {
-            judgeQueue[1].CanSkip = ConnectInfo.IsConnSlide;
-            judgeQueue[1].AddArea(judgeSensors[1].Type + 8);
-            registerSensors.Add(sManager.GetSensor(judgeSensors[1].Type + 8));
-            if (slideType == "L5")// 1V35
+            if (ConnectInfo.IsGroupPartEnd)
             {
-                judgeQueue[3].CanSkip = ConnectInfo.IsConnSlide;
-                judgeQueue[3].AddArea(judgeSensors[3].Type + 8);
-                registerSensors.Add(sManager.GetSensor(judgeSensors[3].Type + 8));
+                judgeQueue.LastOrDefault().SetIsLast();
             }
+            else
+            {
+                judgeQueue.LastOrDefault().SetNonLast();
+            }
+            UpdateJudgeQueue();
         }
 
-        if (ConnectInfo.IsConnSlide && ConnectInfo.IsGroupPartEnd)
-            judgeQueue.LastOrDefault().SetIsLast();
-        else if (ConnectInfo.IsConnSlide)
-            judgeQueue.LastOrDefault().SetNonLast();
-        registerSensors.AddRange(judgeSensors);
         _judgeQueue = new(judgeQueue);
 
-        parent = ConnectInfo.Parent;
+        foreach (var area in judgeQueue.SelectMany(x => x.Areas))
+            boundSensors.Add(inputManager.GetSensor(area));
+        
+        foreach (var boundSensor in boundSensors)
+            inputManager.BindSensor(Check, boundSensor);
+        
+        //judge timing
         if( (ConnectInfo.IsConnSlide && ConnectInfo.IsGroupPartEnd) || 
             !ConnectInfo.IsConnSlide)
         {
             judgeTiming = time + LastFor * CalJudgeTiming();
         }
-
-    }
-
-    public void SetCanSkip(int totalJudgeAreaCount)
-    {
-        if (ConnectInfo.IsConnSlide && totalJudgeAreaCount == 3 && ConnectInfo.IsGroupPartHead)
+        else
         {
-            // 只有类似1>2>3的情况
-            //judgeQueue[1].CanSkip = false; 
-            canBePendingFinish = false;
+            LastFor = (ConnectInfo.TotalLength / ConnectInfo.TotalSlideLen) * GetSlideLength();
+            if(!ConnectInfo.IsGroupPartHead)
+            {
+                var parent = ConnectInfo.Parent!.GetComponent<SlideDrop>();
+                time = parent.time + parent.LastFor;
+                judgeTiming = time + LastFor * CalJudgeTiming();
+            }
         }
-        else if (!ConnectInfo.IsConnSlide && judgeQueue.Count == 3)
+
+        void UpdateJudgeQueue()
         {
-            // 类似1-3的情况
-            judgeQueue[1].CanSkip = false;
+            if (ConnectInfo.TotalJudgeQueueLen < 4)
+            {
+                if (ConnectInfo.IsGroupPartHead)
+                {
+                    judgeQueue[0].IsSkippable = true;
+                    judgeQueue[1].IsSkippable = false;
+                }
+                else if (ConnectInfo.IsGroupPartEnd)
+                {
+                    judgeQueue[0].IsSkippable = false;
+                    judgeQueue[1].IsSkippable = true;
+                }
+            }
+            else
+            {
+                foreach (var judgeArea in judgeQueue)
+                {
+                    judgeArea.IsSkippable = true;
+                }
+            }
         }
     }
 
@@ -274,69 +249,21 @@ public class SlideBase : NoteLongBase
             return;
         judgeQueue.Clear();
     }
-    private void Start()
+    
+    private void Awake()
     {
-        Initialize();
-        if(ConnectInfo.IsConnSlide)
-        {
-            LastFor = (ConnectInfo.TotalLength / ConnectInfo.TotalSlideLen) * GetSlideLength();
-            if(!ConnectInfo.IsGroupPartHead)
-            {
-                var parent = ConnectInfo.Parent!.GetComponent<SlideBase>();
-                time = parent.time + parent.LastFor;
-                judgeTiming = time + LastFor * CalJudgeTiming();
-            }
-        }
-        var allSensors = judgeQueue.SelectMany(x => x.GetSensorTypes())
-                                   .GroupBy(x => x)
-                                   .Select(x => x.Key);
-        inputManager = GameObject.Find("Input").GetComponent<InputManager>();
-        boundSensors.AddRange(allSensors);
-        foreach (var sensor in allSensors)
-            inputManager.BindSensor(Check, sensor);
-    }
-    void GetSensors(RectTransform[] sensors)
-    {
-        Sensor lastSensor = null;
-        foreach (var bar in slideBars)
-        {
-            var pos = bar.transform.position;
-            
-            foreach (var s in sensors)
-            {
-                var sensor = s.GetComponent<Sensor>();
-                if (sensor.Group == SensorGroup.E || sensor.Group == SensorGroup.D)
-                    continue;
 
-                var rCenter = s.position;
-                var rWidth = s.rect.width * s.lossyScale.x;
-                var rHeight = s.rect.height * s.lossyScale.y;
-
-                var radius = Math.Max(rWidth, rHeight) / 2;
-
-                if ((pos - rCenter).sqrMagnitude <= radius * radius)
-                {
-                    if(lastSensor is null || sensor != lastSensor)
-                    {
-                        judgeSensors.Add(sensor);
-                        lastSensor = sensor;
-                        break;
-                    }
-                }
-            }
-        }
-        
     }
     private void FixedUpdate()
     {
         if (InputManager.Mode is AutoPlayMode.Enable or AutoPlayMode.Random)
             return;
 
-        /// time      是Slide启动的时间点
-        /// timeStart 是Slide完全显示但未启动
-        /// LastFor   是Slide的时值
-        var timing = TimeProvider.AudioTime - time;
-        var startTiming = TimeProvider.AudioTime - timeStart;
+        // time      是Slide启动的时间点
+        // timeStart 是Slide完全显示但未启动
+        // LastFor   是Slide的时值
+        var timing = timeProvider.AudioTime - time;
+        var startTiming = timeProvider.AudioTime - timeStart;
         var forceJudgeTiming = time + LastFor + (isMine ? 0 : 0.6); //mine一到就判
 
         if (ConnectInfo.IsGroupPart)
@@ -360,7 +287,7 @@ public class SlideBase : NoteLongBase
                 HideBar(areaStep.LastOrDefault());
                 Judge();
             }
-            else if (ConnectInfo.IsGroupPartEnd && TimeProvider.AudioTime - forceJudgeTiming >= 0)
+            else if (ConnectInfo.IsGroupPartEnd && timeProvider.AudioTime - forceJudgeTiming >= 0)
                 TooLateJudge();
             else if(isFinished)
                 HideBar(areaStep.LastOrDefault());
@@ -370,7 +297,7 @@ public class SlideBase : NoteLongBase
             HideBar(areaStep.LastOrDefault());
             Judge();
         }
-        else if (TimeProvider.AudioTime - forceJudgeTiming >= 0)
+        else if (timeProvider.AudioTime - forceJudgeTiming >= 0)
         {
             TooLateJudge();
         }
@@ -385,7 +312,7 @@ public class SlideBase : NoteLongBase
             return;
         }
         // Slide淡入期间，不透明度从0到0.55耗时200ms
-        var startiming = TimeProvider.AudioTime - timeStart;
+        var startiming = timeProvider.AudioTime - timeStart;
         if (startiming <= 0f)
         {
             if (startiming >= -0.05f)
@@ -402,7 +329,7 @@ public class SlideBase : NoteLongBase
         setSlideBarAlpha(1f);
 
         star_slide.SetActive(true);
-        var timing = TimeProvider.AudioTime - time;
+        var timing = timeProvider.AudioTime - time;
         if (timing <= 0f)
         {
             canShine = true;
@@ -417,7 +344,7 @@ public class SlideBase : NoteLongBase
                 alpha = alpha < 0f ? 0f : alpha;                
             }
 
-            spriteRenderer_star.color = new Color(1, 1, 1, alpha);
+            starRenderer.color = new Color(1, 1, 1, alpha);
             star_slide.transform.localScale = new Vector3(alpha + 0.5f, alpha + 0.5f, alpha + 0.5f);
             star_slide.transform.position = slidePositions[0];
             applyStarRotation(slideRotations[0]);
@@ -429,77 +356,61 @@ public class SlideBase : NoteLongBase
         }
         Check();
     }
-    public float GetSlideLength()
-    {
-        float len = 0;
-        for (int i = 0; i < slidePositions.Count - 2; i++)
-        {
-            var a = slidePositions[i];
-            var b = slidePositions[i + 1];
-            len += (b - a).magnitude; 
-        }
-        return len;
-    }
+
+    public float GetSlideLength() => slideBars.Count + 1;
+    
     public void Check(object sender, InputEventArgs arg) => Check();
     /// <summary>
     /// 判定队列检查
     /// </summary>
     public void Check()
     {
-        if (!canCheck)
+        if (!canCheck || isChecking || isFinished)
             return;
-        if (isFinished)
-        {
-            //if (ConnectInfo.Parent != null) //防止类似1>2>3这种情况2>3能判定为被完成了然后父Slide还卡在那
-            //{
-            //    if (!ConnectInfo.ParentFinished)
-            //        ConnectInfo.Parent.GetComponent<SlideDrop>().ForceFinish();
-            //}
-            //1>2>3不能通过跳区直接完成了，这一段作废
+        if (InputManager.Mode is AutoPlayMode.Enable or AutoPlayMode.Random)
             return;
-        }
-        else if (isChecking)
-            return;
-        else if (InputManager.Mode is AutoPlayMode.Enable or AutoPlayMode.Random)
-            return;
+                
         isChecking = true;
+        
+        //parent conn slide
         if (ConnectInfo.Parent != null && judgeQueue.Count < _judgeQueue.Count)
         {
             if (!ConnectInfo.ParentFinished)
-                ConnectInfo.Parent.GetComponent<SlideBase>().ForceFinish();
+                ConnectInfo.Parent.GetComponent<SlideDrop>().ForceFinish();
         }
 
+        //slide
         var first = judgeQueue.First();
-        JudgeArea? second = null;
+        SlideArea? second = null;
 
         if (judgeQueue.Count >= 2)
             second = judgeQueue[1];
-        var fType = first.GetSensorTypes();
+        var fType = first.Areas;
         foreach (var t in fType)
         {
-            var sensor = sManager.GetSensor(t);
-            first.Judge(t, sensor.Status);
+            var sensor = inputManager.GetSensor(t);
+            first.Judge(sensor.Status);
         }
 
-        if (second is not null && (first.CanSkip || first.On))
+        if (second is not null && (first.IsSkippable || first.On))
         {
-            var sType = second.GetSensorTypes();
+            var sType = second.Areas;
             foreach (var t in sType)
             {
-                var sensor = sManager.GetSensor(t);
-                second.Judge(t, sensor.Status);
+                var sensor = inputManager.GetSensor(t);
+                second.Judge(sensor.Status);
             }
 
             if (second.IsFinished)
             {
-                HideBar(first.SlideIndex);
+                HideBar(second.ArrowProgressWhenFinished);
                 judgeQueue = judgeQueue.Skip(2).ToList();
                 isChecking = false;
                 return;
             }
             else if (second.On)
             {
-                HideBar(first.SlideIndex);
+                HideBar(second.ArrowProgressWhenOn);
                 judgeQueue = judgeQueue.Skip(1).ToList();
                 isChecking = false;
                 return;
@@ -508,20 +419,21 @@ public class SlideBase : NoteLongBase
 
         if (first.IsFinished)
         {
-            HideBar(first.SlideIndex);
+            HideBar(first.ArrowProgressWhenFinished);
             judgeQueue = judgeQueue.Skip(1).ToList();
             isChecking = false;
             return;
         }
+        
         isChecking = false;
     }
     void HideBar(int endIndex)
     {
-        endIndex = endIndex - 1;
-        endIndex = Math.Min(endIndex, slideBars.Count - 1);
+        endIndex = Math.Min(endIndex - 1, slideBars.Count - 1);
         for (int i = 0; i <= endIndex; i++)
             slideBars[i].SetActive(false);
     }
+    
     /// <summary>
     /// AutoPlay
     /// <para>
@@ -532,19 +444,19 @@ public class SlideBase : NoteLongBase
     {
         if (star_slide == null || isMine)
             return;
-        else if (InputManager.Mode is AutoPlayMode.Enable or AutoPlayMode.Random or AutoPlayMode.Disable)
+        if (InputManager.Mode is AutoPlayMode.Enable or AutoPlayMode.Random or AutoPlayMode.Disable)
             return;
 
         var starRadius = 0.763736616f;
         var starPos = star_slide.transform.position;
         var oldList = new List<Sensor>(triggerSensors);
         triggerSensors.Clear();
-        foreach (var s in sensors.Select(x => x.GetComponent<RectTransform>()))
+        foreach (var sensor in inputManager.sensors)
         {
-            var sensor = s.GetComponent<Sensor>();
-            if (sensor.Group == SensorGroup.E || sensor.Group == SensorGroup.D)
+            if (sensor.Group is SensorGroup.E or SensorGroup.D)
                 continue;
 
+            var s = (RectTransform)sensor.gameObject.transform;
             var rCenter = s.position;
             var rWidth = s.rect.width * s.lossyScale.x;
             var rHeight = s.rect.height * s.lossyScale.y;
@@ -557,9 +469,9 @@ public class SlideBase : NoteLongBase
         var untriggerSensors = oldList.Where(x => !triggerSensors.Contains(x));
 
         foreach (var s in untriggerSensors)
-            sManager.SetSensorOff(s.Type, guid);
+            inputManager.SetSensorOff(s, guid);
         foreach (var s in triggerSensors)
-            sManager.SetSensorOn(s.Type, guid);
+            inputManager.SetSensorOn(s, guid);
     }
     /// <summary>
     /// Slide判定
@@ -580,8 +492,8 @@ public class SlideBase : NoteLongBase
         var stayTime = (time + LastFor) - judgeTiming; // 停留时间
         if (!isJudged)
         {
-            arriveTime = TimeProvider.AudioTime;
-            var triggerTime = TimeProvider.AudioTime;           
+            arriveTime = timeProvider.AudioTime;
+            var triggerTime = timeProvider.AudioTime;           
 
             const float totalInterval = 1.2f; // 秒
             const float nPInterval = 0.4666667f; // Perfect基础区间
@@ -625,9 +537,9 @@ public class SlideBase : NoteLongBase
             SetJust();
             isJudged = true;
         }
-        else if (arriveTime < starTiming && TimeProvider.AudioTime >= starTiming + stayTime * 0.8)
+        else if (arriveTime < starTiming && timeProvider.AudioTime >= starTiming + stayTime * 0.8)
             DestroySelf();
-        else if (arriveTime >= starTiming && TimeProvider.AudioTime >= arriveTime + stayTime * 0.8)
+        else if (arriveTime >= starTiming && timeProvider.AudioTime >= arriveTime + stayTime * 0.8)
             DestroySelf();
     }
     void SetJust()
@@ -662,14 +574,14 @@ public class SlideBase : NoteLongBase
     /// <returns>正解帧 (单位: s)</returns>
     float CalJudgeTiming()
     {
-        var s = judgeSensors.LastOrDefault().gameObject.transform.GetComponent<RectTransform>();
+        var s = inputManager.GetSensor(judgeQueue.Last().Areas[0]).gameObject.transform as RectTransform;
         var starRadius = 0.763736616f;
         var rCenter = s.position;
         var rWidth = s.rect.width * s.lossyScale.x;
         var rHeight = s.rect.height * s.lossyScale.y;
 
         var radius = Math.Max(rWidth, rHeight) / 2;
-        for (float process = 0.85f; process < 1;process += 0.01f)
+        for (var process = 0.85f; process < 1; process += 0.01f)
         {
             var indexProcess = (slidePositions.Count - 1) * process;
             var index = (int)indexProcess;
@@ -722,7 +634,7 @@ public class SlideBase : NoteLongBase
             if(ConnectInfo.Parent != null)
                 Destroy(ConnectInfo.Parent);
 
-            foreach (GameObject obj in slideBars)
+            foreach (var obj in slideBars)
                 obj.SetActive(false);
 
             if (star_slide != null)
@@ -735,10 +647,8 @@ public class SlideBase : NoteLongBase
     /// </summary>
     void ClearTriggeredSensor()
     {
-        var sensors = _judgeQueue.SelectMany(x => x.GetAreas())
-                           .Select(x => x.Type);
-        foreach (var t in sensors)
-            sManager.SetSensorOff(t, guid);
+        foreach (var t in triggerSensors)
+            inputManager.SetSensorOff(t, guid);
     }
     void OnDestroy()
     {
@@ -800,7 +710,7 @@ public class SlideBase : NoteLongBase
     /// </summary>
     void UpdateStar()
     {
-        spriteRenderer_star.color = Color.white;
+        starRenderer.color = Color.white;
         star_slide.transform.localScale = new Vector3(1.5f, 1.5f, 1.5f);
 
         var process = MathF.Min((LastFor - GetRemainingTime()) / LastFor, 1);
@@ -809,7 +719,7 @@ public class SlideBase : NoteLongBase
         var index = (int)indexProcess;
         var pos = indexProcess - index;
 
-        if(process == 1)
+        if(process >= 1f)
         {
             switch (InputManager.Mode)
             {

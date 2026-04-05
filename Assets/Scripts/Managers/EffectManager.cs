@@ -1,5 +1,4 @@
 ﻿using System;
-using Assets.Scripts.Types;
 using UnityEngine;
 using UnityEngine.UIElements;
 #nullable enable
@@ -7,14 +6,10 @@ public class EffectManager : MonoBehaviour
 {
     public static bool showFL;
     public static bool showLevel;
-
-    public Sprite hex;
-    public Sprite star;
+    
     private readonly Animator[] judgeAnimators = new Animator[8];
     private readonly GameObject[] judgeEffects = new GameObject[8];
     private readonly Animator[] tapAnimators = new Animator[8];
-    private readonly Animator[] greatAnimators = new Animator[8];
-    private readonly Animator[] goodAnimators = new Animator[8];
 
     private readonly GameObject[] tapEffects = new GameObject[8];
     private readonly GameObject[] greatEffects = new GameObject[8];
@@ -49,14 +44,9 @@ public class EffectManager : MonoBehaviour
             fastLateAnims[i] = fastLateEffects[i].GetComponent<Animator>();
 
             goodEffects[i] = goodEffectParent.transform.GetChild(i).gameObject;
-            greatAnimators[i] = goodEffects[i].GetComponent<Animator>();
-            
-
             greatEffects[i] = greatEffectParent.transform.GetChild(i).gameObject;
-            greatAnimators[i] = greatEffects[i].GetComponent<Animator>();
-            
-
             tapEffects[i] = tapEffectParent.transform.GetChild(i).gameObject;
+            
             tapAnimators[i] = tapEffects[i].GetComponent<Animator>();
             
 
@@ -66,7 +56,7 @@ public class EffectManager : MonoBehaviour
         }
 
         //Load Skin
-        skinManager = GameObject.Find("Outline").GetComponent<SkinManager>();
+        skinManager = Majdata<SkinManager>.Instance!;
         judgeText = skinManager.JudgeText;
 
         foreach (var judgeEffect in judgeEffects)
@@ -94,8 +84,6 @@ public class EffectManager : MonoBehaviour
                 showLevel = true;
                 break;
             case JudgeDisplayMode.Both:
-                showFL = showLevel = true;
-                break;
             default:
                 showFL = showLevel = true;
                 break;
@@ -195,7 +183,7 @@ public class EffectManager : MonoBehaviour
 
         var pos = position - 1;
 
-        if (judge == JudgeType.Miss || judge == JudgeType.Perfect)
+        if (judge is JudgeType.Miss or JudgeType.Perfect)
         {
             fastLateEffects[pos].SetActive(false);
             return;

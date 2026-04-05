@@ -2,20 +2,17 @@
 using UnityEngine;
 using UnityEngine.UI;
 
-public class TImeDisplayer : MonoBehaviour
+public class TimeDisplayer : MonoBehaviour
 {
-    private Text text;
-
     private TimeProvider timeProvider;
-
-    // Start is called before the first frame update
+    
+    private Text text;
+    
     private void Start()
     {
         text = GetComponent<Text>();
-        timeProvider = GameObject.Find("AudioTimeProvider").GetComponent<TimeProvider>();
+        timeProvider = Majdata<TimeProvider>.Instance!;
     }
-
-    // Update is called once per frame
 
     private void Update()
     {

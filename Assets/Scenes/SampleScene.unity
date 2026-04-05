@@ -2407,7 +2407,6 @@ MonoBehaviour:
   noteSpeed: 7
   touchSpeed: 7.5
   smoothSlideAnime: 0
-  starEach: {fileID: 21300000, guid: 18b858f24d67a4341ab427db18c00991, type: 3}
   tapPrefab: {fileID: 7955322054321000439, guid: 97d5979fe9de8fd4198fcafd1ba2d433,
     type: 3}
   holdPrefab: {fileID: 7566527781932749496, guid: 558452b6e8eb68f44b4f035c27e37c25,
@@ -2419,10 +2418,7 @@ MonoBehaviour:
   touchPrefab: {fileID: 3167371522221019254, guid: 93aa98f79a99f9e48a495e74f4fab299,
     type: 3}
   eachLine: {fileID: 278292873598720211, guid: 54e5879f47df2a248b91a3e19dfe8599, type: 3}
-  starLine: {fileID: 7599635926637845735, guid: 170f7f7a95689ea479fc7270d6ebf074,
-    type: 3}
-  mineLine: {fileID: 7599635926637845735, guid: bad1e2783eba3364f874debde4720b12,
-    type: 3}
+  tapLine: {fileID: 8134463029818261665, guid: ed6ad005bb60e9c409c75936f65b7f86, type: 3}
   notes: {fileID: 327139454}
   star_slidePrefab: {fileID: 3082733108601366817, guid: 42156a3b3ae4d054da74641cd739534f,
     type: 3}
@@ -2469,10 +2465,6 @@ MonoBehaviour:
   - {fileID: 8148946950682681393, guid: d050f65c3f52d524ab26963738702536, type: 3}
   - {fileID: 8389343569395675099, guid: 32868e5f4fa463f4c905e870406abea5, type: 3}
   - {fileID: 349982270078930302, guid: d0fd46e58bee17740a889818d94c8816, type: 3}
-  breakMaterial: {fileID: 2100000, guid: 6cea13e5ba8275446be27a38daed20c7, type: 2}
-  BreakShine: {fileID: 9100000, guid: c28f56116f6dc34408d6f0f544f1e2cc, type: 2}
-  JudgeBreakShine: {fileID: 9100000, guid: 68e114e3215572c4380cbd3b06c36ad0, type: 2}
-  HoldShine: {fileID: 9100000, guid: 3fcb4587ef8c7f141969450782191592, type: 2}
   diffText: {fileID: 295904848}
   levelText: {fileID: 1130077457}
   titleText: {fileID: 494240256}
@@ -2531,8 +2523,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b3231e63be06649428e325e6a0b02ee5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  hex: {fileID: 21300000, guid: 280cf213a61361a408162b1680b6770a, type: 3}
-  star: {fileID: 21300000, guid: 57e073b06f82de348ab42249bc7d1730, type: 3}
 --- !u!4 &413796635
 Transform:
   m_ObjectHideFlags: 0
@@ -4246,7 +4236,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 31c0ca86ea0e4e04ba77bc61f40535e6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  mainCamera: {fileID: 519420031}
+  sensorObjs: []
+  sensors: []
 --- !u!224 &601344169
 RectTransform:
   m_ObjectHideFlags: 0
@@ -8906,7 +8897,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d58a05adbb88e644cab548f31f077071, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  CutoffTime: 0
   APObj: {fileID: 1153691776}
 --- !u!4 &1463030766
 Transform:

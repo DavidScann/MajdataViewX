@@ -1,5 +1,4 @@
 ﻿using Assets.Scripts.Notes;
-using Assets.Scripts.Types;
 using UnityEngine;
 #nullable enable
 public class StarDrop : TapBase
@@ -11,70 +10,13 @@ public class StarDrop : TapBase
     public bool isFakeStar = false;
     public bool isFakeStarRotate = false;
 
-    public Sprite tapSpr_Double;
-    public Sprite eachSpr_Double;
-    public Sprite breakSpr_Double;
-    public Sprite exSpr_Double;
-    public Sprite mineSpr_Double;
-
     public GameObject slide;
+    
     private void Start()
     {
         PreLoad();
 
-        if (isDouble)
-        {
-            exSpriteRender.sprite = exSpr_Double;
-            spriteRenderer.sprite = tapSpr_Double;
-            if (isEX)
-            {
-                exSpriteRender.color = exEffectTap;
-            }
-            if (isEach)
-            {
-                spriteRenderer.sprite = eachSpr_Double;
-                lineSpriteRenderer.sprite = eachTapLineSpr;
-                if (isEX) exSpriteRender.color = exEffectEach;
-            }
-            if (isBreak)
-            {
-                spriteRenderer.sprite = breakSpr_Double;
-                if (isEX) exSpriteRender.color = exEffectBreak;
-                lineSpriteRenderer.sprite = breakTapLineSpr;
-                spriteRenderer.material = breakMaterial;
-            }
-            if (isMine)
-            {
-                spriteRenderer.sprite = mineSpr;
-                lineSpriteRenderer.sprite = mineTapLineSpr;
-            }
-        }
-        else
-        {
-            exSpriteRender.sprite = exSpr;
-            spriteRenderer.sprite = tapSpr;
-            if (isEX) exSpriteRender.color = exEffectTap;
-            if (isEach)
-            {
-                spriteRenderer.sprite = eachSpr;
-                lineSpriteRenderer.sprite = eachTapLineSpr;
-                if (isEX) exSpriteRender.color = exEffectEach;
-            }
-
-            if (isBreak)
-            {
-                spriteRenderer.sprite = breakSpr;
-                lineSpriteRenderer.sprite = breakTapLineSpr;
-                if (isEX) exSpriteRender.color = exEffectBreak;
-                spriteRenderer.material = breakMaterial;
-            }
-
-            if (isMine)
-            {
-                spriteRenderer.sprite = mineSpr;
-                lineSpriteRenderer.sprite = mineTapLineSpr;
-            }
-        }
+        LoadSkin();
 
         spriteRenderer.forceRenderingOff = true;
         exSpriteRender.forceRenderingOff = true;
@@ -84,19 +26,75 @@ public class StarDrop : TapBase
             sensor = GameObject.Find("Sensors")
                                    .transform.GetChild(startPosition - 1)
                                    .GetComponent<Sensor>();
-            manager = GameObject.Find("Sensors")
-                                    .GetComponent<SensorManager>();
-            inputManager = GameObject.Find("Input")
-                                 .GetComponent<InputManager>();
-            sensorPos = (SensorType)(startPosition - 1);
-            inputManager.BindArea(Check, sensorPos);
+            inputManager.BindArea(Check, sensor);
         }
         State = NoteStatus.Initialized;
     }
-    // Update is called once per frame
+
+    private void LoadSkin()
+    {
+        if (isDouble)
+        {
+            exSpriteRender.sprite = skinManager.Star_Ex_Double;
+            spriteRenderer.sprite = skinManager.Star_Double;
+            lineSpriteRenderer.sprite = skinManager.Line;
+            if (isEx)
+            {
+                exSpriteRender.color = skinManager.Ex_Star;
+            }
+            if (isEach)
+            {
+                spriteRenderer.sprite = skinManager.Star_Each_Double;
+                lineSpriteRenderer.sprite = skinManager.Line_Each;
+                if (isEx) exSpriteRender.color = skinManager.Ex_Each;
+            }
+            if (isBreak)
+            {
+                spriteRenderer.sprite = skinManager.Star_Break_Double;
+                lineSpriteRenderer.sprite = skinManager.Line_Break;
+                if (isEx) exSpriteRender.color = skinManager.Ex_Break;
+                spriteRenderer.material = skinManager.BreakMaterial;
+            }
+            if (isMine)
+            {
+                spriteRenderer.sprite = skinManager.Star_Mine_Double;
+                lineSpriteRenderer.sprite = skinManager.Line_Mine;
+            }
+        }
+        else
+        {
+            exSpriteRender.sprite = skinManager.Star_Ex;
+            spriteRenderer.sprite = skinManager.Star;
+            lineSpriteRenderer.sprite = skinManager.Line;
+            if (isEx)
+            {
+                exSpriteRender.color = skinManager.Ex_Star;
+            }
+            if (isEach)
+            {
+                spriteRenderer.sprite = skinManager.Star_Each;
+                lineSpriteRenderer.sprite = skinManager.Line_Each;
+                if (isEx) exSpriteRender.color = skinManager.Ex_Each;
+            }
+            if (isBreak)
+            {
+                spriteRenderer.sprite = skinManager.Star_Break;
+                lineSpriteRenderer.sprite = skinManager.Line_Break;
+                if (isEx) exSpriteRender.color = skinManager.Ex_Break;
+                spriteRenderer.material = skinManager.BreakMaterial;
+            }
+            if (isMine)
+            {
+                spriteRenderer.sprite = skinManager.Star_Mine;
+                lineSpriteRenderer.sprite = skinManager.Line_Mine;
+            }
+        }
+    }
+
+
     protected override void Update()
     {
-        var songSpeed = TimeProvider.CurrentSpeed;
+        var songSpeed = timeProvider.CurrentSpeed;
         var judgeTiming = GetJudgeTiming();
         var distance = judgeTiming * speed + 4.8f;
         var destScale = distance * 0.4f + 0.51f;
@@ -112,8 +110,8 @@ public class StarDrop : TapBase
                     State = NoteStatus.Pending;
                     goto case NoteStatus.Pending;
                 }
-                else
-                    transform.localScale = new Vector3(0, 0);
+                
+                transform.localScale = new Vector3(0, 0);
                 return;
             case NoteStatus.Pending:
                 {
@@ -156,15 +154,15 @@ public class StarDrop : TapBase
         if (isNoHead)
         {
             spriteRenderer.forceRenderingOff = true;
-            if (isEX) exSpriteRender.forceRenderingOff = true;
+            if (isEx) exSpriteRender.forceRenderingOff = true;
         }
         else
         {
             spriteRenderer.forceRenderingOff = false;
-            if (isEX) exSpriteRender.forceRenderingOff = false;
+            if (isEx) exSpriteRender.forceRenderingOff = false;
         }
 
-        if (TimeProvider.isStart && !isFakeStar && rotateSpeed != 0)
+        if (timeProvider.isStart && !isFakeStar && rotateSpeed != 0)
             transform.Rotate(0f, 0f, -180f * Time.deltaTime * songSpeed / rotateSpeed);
         else if (isFakeStarRotate)
             transform.Rotate(0f, 0f, 400f * Time.deltaTime);  

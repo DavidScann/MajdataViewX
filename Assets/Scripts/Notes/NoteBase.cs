@@ -1,8 +1,9 @@
 using Assets.Scripts.Notes;
-using Assets.Scripts.Types;
 using System;
 using System.Diagnostics;
 using UnityEngine;
+using UnityEngine.Serialization;
+
 #nullable enable
 public class NoteBase : MonoBehaviour
 {
@@ -18,6 +19,12 @@ public class NoteBase : MonoBehaviour
     public float speed = 7;
     public int noteSortOrder;
 
+    public bool isEach;
+    public bool isEx;
+    public bool isBreak;
+    public bool isMine;
+
+    
     protected NoteStatus State { get; set; } = NoteStatus.Start;
     
     protected Guid guid = Guid.NewGuid();

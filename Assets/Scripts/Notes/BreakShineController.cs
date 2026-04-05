@@ -5,7 +5,7 @@ public class BreakShineController : MonoBehaviour
 {
     TimeProvider timeProvider;
     
-    public SlideBase? parent;
+    public ICanShine? parent;
 
     private SpriteRenderer spriteRenderer;
     private MaterialPropertyBlock _mpb;

@@ -1,32 +1,33 @@
 ﻿using System;
 using System.Linq;
 #nullable enable
-namespace Assets.Scripts.Types
+
+public class TouchGroup
 {
-    public class TouchGroup
+    public float Percent
     {
-        public float Percent
+        get
         {
-            get
-            {
-                if (Members.Length == 0)
-                    return 0f;
-                var finished = Members.Where(x => x == null);
-                return finished.Count() / (float)Members.Length;
-            }
+            if (Members.Length == 0)
+                return 0f;
+            var finished = Members.Where(x => x == null);
+            return finished.Count() / (float)Members.Length;
         }
-        public JudgeType? JudgeResult
-        {
-            get => _judgeResult;
-            set
-            {
-                if (Percent > 0.5f)
-                    return;
-                else
-                    _judgeResult = value;
-            }
-        }
-        public TouchDrop[] Members { get; set; } = Array.Empty<TouchDrop>();
-        JudgeType? _judgeResult = null;
     }
+
+    public JudgeType? JudgeResult
+    {
+        get => _judgeResult;
+        set
+        {
+            if (Percent > 0.5f)
+                return;
+            
+            _judgeResult = value;
+        }
+    }
+
+    public TouchDrop[] Members { get; set; } = Array.Empty<TouchDrop>();
+    JudgeType? _judgeResult = null;
 }
+

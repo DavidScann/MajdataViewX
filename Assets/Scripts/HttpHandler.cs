@@ -3,7 +3,6 @@ using System.Collections.Concurrent;
 using System.IO;
 using System.Net;
 using System.Threading.Tasks;
-using Assets.Scripts.Types;
 using Newtonsoft.Json;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -33,15 +32,15 @@ public class HttpHandler : MonoBehaviour
             IsReloding = false;
             var data = JsonConvert.DeserializeObject<EditRequestjson>(req);
 
-            var loader = GameObject.Find("DataLoader").GetComponent<JsonDataLoader>();
-            var timeProvider = GameObject.Find("AudioTimeProvider").GetComponent<TimeProvider>();
-            var bgManager = GameObject.Find("Background").GetComponent<BGManager>();
+            var loader = Majdata<DataLoader>.Instance!;
+            var timeProvider = Majdata<TimeProvider>.Instance!;
+            var bgManager = Majdata<BgManager>.Instance!;
+            var screenRecorder = Majdata<ScreenRecorder>.Instance!;
+            var multTouchHandler = Majdata<MultTouchHandler>.Instance!;
+            var objectCounter = Majdata<ObjectCounter>.Instance!;
+            var effectManager = Majdata<EffectManager>.Instance!;
+            
             var bgCover = GameObject.Find("BackgroundCover").GetComponent<SpriteRenderer>();
-            var screenRecorder = GameObject.Find("ScreenRecorder").GetComponent<ScreenRecorder>();
-            var multTouchHandler = GameObject.Find("MultTouchHandler").GetComponent<MultTouchHandler>();
-            var objectCounter = GameObject.Find("ObjectCounter").GetComponent<ObjectCounter>();
-            var effectManager = GameObject.Find("NoteEffects").GetComponent<EffectManager>();
-
             InputManager.Mode = (AutoPlayMode)data.editorPlayMethod;
             effectManager.SetDisplayMode(data.judgeDisplayMode);
 
@@ -89,9 +88,7 @@ public class HttpHandler : MonoBehaviour
                         objectCounter.ComboSetActive(data.comboStatusType);
                         loader.LoadJson(File.ReadAllText(data.jsonPath), data.startTime);
                         multTouchHandler.clearSlots();
-
-                        screenRecorder.CutoffTime = getChartLength();
-                        screenRecorder.CutoffTime += 10f;
+                        
                         screenRecorder.StartRecording(maidataPath);
 
                         bgManager.LoadBGFromPath(maidataPath, data.audioSpeed);
@@ -122,7 +119,7 @@ public class HttpHandler : MonoBehaviour
     private void OnDestroy()
     {
         http.Stop();
-        print("server stoped");
+        print("server stopped");
     }
 
     private void httpListen()
@@ -149,19 +146,5 @@ public class HttpHandler : MonoBehaviour
         }
 
         print("exit listen");
-    }
-
-    private float getChartLength()
-    {
-        var length = 0f;
-        foreach (var noteData in GameObject.Find("Notes").GetComponentsInChildren<NoteBase>(true))
-        {
-            length = Math.Max(length, noteData.time);
-
-            var longData = noteData as NoteLongBase;
-            if (longData != null) length = Math.Max(length, noteData.time + longData.LastFor);
-        }
-
-        return length;
     }
 }

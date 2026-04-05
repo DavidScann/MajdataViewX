@@ -1,5 +1,4 @@
 using System;
-using Assets.Scripts.Types;
 using System.Collections.Generic;
 using UnityEngine;
 #nullable enable
@@ -10,24 +9,18 @@ public class NoteManager : MonoBehaviour
     public Dictionary<int, int> noteIndex = new();
 
     public Dictionary<GameObject, int> touchOrder = new();
-    public Dictionary<SensorType, int> touchIndex = new();
+    public Dictionary<SensorArea, int> touchIndex = new();
 
     private void Awake()
     {
         Majdata<NoteManager>.Instance = this;
     }
-
-    // Start is called before the first frame update
+    
     void Start()
     {
         Application.targetFrameRate = 30;
     }
-    public void Clear()
-    {
-        ResetIndex();
-        noteOrder.Clear();
-        touchOrder.Clear();
-    }
+    
     public void AddNote(GameObject obj,int index) => noteOrder.Add(obj, index);
     public void AddTouch(GameObject obj,int index) => touchOrder.Add(obj, index);
     public void Refresh()
@@ -81,7 +74,7 @@ public class NoteManager : MonoBehaviour
         return index <= nowIndex;
     }
 
-    public bool CanJudge(GameObject obj,SensorType t)
+    public bool CanJudge(GameObject obj,SensorArea t)
     {
         if (!touchOrder.ContainsKey(obj))
             return false;
@@ -89,10 +82,5 @@ public class NoteManager : MonoBehaviour
         var nowIndex = touchIndex[t];
 
         return index <= nowIndex;
-    }
-    // Update is called once per frame
-    void Update()
-    {
-        
     }
 }

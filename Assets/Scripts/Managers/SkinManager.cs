@@ -62,9 +62,13 @@ public class SkinManager : MonoBehaviour
     public Sprite[] TouchBorder_Break = new Sprite[2];
     public Sprite[] TouchBorder_Mine = new Sprite[2];
 
-    public Sprite[] TouchHold = new Sprite[5];
-    public Sprite[] TouchHold_Break = new Sprite[5];
-    public Sprite[] TouchHold_Mine = new Sprite[5];
+    public Sprite[] TouchHold = new Sprite[4];
+    public Sprite[] TouchHold_Break = new Sprite[4];
+    public Sprite[] TouchHold_Mine = new Sprite[4];
+    public Sprite TouchHold_Border;
+    public Sprite TouchHold_Border_Break;
+    public Sprite TouchHold_Border_Mine;
+    public Sprite TouchHold_Border_Miss;
 
     public Color Ex;
     public Color Ex_Star;
@@ -104,10 +108,7 @@ public class SkinManager : MonoBehaviour
     private void Awake()
     {
         Majdata<SkinManager>.Instance = this;
-    }
-
-    private void Start()
-    {
+        
         var path = new DirectoryInfo(Application.dataPath).Parent!.FullName + "/Skin";
         Outline = gameObject.GetComponent<SpriteRenderer>();
 
@@ -244,9 +245,10 @@ public class SkinManager : MonoBehaviour
             TouchHold_Break[i] = SpriteLoader.Load(path + "/touchhold_" + i + "_break.png");
             TouchHold_Mine[i] = SpriteLoader.Load(path + "/touchhold_" + i + "_mine.png");
         }
-        TouchHold[4] = SpriteLoader.Load(path + "/touchhold_border.png");
-        TouchHold_Break[4] = SpriteLoader.Load(path + "/touchhold_border_break.png");
-        TouchHold_Mine[4] = SpriteLoader.Load(path + "/touchhold_border_mine.png");
+        TouchHold_Border = SpriteLoader.Load(path + "/touchhold_border.png");
+        TouchHold_Border_Break = SpriteLoader.Load(path + "/touchhold_border_break.png");
+        TouchHold_Border_Mine = SpriteLoader.Load(path + "/touchhold_border_mine.png");
+        TouchHold_Border_Miss = SpriteLoader.Load(path + "/touchhold_border_miss.png");
 
         Ex = new Color(255, 172, 255, 255);
         Ex_Star = new Color(172, 251, 255, 255);
