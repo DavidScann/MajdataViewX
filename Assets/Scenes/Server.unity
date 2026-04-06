@@ -531,7 +531,7 @@ MonoBehaviour:
   Shine: {fileID: 9100000, guid: 3fcb4587ef8c7f141969450782191592, type: 2}
   Shine_Break: {fileID: 9100000, guid: c28f56116f6dc34408d6f0f544f1e2cc, type: 2}
   Shine_JudgeBreak: {fileID: 9100000, guid: 68e114e3215572c4380cbd3b06c36ad0, type: 2}
-  BreakMaterial: {fileID: 2100000, guid: 5bb436b6ca5b982478e92120156f80af, type: 2}
+  BreakMaterial: {fileID: 2100000, guid: 6cea13e5ba8275446be27a38daed20c7, type: 2}
 --- !u!1 &1794058321
 GameObject:
   m_ObjectHideFlags: 0

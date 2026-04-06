@@ -250,9 +250,9 @@ public class SkinManager : MonoBehaviour
         TouchHold_Border_Mine = SpriteLoader.Load(path + "/touchhold_border_mine.png");
         TouchHold_Border_Miss = SpriteLoader.Load(path + "/touchhold_border_miss.png");
 
-        Ex = new Color(255, 172, 255, 255);
-        Ex_Star = new Color(172, 251, 255, 255);
-        Ex_Each = new Color(255, 254, 119, 255);
+        Ex = new Color32(255, 172, 255, 255);
+        Ex_Star = new Color32(172, 251, 255, 255);
+        Ex_Each = new Color32(255, 254, 119, 255);
         Ex_Break = Ex_Each;
     }
 }

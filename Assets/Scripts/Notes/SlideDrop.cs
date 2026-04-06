@@ -70,6 +70,7 @@ public class SlideDrop : NoteLongBase, ICanShine
             starRenderer.material = skinManager.BreakMaterial;
             starRenderer.material.SetFloat("_Brightness", 0.95f);
             var controller = star_slide.AddComponent<BreakShineController>();
+            controller.parent = this;
             controller.enabled = true;
         }
 
@@ -79,8 +80,6 @@ public class SlideDrop : NoteLongBase, ICanShine
         
         //slideok
         slideOK = transform.GetChild(transform.childCount - 1).gameObject; //slideok is the last one        
-        slideOK.SetActive(false);
-        slideOK.transform.SetParent(transform.parent);
         if (isMirror)
         {
             transform.localScale = new Vector3(-1f, 1f, 1f);
@@ -109,6 +108,8 @@ public class SlideDrop : NoteLongBase, ICanShine
                 slideOK.transform.position += new Vector3(Mathf.Sin(angel) * 0.27f, Mathf.Cos(angel) * -0.27f);
             }
         }
+        slideOK.SetActive(false);
+        slideOK.transform.SetParent(transform.parent);
         
         //bars
         slidePositions.Add(getPositionFromDistance(4.8f));
@@ -148,7 +149,7 @@ public class SlideDrop : NoteLongBase, ICanShine
             {
                 sr.sprite = skinManager.Slide_Break;
                 sr.material = skinManager.BreakMaterial;
-                sr.material.SetFloat("_Brightness", 0.95f);
+                //sr.material.SetFloat("_Brightness", 0.95f);
                 var controller = gm.AddComponent<BreakShineController>();
                 controller.parent = this;
                 controller.enabled = true;
@@ -357,7 +358,14 @@ public class SlideDrop : NoteLongBase, ICanShine
         Check();
     }
 
-    public float GetSlideLength() => slideBars.Count + 1;
+    public float GetSlideLength()
+    {
+        if (areaStep.Count > 0)
+            return areaStep.Last();
+
+        return Math.Max(slideBars.Count, 1);
+    }
+
     
     public void Check(object sender, InputEventArgs arg) => Check();
     /// <summary>

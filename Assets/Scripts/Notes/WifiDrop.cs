@@ -27,8 +27,8 @@ public class WifiDrop : NoteLongBase, ICanShine
     private float arriveTime = -1;
     private List<GameObject> sensors = new();
     private List<Sensor> boundSensors = new();
-    private List<List<SlideArea>> _judgeQueues = new();
-    private List<List<SlideArea>> judgeQueues = new();
+    private List<List<SlideArea>> _judgeQueues = new(3);
+    private List<List<SlideArea>> judgeQueues = new(3);
     private Dictionary<GameObject, List<Sensor>> triggerSensors = new();
     
     private bool isFinished { get => _judgeQueues.All(x => x.Count == 0); }
@@ -161,9 +161,9 @@ public class WifiDrop : NoteLongBase, ICanShine
         }
 
         var table = SlideTables.GetWifiTable(startPosition);
-        judgeQueues[0] = table.Left.ToList();
-        judgeQueues[1] = table.Center.ToList();
-        judgeQueues[2] = table.Right.ToList();
+        judgeQueues.Add(table.Left.ToList());
+        judgeQueues.Add(table.Center.ToList());
+        judgeQueues.Add(table.Right.ToList());
         _judgeQueues = new (judgeQueues);
         
         foreach (var area in judgeQueues.SelectMany(y => y.SelectMany(x => x.Areas)))
