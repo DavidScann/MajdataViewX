@@ -1,5 +1,4 @@
-﻿using Assets.Scripts.Notes;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -660,7 +659,8 @@ public class SlideDrop : NoteLongBase, ICanShine
     }
     void OnDestroy()
     {
-        if (isDestroying || HttpHandler.IsReloding)
+        if (PlayManager.IsReloading) return;
+        if (isDestroying)
             return;
         if (ConnectInfo.Parent != null)
             Destroy(ConnectInfo.Parent);

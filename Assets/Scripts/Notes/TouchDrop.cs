@@ -1,6 +1,4 @@
-﻿using Assets.Scripts;
-using Assets.Scripts.Notes;
-using System;
+﻿using System;
 using Unity.Burst.Intrinsics;
 using UnityEngine;
 #nullable enable
@@ -282,8 +280,7 @@ public class TouchDrop : NoteBase
     }
     private void OnDestroy()
     {
-        if (HttpHandler.IsReloding)
-            return;
+        if (PlayManager.IsReloading) return;
         multTouchHandler.cancelTouch(this);
         PlayJudgeEffect();
         if (GroupInfo is not null && judgeResult != JudgeType.Miss)

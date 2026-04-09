@@ -1,5 +1,4 @@
-﻿using Assets.Scripts.Notes;
-using UnityEngine;
+﻿using UnityEngine;
 #nullable enable
 public class StarDrop : TapBase
 {
@@ -169,6 +168,7 @@ public class StarDrop : TapBase
     }
     protected override void OnDestroy()
     {
+        if (PlayManager.IsReloading) return;
         if(!isNoHead || isFakeStar)
             base.OnDestroy();
     }

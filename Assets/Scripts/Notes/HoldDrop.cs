@@ -340,8 +340,7 @@ public class HoldDrop : NoteLongBase
     }
     private void OnDestroy()
     {
-        if (HttpHandler.IsReloding)
-            return;
+        if (PlayManager.IsReloading) return;
         var realityHT = LastFor - 0.3f - (judgeDiff / 1000f);
         var percent = Math.Clamp((realityHT - playerIdleTime) / realityHT, 0, 1);
         JudgeType result = judgeResult; //头判

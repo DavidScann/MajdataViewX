@@ -1,5 +1,4 @@
-﻿using Assets.Scripts.Notes;
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -8,7 +7,6 @@ using UnityEngine.UI;
 using System.Threading.Tasks;
 using System.Collections;
 using System.Diagnostics;
-using Assets.Scripts;
 using MajSimai;
 
 public class DataLoader : MonoBehaviour
@@ -20,7 +18,6 @@ public class DataLoader : MonoBehaviour
     public float noteSpeed = 7f;
     public float touchSpeed = 7.5f;
     public bool smoothSlideAnime = false;
-    float ignoreOffset = 0;
     
     //SerializeField
     public GameObject tapPrefab;
@@ -36,11 +33,8 @@ public class DataLoader : MonoBehaviour
     public GameObject star_slidePrefab;
     
     public GameObject[] slidePrefab;
-
-    public NoteLoaderStatus State { get; private set; } = NoteLoaderStatus.Idle;
+    
     Majson loadedData = null;
-    Task<Majson> jsonLoaderTask = null;
-    Coroutine noteParserTask = null;
     Dictionary<int, int> noteIndex = new();
     Dictionary<SensorArea, int> touchIndex = new();
 
@@ -207,41 +201,25 @@ public class DataLoader : MonoBehaviour
         skinManager = Majdata<SkinManager>.Instance!;
         noteManager = Majdata<NoteManager>.Instance!;
     }
-
-    private void Update()
+    
+    public void Load(SimaiChart chart, double ignoreOffset, string title, string artist, int diff)
     {
-        switch(State)
-        {
-            case NoteLoaderStatus.LoadingJson:
-                if (jsonLoaderTask is null || !jsonLoaderTask.IsCompleted)
-                    return;
-                loadedData = jsonLoaderTask.Result;
-                diffText.text = loadedData.difficulty;
-                levelText.text = loadedData.level;
-                titleText.text = loadedData.title;
-                artistText.text = loadedData.artist;
-                designText.text = loadedData.designer;
-                cardImage.color = diffColors[loadedData.diffNum];
+        titleText.text = title;
+        artistText.text = artist;
+        diffText.text = GetDifficultyText(diff);
+        cardImage.color = diffColors[diff];
+        
+        levelText.text = chart.Level;
+        designText.text = chart.Designer;
 
-                CountNoteSum(loadedData);
-                var lastNoteTime = loadedData.timingList.Count > 0 ? loadedData.timingList.Last().Timing : 0d;
+        foreach (var timingList in chart.NoteTimings)
+            CountNoteSum(timingList.Notes);
+        var lastNoteTime = chart.NoteTimings.Length > 0 ? chart.NoteTimings[^1].Timing : 0d;
 
-                noteParserTask = StartCoroutine(LoadNotes(loadedData.timingList, ignoreOffset, lastNoteTime));
-
-                State = NoteLoaderStatus.ParsingNote;
-                break;
-            case NoteLoaderStatus.ParsingNote:
-                if (noteParserTask == null)
-                {
-                    State = NoteLoaderStatus.Finished;
-                    //noteManager.Refresh();
-                    return;
-                }
-                break;
-        }
-
+        LoadNotes(chart.NoteTimings, ignoreOffset, lastNoteTime);
     }
-    IEnumerator LoadNotes(IEnumerable<SimaiTimingPoint> timingList, float ignoreOffset, double lastNoteTime)
+    
+    public void LoadNotes(ReadOnlySpan<SimaiTimingPoint> timingList, double ignoreOffset, double lastNoteTime)
     {
         noteManager.Refresh();
         noteIndex.Clear();
@@ -250,21 +228,14 @@ public class DataLoader : MonoBehaviour
             noteIndex.Add(i, 0);
         for (int i = 0; i < 33; i++)
             touchIndex.Add((SensorArea)i, 0);
-
-        Stopwatch sw = new();
-        sw.Start();
+        
         foreach (var timing in timingList)
         {
-            if (sw.ElapsedMilliseconds >= 2)
-            {
-                yield return 0;
-                sw.Restart();
-            }
             try
             {
                 if (timing.Timing < ignoreOffset)
                 {
-                    CountNoteCount(timing.Notes.ToList());
+                    CountNoteCount(timing.Notes);
                     continue;
                 }
                 List<TouchDrop> members = new();
@@ -459,102 +430,46 @@ public class DataLoader : MonoBehaviour
                 UnityEngine.Debug.LogError(e);
             }
         }
-        noteParserTask = null;
-        yield break;
     }
 
-    // 专门为了处理神秘ReadOnlySpan入参。。。虽然在Play+Neo没毛，但向下就有点搞
-    public class MajsonConverter : JsonConverter<SimaiTimingPoint>
+    private void CountNoteSum(IEnumerable<SimaiNote> notes)
     {
-        public override SimaiTimingPoint ReadJson(JsonReader reader, Type objectType, SimaiTimingPoint existingValue, bool hasExistingValue, JsonSerializer serializer)
-        {
-            double timing = 0; float bpm = 0, hspeed = 1f;
-            int textPosX = 0, textPosY = 0, rawPos = 0;
-            SimaiNote[] notes = null;
-            string rawString = null;
-
-            // 手动流式读取，不生成 JObject
-            while (reader.Read())
+        foreach (var note in notes)
+            if (!note.IsBreak)
             {
-                if (reader.TokenType == JsonToken.EndObject) break;
-                if (reader.TokenType != JsonToken.PropertyName) continue;
-
-                string propName = reader.Value.ToString();
-                reader.Read();
-
-                switch (propName)
+                if (note.Type == SimaiNoteType.Tap) objectCounter.tapSum++;
+                if (note.Type == SimaiNoteType.Hold) objectCounter.holdSum++;
+                if (note.Type == SimaiNoteType.TouchHold) objectCounter.holdSum++;
+                if (note.Type == SimaiNoteType.Touch) objectCounter.touchSum++;
+                if (note.Type == SimaiNoteType.Slide)
                 {
-                    case "Timing": timing = Convert.ToDouble(reader.Value); break;
-                    case "Bpm": bpm = Convert.ToSingle(reader.Value); break;
-                    case "HSpeed": hspeed = Convert.ToSingle(reader.Value); break;
-                    case "RawTextPositionX": textPosX = Convert.ToInt32(reader.Value); break;
-                    case "RawTextPositionY": textPosY = Convert.ToInt32(reader.Value); break;
-                    case "RawTextPosition": rawPos = Convert.ToInt32(reader.Value); break;
-                    case "Notes": notes = serializer.Deserialize<SimaiNote[]>(reader); break;
-                    case "RawContent":
-                        rawString = (string)reader.Value;
-                        break;
+                    if (!note.IsSlideNoHead) objectCounter.tapSum++;
+                    if (note.IsSlideBreak)
+                        objectCounter.breakSum++;
+                    else
+                        objectCounter.slideSum++;
                 }
             }
-
-            return new SimaiTimingPoint(
-                timing, notes, rawString.AsSpan(),
-                textPosX, textPosY, bpm, hspeed, rawPos
-            );
-        }
-
-        public override void WriteJson(JsonWriter writer, SimaiTimingPoint value, JsonSerializer serializer) => throw new NotImplementedException();
-    }
-
-    public void LoadJson(string json, float ignoreOffset)
-    {
-        var settings = new JsonSerializerSettings();
-        settings.Converters.Add(new MajsonConverter());
-        jsonLoaderTask = Task.Run(() => JsonConvert.DeserializeObject<Majson>(json, settings));
-        State = NoteLoaderStatus.LoadingJson;
-        this.ignoreOffset = ignoreOffset;
-    }
-
-
-    private void CountNoteSum(Majson json)
-    {
-        foreach (var timing in json.timingList)
-            foreach (var note in timing.Notes)
-                if (!note.IsBreak)
+            else
+            {
+                if (note.Type == SimaiNoteType.Slide)
                 {
-                    if (note.Type == SimaiNoteType.Tap) objectCounter.tapSum++;
-                    if (note.Type == SimaiNoteType.Hold) objectCounter.holdSum++;
-                    if (note.Type == SimaiNoteType.TouchHold) objectCounter.holdSum++;
-                    if (note.Type == SimaiNoteType.Touch) objectCounter.touchSum++;
-                    if (note.Type == SimaiNoteType.Slide)
-                    {
-                        if (!note.IsSlideNoHead) objectCounter.tapSum++;
-                        if (note.IsSlideBreak)
-                            objectCounter.breakSum++;
-                        else
-                            objectCounter.slideSum++;
-                    }
+                    if (!note.IsSlideNoHead) objectCounter.breakSum++;
+                    if (note.IsSlideBreak)
+                        objectCounter.breakSum++;
+                    else
+                        objectCounter.slideSum++;
                 }
                 else
                 {
-                    if (note.Type == SimaiNoteType.Slide)
-                    {
-                        if (!note.IsSlideNoHead) objectCounter.breakSum++;
-                        if (note.IsSlideBreak)
-                            objectCounter.breakSum++;
-                        else
-                            objectCounter.slideSum++;
-                    }
-                    else
-                    {
-                        objectCounter.breakSum++;
-                    }
+                    objectCounter.breakSum++;
                 }
+            }
     }
 
-    private void CountNoteCount(List<SimaiNote> timing)
+    private void CountNoteCount(IEnumerable<SimaiNote> notes)
     {
-        foreach (var note in timing)
+        foreach (var note in notes)
             if (!note.IsBreak)
             {
                 if (note.Type == SimaiNoteType.Tap) objectCounter.tapCount++;
@@ -730,7 +645,7 @@ public class DataLoader : MonoBehaviour
                     IsGroupPartEnd = isGroupEnd,
                     Parent = parent
                 };
-                parent = InstantiateStar(timing, subSlide[i], info);
+                parent = InstantiateSlide(timing, subSlide[i], info);
                 subSlides.Add(parent.GetComponent<SlideDrop>());
             }
         }
@@ -759,7 +674,107 @@ public class DataLoader : MonoBehaviour
         });
     }
 
-    private GameObject InstantiateWifi(SimaiTimingPoint timing, SimaiNote note)
+    private GameObject InstantiateSlide(SimaiTimingPoint timing, SimaiNote note, ConnSlideInfo info)
+         {
+             var GOnote = Instantiate(starPrefab, notes.transform);
+             var NDCompo = GOnote.GetComponent<StarDrop>();
+             if(!note.IsSlideNoHead)
+                 noteManager.AddNote(GOnote, noteIndex[note.StartPosition]++);
+             // note的图层顺序
+             NDCompo.noteSortOrder = noteSortOrder;
+             noteSortOrder -= NOTE_LAYER_COUNT[note.Type];
+     
+             NDCompo.rotateSpeed = (float)note.SlideTime;
+             NDCompo.isEx = note.IsEx;
+             NDCompo.isBreak = note.IsBreak;
+             NDCompo.isMine = note.IsMine;
+             NDCompo.tapLine = tapLine;
+     
+             string slideShape = detectShapeFromText(note.RawContent);
+             var isMirror = false;
+             if (slideShape.StartsWith("-"))
+             {
+                 isMirror = true;
+                 slideShape = slideShape.Substring(1);
+             }
+             int slideIndex = SLIDE_PREFAB_MAP[slideShape];
+     
+             var slide = Instantiate(slidePrefab[slideIndex], notes.transform);
+             var slide_star = Instantiate(star_slidePrefab, notes.transform);
+             slide_star.GetComponent<SpriteRenderer>().sprite = skinManager.Star;
+             slide_star.SetActive(false);
+             slide.SetActive(false);
+             NDCompo.slide = slide;
+             var SliCompo = slide.AddComponent<SlideDrop>();
+     
+             SliCompo.slideType = slideShape;
+             SliCompo.areaStep = new List<int>(SLIDE_AREA_STEP_MAP[slideShape]);
+             SliCompo.smoothSlideAnime = smoothSlideAnime;
+     
+             if (timing.Notes.Length > 1)
+             {
+                 var notes = timing.Notes.ToList();
+                 NDCompo.isEach = true;
+                 if (notes.FindAll(o => o.Type == SimaiNoteType.Slide).Count > 1)
+                 {
+                     SliCompo.isEach = true;
+                     slide_star.GetComponent<SpriteRenderer>().sprite = skinManager.Star_Each;
+                 }
+     
+                 var count = notes.FindAll(
+                     o => o.Type == SimaiNoteType.Slide &&
+                          o.StartPosition == note.StartPosition).Count;
+                 if (count > 1)
+                 {
+                     NDCompo.isDouble = true;
+                     if (count == notes.Count)
+                         NDCompo.isEach = false;
+                     else
+                         NDCompo.isEach = true;
+                 }
+             }
+     
+             SliCompo.ConnectInfo = info;
+             SliCompo.isBreak = note.IsSlideBreak;
+             SliCompo.isMine = note.IsMineSlide;
+             if (note.IsSlideBreak) slide_star.GetComponent<SpriteRenderer>().sprite = skinManager.Star_Break;
+     
+             NDCompo.isNoHead = note.IsSlideNoHead;
+             NDCompo.time = (float)timing.Timing;
+             NDCompo.startPosition = note.StartPosition;
+             NDCompo.speed = noteSpeed * timing.HSpeed;
+     
+     
+             SliCompo.isMirror = isMirror;
+             SliCompo.isJustR = detectJustType(note.RawContent, out int endPos);
+             SliCompo.endPosition = endPos;
+             if (slideIndex - 26 > 0 && slideIndex - 26 <= 8)
+             {
+                 // known slide sprite issue
+                 //    1 2 3 4 5 6 7 8
+                 // p  X X X X X X O O
+                 // q  X O O X X X X X
+                 var pqEndPos = slideIndex - 26;
+                 SliCompo.isSpecialFlip = isMirror == (pqEndPos == 7 || pqEndPos == 8);
+             }
+             else
+             {
+                 SliCompo.isSpecialFlip = isMirror;
+             }
+             SliCompo.speed = noteSpeed * timing.HSpeed;
+             SliCompo.timeStart = (float)timing.Timing;
+             SliCompo.startPosition = note.StartPosition;
+             SliCompo.star_slide = slide_star;
+             SliCompo.time = (float)note.SlideStartTime;
+             SliCompo.LastFor = (float)note.SlideTime;
+             //SliCompo.sortIndex = -7000 + (int)((lastNoteTime - timing.time) * -100) + sort * 5;
+             SliCompo.sortIndex = slideLayer;
+             slideLayer -= SLIDE_AREA_STEP_MAP[slideShape].Last();
+             //slideLayer += 5;
+             return slide;
+         }
+    
+    private void InstantiateWifi(SimaiTimingPoint timing, SimaiNote note)
     {
         var str = note.RawContent.Substring(0, 3);
         var digits = str.Split('w');
@@ -834,110 +849,11 @@ public class DataLoader : MonoBehaviour
         WifiCompo.LastFor = (float)note.SlideTime;
         WifiCompo.sortIndex = slideLayer;
         slideLayer -= SLIDE_AREA_STEP_MAP["wifi"].Last();
-
-        return slideWifi;
     }
-
-    private GameObject InstantiateStar(SimaiTimingPoint timing, SimaiNote note, ConnSlideInfo info)
-    {
-        var GOnote = Instantiate(starPrefab, notes.transform);
-        var NDCompo = GOnote.GetComponent<StarDrop>();
-        if(!note.IsSlideNoHead)
-            noteManager.AddNote(GOnote, noteIndex[note.StartPosition]++);
-        // note的图层顺序
-        NDCompo.noteSortOrder = noteSortOrder;
-        noteSortOrder -= NOTE_LAYER_COUNT[note.Type];
-
-        NDCompo.rotateSpeed = (float)note.SlideTime;
-        NDCompo.isEx = note.IsEx;
-        NDCompo.isBreak = note.IsBreak;
-        NDCompo.isMine = note.IsMine;
-        NDCompo.tapLine = tapLine;
-
-        string slideShape = detectShapeFromText(note.RawContent);
-        var isMirror = false;
-        if (slideShape.StartsWith("-"))
-        {
-            isMirror = true;
-            slideShape = slideShape.Substring(1);
-        }
-        int slideIndex = SLIDE_PREFAB_MAP[slideShape];
-
-        var slide = Instantiate(slidePrefab[slideIndex], notes.transform);
-        var slide_star = Instantiate(star_slidePrefab, notes.transform);
-        slide_star.GetComponent<SpriteRenderer>().sprite = skinManager.Star;
-        slide_star.SetActive(false);
-        slide.SetActive(false);
-        NDCompo.slide = slide;
-        var SliCompo = slide.AddComponent<SlideDrop>();
-
-        SliCompo.slideType = slideShape;
-        SliCompo.areaStep = new List<int>(SLIDE_AREA_STEP_MAP[slideShape]);
-        SliCompo.smoothSlideAnime = smoothSlideAnime;
-
-        if (timing.Notes.Length > 1)
-        {
-            var notes = timing.Notes.ToList();
-            NDCompo.isEach = true;
-            if (notes.FindAll(o => o.Type == SimaiNoteType.Slide).Count > 1)
-            {
-                SliCompo.isEach = true;
-                slide_star.GetComponent<SpriteRenderer>().sprite = skinManager.Star_Each;
-            }
-
-            var count = notes.FindAll(
-                o => o.Type == SimaiNoteType.Slide &&
-                     o.StartPosition == note.StartPosition).Count;
-            if (count > 1)
-            {
-                NDCompo.isDouble = true;
-                if (count == notes.Count)
-                    NDCompo.isEach = false;
-                else
-                    NDCompo.isEach = true;
-            }
-        }
-
-        SliCompo.ConnectInfo = info;
-        SliCompo.isBreak = note.IsSlideBreak;
-        SliCompo.isMine = note.IsMineSlide;
-        if (note.IsSlideBreak) slide_star.GetComponent<SpriteRenderer>().sprite = skinManager.Star_Break;
-
-        NDCompo.isNoHead = note.IsSlideNoHead;
-        NDCompo.time = (float)timing.Timing;
-        NDCompo.startPosition = note.StartPosition;
-        NDCompo.speed = noteSpeed * timing.HSpeed;
-
-
-        SliCompo.isMirror = isMirror;
-        SliCompo.isJustR = detectJustType(note.RawContent, out int endPos);
-        SliCompo.endPosition = endPos;
-        if (slideIndex - 26 > 0 && slideIndex - 26 <= 8)
-        {
-            // known slide sprite issue
-            //    1 2 3 4 5 6 7 8
-            // p  X X X X X X O O
-            // q  X O O X X X X X
-            var pqEndPos = slideIndex - 26;
-            SliCompo.isSpecialFlip = isMirror == (pqEndPos == 7 || pqEndPos == 8);
-        }
-        else
-        {
-            SliCompo.isSpecialFlip = isMirror;
-        }
-        SliCompo.speed = noteSpeed * timing.HSpeed;
-        SliCompo.timeStart = (float)timing.Timing;
-        SliCompo.startPosition = note.StartPosition;
-        SliCompo.star_slide = slide_star;
-        SliCompo.time = (float)note.SlideStartTime;
-        SliCompo.LastFor = (float)note.SlideTime;
-        //SliCompo.sortIndex = -7000 + (int)((lastNoteTime - timing.time) * -100) + sort * 5;
-        SliCompo.sortIndex = slideLayer;
-        slideLayer -= SLIDE_AREA_STEP_MAP[slideShape].Last();
-        //slideLayer += 5;
-        return slide;
-    }
-
+    
+    
+    //helper
+    
     private bool detectJustType(string content, out int endPos)
     {
         // > < ^ V w
@@ -1251,5 +1167,17 @@ public class DataLoader : MonoBehaviour
         if (key == 7) return 3;
         if (key == 8) return 2;
         throw new Exception("Keys out of range: " + key);
+    }
+    
+    public static string GetDifficultyText(int index)
+    {
+        if (index == 0) return "EASY";
+        if (index == 1) return "BASIC";
+        if (index == 2) return "ADVANCED";
+        if (index == 3) return "EXPERT";
+        if (index == 4) return "MASTER";
+        if (index == 5) return "Re:MASTER";
+        if (index == 6) return "ORIGINAL";
+        return "DEFAULT";
     }
 }

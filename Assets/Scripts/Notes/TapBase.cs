@@ -227,8 +227,7 @@ public class TapBase : NoteBase
 
     protected virtual void OnDestroy()
     {
-        if (HttpHandler.IsReloding)
-            return;
+        if (PlayManager.IsReloading) return;
         var effectManager = Majdata<EffectManager>.Instance!;
         effectManager.PlayEffect(startPosition, isBreak, judgeResult);
         effectManager.PlayFastLate(startPosition, judgeResult);

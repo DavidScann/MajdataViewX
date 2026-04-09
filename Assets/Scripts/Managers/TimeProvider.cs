@@ -10,7 +10,6 @@ public class TimeProvider : MonoBehaviour
     private float speed;
 
     private float startTime;
-    private long ticks;
 
     public float CurrentSpeed => isRecord ? Time.timeScale : speed;
 
@@ -33,23 +32,21 @@ public class TimeProvider : MonoBehaviour
     {
         return AudioTime * 1000 / 16.6667f;
     }
-    public void SetStartTime(long _ticks, float _offset, float _speed, bool _isRecord = false)
+    
+    public void SetStartTime(double _seconds, double _startTime, float _speed, bool _isRecord = false, int fps = 60)
     {
-        ticks = _ticks;
-        offset = _offset;
         AudioTime = offset;
-        var dateTime = new DateTime(ticks);
-        var seconds = (dateTime - DateTime.Now).TotalSeconds;
+        offset = (float)_startTime;
         isRecord = _isRecord;
         if (_isRecord)
         {
             startTime = Time.time + 5;
             Time.timeScale = _speed;
-            Time.captureFramerate = 60;
+            Time.captureFramerate = fps;
         }
         else
         {
-            startTime = Time.realtimeSinceStartup + (float)seconds;
+            startTime = Time.realtimeSinceStartup + (float)_seconds;
             speed = _speed;
             Time.captureFramerate = 0;
         }

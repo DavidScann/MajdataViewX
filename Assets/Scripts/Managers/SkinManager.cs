@@ -109,7 +109,7 @@ public class SkinManager : MonoBehaviour
     {
         Majdata<SkinManager>.Instance = this;
         
-        var path = new DirectoryInfo(Application.dataPath).Parent!.FullName + "/Skin";
+        var path = Path.Combine(new DirectoryInfo(Application.dataPath).Parent!.FullName, "Skin");
         Outline = gameObject.GetComponent<SpriteRenderer>();
 
         Outline.sprite = SpriteLoader.Load(path + "/outline.png");

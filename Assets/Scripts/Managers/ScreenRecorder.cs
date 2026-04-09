@@ -29,7 +29,7 @@ public class ScreenRecorder : MonoBehaviour
     {
         if(isRecording)
         {
-            if (loader.State is not (NoteLoaderStatus.Idle or NoteLoaderStatus.Finished))
+            if (PlayManager.Summary.State is not ViewStatus.Playing)
                 return;
             if(counter.AllFinished && APObj == null)
                 isRecording = false;

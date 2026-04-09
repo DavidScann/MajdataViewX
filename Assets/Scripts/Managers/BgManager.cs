@@ -44,7 +44,6 @@ public class BgManager : MonoBehaviour
 
         if (Time.captureFramerate != 0)
         {
-            //print("speed="+realSpeed+" delta="+delta);
             videoPlayer.playbackSpeed = realSpeed - delta;
             return;
         }
@@ -67,67 +66,36 @@ public class BgManager : MonoBehaviour
         videoPlayer.Pause();
     }
 
-    public void ContinueVideo(float speed)
+    public void ContinueVideo()
     {
-        videoPlayer.playbackSpeed = speed;
-        playSpeed = speed;
         videoPlayer.Play();
     }
 
-
-    public void LoadBGFromPath(string path, float speed)
+    public void SetSpeed(float speed)
     {
-        var pictureName = new[] { "Cover", "bg" };
-        var pictureExt = new[] { ".png", ".jpg", ".jpeg" };
-
-        var videoName = new[] { "pv.mp4", "mv.mp4", "bg.mp4" };
-
-        foreach (var name in pictureName)
-        {
-            var finished = false;
-            foreach (var ext in pictureExt)
-                if (File.Exists(path + "/" + name + ext))
-                {
-                    StartCoroutine(loadPic(path + "/" + name + ext));
-                    finished = true;
-                    break;
-                }
-
-            if (finished) break;
-        }
-
-        foreach (var name in videoName)
-        {
-            if (!File.Exists(path + "/" + name)) continue;
-            
-            loadVideo(path + "/" + name, speed);
-            break;
-        }
+        videoPlayer.playbackSpeed = speed;
+        playSpeed = speed;
     }
-
-    private IEnumerator loadPic(string path)
+    
+    public void LoadBG(string path)
     {
-        Sprite sprite;
-        yield return sprite = SpriteLoader.Load(path);
+        var sprite = SpriteLoader.Load(path);
         rawImage.texture = sprite.texture;
         spriteRender.sprite = sprite;
         var scale = 1140f / sprite.texture.width;
         gameObject.transform.localScale = new Vector3(scale, scale, scale);
     }
 
-    private void loadVideo(string path, float speed)
+    public void LoadVideo(string path)
     {
         videoPlayer.url = "file://" + path;
         videoPlayer.audioOutputMode = VideoAudioOutputMode.None;
-        videoPlayer.playbackSpeed = speed;
-        playSpeed = speed;
         StartCoroutine(waitFumenStart());
     }
 
     private IEnumerator waitFumenStart()
     {
         videoPlayer.Prepare();
-        //videoPlayer.timeReference = VideoTimeReference.ExternalTime;
         while (provider.AudioTime <= 0) yield return new WaitForEndOfFrame();
         while (!videoPlayer.isPrepared) yield return new WaitForEndOfFrame();
         videoPlayer.Play();
