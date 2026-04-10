@@ -343,14 +343,14 @@ public class HoldDrop : NoteLongBase
         if (PlayManager.IsReloading) return;
         var realityHT = LastFor - 0.3f - (judgeDiff / 1000f);
         var percent = Math.Clamp((realityHT - playerIdleTime) / realityHT, 0, 1);
-        JudgeType result = judgeResult; //头判
+        var result = judgeResult; //头判
         if(realityHT > 0)
         {
             if (percent >= 1f)
             {
                 if(judgeResult == JudgeType.Miss)
                     result = JudgeType.LateGood;
-                else if (MathF.Abs((int)judgeResult - 7) == 6)
+                else if (Math.Abs((int)judgeResult - 7) == 6)
                     result = (int)judgeResult < 7 ? JudgeType.LateGreat : JudgeType.FastGreat;
                 else
                     result = judgeResult;
@@ -359,14 +359,14 @@ public class HoldDrop : NoteLongBase
             {
                 if (judgeResult == JudgeType.Miss)
                     result = JudgeType.LateGood;
-                else if (MathF.Abs((int)judgeResult - 7) == 6)
+                else if (Math.Abs((int)judgeResult - 7) == 6)
                     result = (int)judgeResult < 7 ? JudgeType.LateGreat : JudgeType.FastGreat;
                 else if (judgeResult == JudgeType.Perfect)
                     result = (int)judgeResult < 7 ? JudgeType.LatePerfect1 : JudgeType.FastPerfect1;
             }
             else if (percent >= 0.33f)
             {
-                if (MathF.Abs((int)judgeResult - 7) >= 6)
+                if (Math.Abs((int)judgeResult - 7) >= 6)
                     result = (int)judgeResult < 7 ? JudgeType.LateGood : JudgeType.FastGood;
                 else
                     result = (int)judgeResult < 7 ? JudgeType.LateGreat : JudgeType.FastGreat;
