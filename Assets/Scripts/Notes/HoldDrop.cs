@@ -3,6 +3,8 @@ using UnityEngine;
 #nullable enable
 public class HoldDrop : NoteLongBase
 {
+    private EffectManager effectManager;
+    
     public GameObject tapLine;
     
     private Animator animator;
@@ -23,6 +25,7 @@ public class HoldDrop : NoteLongBase
         noteManager = Majdata<NoteManager>.Instance!;
         skinManager = Majdata<SkinManager>.Instance!;
         inputManager = Majdata<InputManager>.Instance!;
+        effectManager = Majdata<EffectManager>.Instance!;
         
         holdEffect = Instantiate(holdEffect, notes);
         holdEffect.SetActive(false);
@@ -216,7 +219,7 @@ public class HoldDrop : NoteLongBase
         if (isJudged)
             return;
 
-        var timing = timeProvider.AudioTime - time;
+        var timing = timeProvider.NoteTime - time;
         var isFast = timing < 0;
         var diff = MathF.Abs(timing * 1000);
         JudgeType result;
@@ -403,7 +406,6 @@ public class HoldDrop : NoteLongBase
                 result = JudgeType.Perfect;
         }
 
-        var effectManager = GameObject.Find("NoteEffects").GetComponent<EffectManager>();
         effectManager.PlayEffect(startPosition, isBreak, result);
         effectManager.PlayFastLate(startPosition, result);
         print($"Hold: {MathF.Round(percent * 100,2)}%\nTotal Len : {MathF.Round(realityHT * 1000,2)}ms");

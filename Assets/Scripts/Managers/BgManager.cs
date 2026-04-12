@@ -1,15 +1,20 @@
 ﻿using System;
 using System.Collections;
 using System.IO;
+using JetBrains.Annotations;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.Video;
+#nullable enable
 
 public class BgManager : MonoBehaviour
 {
     private TimeProvider provider;
+
+    [SerializeField] 
+    private Sprite defaultBg;
     
-    private RawImage rawImage;
+    private RawImage jacketImage;
     private GameObject songDetail;
     private SpriteRenderer spriteRender;
     private VideoPlayer videoPlayer;
@@ -17,6 +22,8 @@ public class BgManager : MonoBehaviour
     private float smoothRDelta;
     private float playSpeed;
     private float originalScaleX;
+
+    private Sprite? Bg;
 
     private void Awake()
     {
@@ -30,16 +37,16 @@ public class BgManager : MonoBehaviour
         originalScaleX = gameObject.transform.localScale.x;
         spriteRender = GetComponent<SpriteRenderer>();
         videoPlayer = GetComponent<VideoPlayer>();
-        rawImage = GameObject.Find("Jacket").GetComponent<RawImage>();
+        jacketImage = GameObject.Find("Jacket").GetComponent<RawImage>();
         songDetail = GameObject.Find("CanvasSongDetail");
         songDetail.SetActive(false);
     }
 
     private void Update()
     {
-        var delta = (float)videoPlayer.clockTime - provider.AudioTime;
+        var delta = (float)videoPlayer.clockTime - provider.NoteTime;
         smoothRDelta += (Time.unscaledDeltaTime - smoothRDelta) * 0.01f;
-        if (provider.AudioTime < 0) return;
+        if (provider.NoteTime < 0) return;
         var realSpeed = Time.deltaTime / smoothRDelta;
 
         if (Time.captureFramerate != 0)
@@ -79,10 +86,16 @@ public class BgManager : MonoBehaviour
     
     public void LoadBG(string path)
     {
-        var sprite = SpriteLoader.Load(path);
-        rawImage.texture = sprite.texture;
-        spriteRender.sprite = sprite;
-        var scale = 1140f / sprite.texture.width;
+        Bg = SpriteLoader.Load(path);
+        jacketImage.texture = Bg.texture;
+    }
+
+    public void ShowBG()
+    {
+        if (Bg == null) return;
+        
+        spriteRender.sprite = Bg;
+        var scale = 1140f / Bg.texture.width;
         gameObject.transform.localScale = new Vector3(scale, scale, scale);
     }
 
@@ -90,16 +103,20 @@ public class BgManager : MonoBehaviour
     {
         videoPlayer.url = "file://" + path;
         videoPlayer.audioOutputMode = VideoAudioOutputMode.None;
+    }
+
+    public void ShowVideo()
+    {
         StartCoroutine(waitFumenStart());
     }
 
     private IEnumerator waitFumenStart()
     {
         videoPlayer.Prepare();
-        while (provider.AudioTime <= 0) yield return new WaitForEndOfFrame();
+        while (provider.NoteTime <= 0) yield return new WaitForEndOfFrame();
         while (!videoPlayer.isPrepared) yield return new WaitForEndOfFrame();
         videoPlayer.Play();
-        videoPlayer.time = provider.AudioTime;
+        videoPlayer.time = provider.NoteTime;
 
         var scale = videoPlayer.height / (float)videoPlayer.width;
         spriteRender.sprite =

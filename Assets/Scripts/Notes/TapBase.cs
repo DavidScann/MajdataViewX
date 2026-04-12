@@ -193,7 +193,7 @@ public class TapBase : NoteBase
             return;
         }
 
-        var timing = timeProvider.AudioTime - time;
+        var timing = timeProvider.NoteTime - time;
         var isFast = timing < 0;
         var diff = MathF.Abs(timing * 1000);
         JudgeType result;

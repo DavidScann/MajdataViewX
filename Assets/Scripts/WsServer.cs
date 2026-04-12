@@ -113,7 +113,7 @@ public class MajdataWsService : WebSocketBehavior, IDisposable
                 {
                     var payload = JsonConvert.DeserializeObject<MajWsRequestSetting>(payloadJson);
                     playManager.SyncSetting(payload.ViewSetting);
-                    Response(MajWsResponseType.LoadOk, PlayManager.Summary);
+                    Response(MajWsResponseType.Ok, PlayManager.Summary);
                 }
                     break;
                 case MajWsRequestType.Load:

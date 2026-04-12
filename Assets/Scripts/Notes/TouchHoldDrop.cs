@@ -133,7 +133,7 @@ public class TouchHoldDrop : NoteLongBase
         if (isJudged)
             return;
 
-        var timing = timeProvider.AudioTime - time;
+        var timing = timeProvider.NoteTime - time;
         var isFast = timing < 0;
         var diff = MathF.Abs(timing * 1000);
         JudgeType result;

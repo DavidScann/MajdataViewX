@@ -129,7 +129,7 @@ public class ScreenRecorder : MonoBehaviour
             }
         }
 
-        timeProvider.isStart = false;
+        timeProvider.Pause();
         bgManager.PauseVideo();
     }
 }

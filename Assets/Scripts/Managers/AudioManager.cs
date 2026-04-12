@@ -2,16 +2,23 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using JetBrains.Annotations;
 using MajSimai;
 using ManagedBass;
 using UnityEngine;
 
-public class NoteAudioManager : MonoBehaviour
+public class AudioManager : MonoBehaviour
 {
-    static List<AnswerTimingPoint> answerTimingPoints = new();
+    private TimeProvider timeProvider;
+    
+    [CanBeNull] static AudioSample trackSample = null;
+    
+    List<AnswerTimingPoint> answerTimingPoints = new();
     static bool[] noteSFXPlaybackRequests = new bool[14];
-    static List<AudioSample> NoteSFXs = new(14);
+    List<AudioSample> NoteSFXs = new(14);
+    
     const float ANSWER_PLAYBACK_OFFSET_SEC = -(16.66666f * 1) / 1000;
+    
     const int TAP_PERFECT = 0;
     const int TAP_GREAT = 1;
     const int TAP_GOOD = 2;
@@ -31,7 +38,7 @@ public class NoteAudioManager : MonoBehaviour
 
     private void Awake()
     {
-        Majdata<NoteAudioManager>.Instance = this;
+        Majdata<AudioManager>.Instance = this;
         Bass.Init();
         
         //Note SFX
@@ -70,18 +77,29 @@ public class NoteAudioManager : MonoBehaviour
         }
     }
 
+    private void Start()
+    {
+        timeProvider = Majdata<TimeProvider>.Instance!;
+    }
+
     private void Update()
     {
         //Answer SFX
-        foreach (var timing in answerTimingPoints)
+        for (var i = 0; i < answerTimingPoints.Count; i++)
         {
-            var thisFrameSec = Majdata<TimeProvider>.Instance!.AudioTime;
+            var timing = answerTimingPoints[i];
+            
+            if (timing.IsPlayed) continue;
+            
+            var thisFrameSec = Majdata<TimeProvider>.Instance!.NoteTime;
 
             var delta = thisFrameSec - (timing.Timing + ANSWER_PLAYBACK_OFFSET_SEC);
             if (delta > 0)
             {
                 if (timing.IsClock) noteSFXPlaybackRequests[ANSWER_CLOCK] = true;
                 else noteSFXPlaybackRequests[ANSWER] = true;
+
+                timing.IsPlayed = true;
             }
         }
         
@@ -163,6 +181,28 @@ public class NoteAudioManager : MonoBehaviour
         Bass.Free();
     }
 
+    public void LoadTrack(string path)
+    {
+        trackSample?.Dispose();
+        trackSample = new AudioSample(path)
+        {
+            SampleType = SampleType.Track
+        };
+    }
+    
+    public void PlayTrack()
+    {
+        if (trackSample == null) return;
+        trackSample.CurrentSec = timeProvider.AudioTime;
+        trackSample.Speed = timeProvider.CurrentSpeed;
+        trackSample.Play();
+    }
+    
+    public void PauseTrack() => trackSample?.Pause();
+    
+    public void StopTrack() => trackSample?.Stop();
+    
+
     public void GenerateAnswerSFX(SimaiChart chart, int clockCount = 0)
     {
         //Generate ClockSounds
@@ -181,18 +221,36 @@ public class NoteAudioManager : MonoBehaviour
         }
 
         //Generate AnswerSounds
+        var rawTimings = new List<float>();
+
         foreach (var timingPoint in chart.NoteTimings)
         {
-            var timing = (float)timingPoint.Timing;
-            answerTimingPoints.Add(new AnswerTimingPoint(timing, false));
+            var startTiming = (float)timingPoint.Timing;
+            rawTimings.Add(startTiming);
+            
             var holds = Array.FindAll(timingPoint.Notes,
                 o => o.Type is SimaiNoteType.Hold or SimaiNoteType.TouchHold);
+
             foreach (var hold in holds)
             {
-                var newTime = (float)(timingPoint.Timing + hold.HoldTime);
-                if (!chart.NoteTimings.Any(o => Math.Abs(o.Timing - newTime) < 0.001) &&
-                    !answerTimingPoints.Any(o => Math.Abs(o.Timing - newTime) < 0.001))
-                    answerTimingPoints.Add(new AnswerTimingPoint(newTime, false));
+                var endTiming = (float)(timingPoint.Timing + hold.HoldTime);
+                rawTimings.Add(endTiming);
+            }
+        }
+        
+        rawTimings.Sort();
+
+        answerTimingPoints.Clear();
+        float lastAddedTime = -1f;
+        float epsilon = 0.001f; // 1ms 阈值
+
+        foreach (var t in rawTimings)
+        {
+            // 如果是第一个元素，或者当前时间与上一个添加的时间点差距超过阈值
+            if (lastAddedTime < 0 || t - lastAddedTime > epsilon)
+            {
+                answerTimingPoints.Add(new AnswerTimingPoint(t, false));
+                lastAddedTime = t;
             }
         }
     }
@@ -202,17 +260,17 @@ public class NoteAudioManager : MonoBehaviour
         
     }
 
-    private struct AnswerTimingPoint
+    private class AnswerTimingPoint
     {
         public readonly float Timing;
         public readonly bool IsClock;
-       // public bool IsPlayed;
+        public bool IsPlayed;
 
         public AnswerTimingPoint(float timing, bool isClock)
         {
             Timing = timing;
             IsClock = isClock;
-            //IsPlayed = false;
+            IsPlayed = false;
         }
     }
 }

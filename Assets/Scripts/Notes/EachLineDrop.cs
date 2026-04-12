@@ -31,7 +31,7 @@ public class EachLineDrop : MonoBehaviour
     // Update is called once per frame
     private void Update()
     {
-        var timing = timeProvider.AudioTime - time;
+        var timing = timeProvider.NoteTime - time;
         var distance = timing * speed + 4.8f;
         var destScale = distance * 0.4f + 0.51f;
         if (timing > 0) Destroy(gameObject);

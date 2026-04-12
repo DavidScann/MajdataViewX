@@ -26,11 +26,9 @@ public class PlayManager : MonoBehaviour
     private static ViewStatus _state = ViewStatus.Idle;
     private static string _errMsg = string.Empty;
     private static float _thisFrameSec = 0f;
-
-    private static AudioSample? _audioSample = null;
-
-    private static double? _startAt;
-    private static double? _startTime;
+    
+    private static double? _trackTime;
+    private static double? _offset;
     private static float? _speed;
  
     private static MajViewSetting _setting = new();
@@ -39,9 +37,9 @@ public class PlayManager : MonoBehaviour
     private TimeProvider timeProvider;
     private BgManager bgManager;
     private ScreenRecorder screenRecorder;
-    private MultTouchHandler multTouchHandler;
     private ObjectCounter objectCounter;
     private EffectManager effectManager;
+    private AudioManager audioManager;
 
     private SpriteRenderer bgCover;
     
@@ -56,11 +54,14 @@ public class PlayManager : MonoBehaviour
         timeProvider = Majdata<TimeProvider>.Instance!;
         bgManager = Majdata<BgManager>.Instance!;
         screenRecorder = Majdata<ScreenRecorder>.Instance!;
-        multTouchHandler = Majdata<MultTouchHandler>.Instance!;
         objectCounter = Majdata<ObjectCounter>.Instance!;
         effectManager = Majdata<EffectManager>.Instance!;
+        audioManager = Majdata<AudioManager>.Instance!;
         
         bgCover = GameObject.Find("BackgroundCover").GetComponent<SpriteRenderer>();
+        
+        IsReloading = false;
+        _state = ViewStatus.Idle;
     }
 
     public void SyncSetting(MajViewSetting setting)
@@ -76,11 +77,7 @@ public class PlayManager : MonoBehaviour
         try
         {
             //audio
-            if(_audioSample is not null) _audioSample.Dispose();
-            _audioSample = new AudioSample(audioPath)
-            {
-                SampleType = SampleType.Track
-            };
+            audioManager.LoadTrack(audioPath);
             
             //bg
             await UniTask.SwitchToMainThread();
@@ -105,7 +102,7 @@ public class PlayManager : MonoBehaviour
         }
     }
     
-    public async UniTask<bool> PlayAsync(PlaybackMode mode, double startAt, double startTime, float speed, 
+    public async UniTask<bool> PlayAsync(PlaybackMode mode, double startAt, double offset, float speed, 
         string fumen, string title, string artist, int diff, string? maidataPath)
     {
         while (_state is ViewStatus.Busy)
@@ -119,17 +116,21 @@ public class PlayManager : MonoBehaviour
             await UniTask.SwitchToMainThread();
             
             _chart = await SimaiParser.ParseChartAsync(string.Empty, string.Empty, fumen);
-            loader.Load(_chart, startTime, title, artist, diff);
             
-            _audioSample!.Speed = speed;
             bgManager.SetSpeed(speed);
+            
             loader.noteSpeed = (float)(107.25 / (71.4184491 * Mathf.Pow(_setting.TapSpeed + 0.9975f, -0.985558604f)));
             loader.touchSpeed = _setting.TouchSpeed;
-            
             loader.smoothSlideAnime = _setting.SmoothSlideAnime;
+            loader.Load(_chart, offset, title, artist, diff);
+            
             objectCounter.ComboSetActive(_setting.ComboStatusType);
             effectManager.SetDisplayMode(_setting.JudgeDisplayMode);
             bgCover.color = new Color(0f, 0f, 0f, _setting.BackgroundDim);
+            bgManager.ShowBG();
+            bgManager.ShowVideo();
+            
+            audioManager.GenerateAnswerSFX(_chart);
             
             Majdata<PlayAllPerfect>.Instance!.enabled = false;
             Majdata<MultTouchHandler>.Instance!.clearSlots();
@@ -150,14 +151,14 @@ public class PlayManager : MonoBehaviour
                     isRecord = true;
                     break;
             }
-
-            _startAt = startAt;
-            _startTime = startTime;
+            
             _speed = speed;
             
             _state = ViewStatus.Playing;
-            _audioSample!.Play();
-            timeProvider.SetStartTime(startAt, startTime, speed, isRecord);
+            
+            timeProvider.SetStartTime(startAt, offset, speed, isRecord);
+            
+            audioManager.PlayTrack();
             
             return true;
         }
@@ -171,11 +172,10 @@ public class PlayManager : MonoBehaviour
 
     public async UniTask ResumeAsync()
     {
-        if (_startAt is not null && _startTime is not null && _speed is not null)
-            await ResumeAsync(_startAt.Value, _startTime.Value, _speed.Value);
+        await ResumeAsync(_speed.Value);
     }
     
-    public async UniTask ResumeAsync(double startAt, double startTime, float speed)
+    public async UniTask ResumeAsync(float speed)
     {
         while (_state is ViewStatus.Busy)
             await UniTask.Yield();
@@ -185,11 +185,11 @@ public class PlayManager : MonoBehaviour
         {
             await UniTask.SwitchToMainThread();
             
-            _audioSample!.Play();
-            
             bgManager.SetSpeed(speed);
             bgManager.ContinueVideo();
-            timeProvider.SetStartTime(startAt, startTime, speed);
+            timeProvider.Resume(speed);
+            
+            audioManager.PlayTrack();
             
             _state = ViewStatus.Playing;
         }
@@ -211,10 +211,10 @@ public class PlayManager : MonoBehaviour
         {
             await UniTask.SwitchToMainThread();
             
-            _audioSample!.Pause();
+            audioManager.PauseTrack();
             
             bgManager.PauseVideo();
-            timeProvider.isStart = false;
+            timeProvider.Pause();
             
             _state = ViewStatus.Paused;
         }
@@ -236,13 +236,11 @@ public class PlayManager : MonoBehaviour
         {
             await UniTask.SwitchToMainThread();
             
-            _audioSample!.Stop();
+            audioManager.StopTrack();
             
             screenRecorder.StopRecording();
-            timeProvider.ResetStartTime();
-            IsReloading = false;
-            _state = ViewStatus.Idle;
-            SceneManager.LoadScene(1); //TODO: dont use reloading scene
+            IsReloading = true;
+            SceneManager.LoadScene(1);
         }
         catch (Exception ex)
         {
