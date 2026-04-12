@@ -3,14 +3,18 @@ using UnityEngine;
 
 public class TimeProvider : MonoBehaviour
 {
-    public float AudioTime; //notes get this value
-    public bool isStart;
+    public bool isStart { get; private set; }
     public bool isRecord;
-    public float offset;
-    private float speed;
-
-    private float startTime;
-
+    
+    public float AudioTime { get; private set; }
+    //notes get this value
+    public float NoteTime { get; private set; }
+    private float offset;
+    //for pause and resume
+    private float lastPauseAt; //the beginning of the program is 0
+    private float startTime; //the beginning of the program is 0
+    public float speed;
+    
     public float CurrentSpeed => isRecord ? Time.timeScale : speed;
 
     private void Awake()
@@ -21,22 +25,27 @@ public class TimeProvider : MonoBehaviour
     private void Update()
     {
         if (!isStart) return;
-        
+
         if (isRecord)
-            AudioTime = Time.time - startTime + offset;
+        {
+            AudioTime = Time.time - startTime;
+            NoteTime = AudioTime - offset;
+        }
         else
-            AudioTime = (Time.realtimeSinceStartup - startTime) * speed + offset;
+        {
+            AudioTime = (Time.realtimeSinceStartup - startTime) * speed;
+            NoteTime = AudioTime - offset;
+        }
     }
 
     public float GetFrame()
     {
-        return AudioTime * 1000 / 16.6667f;
+        return NoteTime * 1000 / 16.6667f;
     }
     
-    public void SetStartTime(double _seconds, double _startTime, float _speed, bool _isRecord = false, int fps = 60)
+    public void SetStartTime(double _startAt, double _offset, float _speed, bool _isRecord = false, int fps = 60)
     {
-        AudioTime = offset;
-        offset = (float)_startTime;
+        offset = (float)_offset;
         isRecord = _isRecord;
         if (_isRecord)
         {
@@ -46,17 +55,28 @@ public class TimeProvider : MonoBehaviour
         }
         else
         {
-            startTime = Time.realtimeSinceStartup + (float)_seconds;
+            startTime = Time.realtimeSinceStartup - (float)_startAt;
             speed = _speed;
             Time.captureFramerate = 0;
+            
+            //calculate immediately
+            AudioTime = (Time.realtimeSinceStartup - startTime) * speed;
         }
 
         isStart = true;
     }
 
-    public void ResetStartTime()
+    public void Pause()
     {
-        offset = 0f;
         isStart = false;
+        lastPauseAt = Time.realtimeSinceStartup;
+    }
+
+    public void Resume(float? _speed)
+    {
+        if (_speed != null) speed = _speed.Value;
+        if (isStart) return;
+        startTime += Time.realtimeSinceStartup - lastPauseAt;
+        isStart = true;
     }
 }

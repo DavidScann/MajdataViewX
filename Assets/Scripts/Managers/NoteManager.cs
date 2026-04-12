@@ -16,11 +16,6 @@ public class NoteManager : MonoBehaviour
         Majdata<NoteManager>.Instance = this;
     }
     
-    void Start()
-    {
-        Application.targetFrameRate = 30;
-    }
-    
     public void AddNote(GameObject obj,int index) => noteOrder.Add(obj, index);
     public void AddTouch(GameObject obj,int index) => touchOrder.Add(obj, index);
     public void Refresh()

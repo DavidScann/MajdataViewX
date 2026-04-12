@@ -206,7 +206,7 @@ public class TouchDrop : NoteBase
         if (isJudged)
             return;
 
-        var timing = timeProvider.AudioTime - time;
+        var timing = timeProvider.NoteTime - time;
         var isFast = timing < 0;
         var diff = MathF.Abs(timing * 1000);
         JudgeType result;
@@ -229,7 +229,7 @@ public class TouchDrop : NoteBase
     // Update is called once per frame
     private void Update()
     {
-        var timing = timeProvider.AudioTime - time;
+        var timing = timeProvider.NoteTime - time;
 
         //var timing = time;
         //var pow = Mathf.Pow(-timing * speed, 0.1f)-0.4f;

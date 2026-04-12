@@ -31,7 +31,7 @@ public class NoteBase : MonoBehaviour
     protected bool isJudged = false;
     private JudgeType _judgeResult;
     
-    protected float GetJudgeTiming() => timeProvider.AudioTime - time;
+    protected float GetJudgeTiming() => timeProvider.NoteTime - time;
     protected Vector3 getPositionFromDistance(float distance) => getPositionFromDistance(distance, startPosition);
     protected Vector3 getPositionFromDistance(float distance, int position)
     {
