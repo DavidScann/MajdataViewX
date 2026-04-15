@@ -94,3 +94,13 @@ public enum JudgeDisplayMode
     Both
 }
 
+public enum SampleType
+{
+    Answer,
+    Track,
+    Tap,
+    Slide,
+    Break,
+    Touch
+}
+

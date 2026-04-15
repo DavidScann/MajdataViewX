@@ -193,7 +193,7 @@ public class TapBase : NoteBase
             return;
         }
 
-        var timing = timeProvider.AudioTime - time;
+        var timing = timeProvider.NoteTime - time;
         var isFast = timing < 0;
         var diff = MathF.Abs(timing * 1000);
         JudgeType result;
@@ -227,8 +227,7 @@ public class TapBase : NoteBase
 
     protected virtual void OnDestroy()
     {
-        if (HttpHandler.IsReloding)
-            return;
+        if (PlayManager.IsReloading) return;
         var effectManager = Majdata<EffectManager>.Instance!;
         effectManager.PlayEffect(startPosition, isBreak, judgeResult);
         effectManager.PlayFastLate(startPosition, judgeResult);
