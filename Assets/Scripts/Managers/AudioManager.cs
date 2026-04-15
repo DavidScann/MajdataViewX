@@ -84,6 +84,8 @@ public class AudioManager : MonoBehaviour
 
     private void Update()
     {
+        if (timeProvider.isRecord) return;
+        
         //Answer SFX
         for (var i = 0; i < answerTimingPoints.Count; i++)
         {

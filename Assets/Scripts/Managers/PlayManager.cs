@@ -111,8 +111,6 @@ public class PlayManager : MonoBehaviour
         _state = ViewStatus.Busy;
         try
         {
-            var isRecord = false;
-            
             await UniTask.SwitchToMainThread();
             
             _chart = await SimaiParser.ParseChartAsync(string.Empty, string.Empty, fumen);
@@ -137,8 +135,15 @@ public class PlayManager : MonoBehaviour
 
             switch (mode)
             {
+                case PlaybackMode.Normal:
+                    timeProvider.SetStartTime(startAt, offset, speed);
+                    audioManager.PlayTrack();
+                    break;
                 case PlaybackMode.IncludeOp:
                     bgManager.PlaySongDetail();
+                    
+                    timeProvider.SetStartTime(startAt, offset, speed);
+                    audioManager.PlayTrack();
                     break;
                 case PlaybackMode.Record:
                     bgManager.PlaySongDetail();
@@ -147,19 +152,14 @@ public class PlayManager : MonoBehaviour
                     {
                         throw new InvalidPathException($"maidata path is required");
                     }
-                    screenRecorder.StartRecording(maidataPath);
-                    isRecord = true;
+                    timeProvider.SetStartTime(startAt, offset, speed, true, _setting.OutputFps);
+                    screenRecorder.StartRecording(maidataPath, _setting.OutputFps);
                     break;
             }
             
             _speed = speed;
             
             _state = ViewStatus.Playing;
-            
-            timeProvider.SetStartTime(startAt, offset, speed, isRecord);
-            
-            audioManager.PlayTrack();
-            
             return true;
         }
         catch (Exception ex)
