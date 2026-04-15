@@ -3,10 +3,16 @@
 
 public class PlayAllPerfect : MonoBehaviour
 {
-    private GameObject Allperfect;
     private TimeProvider timeProvider;
-    DataLoader loader;
+    private DataLoader loader;
 
+    private GameObject Allperfect;
+    
+    private void Awake()
+    {
+        Majdata<PlayAllPerfect>.Instance = this;
+    }
+    
     private void Start()
     {
         loader = Majdata<DataLoader>.Instance!;
@@ -21,7 +27,7 @@ public class PlayAllPerfect : MonoBehaviour
     {
         if (loader == null)
             return;
-        if (loader.State is not (NoteLoaderStatus.Idle or NoteLoaderStatus.Finished))
+        if (PlayManager.Summary.State is not ViewStatus.Playing)
             return;
         
         if (timeProvider.isStart && transform.childCount == 0 && Allperfect) 

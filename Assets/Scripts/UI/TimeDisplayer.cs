@@ -17,7 +17,7 @@ public class TimeDisplayer : MonoBehaviour
     private void Update()
     {
         // Lock AudioTime variable for real
-        var ctime = timeProvider.AudioTime;
+        var ctime = timeProvider.NoteTime;
         var timenowInt = (int)ctime;
         var minute = timenowInt / 60;
         var second = timenowInt - 60 * minute;

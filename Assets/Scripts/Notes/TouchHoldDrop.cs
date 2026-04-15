@@ -1,6 +1,4 @@
-﻿using Assets.Scripts;
-using Assets.Scripts.Notes;
-using System;
+﻿using System;
 using UnityEngine;
 #nullable enable
 public class TouchHoldDrop : NoteLongBase
@@ -135,7 +133,7 @@ public class TouchHoldDrop : NoteLongBase
         if (isJudged)
             return;
 
-        var timing = timeProvider.AudioTime - time;
+        var timing = timeProvider.NoteTime - time;
         var isFast = timing < 0;
         var diff = MathF.Abs(timing * 1000);
         JudgeType result;
@@ -284,8 +282,7 @@ public class TouchHoldDrop : NoteLongBase
     }
     private void OnDestroy()
     {
-        if (HttpHandler.IsReloding)
-            return;
+        if (PlayManager.IsReloading) return;
         var realityHT = LastFor - 0.45f - (judgeDiff / 1000f);
         var percent = Math.Clamp((realityHT - playerIdleTime) / realityHT, 0, 1);
         JudgeType result = judgeResult;

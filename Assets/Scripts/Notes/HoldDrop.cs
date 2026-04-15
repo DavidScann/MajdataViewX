@@ -3,6 +3,8 @@ using UnityEngine;
 #nullable enable
 public class HoldDrop : NoteLongBase
 {
+    private EffectManager effectManager;
+    
     public GameObject tapLine;
     
     private Animator animator;
@@ -23,6 +25,7 @@ public class HoldDrop : NoteLongBase
         noteManager = Majdata<NoteManager>.Instance!;
         skinManager = Majdata<SkinManager>.Instance!;
         inputManager = Majdata<InputManager>.Instance!;
+        effectManager = Majdata<EffectManager>.Instance!;
         
         holdEffect = Instantiate(holdEffect, notes);
         holdEffect.SetActive(false);
@@ -30,10 +33,6 @@ public class HoldDrop : NoteLongBase
         tapLine = Instantiate(tapLine, notes);
         tapLine.SetActive(false);
         
-        //TODO: ADD empty Animator to prefab
-        //var anim = gameObject.AddComponent<Animator>();
-        //anim.enabled = false;
-        //animator = anim;
         animator = GetComponent<Animator>();
         animator.enabled = false;
         
@@ -216,7 +215,7 @@ public class HoldDrop : NoteLongBase
         if (isJudged)
             return;
 
-        var timing = timeProvider.AudioTime - time;
+        var timing = timeProvider.NoteTime - time;
         var isFast = timing < 0;
         var diff = MathF.Abs(timing * 1000);
         JudgeType result;
@@ -340,18 +339,17 @@ public class HoldDrop : NoteLongBase
     }
     private void OnDestroy()
     {
-        if (HttpHandler.IsReloding)
-            return;
+        if (PlayManager.IsReloading) return;
         var realityHT = LastFor - 0.3f - (judgeDiff / 1000f);
         var percent = Math.Clamp((realityHT - playerIdleTime) / realityHT, 0, 1);
-        JudgeType result = judgeResult; //头判
+        var result = judgeResult; //头判
         if(realityHT > 0)
         {
             if (percent >= 1f)
             {
                 if(judgeResult == JudgeType.Miss)
                     result = JudgeType.LateGood;
-                else if (MathF.Abs((int)judgeResult - 7) == 6)
+                else if (Math.Abs((int)judgeResult - 7) == 6)
                     result = (int)judgeResult < 7 ? JudgeType.LateGreat : JudgeType.FastGreat;
                 else
                     result = judgeResult;
@@ -360,14 +358,14 @@ public class HoldDrop : NoteLongBase
             {
                 if (judgeResult == JudgeType.Miss)
                     result = JudgeType.LateGood;
-                else if (MathF.Abs((int)judgeResult - 7) == 6)
+                else if (Math.Abs((int)judgeResult - 7) == 6)
                     result = (int)judgeResult < 7 ? JudgeType.LateGreat : JudgeType.FastGreat;
                 else if (judgeResult == JudgeType.Perfect)
                     result = (int)judgeResult < 7 ? JudgeType.LatePerfect1 : JudgeType.FastPerfect1;
             }
             else if (percent >= 0.33f)
             {
-                if (MathF.Abs((int)judgeResult - 7) >= 6)
+                if (Math.Abs((int)judgeResult - 7) >= 6)
                     result = (int)judgeResult < 7 ? JudgeType.LateGood : JudgeType.FastGood;
                 else
                     result = (int)judgeResult < 7 ? JudgeType.LateGreat : JudgeType.FastGreat;
@@ -404,7 +402,6 @@ public class HoldDrop : NoteLongBase
                 result = JudgeType.Perfect;
         }
 
-        var effectManager = GameObject.Find("NoteEffects").GetComponent<EffectManager>();
         effectManager.PlayEffect(startPosition, isBreak, result);
         effectManager.PlayFastLate(startPosition, result);
         print($"Hold: {MathF.Round(percent * 100,2)}%\nTotal Len : {MathF.Round(realityHT * 1000,2)}ms");
