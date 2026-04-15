@@ -33,10 +33,6 @@ public class HoldDrop : NoteLongBase
         tapLine = Instantiate(tapLine, notes);
         tapLine.SetActive(false);
         
-        //TODO: ADD empty Animator to prefab
-        //var anim = gameObject.AddComponent<Animator>();
-        //anim.enabled = false;
-        //animator = anim;
         animator = GetComponent<Animator>();
         animator.enabled = false;
         

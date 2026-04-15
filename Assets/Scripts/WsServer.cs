@@ -128,7 +128,8 @@ public class MajdataWsService : WebSocketBehavior, IDisposable
                     var payload = JsonConvert.DeserializeObject<MajWsRequestPlay>(payloadJson);
                     await playManager.PlayAsync(payload.Mode, payload.StartAt, payload.Offset, payload.Speed, 
                         payload.SimaiFumen, payload.Title, payload.Artist, payload.Difficulty, payload.MaidataPath);
-                    Response(MajWsResponseType.PlayStarted, PlayManager.Summary);
+                    if (payload.Mode != PlaybackMode.Record)
+                        Response(MajWsResponseType.PlayStarted, PlayManager.Summary);
                 }
                     break;
                 case MajWsRequestType.Resume:
