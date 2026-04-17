@@ -9,8 +9,12 @@ using UnityEngine.UI;
 public class ScreenRecorder : MonoBehaviour
 {
     public GameObject APObj;
-    DataLoader loader;
     ObjectCounter counter;
+    TimeProvider timeProvider;
+    BgManager bgManager;
+    AudioManager audioManager;
+
+    Text errText;
 
     private bool isRecording;
 
@@ -21,8 +25,11 @@ public class ScreenRecorder : MonoBehaviour
 
     private void Start()
     {
-        loader = Majdata<DataLoader>.Instance!;
         counter = Majdata<ObjectCounter>.Instance!;
+        timeProvider = Majdata<TimeProvider>.Instance!;
+        bgManager = Majdata<BgManager>.Instance!;
+        audioManager = Majdata<AudioManager>.Instance!;
+        errText = GameObject.Find("ErrText").GetComponent<Text>();
     }
     
     private void Update()
@@ -47,12 +54,9 @@ public class ScreenRecorder : MonoBehaviour
         isRecording = false;
     }
 
-    private IEnumerator CaptureScreen(string maidata_path, int fps)
+    private IEnumerator CaptureScreen(string maidataPath, int fps)
     {
-        var timeProvider = Majdata<TimeProvider>.Instance!;
-        var bgManager = Majdata<BgManager>.Instance!;
-        var errText = GameObject.Find("ErrText").GetComponent<Text>();
-        
+        //check
         if (Screen.width % 2 != 0 || Screen.height % 2 != 0)
         {
             errText.text =
@@ -61,89 +65,105 @@ public class ScreenRecorder : MonoBehaviour
             yield break;
         }
 
-        if (File.Exists(maidata_path + "\\out.mp4"))
-            File.Delete(maidata_path + "\\out.mp4");
+        if (File.Exists(maidataPath + "\\out.mp4"))
+            File.Delete(maidataPath + "\\out.mp4");
         
-        if (!File.Exists(maidata_path + "\\out.wav"))
+
+        //prepare
+        var ffmpegPath = Application.streamingAssetsPath + "\\ffmpeg.exe";
+        var wavName = "temp.wav";
+        var mp4Name = "temp.mp4";
+        var finalName = "out.mp4";
+        
+        var outArgs = 
+             "-hide_banner -y " +
+            $"-f rawvideo -pix_fmt rgba -s {Screen.width}x{Screen.height} -r {fps} " +
+            @"-i \\.\pipe\majdataRec " +
+             "-vf vflip " +
+             "-c:v libx264 -preset fast -crf 18 -pix_fmt yuv420p " +
+             $"\"{mp4Name}\"";
+        
+        var muxArgs = 
+             "-hide_banner -y " +
+            $"-i \"{mp4Name}\" -i \"{wavName}\" " +
+             "-c:v copy " +
+             "-c:a aac " +
+             "-b:a 320k " +
+             "-shortest " +
+            $"\"{finalName}\"";
+        
+        var startInfo = new ProcessStartInfo(ffmpegPath)
         {
-            errText.text =
-                "无法开始编码，因为没有out.wav文件。\nCan not start render because out.wav not found.\n当前分辨率:" +
-                Screen.width + "x" + Screen.height + "\n";
-            yield break;
-        } //TODO: Render Sound Effect
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            WorkingDirectory = maidataPath
+        };
+        startInfo.EnvironmentVariables.Add("FFREPORT", "file=out.log:level=24");
+
         
-        byte[] data;
-        var texture = new Texture2D(0, 0);
+        //start
+        audioManager.PrepareRecordingBuffer();
+        isRecording = true;
+        
         using (var pipeServer = new NamedPipeServerStream("majdataRec", PipeDirection.Out))
         {
-            var wavpath = "out.wav";
-            var outputfile = "out.mp4";
-            
-            var arguments =
-                $"-hide_banner -y " +
-                $"-thread_queue_size 512 " +
-                $"-f rawvideo -pix_fmt rgba -s {Screen.width}x{Screen.height} -framerate {fps} " +
-                $"-i \\\\.\\pipe\\majdataRec " +
-                $"-thread_queue_size 512 " +
-                $"-i {wavpath} " +
-                $"-vf vflip " +
-                $"-c:v libx264 -preset fast -pix_fmt yuv420p " +
-                $"-c:a aac -b:a 320k " +
-                $"-shortest " +
-                outputfile;
-            var startInfo = new ProcessStartInfo(Application.streamingAssetsPath + "\\ffmpeg.exe", arguments)
-            {
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                WorkingDirectory = maidata_path
-            };
-            startInfo.EnvironmentVariables.Add("FFREPORT", "file=out.log:level=24");
-            print(arguments);
-            
-            var p = Process.Start(startInfo);
+            //out
+            startInfo.Arguments = outArgs;
+            var outProcess = Process.Start(startInfo);
             pipeServer.WaitForConnection();
-            isRecording = true;
             using (var bw = new BinaryWriter(pipeServer))
             {
                 do
                 {
                     yield return new WaitForEndOfFrame();
-                    try
+                    
+                    //audio update
+                    audioManager.UpdateAnswerSfx();
+                    for (var i = 0; i < AudioManager.noteSfxPlaybackRequests.Length - 1; i++) //ignore track_start
                     {
-                        texture.Reinitialize(0, 0);
-                        texture = ScreenCapture.CaptureScreenshotAsTexture();
-
-                        data = texture.GetRawTextureData();
-
-                        bw.Write(data, 0, data.Length);
-                        bw.Flush();
+                        if (AudioManager.noteSfxPlaybackRequests[i])
+                        {
+                            audioManager.MixSfxToBuffer(i);
+                            AudioManager.noteSfxPlaybackRequests[i] = false;
+                        }
                     }
-                    catch (Exception e)
-                    {
-                        errText.text += e.Message;
-                    }
+                    
+                    //video update
+                    var frameTex = ScreenCapture.CaptureScreenshotAsTexture();
+                    var rawData = frameTex.GetRawTextureData();
+                    bw.Write(rawData);
+                    Destroy(frameTex);
                 } while (
                     pipeServer.IsConnected &&
                     isRecording &&
-                    !p!.HasExited
+                    !outProcess!.HasExited
                 );
             }
+            outProcess!.WaitForExit();
 
-            p.WaitForExit();
+            //audio
+            audioManager.ExportFinalWav(Path.Combine(maidataPath, wavName));
+            
+            //mux
+            startInfo.Arguments = muxArgs;
+            var muxProcess = Process.Start(startInfo);
+            muxProcess!.WaitForExit();
 
-            if (File.Exists(maidata_path + "/out.mp4") && p.ExitCode == 0)
+            //show
+            var outPath = Path.Combine(maidataPath, finalName);
+            if (File.Exists(outPath) && outProcess.ExitCode == 0)
             {
-                errText.text += "渲染成功，视频生成在" + maidata_path 
-                                + "\\out.mp4\nRender Successed\nExitCode:" + p.ExitCode;
-                Process.Start("explorer", "/select,\"" + maidata_path + "\\out.mp4" + "\"");
+                errText.text += "渲染成功，视频生成在" + outPath +
+                                "Render Successes \n" +
+                                $"ExitCode: {outProcess.ExitCode} | {muxProcess.ExitCode}";
+                Process.Start("explorer", "/select,\"" + outPath + "\"");
             }
             else
             {
-                errText.text +=
-                    "编码器已退出\nFFmpeg Exited.\nExitCode:" + p.ExitCode;
+                errText.text += $"编码器已退出\nFFmpeg Exited.\nExitCode: {outProcess.ExitCode} | {muxProcess.ExitCode}";
             }
         }
-
+        
         timeProvider.Pause();
         bgManager.PauseVideo();
     }

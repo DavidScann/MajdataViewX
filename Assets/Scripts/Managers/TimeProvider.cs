@@ -6,16 +6,22 @@ public class TimeProvider : MonoBehaviour
     public bool isStart { get; private set; }
     public bool isRecord;
     
+    //only audioSample get this value
     public float AudioTime { get; private set; }
     //notes get this value
     public float NoteTime { get; private set; }
+    
+    private float startRealtime; //the beginning of the program is 0
+    private float startAt; //the beginning of the audio is 0
     private float offset;
     //for pause and resume
-    private float lastPauseAt; //the beginning of the program is 0
-    private float startTime; //the beginning of the program is 0
+    private float accumulated;
+    
     public float speed;
     
     public float CurrentSpeed => isRecord ? Time.timeScale : speed;
+    
+    public const float SONG_DETAIL_OFFSET = 5f;
 
     private void Awake()
     {
@@ -26,16 +32,10 @@ public class TimeProvider : MonoBehaviour
     {
         if (!isStart) return;
 
-        if (isRecord)
-        {
-            AudioTime = Time.time - startTime;
-            NoteTime = AudioTime - offset;
-        }
-        else
-        {
-            AudioTime = (Time.realtimeSinceStartup - startTime) * speed;
-            NoteTime = AudioTime - offset;
-        }
+        var now = isRecord ? Time.time : Time.realtimeSinceStartup;
+
+        AudioTime = startAt + accumulated + (now - startRealtime) * speed;
+        NoteTime = AudioTime + offset;
     }
 
     public float GetFrame()
@@ -43,40 +43,61 @@ public class TimeProvider : MonoBehaviour
         return NoteTime * 1000 / 16.6667f;
     }
     
-    public void SetStartTime(double _startAt, double _offset, float _speed, bool _isRecord = false, int fps = 60)
+    public void SetStartTime(double _startAt, double _offset, float _speed, PlaybackMode mode, int fps = 60)
     {
+        startAt = (float)_startAt;
         offset = (float)_offset;
-        isRecord = _isRecord;
-        if (_isRecord)
+
+        switch (mode)
         {
-            startTime = Time.time + 5;
-            Time.timeScale = _speed;
-            Time.captureFramerate = fps;
-        }
-        else
-        {
-            startTime = Time.realtimeSinceStartup - (float)_startAt;
-            speed = _speed;
-            Time.captureFramerate = 0;
-            
-            //calculate immediately
-            AudioTime = (Time.realtimeSinceStartup - startTime) * speed;
+            case PlaybackMode.Normal:
+            {
+                startRealtime = Time.realtimeSinceStartup;
+                speed = _speed;
+                Time.captureFramerate = 0;
+            }
+                break;
+            case PlaybackMode.IncludeOp:
+            {
+                startRealtime = Time.realtimeSinceStartup;
+                startAt += SONG_DETAIL_OFFSET;
+                speed = _speed;
+                Time.captureFramerate = 0;
+            }
+                break;
+            case PlaybackMode.Record:
+            {
+                isRecord = true;
+                startRealtime = Time.time;
+                startAt += SONG_DETAIL_OFFSET;
+                Time.timeScale = _speed;
+                Time.captureFramerate = fps;
+            }
+                break;
         }
 
         isStart = true;
+        //calculate immediately
+        Update();
     }
 
     public void Pause()
     {
+        if (!isStart) return;
+
+        var now = isRecord ? Time.time : Time.realtimeSinceStartup;
+        accumulated += (now - startRealtime) * speed;
+
         isStart = false;
-        lastPauseAt = Time.realtimeSinceStartup;
     }
 
     public void Resume(float? _speed)
     {
         if (_speed != null) speed = _speed.Value;
         if (isStart) return;
-        startTime += Time.realtimeSinceStartup - lastPauseAt;
+
+        startRealtime = isRecord ? Time.time : Time.realtimeSinceStartup;
+
         isStart = true;
     }
 }

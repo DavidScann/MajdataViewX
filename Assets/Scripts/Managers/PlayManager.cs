@@ -102,8 +102,10 @@ public class PlayManager : MonoBehaviour
         }
     }
     
-    public async UniTask<bool> PlayAsync(PlaybackMode mode, double startAt, double offset, float speed, 
-        string fumen, string title, string artist, int diff, string? maidataPath)
+    public async UniTask<bool> PlayAsync(PlaybackMode mode, double startAt, float speed, 
+        string title, string artist, float offset, 
+        string designer, string level, string fumen, 
+        SimaiCommand[] commands, int difficulty, string? maidataPath = null)
     {
         while (_state is ViewStatus.Busy)
             await UniTask.Yield();
@@ -112,47 +114,53 @@ public class PlayManager : MonoBehaviour
         try
         {
             await UniTask.SwitchToMainThread();
-            
-            _chart = await SimaiParser.ParseChartAsync(string.Empty, string.Empty, fumen);
+
+            _chart = await SimaiParser.ParseChartAsync(level, designer, fumen);
             
             bgManager.SetSpeed(speed);
             
             loader.noteSpeed = (float)(107.25 / (71.4184491 * Mathf.Pow(_setting.TapSpeed + 0.9975f, -0.985558604f)));
             loader.touchSpeed = _setting.TouchSpeed;
             loader.smoothSlideAnime = _setting.SmoothSlideAnime;
-            loader.Load(_chart, offset, title, artist, diff);
+            loader.Load(_chart, offset, title, artist, difficulty);
             
             objectCounter.ComboSetActive(_setting.ComboStatusType);
             effectManager.SetDisplayMode(_setting.JudgeDisplayMode);
             bgCover.color = new Color(0f, 0f, 0f, _setting.BackgroundDim);
             bgManager.ShowBG();
             bgManager.ShowVideo();
+
+            var clockCount = 0;
+            var clockCommand = Array.Find(commands, c => c.Prefix == "clock_count");
+            if (clockCommand != default) int.TryParse(clockCommand.Value, out clockCount);
+            audioManager.GenerateAnswerSFX(_chart, clockCount);
             
-            audioManager.GenerateAnswerSFX(_chart);
-            
-            Majdata<PlayAllPerfect>.Instance!.enabled = false;
+            Majdata<AllPerfectManager>.Instance!.enabled = false;
             Majdata<MultTouchHandler>.Instance!.clearSlots();
 
             switch (mode)
             {
                 case PlaybackMode.Normal:
-                    timeProvider.SetStartTime(startAt, offset, speed);
+                    timeProvider.SetStartTime(startAt, offset, speed, mode);
                     audioManager.PlayTrack();
                     break;
                 case PlaybackMode.IncludeOp:
                     bgManager.PlaySongDetail();
+                    AudioManager.noteSfxPlaybackRequests[14] = true; //track_start
                     
-                    timeProvider.SetStartTime(startAt, offset, speed);
+                    timeProvider.SetStartTime(startAt, offset, speed, mode);
                     audioManager.PlayTrack();
                     break;
                 case PlaybackMode.Record:
                     bgManager.PlaySongDetail();
+                    AudioManager.noteSfxPlaybackRequests[14] = true; //track_start
+                    
                     GameObject.Find("CanvasButtons").SetActive(false);
                     if (!Directory.Exists(maidataPath))
                     {
                         throw new InvalidPathException($"maidata path is required");
                     }
-                    timeProvider.SetStartTime(startAt, offset, speed, true, _setting.OutputFps);
+                    timeProvider.SetStartTime(startAt, offset, speed, mode, _setting.OutputFps);
                     screenRecorder.StartRecording(maidataPath, _setting.OutputFps);
                     break;
             }
