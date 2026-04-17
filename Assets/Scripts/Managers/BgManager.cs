@@ -44,9 +44,9 @@ public class BgManager : MonoBehaviour
 
     private void Update()
     {
-        var delta = (float)videoPlayer.clockTime - provider.NoteTime;
+        var delta = (float)videoPlayer.clockTime - provider.AudioTime;
         smoothRDelta += (Time.unscaledDeltaTime - smoothRDelta) * 0.01f;
-        if (provider.NoteTime < 0) return;
+        if (provider.AudioTime < 0) return;
         var realSpeed = Time.deltaTime / smoothRDelta;
 
         if (Time.captureFramerate != 0)
@@ -113,10 +113,10 @@ public class BgManager : MonoBehaviour
     private IEnumerator waitFumenStart()
     {
         videoPlayer.Prepare();
-        while (provider.NoteTime <= 0) yield return new WaitForEndOfFrame();
+        while (provider.AudioTime <= 0) yield return new WaitForEndOfFrame();
         while (!videoPlayer.isPrepared) yield return new WaitForEndOfFrame();
         videoPlayer.Play();
-        videoPlayer.time = provider.NoteTime;
+        videoPlayer.time = provider.AudioTime;
 
         var scale = videoPlayer.height / (float)videoPlayer.width;
         spriteRender.sprite =
