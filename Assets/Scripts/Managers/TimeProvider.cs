@@ -6,7 +6,7 @@ public class TimeProvider : MonoBehaviour
     public bool isStart { get; private set; }
     public bool isRecord;
     
-    //only audioSample get this value
+    //audio get this value
     public float AudioTime { get; private set; }
     //notes get this value
     public float NoteTime { get; private set; }
@@ -31,11 +31,17 @@ public class TimeProvider : MonoBehaviour
     private void Update()
     {
         if (!isStart) return;
-
-        var now = isRecord ? Time.time : Time.realtimeSinceStartup;
-
-        AudioTime = startAt + accumulated + (now - startRealtime) * speed;
-        NoteTime = AudioTime + offset;
+        
+        if (isRecord)
+        {
+            AudioTime = startAt + accumulated + (Time.time - startRealtime);
+            NoteTime = AudioTime - offset;
+        }
+        else
+        {
+            AudioTime = startAt + accumulated + (Time.unscaledTime - startRealtime) * speed;
+            NoteTime = AudioTime - offset;
+        }
     }
 
     public float GetFrame()
@@ -52,15 +58,15 @@ public class TimeProvider : MonoBehaviour
         {
             case PlaybackMode.Normal:
             {
-                startRealtime = Time.realtimeSinceStartup;
+                startRealtime = Time.unscaledTime;
                 speed = _speed;
                 Time.captureFramerate = 0;
             }
                 break;
             case PlaybackMode.IncludeOp:
             {
-                startRealtime = Time.realtimeSinceStartup;
-                startAt += SONG_DETAIL_OFFSET;
+                startRealtime = Time.unscaledTime;
+                startAt -= SONG_DETAIL_OFFSET;
                 speed = _speed;
                 Time.captureFramerate = 0;
             }
@@ -69,7 +75,7 @@ public class TimeProvider : MonoBehaviour
             {
                 isRecord = true;
                 startRealtime = Time.time;
-                startAt += SONG_DETAIL_OFFSET;
+                startAt -= SONG_DETAIL_OFFSET;
                 Time.timeScale = _speed;
                 Time.captureFramerate = fps;
             }
@@ -85,7 +91,7 @@ public class TimeProvider : MonoBehaviour
     {
         if (!isStart) return;
 
-        var now = isRecord ? Time.time : Time.realtimeSinceStartup;
+        var now = isRecord ? Time.time : Time.unscaledTime;
         accumulated += (now - startRealtime) * speed;
 
         isStart = false;
@@ -96,7 +102,7 @@ public class TimeProvider : MonoBehaviour
         if (_speed != null) speed = _speed.Value;
         if (isStart) return;
 
-        startRealtime = isRecord ? Time.time : Time.realtimeSinceStartup;
+        startRealtime = isRecord ? Time.time : Time.unscaledTime;
 
         isStart = true;
     }
