@@ -45,6 +45,7 @@ public class TouchHoldDrop : NoteLongBase
         timeProvider = Majdata<TimeProvider>.Instance!;
         inputManager = Majdata<InputManager>.Instance!;
         skinManager = Majdata<SkinManager>.Instance!;
+        audioManager = Majdata<AudioManager>.Instance!;
         
         holdEffect = Instantiate(holdEffect, notes);
         holdEffect.SetActive(false);
@@ -157,6 +158,7 @@ public class TouchHoldDrop : NoteLongBase
         judgeResult = result;
         isJudged = true;
         PlayHoldEffect();
+        audioManager.PlayTouchSound();
     }
     private void FixedUpdate()
     {
@@ -231,11 +233,13 @@ public class TouchHoldDrop : NoteLongBase
             if (on)
             {
                 PlayHoldEffect();
+                audioManager.PlayTouchHoldSound();
             }
             else
             {
                 playerIdleTime += Time.fixedDeltaTime;
                 StopHoldEffect();
+                audioManager.StopTouchHoldSound();
             }
         }
         else if (timing > 0.316667f)
@@ -354,6 +358,22 @@ public class TouchHoldDrop : NoteLongBase
             fireworkEffect.SetTrigger("Fire");
             firework.transform.position = transform.position;
         }
+        if (judgeResult != JudgeType.Miss)
+        {
+            if (isBreak)
+            {
+                audioManager.PlayTapSound(judgeResult, false, isBreak);
+            }
+            else if (isFirework)
+            {
+                audioManager.PlayHanabiSound();
+            }
+            else
+            {
+                audioManager.PlayTouchSound();
+            }
+        }
+        audioManager.StopTouchHoldSound();
         inputManager.UnbindSensor(Check, sensor);
         inputManager.SetSensorOff(sensor, guid);
         PlayJudgeEffect(result);

@@ -29,7 +29,7 @@ public class AudioManager : MonoBehaviour
     const int SAMPLERATE = 44100;
     const int CHANNELS = 2;
     
-    const float ANSWER_PLAYBACK_OFFSET_SEC = -(16.66666f * 1) / 1000;
+    const float ANSWER_PLAYBACK_OFFSET_SEC = (16.66666f * 1) / 1000; //TODO: is this correct?
     
     const int TAP_PERFECT = 0;
     const int TAP_GREAT = 1;
@@ -283,9 +283,106 @@ public class AudioManager : MonoBehaviour
         }
     }
 
-    public void PlayTapSound(JudgeType judgeType)
+    public void PlayTapSound(in JudgeType judgeType, bool isEx, bool isBreak)
     {
+        if (isBreak)
+        {
+            if (isEx)
+            {
+                noteSfxPlaybackRequests[TAP_EX] = true;
+            }
         
+            switch (judgeType)
+            {
+                case JudgeType.LateGood:
+                case JudgeType.FastGood:
+                case JudgeType.LateGreat:
+                case JudgeType.LateGreat1:
+                case JudgeType.LateGreat2:
+                case JudgeType.FastGreat2:
+                case JudgeType.FastGreat1:
+                case JudgeType.FastGreat:
+                case JudgeType.LatePerfect2:
+                case JudgeType.FastPerfect2:
+                case JudgeType.LatePerfect1:
+                case JudgeType.FastPerfect1:
+                    noteSfxPlaybackRequests[BREAK_JUDGE] = true;
+                    break;
+                case JudgeType.Perfect:
+                    noteSfxPlaybackRequests[BREAK_JUDGE] = true;
+                    noteSfxPlaybackRequests[BREAK_SFX] = true;
+                    break;
+                case JudgeType.Miss:
+                default:
+                    break;
+            }
+            return;
+        }
+        
+        if (isEx)
+        {
+            noteSfxPlaybackRequests[TAP_EX] = true;
+            return;
+        }
+
+        switch (judgeType)
+        {
+            case JudgeType.LateGood:
+            case JudgeType.FastGood:
+                noteSfxPlaybackRequests[TAP_GOOD] = true;
+                break;
+            case JudgeType.LateGreat:
+            case JudgeType.LateGreat1:
+            case JudgeType.LateGreat2:
+            case JudgeType.FastGreat2:
+            case JudgeType.FastGreat1:
+            case JudgeType.FastGreat:
+                noteSfxPlaybackRequests[TAP_GREAT] = true;
+                break;
+            case JudgeType.LatePerfect2:
+            case JudgeType.FastPerfect2:
+            case JudgeType.LatePerfect1:
+            case JudgeType.FastPerfect1:
+            case JudgeType.Perfect:
+                noteSfxPlaybackRequests[TAP_PERFECT] = true;
+                break;
+            case JudgeType.Miss:
+            default:
+                break;
+        }
+    }
+    
+    public void PlayTouchSound()
+    {
+        noteSfxPlaybackRequests[TOUCH] = true;
+    }
+    public void PlayHanabiSound()
+    {
+        noteSfxPlaybackRequests[FIREWORK] = true;
+    }
+    public void PlayTouchHoldSound()
+    {
+        noteSfxPlaybackRequests[TOUCHHOLD] = true;
+    }
+    public void StopTouchHoldSound()
+    {
+        noteSfxPlaybackRequests[TOUCHHOLD] = false;
+    }
+    public void PlaySlideSound(bool isBreak)
+    {
+        if (isBreak)
+        {
+            noteSfxPlaybackRequests[BREAK_SLIDE] = true;
+        }
+        else
+        {
+            noteSfxPlaybackRequests[SLIDE] = true;
+        }
+    }
+    public void PlayBreakSlideEndSound()
+    {
+        noteSfxPlaybackRequests[BREAK_SLIDE_JUDGE] = true;
+        noteSfxPlaybackRequests[BREAK_SFX] = true;
     }
     
     
@@ -299,6 +396,9 @@ public class AudioManager : MonoBehaviour
     
     public void MixSfxToBuffer(int index)
     {
+        //TODO: mysterious sharp audio...
+        //TODO: touchhold sound exception
+        //TODO: AllPerfect cant be shown
         if (index < 0 || index >= noteSfxSamplesData.Count) return;
         
         var sfx = noteSfxSamplesData[index];

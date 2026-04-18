@@ -53,6 +53,7 @@ public class TouchDrop : NoteBase
         objectCounter = Majdata<ObjectCounter>.Instance!;
         inputManager = Majdata<InputManager>.Instance!;
         skinManager = Majdata<SkinManager>.Instance!;
+        audioManager = Majdata<AudioManager>.Instance!;
         
         firework = GameObject.Find("FireworkEffect");
         fireworkEffect = firework.GetComponent<Animator>();
@@ -283,6 +284,21 @@ public class TouchDrop : NoteBase
         if (PlayManager.IsReloading) return;
         multTouchHandler.cancelTouch(this);
         PlayJudgeEffect();
+        if (judgeResult != JudgeType.Miss)
+        {
+            if (isBreak)
+            {
+                audioManager.PlayTapSound(judgeResult, false, isBreak);
+            }
+            else if (isFirework)
+            {
+                audioManager.PlayHanabiSound();
+            }
+            else
+            {
+                audioManager.PlayTouchSound();
+            }
+        }
         if (GroupInfo is not null && judgeResult != JudgeType.Miss)
             GroupInfo.JudgeResult = judgeResult;
         objectCounter.ReportResult(this, judgeResult, isBreak);

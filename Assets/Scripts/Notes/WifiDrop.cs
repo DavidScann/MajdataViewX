@@ -26,11 +26,10 @@ public class WifiDrop : NoteLongBase, ICanShine
     private float arriveTime = -1;
     private List<GameObject> sensors = new();
     private List<Sensor> boundSensors = new();
-    private List<List<SlideArea>> _judgeQueues = new(3);
     private List<List<SlideArea>> judgeQueues = new(3);
     private Dictionary<GameObject, List<Sensor>> triggerSensors = new();
     
-    private bool isFinished { get => _judgeQueues.All(x => x.Count == 0); }
+    private bool isFinished => judgeQueues.All(x => x.Count == 0);
     
     private Animator fadeInAnimator = null;
     private readonly GameObject[] star_slides = new GameObject[3];
@@ -46,6 +45,7 @@ public class WifiDrop : NoteLongBase, ICanShine
     bool canShine = false;
     bool isChecking = false;
     bool canCheck = false;
+    bool isSoundPlayed = false;
     Dictionary<GameObject, Guid> guids = new();
 
 
@@ -55,6 +55,7 @@ public class WifiDrop : NoteLongBase, ICanShine
         timeProvider = Majdata<TimeProvider>.Instance!;
         skinManager = Majdata<SkinManager>.Instance!;
         inputManager = Majdata<InputManager>.Instance!;
+        audioManager = Majdata<AudioManager>.Instance!;
         var notes = GameObject.Find("Notes").transform;
         
         // 计算Slide淡入时机
@@ -152,18 +153,17 @@ public class WifiDrop : NoteLongBase, ICanShine
             sr.sortingLayerName = "Slide";
         }
         
-        //judge queue
         foreach (var star in star_slides)
         {
             triggerSensors.Add(star, new());
             guids.Add(star, Guid.NewGuid());
         }
 
+        //judge queue
         var table = SlideTables.GetWifiTable(startPosition);
         judgeQueues.Add(table.Left.ToList());
         judgeQueues.Add(table.Center.ToList());
         judgeQueues.Add(table.Right.ToList());
-        _judgeQueues = new (judgeQueues);
         
         foreach (var area in judgeQueues.SelectMany(y => y.SelectMany(x => x.Areas)))
             boundSensors.Add(inputManager.GetSensor(area));
@@ -195,21 +195,10 @@ public class WifiDrop : NoteLongBase, ICanShine
     }
     int GetLastIndex()
     {
-        if(_judgeQueues.All(x => x.Count == 0))
+        if (judgeQueues.All(x => x.Count == 0))
             return areaStep.LastOrDefault();
-        else
-        {
-            IEnumerable<int>[] queues = new IEnumerable<int>[]
-            {
-                _judgeQueues[0].Select(x => x.ArrowProgressWhenFinished),
-                _judgeQueues[1].Select(x => x.ArrowProgressWhenFinished),
-                _judgeQueues[2].Select(x => x.ArrowProgressWhenFinished),
-            };
-            var _ = queues.SelectMany(x => x)
-                          .GroupBy(x => x)
-                          .Select(x => x.Key);
-            return areaStep[areaStep.FindIndex(x => x == _.Min())];
-        }
+        
+        return areaStep[4 - judgeQueues.Select(q => q.Count).Min()];
     }
     void TooLateJudge()
     {
@@ -220,7 +209,7 @@ public class WifiDrop : NoteLongBase, ICanShine
             DestroySelf();
             return;
         }
-        if (_judgeQueues.Count == 1)
+        if (judgeQueues.Count == 1)
             slideOK.GetComponent<LoadJustSprite>().setLateGd();
         else
             slideOK.GetComponent<LoadJustSprite>().setMiss();
@@ -237,9 +226,9 @@ public class WifiDrop : NoteLongBase, ICanShine
         isChecking = true;
         for (int i = 0; i < 3; i++)
         {
-            var queue = _judgeQueues[i];
+            var queue = judgeQueues[i];
             Check(ref queue);
-            _judgeQueues[i] = queue;
+            judgeQueues[i] = queue;
         }
         isChecking = false;
     }
@@ -258,6 +247,11 @@ public class WifiDrop : NoteLongBase, ICanShine
         {
             var sensor = inputManager.GetSensor(t);
             first.Judge(sensor.Status);
+        }
+        
+        if (first.On)
+        {
+            PlaySFX();
         }
 
         if (second is not null && (first.IsSkippable || first.On))
@@ -377,12 +371,12 @@ public class WifiDrop : NoteLongBase, ICanShine
             var starPos = star.transform.position;
             var oldList = new List<Sensor>(triggerSensors[star]);
             triggerSensors[star].Clear();
-            foreach (var s in sensors.Select(x => x.GetComponent<RectTransform>()))
+            foreach (var sensor in inputManager.sensors)
             {
-                var sensor = s.GetComponent<Sensor>();
-                if (sensor.Group == SensorGroup.E || sensor.Group == SensorGroup.D)
+                if (sensor.Group is SensorGroup.E or SensorGroup.D)
                     continue;
 
+                var s = (RectTransform)sensor.gameObject.transform;
                 var rCenter = s.position;
                 var rWidth = s.rect.width * s.lossyScale.x;
                 var rHeight = s.rect.height * s.lossyScale.y;
@@ -494,11 +488,13 @@ public class WifiDrop : NoteLongBase, ICanShine
                 judgeQueues = judgeQueues.Skip((int)(process * (judgeQueues.Count - 1))).ToList();
                 if (smoothSlideAnime) HideBar((int)pos + 1);
                 else HideBar(areaStep[(int)(process * (areaStep.Count - 1))]);
+                PlaySFX();
                 break;
             case AutoPlayMode.Random:
                 judgeQueues = judgeQueues.Skip((int)(process * (judgeQueues.Count - 1))).ToList();
                 var barIndex = areaStep[(int)(process * (areaStep.Count - 1))];
                 HideBar(barIndex);
+                PlaySFX();
                 break;
         }
     }
@@ -568,6 +564,11 @@ public class WifiDrop : NoteLongBase, ICanShine
                 SetJust();
                 break;
         }
+        if (isBreak && 
+            judgeResult == JudgeType.Perfect)
+        {
+            audioManager.PlayBreakSlideEndSound();
+        }
         objectCounter.ReportResult(this, judgeResult, isBreak);
         if (isBreak && judgeResult == JudgeType.Perfect)
             slideOK.GetComponent<Animator>().runtimeAnimatorController = judgeBreakShine;
@@ -602,5 +603,12 @@ public class WifiDrop : NoteLongBase, ICanShine
             oldColor.a = alpha;
             sr.color = oldColor;
         }
+    }
+    private void PlaySFX()
+    {
+        if (isSoundPlayed) return;
+        
+        isSoundPlayed = true;
+        audioManager.PlaySlideSound(isBreak);
     }
 }

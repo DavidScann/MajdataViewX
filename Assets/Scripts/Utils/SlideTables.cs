@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 
 #nullable enable
 
@@ -27,6 +28,28 @@ public class SlideArea
     public void SetIsLast() => IsLast = true;
     public void SetNonLast() => IsLast = false;
     
+    public SlideArea Clone()
+    {
+        return new SlideArea
+        {
+            Areas = (SensorArea[])Areas.Clone(),
+            ArrowProgressWhenOn = ArrowProgressWhenOn,
+            ArrowProgressWhenFinished = ArrowProgressWhenFinished,
+            IsSkippable = IsSkippable,
+            IsLast = IsLast,
+            On = false,
+            Off = false
+        };
+    }
+
+    public void Diff(int diff)
+    {
+        for (var i = 0; i < Areas.Length; i++)
+        {
+            Areas[i] = Areas[i].Diff(diff);
+        }
+    }
+    
     public void Judge(SensorStatus status)
     {
         if (status == SensorStatus.Off)
@@ -44,6 +67,24 @@ public class SlideTable
     public string Name { get; init; } = string.Empty;
     public SlideArea[] JudgeQueue { get; init; } = Array.Empty<SlideArea>();
     public float Const { get; init; } = 0f;
+
+    public SlideTable Clone()
+    {
+        return new SlideTable()
+        {
+            Name = Name,
+            JudgeQueue = JudgeQueue.Select(area => area.Clone()).ToArray(),
+            Const = Const
+        };
+    }
+    
+    public void Diff(int diff)
+    {
+        foreach (var area in JudgeQueue)
+        {
+            area.Diff(diff);
+        }
+    }
 }
 
 public class WifiTable
@@ -53,6 +94,23 @@ public class WifiTable
     public SlideArea[] Center { get; init; } = Array.Empty<SlideArea>();
     public SlideArea[] Right { get; init; } = Array.Empty<SlideArea>();
     public float Const { get; init; } = 0f;
+    public WifiTable Clone()
+    {
+        return new WifiTable()
+        {
+            Name = Name,
+            Left = Left.Select(area => area.Clone()).ToArray(),
+            Center = Center.Select(area => area.Clone()).ToArray(),
+            Right = Right.Select(area => area.Clone()).ToArray(),
+            Const = Const
+        };
+    }
+    public void Diff(int diff)
+    {
+        foreach (var area in Left) area.Diff(diff);
+        foreach (var area in Center) area.Diff(diff);
+        foreach (var area in Right) area.Diff(diff);
+    }
 }
 
 public static class SlideTables
@@ -652,234 +710,47 @@ public static class SlideTables
         },
     };
 
-    static readonly WifiTable[] WIFI_TABLES = new WifiTable[]
+    static readonly WifiTable WIFI_TABLE = new WifiTable
     {
-        // Index 0 (Dictionary Key 1)
-        new WifiTable
+        Name = "wifi",
+        Left = new SlideArea[] // L
         {
-            Name = "wifi",
-            Left = new SlideArea[]
-            {
-                BuildSlideArea(SensorArea.A1, 0),
-                BuildSlideArea(SensorArea.B8, 2),
-                BuildSlideArea(SensorArea.B7, 4),
-                BuildSlideArea(new[] { SensorArea.A6, SensorArea.D6 }, 7, true, true)
-            },
-            Center = new SlideArea[]
-            {
-                BuildSlideArea(SensorArea.A1, 0),
-                BuildSlideArea(SensorArea.B1, 2),
-                BuildSlideArea(SensorArea.C, 4),
-                BuildSlideArea(new[] { SensorArea.A5, SensorArea.B5 }, 7, true, true)
-            },
-            Right = new SlideArea[]
-            {
-                BuildSlideArea(SensorArea.A1, 0),
-                BuildSlideArea(SensorArea.B2, 2),
-                BuildSlideArea(SensorArea.B3, 4),
-                BuildSlideArea(new[] { SensorArea.A4, SensorArea.D5 }, 7, true, true)
-            },
-            Const = 0.162870f
+            BuildSlideArea(SensorArea.A1,0),
+            BuildSlideArea(SensorArea.B8,2),
+            BuildSlideArea(SensorArea.B7,4),
+            BuildSlideArea(new SensorArea[] { SensorArea.A6 , SensorArea.D6 },7,true,true)
         },
-        // Index 1 (Dictionary Key 2)
-        new WifiTable
+        Center = new SlideArea[] // Center
         {
-            Name = "wifi",
-            Left = new SlideArea[]
-            {
-                BuildSlideArea(SensorArea.A2, 0),
-                BuildSlideArea(SensorArea.B1, 2),
-                BuildSlideArea(SensorArea.B8, 4),
-                BuildSlideArea(new[] { SensorArea.A7, SensorArea.D7 }, 7, true, true)
-            },
-            Center = new SlideArea[]
-            {
-                BuildSlideArea(SensorArea.A2, 0),
-                BuildSlideArea(SensorArea.B2, 2),
-                BuildSlideArea(SensorArea.C, 4),
-                BuildSlideArea(new[] { SensorArea.A6, SensorArea.B6 }, 7, true, true)
-            },
-            Right = new SlideArea[]
-            {
-                BuildSlideArea(SensorArea.A2, 0),
-                BuildSlideArea(SensorArea.B3, 2),
-                BuildSlideArea(SensorArea.B4, 4),
-                BuildSlideArea(new[] { SensorArea.A5, SensorArea.D6 }, 7, true, true)
-            },
-            Const = 0.162870f
+            BuildSlideArea(SensorArea.A1,0),
+            BuildSlideArea(SensorArea.B1,2),
+            BuildSlideArea(SensorArea.C,4),
+            BuildSlideArea(new SensorArea[] { SensorArea.A5 , SensorArea.B5 },7,true,true)
         },
-        // Index 2 (Dictionary Key 3)
-        new WifiTable
+        Right = new SlideArea[] // R
         {
-            Name = "wifi",
-            Left = new SlideArea[]
-            {
-                BuildSlideArea(SensorArea.A3, 0),
-                BuildSlideArea(SensorArea.B2, 2),
-                BuildSlideArea(SensorArea.B1, 4),
-                BuildSlideArea(new[] { SensorArea.A8, SensorArea.D8 }, 7, true, true)
-            },
-            Center = new SlideArea[]
-            {
-                BuildSlideArea(SensorArea.A3, 0),
-                BuildSlideArea(SensorArea.B3, 2),
-                BuildSlideArea(SensorArea.C, 4),
-                BuildSlideArea(new[] { SensorArea.A7, SensorArea.B7 }, 7, true, true)
-            },
-            Right = new SlideArea[]
-            {
-                BuildSlideArea(SensorArea.A3, 0),
-                BuildSlideArea(SensorArea.B4, 2),
-                BuildSlideArea(SensorArea.B5, 4),
-                BuildSlideArea(new[] { SensorArea.A6, SensorArea.D7 }, 7, true, true)
-            },
-            Const = 0.162870f
+            BuildSlideArea(SensorArea.A1,0),
+            BuildSlideArea(SensorArea.B2,2),
+            BuildSlideArea(SensorArea.B3,4),
+            BuildSlideArea(new SensorArea[] { SensorArea.A4 , SensorArea.D5 },7,true,true)
         },
-        // Index 3 (Dictionary Key 4)
-        new WifiTable
-        {
-            Name = "wifi",
-            Left = new SlideArea[]
-            {
-                BuildSlideArea(SensorArea.A4, 0),
-                BuildSlideArea(SensorArea.B3, 2),
-                BuildSlideArea(SensorArea.B2, 4),
-                BuildSlideArea(new[] { SensorArea.A1, SensorArea.D1 }, 7, true, true)
-            },
-            Center = new SlideArea[]
-            {
-                BuildSlideArea(SensorArea.A4, 0),
-                BuildSlideArea(SensorArea.B4, 2),
-                BuildSlideArea(SensorArea.C, 4),
-                BuildSlideArea(new[] { SensorArea.A8, SensorArea.B8 }, 7, true, true)
-            },
-            Right = new SlideArea[]
-            {
-                BuildSlideArea(SensorArea.A4, 0),
-                BuildSlideArea(SensorArea.B5, 2),
-                BuildSlideArea(SensorArea.B6, 4),
-                BuildSlideArea(new[] { SensorArea.A7, SensorArea.D8 }, 7, true, true)
-            },
-            Const = 0.162870f
-        },
-        // Index 4 (Dictionary Key 5)
-        new WifiTable
-        {
-            Name = "wifi",
-            Left = new SlideArea[]
-            {
-                BuildSlideArea(SensorArea.A5, 0),
-                BuildSlideArea(SensorArea.B4, 2),
-                BuildSlideArea(SensorArea.B3, 4),
-                BuildSlideArea(new[] { SensorArea.A2, SensorArea.D2 }, 7, true, true)
-            },
-            Center = new SlideArea[]
-            {
-                BuildSlideArea(SensorArea.A5, 0),
-                BuildSlideArea(SensorArea.B5, 2),
-                BuildSlideArea(SensorArea.C, 4),
-                BuildSlideArea(new[] { SensorArea.A1, SensorArea.B1 }, 7, true, true)
-            },
-            Right = new SlideArea[]
-            {
-                BuildSlideArea(SensorArea.A5, 0),
-                BuildSlideArea(SensorArea.B6, 2),
-                BuildSlideArea(SensorArea.B7, 4),
-                BuildSlideArea(new[] { SensorArea.A8, SensorArea.D1 }, 7, true, true)
-            },
-            Const = 0.162870f
-        },
-        // Index 5 (Dictionary Key 6)
-        new WifiTable
-        {
-            Name = "wifi",
-            Left = new SlideArea[]
-            {
-                BuildSlideArea(SensorArea.A6, 0),
-                BuildSlideArea(SensorArea.B5, 2),
-                BuildSlideArea(SensorArea.B4, 4),
-                BuildSlideArea(new[] { SensorArea.A3, SensorArea.D3 }, 7, true, true)
-            },
-            Center = new SlideArea[]
-            {
-                BuildSlideArea(SensorArea.A6, 0),
-                BuildSlideArea(SensorArea.B6, 2),
-                BuildSlideArea(SensorArea.C, 4),
-                BuildSlideArea(new[] { SensorArea.A2, SensorArea.B2 }, 7, true, true)
-            },
-            Right = new SlideArea[]
-            {
-                BuildSlideArea(SensorArea.A6, 0),
-                BuildSlideArea(SensorArea.B7, 2),
-                BuildSlideArea(SensorArea.B8, 4),
-                BuildSlideArea(new[] { SensorArea.A1, SensorArea.D2 }, 7, true, true)
-            },
-            Const = 0.162870f
-        },
-        // Index 6 (Dictionary Key 7)
-        new WifiTable
-        {
-            Name = "wifi",
-            Left = new SlideArea[]
-            {
-                BuildSlideArea(SensorArea.A7, 0),
-                BuildSlideArea(SensorArea.B6, 2),
-                BuildSlideArea(SensorArea.B5, 4),
-                BuildSlideArea(new[] { SensorArea.A4, SensorArea.D4 }, 7, true, true)
-            },
-            Center = new SlideArea[]
-            {
-                BuildSlideArea(SensorArea.A7, 0),
-                BuildSlideArea(SensorArea.B7, 2),
-                BuildSlideArea(SensorArea.C, 4),
-                BuildSlideArea(new[] { SensorArea.A3, SensorArea.B3 }, 7, true, true)
-            },
-            Right = new SlideArea[]
-            {
-                BuildSlideArea(SensorArea.A7, 0),
-                BuildSlideArea(SensorArea.B8, 2),
-                BuildSlideArea(SensorArea.B1, 4),
-                BuildSlideArea(new[] { SensorArea.A2, SensorArea.D3 }, 7, true, true)
-            },
-            Const = 0.162870f
-        },
-        // Index 7 (Dictionary Key 8)
-        new WifiTable
-        {
-            Name = "wifi",
-            Left = new SlideArea[]
-            {
-                BuildSlideArea(SensorArea.A8, 0),
-                BuildSlideArea(SensorArea.B7, 2),
-                BuildSlideArea(SensorArea.B6, 4),
-                BuildSlideArea(new[] { SensorArea.A5, SensorArea.D5 }, 7, true, true)
-            },
-            Center = new SlideArea[]
-            {
-                BuildSlideArea(SensorArea.A8, 0),
-                BuildSlideArea(SensorArea.B8, 2),
-                BuildSlideArea(SensorArea.C, 4),
-                BuildSlideArea(new[] { SensorArea.A4, SensorArea.B4 }, 7, true, true)
-            },
-            Right = new SlideArea[]
-            {
-                BuildSlideArea(SensorArea.A8, 0),
-                BuildSlideArea(SensorArea.B1, 2),
-                BuildSlideArea(SensorArea.B2, 4),
-                BuildSlideArea(new[] { SensorArea.A3, SensorArea.D4 }, 7, true, true)
-            },
-            Const = 0.162870f
-        }
+        Const = 0.162870f
     };
 
     public static SlideTable? FindTableByName(string prefabName)
     {
-        return Array.Find(SLIDE_TABLES, x => x.Name == prefabName);
+        return Array.Find(SLIDE_TABLES, x => x.Name == prefabName)?.Clone();
     }
 
     public static WifiTable GetWifiTable(int startPos)
     {
-        return WIFI_TABLES[startPos - 1];
+        var table = WIFI_TABLE.Clone();
+        var diff = Math.Abs(1 - startPos);
+        if (diff != 0)
+        {
+            table.Diff(diff);
+        }
+        return table;
     }
 
     static SlideArea BuildSlideArea(SensorArea area, int arrowProgress,
@@ -934,4 +805,3 @@ public static class SlideTables
         };
     }
 }
-

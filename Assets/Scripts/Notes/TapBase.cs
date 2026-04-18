@@ -20,6 +20,7 @@ public class TapBase : NoteBase
         objectCounter = Majdata<ObjectCounter>.Instance!;
         inputManager = Majdata<InputManager>.Instance!;
         skinManager = Majdata<SkinManager>.Instance!;
+        audioManager = Majdata<AudioManager>.Instance!;
         
         tapLine = Instantiate(tapLine, notes);
         tapLine.SetActive(false);
@@ -231,6 +232,7 @@ public class TapBase : NoteBase
         var effectManager = Majdata<EffectManager>.Instance!;
         effectManager.PlayEffect(startPosition, isBreak, judgeResult);
         effectManager.PlayFastLate(startPosition, judgeResult);
+        audioManager.PlayTapSound(judgeResult, isEx, isBreak);
         objectCounter.NextNote(startPosition);
         objectCounter.ReportResult(this, judgeResult, isBreak);
         inputManager.UnbindArea(Check, sensor);
