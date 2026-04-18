@@ -487,10 +487,7 @@ public class ObjectCounter : MonoBehaviour
         }
         CalAccRate();
     }
-    internal void NextNote(int pos)
-    {
-        notes.noteIndex[pos]++;
-    }
+    internal void NextNote(int pos) => notes.noteIndex[pos]++;
     internal void NextTouch(SensorArea pos) => notes.touchIndex[pos]++;
     SimaiNoteType GetNoteType(NoteBase note) => note switch
     {

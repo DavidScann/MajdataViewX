@@ -1,12 +1,4 @@
-﻿public enum NoteLoaderStatus
-{
-    Idle,
-    Start,
-    LoadingJson,
-    ParsingNote,
-    Finished
-}
-public enum SensorStatus
+﻿public enum SensorStatus
 {
     On,
     Off
@@ -79,21 +71,6 @@ public enum NoteStatus
     Pending,
     Running
 }
-public enum AutoPlayMode
-{
-    Enable,
-    DjAuto,
-    Random,
-    Disable
-}
-public enum JudgeDisplayMode
-{
-    None,
-    FastLate,
-    Level,
-    Both
-}
-
 public enum SampleType
 {
     Answer,

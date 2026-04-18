@@ -18,8 +18,10 @@ public class NoteManager : MonoBehaviour
     
     public void AddNote(GameObject obj,int index) => noteOrder.Add(obj, index);
     public void AddTouch(GameObject obj,int index) => touchOrder.Add(obj, index);
+    
     public void Refresh()
     {
+        ResetIndex();
         var count = transform.childCount;
         for (int i = 0; i < count; i++)
         {
@@ -43,7 +45,6 @@ public class NoteManager : MonoBehaviour
 
             notes.Add(child.gameObject);
         }
-        ResetIndex();
     }
     void ResetIndex()
     {

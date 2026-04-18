@@ -102,7 +102,8 @@ public class PlayManager : MonoBehaviour
         }
     }
     
-    public async UniTask<bool> PlayAsync(PlaybackMode mode, double startAt, float speed, 
+    public async UniTask<bool> PlayAsync(PlaybackMode playmode, 
+        double startAt, float speed, 
         string title, string artist, float offset, 
         string designer, string level, string fumen, 
         SimaiCommand[] commands, int difficulty, string? maidataPath = null)
@@ -126,6 +127,7 @@ public class PlayManager : MonoBehaviour
             
             objectCounter.ComboSetActive(_setting.ComboStatusType);
             effectManager.SetDisplayMode(_setting.JudgeDisplayMode);
+            InputManager.Mode = _setting.AutoMode;
             bgCover.color = new Color(0f, 0f, 0f, _setting.BackgroundDim);
             bgManager.ShowBG();
             bgManager.ShowVideo();
@@ -138,29 +140,28 @@ public class PlayManager : MonoBehaviour
             Majdata<AllPerfectManager>.Instance!.enabled = false;
             Majdata<MultTouchHandler>.Instance!.clearSlots();
 
-            switch (mode)
+            switch (playmode)
             {
                 case PlaybackMode.Normal:
-                    timeProvider.SetStartTime(startAt, offset, speed, mode);
+                    timeProvider.SetStartTime(startAt, offset, speed, playmode);
                     audioManager.PlayTrack();
                     break;
                 case PlaybackMode.IncludeOp:
                     bgManager.PlaySongDetail();
                     AudioManager.noteSfxPlaybackRequests[14] = true; //track_start
                     
-                    timeProvider.SetStartTime(startAt, offset, speed, mode);
+                    timeProvider.SetStartTime(startAt, offset, speed, playmode);
                     audioManager.PlayTrack();
                     break;
                 case PlaybackMode.Record:
                     bgManager.PlaySongDetail();
-                    AudioManager.noteSfxPlaybackRequests[14] = true; //track_start
                     
                     GameObject.Find("CanvasButtons").SetActive(false);
                     if (!Directory.Exists(maidataPath))
                     {
                         throw new InvalidPathException($"maidata path is required");
                     }
-                    timeProvider.SetStartTime(startAt, offset, speed, mode, _setting.OutputFps);
+                    timeProvider.SetStartTime(startAt, offset, speed, playmode, _setting.OutputFps);
                     screenRecorder.StartRecording(maidataPath, _setting.OutputFps);
                     break;
             }

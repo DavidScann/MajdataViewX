@@ -26,6 +26,7 @@ public class HoldDrop : NoteLongBase
         skinManager = Majdata<SkinManager>.Instance!;
         inputManager = Majdata<InputManager>.Instance!;
         effectManager = Majdata<EffectManager>.Instance!;
+        audioManager = Majdata<AudioManager>.Instance!;
         
         holdEffect = Instantiate(holdEffect, notes);
         holdEffect.SetActive(false);
@@ -116,6 +117,7 @@ public class HoldDrop : NoteLongBase
                     isJudged = true;
                     isTouched = true; //算是点到了
                     PlayHoldEffect();
+                    audioManager.PlayTapSound(judgeResult, false, false);
                     break;
                 case AutoPlayMode.DjAuto:
                     if (!isJudged && !isMine) //mine buda
@@ -142,6 +144,7 @@ public class HoldDrop : NoteLongBase
                         isJudged = true;
                     }
                     PlayHoldEffect();
+                    audioManager.PlayTapSound(judgeResult, false, false);
                     return;
                 case AutoPlayMode.Disable:
                     inputManager.SetSensorOff(sensor, guid);
@@ -250,6 +253,7 @@ public class HoldDrop : NoteLongBase
         judgeResult = result;
         isJudged = true;
         PlayHoldEffect();
+        audioManager.PlayTapSound(judgeResult, false, false);
     }
     
     private void Update()
@@ -404,6 +408,7 @@ public class HoldDrop : NoteLongBase
 
         effectManager.PlayEffect(startPosition, isBreak, result);
         effectManager.PlayFastLate(startPosition, result);
+        audioManager.PlayTapSound(judgeResult, isEx, isBreak);
         print($"Hold: {MathF.Round(percent * 100,2)}%\nTotal Len : {MathF.Round(realityHT * 1000,2)}ms");
 
         objectCounter.ReportResult(this, result, isBreak);

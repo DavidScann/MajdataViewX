@@ -126,7 +126,8 @@ public class MajdataWsService : WebSocketBehavior, IDisposable
                 case MajWsRequestType.Play:
                 {
                     var payload = JsonConvert.DeserializeObject<MajWsRequestPlay>(payloadJson);
-                    await playManager.PlayAsync(payload.Mode, payload.StartAt, payload.Speed, 
+                    await playManager.PlayAsync(payload.Mode, 
+                        payload.StartAt, payload.Speed, 
                         payload.Title, payload.Artist, payload.Offset, 
                         payload.Designer, payload.Level, payload.Fumen,
                         payload.Commands, payload.Difficulty, payload.MaidataPath);

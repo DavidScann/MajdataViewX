@@ -11,6 +11,7 @@ public class NoteBase : MonoBehaviour
     protected NoteManager noteManager;
     protected InputManager inputManager;
     protected SkinManager skinManager;
+    protected AudioManager audioManager;
     
     public float time;
     public int startPosition;
