@@ -122,7 +122,7 @@ public class PlayManager : MonoBehaviour
             loader.noteSpeed = (float)(107.25 / (71.4184491 * Mathf.Pow(_setting.TapSpeed + 0.9975f, -0.985558604f)));
             loader.touchSpeed = _setting.TouchSpeed;
             loader.smoothSlideAnime = _setting.SmoothSlideAnime;
-            loader.Load(_chart, offset, title, artist, difficulty);
+            loader.Load(_chart, startAt - offset, title, artist, difficulty);
             
             objectCounter.ComboSetActive(_setting.ComboStatusType);
             effectManager.SetDisplayMode(_setting.JudgeDisplayMode);
