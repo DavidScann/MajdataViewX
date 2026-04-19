@@ -4,8 +4,7 @@ using UnityEngine;
 
 public static class ResProvider
 {
-    public static AudioSample? TrackSampleRes;
-    public static float[]? TrackSampleDataRes;
+    public static string? TrackSamplePath;
     public static Sprite? BgRes;
     public static string VideoPath = string.Empty;
 }

@@ -34,8 +34,9 @@ public class BgManager : MonoBehaviour
         set => ResProvider.VideoPath = value;
     }
 
+    public static bool hasBg;
     public static bool hasVideo;
-    public bool IsBgLoaded => Bg != null;
+    public bool IsBgLoaded => !hasBg || Bg != null;
     public bool IsVideoLoaded => !hasVideo || !string.IsNullOrWhiteSpace(VideoUrl);
     
 
