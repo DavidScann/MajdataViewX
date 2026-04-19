@@ -89,7 +89,12 @@ public class PlayManager : MonoBehaviour
             //bg
             if (File.Exists(bgPath))
             {
+                BgManager.hasBg = true;
                 bgManager.LoadBG(bgPath);
+            }
+            else
+            {
+                BgManager.hasBg = false;
             }
             
             //video

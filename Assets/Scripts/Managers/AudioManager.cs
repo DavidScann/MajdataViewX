@@ -14,18 +14,8 @@ public class AudioManager : MonoBehaviour
 {
     private TimeProvider timeProvider;
 
-    [CanBeNull]
-    private static AudioSample TrackSample
-    {
-        get => ResProvider.TrackSampleRes;
-        set => ResProvider.TrackSampleRes = value;
-    }
-    [CanBeNull]
-    private static float[] TrackSampleData
-    {
-        get => ResProvider.TrackSampleDataRes;
-        set => ResProvider.TrackSampleDataRes = value;
-    }
+    [CanBeNull] private AudioSample TrackSample;
+    [CanBeNull] private float[] TrackSampleData;
     public bool IsTrackLoaded => TrackSample != null && TrackSampleData != null;
     
     //answer SFX
@@ -66,6 +56,11 @@ public class AudioManager : MonoBehaviour
         Majdata<AudioManager>.Instance = this;
         Bass.Init();
         Bass.PluginLoad("bassmix");
+        
+        if (File.Exists(ResProvider.TrackSamplePath))
+        {
+            LoadTrack(ResProvider.TrackSamplePath);
+        }
         
         //Note SFX
         foreach (var filename in new []
@@ -229,6 +224,8 @@ public class AudioManager : MonoBehaviour
     
     public void LoadTrack(string path)
     {
+        ResProvider.TrackSamplePath = path;
+        
         TrackSample?.Dispose();
         TrackSample = new AudioSample(path)
         {
