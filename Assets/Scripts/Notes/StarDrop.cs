@@ -36,7 +36,7 @@ public class StarDrop : TapBase
         {
             exSpriteRender.sprite = skinManager.Star_Ex_Double;
             spriteRenderer.sprite = skinManager.Star_Double;
-            lineSpriteRenderer.sprite = skinManager.Line;
+            lineSpriteRenderer.sprite = skinManager.Line_Star;
             if (isEx)
             {
                 exSpriteRender.color = skinManager.Ex_Star;
@@ -64,7 +64,7 @@ public class StarDrop : TapBase
         {
             exSpriteRender.sprite = skinManager.Star_Ex;
             spriteRenderer.sprite = skinManager.Star;
-            lineSpriteRenderer.sprite = skinManager.Line;
+            lineSpriteRenderer.sprite = skinManager.Line_Star;
             if (isEx)
             {
                 exSpriteRender.color = skinManager.Ex_Star;
