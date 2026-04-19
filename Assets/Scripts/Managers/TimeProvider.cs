@@ -39,7 +39,7 @@ public class TimeProvider : MonoBehaviour
         }
         else
         {
-            AudioTime = startAt + accumulated + (Time.unscaledTime - startRealtime) * speed;
+            AudioTime = startAt + accumulated + (Time.realtimeSinceStartup - startRealtime) * speed;
             NoteTime = AudioTime - offset;
         }
     }
@@ -58,14 +58,14 @@ public class TimeProvider : MonoBehaviour
         {
             case PlaybackMode.Normal:
             {
-                startRealtime = Time.unscaledTime;
+                startRealtime = Time.realtimeSinceStartup;
                 speed = _speed;
                 Time.captureFramerate = 0;
             }
                 break;
             case PlaybackMode.IncludeOp:
             {
-                startRealtime = Time.unscaledTime;
+                startRealtime = Time.realtimeSinceStartup;
                 startAt -= SONG_DETAIL_OFFSET;
                 speed = _speed;
                 Time.captureFramerate = 0;
@@ -91,7 +91,7 @@ public class TimeProvider : MonoBehaviour
     {
         if (!isStart) return;
 
-        var now = isRecord ? Time.time : Time.unscaledTime;
+        var now = isRecord ? Time.time : Time.realtimeSinceStartup;
         accumulated += (now - startRealtime) * speed;
 
         isStart = false;
@@ -102,7 +102,7 @@ public class TimeProvider : MonoBehaviour
         if (_speed != null) speed = _speed.Value;
         if (isStart) return;
 
-        startRealtime = isRecord ? Time.time : Time.unscaledTime;
+        startRealtime = isRecord ? Time.time : Time.realtimeSinceStartup;
 
         isStart = true;
     }

@@ -22,8 +22,22 @@ public class BgManager : MonoBehaviour
     private float smoothRDelta;
     private float playSpeed;
     private float originalScaleX;
+    
+    private static Sprite? Bg
+    {
+        get => ResProvider.BgRes;
+        set => ResProvider.BgRes = value;
+    }
+    private static string VideoUrl
+    {
+        get => ResProvider.VideoPath;
+        set => ResProvider.VideoPath = value;
+    }
 
-    private Sprite? Bg;
+    public static bool hasVideo;
+    public bool IsBgLoaded => Bg != null;
+    public bool IsVideoLoaded => !hasVideo || !string.IsNullOrWhiteSpace(VideoUrl);
+    
 
     private void Awake()
     {
@@ -101,12 +115,12 @@ public class BgManager : MonoBehaviour
 
     public void LoadVideo(string path)
     {
-        videoPlayer.url = "file://" + path;
-        videoPlayer.audioOutputMode = VideoAudioOutputMode.None;
+        VideoUrl = "file://" + path;
     }
 
     public void ShowVideo()
     {
+        videoPlayer.url = VideoUrl;
         StartCoroutine(waitFumenStart());
     }
 

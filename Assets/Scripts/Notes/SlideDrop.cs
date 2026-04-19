@@ -176,6 +176,10 @@ public class SlideDrop : NoteLongBase, ICanShine
         
         //judgeQueue
         var table = SlideTables.FindTableByName(slideType);
+        if (isMirror)
+        {
+            table!.Mirror(SensorArea.A1);
+        }
         var diff = Math.Abs(1 - startPosition);
         if (diff != 0)
         {
@@ -401,9 +405,6 @@ public class SlideDrop : NoteLongBase, ICanShine
             first.Judge(sensor.Status);
         }
         
-        if (ConnectInfo.IsGroupPartEnd)
-            print($"{first.Areas[0]} {first.On} {first.IsSkippable}");
-
         if (first.On)
         {
             PlaySFX();
@@ -815,7 +816,7 @@ public class SlideDrop : NoteLongBase, ICanShine
         else
             star_slide.transform.rotation = newRotation;
     }
-
+    
     private void PlaySFX()
     {
         if (isSoundPlayed) return;
@@ -826,6 +827,5 @@ public class SlideDrop : NoteLongBase, ICanShine
             audioManager.PlaySlideSound(isBreak);
         }
     }
-    public GameObject[] GetSlideBars() => slideBars.ToArray();
     public bool CanShine() => canShine;
 }

@@ -50,7 +50,6 @@ public class ScreenRecorder : MonoBehaviour
 
     public void StopRecording()
     {
-        print("stop recording");
         isRecording = false;
     }
 
@@ -105,6 +104,8 @@ public class ScreenRecorder : MonoBehaviour
         audioManager.PrepareRecordingBuffer();
         isRecording = true;
         
+        var touchHoldStartTime = 0f;
+        var isTouchHoldRising = false;
         using (var pipeServer = new NamedPipeServerStream("majdataRec", PipeDirection.Out))
         {
             //out
@@ -121,10 +122,34 @@ public class ScreenRecorder : MonoBehaviour
                     audioManager.UpdateAnswerSfx();
                     for (var i = 0; i < AudioManager.noteSfxPlaybackRequests.Length - 1; i++) //ignore track_start
                     {
-                        if (AudioManager.noteSfxPlaybackRequests[i])
+                        // skip track_start
+                        if (i == AudioManager.TRACK_START) continue;
+
+                        var currentNoteTime = Majdata<TimeProvider>.Instance!.NoteTime;
+                        if (i == AudioManager.TOUCHHOLD)
                         {
-                            audioManager.MixSfxToBuffer(i);
-                            AudioManager.noteSfxPlaybackRequests[i] = false;
+                            var isRequested = AudioManager.noteSfxPlaybackRequests[i];
+                            
+                            if (isRequested && !isTouchHoldRising)
+                            {
+                                isTouchHoldRising = true;
+                                touchHoldStartTime = currentNoteTime;
+                            }
+                            else if (!isRequested && isTouchHoldRising)
+                            {
+                                isTouchHoldRising = false;
+                                var duration = currentNoteTime - touchHoldStartTime;
+                                
+                                audioManager.MixSfxToBuffer(AudioManager.TOUCHHOLD, touchHoldStartTime, duration);
+                            }
+                        }
+                        else
+                        {
+                            if (AudioManager.noteSfxPlaybackRequests[i])
+                            {
+                                audioManager.MixSfxToBuffer(i);
+                                AudioManager.noteSfxPlaybackRequests[i] = false;
+                            }
                         }
                     }
                     

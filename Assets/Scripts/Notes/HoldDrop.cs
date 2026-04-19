@@ -15,6 +15,7 @@ public class HoldDrop : NoteLongBase
     private SpriteRenderer exSpriteRender;
 
     private bool isTouched = false; //for mine judge
+    private bool isPlayedJudgeSFX = false; //for Enable / Random mode
 
 
     private void Start()
@@ -117,7 +118,7 @@ public class HoldDrop : NoteLongBase
                     isJudged = true;
                     isTouched = true; //算是点到了
                     PlayHoldEffect();
-                    audioManager.PlayTapSound(judgeResult, false, false);
+                    PlayJudgeSFX();
                     break;
                 case AutoPlayMode.DjAuto:
                     if (!isJudged && !isMine) //mine buda
@@ -144,7 +145,7 @@ public class HoldDrop : NoteLongBase
                         isJudged = true;
                     }
                     PlayHoldEffect();
-                    audioManager.PlayTapSound(judgeResult, false, false);
+                    PlayJudgeSFX();
                     return;
                 case AutoPlayMode.Disable:
                     inputManager.SetSensorOff(sensor, guid);
@@ -253,7 +254,7 @@ public class HoldDrop : NoteLongBase
         judgeResult = result;
         isJudged = true;
         PlayHoldEffect();
-        audioManager.PlayTapSound(judgeResult, false, false);
+        PlayJudgeSFX();
     }
     
     private void Update()
@@ -408,7 +409,7 @@ public class HoldDrop : NoteLongBase
 
         effectManager.PlayEffect(startPosition, isBreak, result);
         effectManager.PlayFastLate(startPosition, result);
-        audioManager.PlayTapSound(judgeResult, isEx, isBreak);
+        PlaySFX();
         print($"Hold: {MathF.Round(percent * 100,2)}%\nTotal Len : {MathF.Round(realityHT * 1000,2)}ms");
 
         objectCounter.ReportResult(this, result, isBreak);
@@ -452,5 +453,19 @@ public class HoldDrop : NoteLongBase
         holdAnimStart = false;
         animator.enabled = false;
         spriteRenderer.sprite = skinManager.Hold_Off;
+    }
+
+    
+    private void PlayJudgeSFX()
+    {
+        if (isPlayedJudgeSFX) return;
+
+        audioManager.PlayTapSound(judgeResult, false, false);
+        isPlayedJudgeSFX = true;
+    }
+
+    private void PlaySFX()
+    {
+        audioManager.PlayTapSound(judgeResult, isEx, isBreak);
     }
 }

@@ -10,8 +10,6 @@ public class WifiDrop : NoteLongBase, ICanShine
 {
     public GameObject star_slidePrefab;
     
-    public RuntimeAnimatorController judgeBreakShine;
-
     public bool isJustR;
     public float timeStart;
     public int endPosition;
@@ -571,7 +569,7 @@ public class WifiDrop : NoteLongBase, ICanShine
         }
         objectCounter.ReportResult(this, judgeResult, isBreak);
         if (isBreak && judgeResult == JudgeType.Perfect)
-            slideOK.GetComponent<Animator>().runtimeAnimatorController = judgeBreakShine;
+            slideOK.GetComponent<Animator>().runtimeAnimatorController = skinManager.Shine_JudgeBreak;
         if (!EffectManager.showLevel) slideOK.GetComponent<SpriteRenderer>().sprite = 
                 Sprite.Create(new Texture2D(0, 0), new Rect(0, 0, 0, 0), new Vector2(0.5f, 0.5f));
 
