@@ -1,13 +1,17 @@
 ---
 name: 提交BUG(中文)
 about: 如果您使用简体或繁体中文，请使用此模板
+title: 'BUG: '
+labels: ''
+assignees: ''
+
 ---
 
 (Tips: 你可以删除小括号中的内容，这些内容只是提醒你应该写什么的)
 
 ## 问题出现的位置
-
-(是MajdataEdit——也就是谱面编辑器——出现了问题，还是MajdataView出现了问题，亦或是二者都出现了问题呢？)
+MajdataEdit/View v5.1.6
+(是MajdataEdit——也就是谱面编辑器——出现了问题，还是MajdataView出现了问题，亦或是二者都出现了问题呢？哪个版本？)
 
 ## 问题描述
 

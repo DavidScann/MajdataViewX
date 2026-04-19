@@ -1,6 +1,10 @@
 ---
 name: 新功能建议/New feature
 about: 提出一些新功能的建议/Suggest some new features
+title: ''
+labels: ''
+assignees: ''
+
 ---
 
 ## Where?
