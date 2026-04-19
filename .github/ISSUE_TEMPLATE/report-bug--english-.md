@@ -1,13 +1,15 @@
 ---
-name: Report BUG(English)
+name: Report BUG (English)
 about: Please use this issue template if you speaks English
+title: 'BUG: '
+labels: ''
+assignees: ''
+
 ---
 
-(Tips: You can delete texts in the parenthesis. These texts are just some suggestion for you.)
-
 ## Where the problem occurs?
-
-(Is the MajdataEdit -- which is the chart Editor -- crashed? Or the MajdataView? Or both of them?)
+MajdataEdit/View v5.1.6
+(Is the MajdataEdit -- which is the chart Editor -- crashed? Or the MajdataView? Or both of them? which version?)
 
 ## Description
 
@@ -23,7 +25,6 @@ about: Please use this issue template if you speaks English
 ## Can it be repeated?
 
 (If you repeat your previous operation and this problem occurs again, it indicates that it can be repeated. Otherwise, it is not allowed.)
-(如果您重复您之前的操作，这个问题再次出现了，那么说明它可以复现。否则，说明不可以。)
 
 ## Screenshot and files that may helped
 
