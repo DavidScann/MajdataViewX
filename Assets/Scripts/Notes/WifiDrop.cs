@@ -581,17 +581,14 @@ public class WifiDrop : NoteLongBase, ICanShine
         ClearTriggeredSensor();
         isDestroying = true;
     }
+    /// <summary>
+    /// 清空所有已触发的Sensor
+    /// </summary>
     void ClearTriggeredSensor()
     {
-        foreach (var sensor in sensors)
-        {
-            var s = sensor.GetComponent<Sensor>();
-            if (s != null)
-            {
-                foreach (var id in guids.Values)
-                    s.SetOff(id);
-            }
-        }
+        foreach (var star in star_slides)
+            foreach (var s in triggerSensors[star])
+                inputManager.SetSensorOff(s, guids[star]);
     }
     private void setSlideBarAlpha(float alpha)
     {
