@@ -7,13 +7,26 @@ using Cysharp.Threading.Tasks;
 using JetBrains.Annotations;
 using MajSimai;
 using ManagedBass;
+using ManagedBass.Mix;
 using UnityEngine;
 
 public class AudioManager : MonoBehaviour
 {
     private TimeProvider timeProvider;
-    
-    [CanBeNull] static AudioSample trackSample = null;
+
+    [CanBeNull]
+    private static AudioSample TrackSample
+    {
+        get => ResProvider.TrackSampleRes;
+        set => ResProvider.TrackSampleRes = value;
+    }
+    [CanBeNull]
+    private static float[] TrackSampleData
+    {
+        get => ResProvider.TrackSampleDataRes;
+        set => ResProvider.TrackSampleDataRes = value;
+    }
+    public bool IsTrackLoaded => TrackSample != null && TrackSampleData != null;
     
     //answer SFX
     List<AnswerTimingPoint> answerTimingPoints = new();
@@ -22,30 +35,29 @@ public class AudioManager : MonoBehaviour
     List<AudioSample> NoteSfxs = new(15);
     
     //SFX for recording
-    private float[] trackSampleData;
     private List<float[]> noteSfxSamplesData = new(15);
     private float[] recordingBuffer; 
     
     const int SAMPLERATE = 44100;
     const int CHANNELS = 2;
     
-    const float ANSWER_PLAYBACK_OFFSET_SEC = (16.66666f * 1) / 1000; //TODO: is this correct?
+    const float ANSWER_PLAYBACK_OFFSET_SEC = (16.66666f * 1) / 1000; //BUG: is this correct?
     
-    const int TAP_PERFECT = 0;
-    const int TAP_GREAT = 1;
-    const int TAP_GOOD = 2;
-    const int TAP_EX = 3;
-    const int BREAK_JUDGE = 4;
-    const int BREAK_SFX = 5;
-    const int SLIDE = 6;
-    const int BREAK_SLIDE = 7;
-    const int BREAK_SLIDE_JUDGE = 8;
-    const int TOUCH = 9;
-    const int TOUCHHOLD = 10;
-    const int FIREWORK = 11;
-    const int ANSWER = 12;
-    const int ANSWER_CLOCK = 13;
-    const int TRACK_START = 14;
+    public const int TAP_PERFECT = 0;
+    public const int TAP_GREAT = 1;
+    public const int TAP_GOOD = 2;
+    public const int TAP_EX = 3;
+    public const int BREAK_JUDGE = 4;
+    public const int BREAK_SFX = 5;
+    public const int SLIDE = 6;
+    public const int BREAK_SLIDE = 7;
+    public const int BREAK_SLIDE_JUDGE = 8;
+    public const int TOUCH = 9;
+    public const int TOUCHHOLD = 10;
+    public const int FIREWORK = 11;
+    public const int ANSWER = 12;
+    public const int ANSWER_CLOCK = 13;
+    public const int TRACK_START = 14;
     
     private bool isTouchHoldRiserPlaying = false;
 
@@ -53,6 +65,7 @@ public class AudioManager : MonoBehaviour
     {
         Majdata<AudioManager>.Instance = this;
         Bass.Init();
+        Bass.PluginLoad("bassmix");
         
         //Note SFX
         foreach (var filename in new []
@@ -95,9 +108,7 @@ public class AudioManager : MonoBehaviour
             noteSfxSamplesData.Add(GetSampleDataFromFile(path));
         }
     }
-
-
-
+    
     private void Start()
     {
         timeProvider = Majdata<TimeProvider>.Instance!;
@@ -200,7 +211,11 @@ public class AudioManager : MonoBehaviour
             }
         }
         //clear
-        for (var i = 0; i < noteSfxPlaybackRequests.Length; i++) noteSfxPlaybackRequests[i] = false;
+        for (var i = 0; i < noteSfxPlaybackRequests.Length; i++)
+        {
+            if (i != TOUCHHOLD) //manual control
+                noteSfxPlaybackRequests[i] = false;
+        }
     }
 
     private void OnDestroy()
@@ -209,27 +224,40 @@ public class AudioManager : MonoBehaviour
         Bass.Free();
     }
     
+    
+    //track control
+    
     public void LoadTrack(string path)
     {
-        trackSample?.Dispose();
-        trackSample = new AudioSample(path)
+        TrackSample?.Dispose();
+        TrackSample = new AudioSample(path)
         {
             SampleType = SampleType.Track
         };
-        trackSampleData = GetSampleDataFromFile(path);
+        TrackSampleData = GetSampleDataFromFile(path);
     }
     
     public void PlayTrack()
     {
-        if (trackSample == null) return;
-        trackSample.Speed = timeProvider.CurrentSpeed;
+        if (TrackSample == null) return;
+        TrackSample.Speed = timeProvider.CurrentSpeed;
         StartCoroutine(WaitForTrackAudioStart());
+        
+        IEnumerator WaitForTrackAudioStart()
+        {
+            while (Majdata<TimeProvider>.Instance!.AudioTime < 0) yield return null;
+        
+            TrackSample!.CurrentSec = Majdata<TimeProvider>.Instance!.AudioTime;
+            TrackSample.Play();
+        }
     }
     
-    public void PauseTrack() => trackSample?.Pause();
+    public void PauseTrack() => TrackSample?.Pause();
     
-    public void StopTrack() => trackSample?.Stop();
+    public void StopTrack() => TrackSample?.Stop();
     
+    
+    //Sfx control
 
     public void GenerateAnswerSFX(SimaiChart chart, int clockCount = 0)
     {
@@ -386,29 +414,38 @@ public class AudioManager : MonoBehaviour
     }
     
     
+    //recording control
+    
     public void PrepareRecordingBuffer()
     {
-        var totalLen = trackSample!.Length + 13; // 留给开头5秒和结尾AP音效
+        var totalLen = TrackSample!.Length + 13; // 留给开头5秒和结尾AP音效
         var size = (int)(totalLen * SAMPLERATE * CHANNELS);
         recordingBuffer = new float[size];
         Array.Clear(recordingBuffer, 0, recordingBuffer.Length);
     }
     
-    public void MixSfxToBuffer(int index)
+    public void MixSfxToBuffer(int index, float? startTime = null, float? duration = null)
     {
-        //TODO: mysterious sharp audio...
-        //TODO: touchhold sound exception
-        //TODO: AllPerfect cant be shown
         if (index < 0 || index >= noteSfxSamplesData.Count) return;
-        
+    
         var sfx = noteSfxSamplesData[index];
-        var time = Majdata<TimeProvider>.Instance!.NoteTime + TimeProvider.SONG_DETAIL_OFFSET;
-        var startPos = (int)(time * SAMPLERATE) * CHANNELS;
+        var vol = NoteSfxs[index].Volume <= 0 ? 1.0f : NoteSfxs[index].Volume;
 
-        for (var i = 0; i < sfx.Length; i++)
+        startTime ??= Majdata<TimeProvider>.Instance!.NoteTime;
+        var startPos = (int)((startTime + TimeProvider.SONG_DETAIL_OFFSET) * SAMPLERATE) * CHANNELS;
+        
+        var samplesToMix = sfx.Length;
+        if (duration.HasValue)
+        {
+            // 时长转采样数 (时长 * 采样率 * 声道)
+            var durationSamples = (int)(duration.Value * SAMPLERATE) * CHANNELS;
+            samplesToMix = Math.Min(sfx.Length, durationSamples);
+        }
+
+        for (var i = 0; i < samplesToMix; i++)
         {
             if (startPos + i < recordingBuffer.Length)
-                recordingBuffer[startPos + i] += sfx[i] * NoteSfxs[index].Volume; //TODO: Volume
+                recordingBuffer[startPos + i] += sfx[i] * vol;
         }
     }
     
@@ -425,11 +462,11 @@ public class AudioManager : MonoBehaviour
         
         // BGM
         var bgmStartSample = (int)(TimeProvider.SONG_DETAIL_OFFSET * SAMPLERATE) * CHANNELS;
-        for (var i = 0; i < trackSampleData.Length; i++)
+        for (var i = 0; i < TrackSampleData.Length; i++)
         {
             if (bgmStartSample + i < recordingBuffer.Length)
             {
-                var s = recordingBuffer[bgmStartSample + i] + trackSampleData[i];
+                var s = recordingBuffer[bgmStartSample + i] + TrackSampleData[i];
                 recordingBuffer[bgmStartSample + i] = Math.Clamp(s, -1.0f, 1.0f);
             }
         }
@@ -437,21 +474,27 @@ public class AudioManager : MonoBehaviour
         WavFileWriter.WriteFile(outputPath, SAMPLERATE, CHANNELS, recordingBuffer);
     }
 
-    private IEnumerator WaitForTrackAudioStart()
-    {
-        while (Majdata<TimeProvider>.Instance!.AudioTime < 0) yield return null;
-        
-        trackSample!.CurrentSec = Majdata<TimeProvider>.Instance!.AudioTime;
-        trackSample.Play();
-    }
+
 
     private float[] GetSampleDataFromFile(string path)
-    {
-        var stream = Bass.CreateStream(path, 0, 0, BassFlags.Decode | BassFlags.Float);
-        var lenBytes = Bass.ChannelGetLength(stream);
-        var buffer = new float[lenBytes / 4]; 
-        Bass.ChannelGetData(stream, buffer, (int)lenBytes);
-        Bass.StreamFree(stream);
+    { 
+        var sourceStream = Bass.CreateStream(path, 0, 0, BassFlags.Decode | BassFlags.Float);
+        if (sourceStream == 0) return Array.Empty<float>();
+        
+        var mixer = BassMix.CreateMixerStream(SAMPLERATE, CHANNELS, BassFlags.Decode | BassFlags.Float);
+        
+        BassMix.MixerAddChannel(mixer, sourceStream, BassFlags.Default);
+        
+        var lenBytes = Bass.ChannelGetLength(sourceStream);
+        var duration = Bass.ChannelBytes2Seconds(sourceStream, lenBytes);
+        var targetLenBytes = Bass.ChannelSeconds2Bytes(mixer, duration);
+
+        var buffer = new float[targetLenBytes / 4];
+        Bass.ChannelGetData(mixer, buffer, (int)targetLenBytes);
+        
+        Bass.StreamFree(mixer);
+        Bass.StreamFree(sourceStream);
+
         return buffer;
     }
 

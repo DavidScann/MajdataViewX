@@ -3,7 +3,8 @@
 
 public class AllPerfectManager : MonoBehaviour
 {
-    private GameObject AllPerfect;
+    [SerializeField]
+    GameObject AllPerfect;
     
     private void Awake()
     {
@@ -12,7 +13,6 @@ public class AllPerfectManager : MonoBehaviour
     
     private void Start()
     {
-        AllPerfect = GameObject.Find("CanvasAllPerfect");
         AllPerfect.SetActive(false);
     }
     

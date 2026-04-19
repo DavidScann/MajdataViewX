@@ -42,6 +42,14 @@ public class SlideArea
         };
     }
 
+    public void Mirror(SensorArea baseLine)
+    {
+        for (var i = 0; i < Areas.Length; i++)
+        {
+            Areas[i] = Areas[i].Mirror(baseLine);
+        }
+    }
+    
     public void Diff(int diff)
     {
         for (var i = 0; i < Areas.Length; i++)
@@ -76,6 +84,14 @@ public class SlideTable
             JudgeQueue = JudgeQueue.Select(area => area.Clone()).ToArray(),
             Const = Const
         };
+    }
+    
+    public void Mirror(SensorArea baseLine)
+    {
+        foreach (var area in JudgeQueue)
+        {
+            area.Mirror(baseLine);
+        }
     }
     
     public void Diff(int diff)

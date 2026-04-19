@@ -31,6 +31,7 @@ public class TouchHoldDrop : NoteLongBase
     
     private bool _isTouched = false; //for mine judge
     private Sprite _borderSprite;
+    private bool isSfxPlaying;
 
     // Start is called before the first frame update
     private void Start()
@@ -187,6 +188,7 @@ public class TouchHoldDrop : NoteLongBase
                     isJudged = true;
                     _isTouched = true;
                     PlayHoldEffect();
+                    audioManager.PlayTouchHoldSound();
                     return;
                 case AutoPlayMode.DjAuto:
                     if (!isJudged && !isMine)
@@ -212,6 +214,7 @@ public class TouchHoldDrop : NoteLongBase
                         isJudged = true;
                     }
                     PlayHoldEffect();
+                    audioManager.PlayTouchHoldSound();
                     return;
                 case AutoPlayMode.Disable:
                 default:
@@ -221,25 +224,33 @@ public class TouchHoldDrop : NoteLongBase
 
         if (isJudged)
         {
-            if (inputManager.CheckSensorStatus(sensor, SensorStatus.On)) _isTouched = true;
+            if (!timeProvider.isStart) // 忽略暂停
+                return;
+            
+            if (inputManager.CheckSensorStatus(sensor, SensorStatus.On))
+            {
+                _isTouched = true;
+                audioManager.PlayTouchHoldSound();
+            }
+            else
+            {
+                audioManager.StopTouchHoldSound();
+            }
+            
             if (timing <= 0.25f) // 忽略头部15帧
                 return;
             if (remainingTime <= 0.2f) // 忽略尾部12帧
-                return;
-            if (!timeProvider.isStart) // 忽略暂停
                 return;
 
             var on = inputManager.CheckSensorStatus(sensor, SensorStatus.On);
             if (on)
             {
                 PlayHoldEffect();
-                audioManager.PlayTouchHoldSound();
             }
             else
             {
                 playerIdleTime += Time.fixedDeltaTime;
                 StopHoldEffect();
-                audioManager.StopTouchHoldSound();
             }
         }
         else if (timing > 0.316667f)
@@ -286,6 +297,7 @@ public class TouchHoldDrop : NoteLongBase
     }
     private void OnDestroy()
     {
+        audioManager.StopTouchHoldSound();
         if (PlayManager.IsReloading) return;
         var realityHT = LastFor - 0.45f - (judgeDiff / 1000f);
         var percent = Math.Clamp((realityHT - playerIdleTime) / realityHT, 0, 1);
@@ -373,7 +385,6 @@ public class TouchHoldDrop : NoteLongBase
                 audioManager.PlayTouchSound();
             }
         }
-        audioManager.StopTouchHoldSound();
         inputManager.UnbindSensor(Check, sensor);
         inputManager.SetSensorOff(sensor, guid);
         PlayJudgeEffect(result);

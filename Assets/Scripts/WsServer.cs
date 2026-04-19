@@ -1,23 +1,24 @@
 ﻿#nullable enable
 
 using System;
+using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 using Cysharp.Threading.Tasks;
-using ManagedBass;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Converters;
-using UnityEditor;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using WebSocketSharp;
 using WebSocketSharp.Server;
+using Debug = UnityEngine.Debug;
 
 internal class WsServer: MonoBehaviour
 {
+    public static readonly ConcurrentQueue<string> MessageQueue = new();
     private WebSocketServer? webSocket;
+    
     private void Awake()
     {
         Majdata<WsServer>.Instance = this;
@@ -30,8 +31,138 @@ internal class WsServer: MonoBehaviour
         webSocket = new WebSocketServer("ws://127.0.0.1:8083");
         webSocket.AddWebSocketService<MajdataWsService>("/majdata");
         webSocket.Start();
+        ProcessQueue().Forget();
+        
+        //pull up MajdataEdit-Neo
+        var neoPath = Path.Combine(
+            new DirectoryInfo(Application.dataPath).Parent!.FullName, 
+            "MajdataEdit-Neo.exe");
+        
+        if (File.Exists(neoPath) && 
+            Process.GetProcessesByName("MajdataEdit-Neo").Length <= 0)
+        {
+            Process.Start(neoPath);
+        }
+    }
+    
+    private async UniTaskVoid ProcessQueue()
+    {
+        while (this != null)
+        {
+            if (MessageQueue.TryDequeue(out var json))
+            {
+                while (Majdata<PlayManager>.Instance == null) 
+                    await UniTask.Yield();
+
+                Debug.Log($"dequeue: {json}");
+                await HandleMessageAsync(json);
+            }
+            else
+            {
+                await UniTask.Yield();
+            }
+        }
+    }
+    
+    private async UniTask HandleMessageAsync(string json)
+    {
+        var playManager = Majdata<PlayManager>.Instance!;
+        try
+        {
+            var req = JsonConvert.DeserializeObject<MajWsRequestBase>(json);
+            var payloadJson = req.requestData?.ToString() ?? string.Empty;
+            switch (req.requestType)
+            {
+                case MajWsRequestType.Setting:
+                {
+                    var payload = JsonConvert.DeserializeObject<MajWsRequestSetting>(payloadJson);
+                    playManager.Setting(payload.ViewSetting);
+                    Response(MajWsResponseType.Ok, PlayManager.Summary);
+                    Debug.Log("dequeued: Setting");
+                }
+                    break;
+                case MajWsRequestType.Load:
+                {
+                    var payload = JsonConvert.DeserializeObject<MajWsRequestLoad>(payloadJson);
+                    await playManager.LoadAsync(payload.TrackPath, payload.ImagePath, payload.VideoPath);
+                    Response(MajWsResponseType.LoadOk, PlayManager.Summary);
+                    Debug.Log("dequeued: Load");
+                }
+                    break;
+                case MajWsRequestType.Play:
+                {
+                    var payload = JsonConvert.DeserializeObject<MajWsRequestPlay>(payloadJson);
+                    await playManager.PlayAsync(payload.Mode, 
+                        payload.StartAt, payload.Speed, 
+                        payload.Title, payload.Artist, payload.Offset, 
+                        payload.Designer, payload.Level, payload.Fumen,
+                        payload.Commands, payload.Difficulty, payload.MaidataPath);
+                    if (payload.Mode == PlaybackMode.Normal)
+                        Response(MajWsResponseType.PlayStarted, PlayManager.Summary);
+                    Debug.Log("dequeued: Play");
+                }
+                    break;
+                case MajWsRequestType.Resume:
+                {
+                    await playManager.ResumeAsync();
+                    Response(MajWsResponseType.PlayResumed, PlayManager.Summary);
+                    Debug.Log("dequeued: Resume");
+                }
+                    break;
+                case MajWsRequestType.Pause:
+                {
+                    await playManager.PauseAsync();
+                    Response(MajWsResponseType.PlayPaused, PlayManager.Summary);
+                    Debug.Log("dequeued: Pause");
+                }
+                    break;
+                case MajWsRequestType.Stop:
+                {
+                    await playManager.StopAsync();
+                    Response(MajWsResponseType.PlayStopped, PlayManager.Summary);
+                    Debug.Log("dequeued: Stop");
+                }
+                    break;
+                case MajWsRequestType.State:
+                {
+                    Response(MajWsResponseType.Ok, PlayManager.Summary);
+                    Debug.Log("dequeued: State");
+                }
+                    break;
+                default:
+                    Error("Not Supported");
+                    Debug.LogError("dequeue: Not Supported");
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            Error(ex);
+            throw;
+        }
+    }
+    
+    private void Response(MajWsResponseType type, object? data = null)
+    {
+        var rsp = new MajWsResponseBase
+        {
+            responseType = type, 
+            responseData = data ?? PlayManager.Summary
+        };
+        webSocket?.WebSocketServices["/majdata"].Sessions.
+            Broadcast(JsonConvert.SerializeObject(rsp));
     }
 
+    void Error<T>(T exception) where T : Exception
+    {
+        Response(MajWsResponseType.Error, exception.ToString());
+    }
+
+    void Error(string errMsg)
+    {
+        Response(MajWsResponseType.Error, errMsg);
+    }
+    
     void OnDestroy()
     {
         if (webSocket is not null)
@@ -44,8 +175,6 @@ internal class WsServer: MonoBehaviour
 
 public class MajdataWsService : WebSocketBehavior, IDisposable
 {
-    PlayManager? playManager => Majdata<PlayManager>.Instance;
-    
     public MajdataWsService()
     {
         _ = UniTask.RunOnThreadPool(() =>
@@ -86,115 +215,12 @@ public class MajdataWsService : WebSocketBehavior, IDisposable
     {
     }
 
-    protected override async void OnMessage(MessageEventArgs e)
+    protected override void OnMessage(MessageEventArgs e)
     {
-        if (playManager is null) return;
-        try
-        {
-            var json = string.Empty;
-            if (e.IsText)
-            {
-                json = e.Data;
-            }
-            else if (e.IsBinary)
-            {
-                json = Encoding.UTF8.GetString(e.RawData);
-            }
-            else
-            {
-                return;
-            }
-
-            var req = JsonConvert.DeserializeObject<MajWsRequestBase>(json);
-            var payloadJson = req.requestData?.ToString() ?? string.Empty;
-            switch (req.requestType)
-            {
-                case MajWsRequestType.Setting:
-                {
-                    var payload = JsonConvert.DeserializeObject<MajWsRequestSetting>(payloadJson);
-                    playManager.SyncSetting(payload.ViewSetting);
-                    Response(MajWsResponseType.Ok, PlayManager.Summary);
-                }
-                    break;
-                case MajWsRequestType.Load:
-                {
-                    var payload = JsonConvert.DeserializeObject<MajWsRequestLoad>(payloadJson);
-                    await playManager.LoadAsync(payload.TrackPath, payload.ImagePath, payload.VideoPath);
-                    Response(MajWsResponseType.LoadOk, PlayManager.Summary);
-                }
-                    break;
-                case MajWsRequestType.Play:
-                {
-                    var payload = JsonConvert.DeserializeObject<MajWsRequestPlay>(payloadJson);
-                    await playManager.PlayAsync(payload.Mode, 
-                        payload.StartAt, payload.Speed, 
-                        payload.Title, payload.Artist, payload.Offset, 
-                        payload.Designer, payload.Level, payload.Fumen,
-                        payload.Commands, payload.Difficulty, payload.MaidataPath);
-                    if (payload.Mode == PlaybackMode.Normal)
-                        Response(MajWsResponseType.PlayStarted, PlayManager.Summary);
-                }
-                    break;
-                case MajWsRequestType.Resume:
-                {
-                    await playManager.ResumeAsync();
-                    Response(MajWsResponseType.PlayResumed, PlayManager.Summary);
-                }
-                    break;
-                case MajWsRequestType.Pause:
-                {
-                    await playManager.PauseAsync();
-                    Response(MajWsResponseType.PlayPaused, PlayManager.Summary);
-                }
-                    break;
-                case MajWsRequestType.Stop:
-                {
-                    await playManager.StopAsync();
-                    Response(MajWsResponseType.PlayStopped, PlayManager.Summary);
-                }
-                    break;
-                
-                //TODO: Status
-                case MajWsRequestType.State:
-                {
-                    Response(MajWsResponseType.Ok, PlayManager.Summary);
-                }
-                    break;
-                default:
-                    Error("Not Supported");
-                    break;
-            }
-        }
-        catch (Exception ex)
-        {
-            if (Bass.LastError is not (Errors.Empty or Errors.OK))
-            {
-                Error(Bass.LastError.ToString());
-                return;
-            }
-            
-            Error(ex);
-            throw;
-        }
-    }
-
-    void Error<T>(T exception) where T : Exception
-    {
-        Response(MajWsResponseType.Error, exception.ToString());
-    }
-
-    void Error(string errMsg)
-    {
-        Response(MajWsResponseType.Error, errMsg);
-    }
-
-    void Response(MajWsResponseType type = MajWsResponseType.Ok, object? data = null)
-    {
-        var rsp = new MajWsResponseBase()
-        {
-            responseType = type,
-            responseData = data
-        };
-        Send(JsonConvert.SerializeObject(rsp));
+        var json = e.IsText ? e.Data : Encoding.UTF8.GetString(e.RawData);
+        if (string.IsNullOrWhiteSpace(json)) 
+            return;
+        
+        WsServer.MessageQueue.Enqueue(json);
     }
 }
