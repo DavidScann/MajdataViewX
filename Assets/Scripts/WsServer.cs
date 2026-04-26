@@ -76,7 +76,7 @@ internal class WsServer: MonoBehaviour
                 case MajWsRequestType.Setting:
                 {
                     var payload = JsonConvert.DeserializeObject<MajWsRequestSetting>(payloadJson);
-                    playManager.Setting(payload.ViewSetting);
+                    playManager.Setting(payload.ViewSetting, payload.VolumeSetting);
                     Response(MajWsResponseType.Ok, PlayManager.Summary);
                     Debug.Log("dequeued: Setting");
                 }

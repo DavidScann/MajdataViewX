@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Cysharp.Threading.Tasks;
 using MajSimai;
@@ -68,9 +70,10 @@ public class PlayManager : MonoBehaviour
                                    bgManager.IsBgLoaded && 
                                    bgManager.IsVideoLoaded;
     
-    public void Setting(MajViewSetting setting)
+    public void Setting(MajViewSetting setting, MajVolumeSetting volumeSetting)
     {
         _setting = setting;
+        audioManager.SetVolume(volumeSetting);
     }
     
     public async UniTask LoadAsync(string audioPath, string bgPath, string? pvPath)
@@ -122,7 +125,7 @@ public class PlayManager : MonoBehaviour
         double startAt, float speed, 
         string title, string artist, float offset, 
         string designer, string level, string fumen, 
-        SimaiCommand[] commands, int difficulty, string? maidataPath = null)
+        IList<SimaiCommand> commands, int difficulty, string? maidataPath = null)
     {
         while (_state is ViewStatus.Busy)
             await UniTask.Yield();
@@ -150,7 +153,7 @@ public class PlayManager : MonoBehaviour
             bgManager.ShowVideo();
             //sfx
             var clockCount = 0;
-            var clockCommand = Array.Find(commands, c => c.Prefix == "clock_count");
+            var clockCommand = commands.FirstOrDefault(c => c.Prefix == "clock_count");
             if (clockCommand != default) int.TryParse(clockCommand.Value, out clockCount);
             audioManager.GenerateAnswerSFX(_chart, clockCount);
 

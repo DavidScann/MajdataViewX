@@ -102,13 +102,13 @@ public class BgManager : MonoBehaviour
     public void LoadBG(string path)
     {
         Bg = SpriteLoader.Load(path);
-        jacketImage.texture = Bg.texture;
     }
 
     public void ShowBG()
     {
-        if (Bg == null) return;
+        if (Bg == null || !hasBg) return;
         
+        jacketImage.texture = Bg.texture;
         spriteRender.sprite = Bg;
         var scale = 1140f / Bg.texture.width;
         gameObject.transform.localScale = new Vector3(scale, scale, scale);
@@ -121,6 +121,8 @@ public class BgManager : MonoBehaviour
 
     public void ShowVideo()
     {
+        if (!hasVideo) return;
+        
         videoPlayer.url = VideoUrl;
         StartCoroutine(waitFumenStart());
     }
