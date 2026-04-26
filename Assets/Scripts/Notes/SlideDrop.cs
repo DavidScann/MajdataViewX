@@ -66,8 +66,12 @@ public class SlideDrop : NoteLongBase, ICanShine
         
         //star
         starRenderer = star_slide.GetComponent<SpriteRenderer>();
+        starRenderer.sprite = skinManager.Star;
+        if (isEach) starRenderer.sprite = skinManager.Star_Each;
+        if (isMine) starRenderer.sprite = skinManager.Star_Mine;
         if (isBreak)
         {
+            starRenderer.sprite = skinManager.Star_Break;
             starRenderer.material = skinManager.BreakMaterial;
             starRenderer.material.SetFloat("_Brightness", 0.95f);
             var controller = star_slide.AddComponent<BreakShineController>();

@@ -1,4 +1,5 @@
 #nullable enable
+using System.Collections.Generic;
 using MajSimai;
 
 internal readonly struct MajWsRequestPlay
@@ -12,7 +13,7 @@ internal readonly struct MajWsRequestPlay
     public string Designer { get; init; }
     public string Level { get; init; }
     public string Fumen { get; init; }
-    public SimaiCommand[] Commands { get; init; }
+    public IList<SimaiCommand> Commands { get; init; }
     public int Difficulty { get; init; }
     public string? MaidataPath { get; init; }
 }

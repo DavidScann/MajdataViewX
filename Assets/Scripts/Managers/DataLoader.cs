@@ -703,7 +703,6 @@ public class DataLoader : MonoBehaviour
      
              var slide = Instantiate(slidePrefab[slideIndex], notes.transform);
              var slide_star = Instantiate(star_slidePrefab, notes.transform);
-             slide_star.GetComponent<SpriteRenderer>().sprite = skinManager.Star;
              slide_star.SetActive(false);
              slide.SetActive(false);
              NDCompo.slide = slide;
@@ -720,7 +719,6 @@ public class DataLoader : MonoBehaviour
                  if (notes.FindAll(o => o.Type == SimaiNoteType.Slide).Count > 1)
                  {
                      SliCompo.isEach = true;
-                     slide_star.GetComponent<SpriteRenderer>().sprite = skinManager.Star_Each;
                  }
      
                  var count = notes.FindAll(
@@ -739,8 +737,7 @@ public class DataLoader : MonoBehaviour
              SliCompo.ConnectInfo = info;
              SliCompo.isBreak = note.IsSlideBreak;
              SliCompo.isMine = note.IsMineSlide;
-             if (note.IsSlideBreak) slide_star.GetComponent<SpriteRenderer>().sprite = skinManager.Star_Break;
-     
+             
              NDCompo.isNoHead = note.IsSlideNoHead;
              NDCompo.time = (float)timing.Timing;
              NDCompo.startPosition = note.StartPosition;

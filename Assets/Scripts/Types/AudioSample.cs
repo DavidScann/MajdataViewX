@@ -1,66 +1,118 @@
 ﻿using System;
 using ManagedBass;
 
-public class AudioSample
+public enum AudioSampleMode
+{
+    Stream,
+    Sample
+}
+
+public class AudioSample : IDisposable
 {
     public SampleType SampleType { get; set; }
+
+    /// <summary>
+    /// 当前可操作的通道句柄
+    /// Stream模式下 = Stream Handle
+    /// Sample模式下 = 最近一次获取的播放通道
+    /// </summary>
     public int Decode { get; private set; }
-    
+
+    public AudioSampleMode Mode { get; }
+
+    private readonly int _handle;
     private double _length;
-    
-    public bool IsLoop
-    {
-        get => Bass.ChannelHasFlag(Decode, BassFlags.Loop);
-        
-        set
-        {
-            if (value)
-            {
-                if (!Bass.ChannelHasFlag(Decode, BassFlags.Loop))
-                {
-                    Bass.ChannelAddFlag(Decode, BassFlags.Loop);
-                }
-            }
-            else
-            {
-                if (Bass.ChannelHasFlag(Decode, BassFlags.Loop))
-                {
-                    Bass.ChannelRemoveFlag(Decode, BassFlags.Loop);
-                }
-            }
-        }
-    }
+
     public double CurrentSec
     {
-        get => Bass.ChannelBytes2Seconds(Decode, Bass.ChannelGetPosition(Decode));
-        set => Bass.ChannelSetPosition(Decode, Bass.ChannelSeconds2Bytes(Decode, value));
+        get
+        {
+            EnsureStream(nameof(CurrentSec));
+
+            return Bass.ChannelBytes2Seconds(
+                Decode,
+                Bass.ChannelGetPosition(Decode));
+        }
+        set
+        {
+            EnsureStream(nameof(CurrentSec));
+
+            Bass.ChannelSetPosition(
+                Decode,
+                Bass.ChannelSeconds2Bytes(Decode, value));
+        }
     }
+
     public float Volume
     {
         get => (float)Bass.ChannelGetAttribute(Decode, ChannelAttribute.Volume);
         set
         {
-            var volume = value.Clamp(0, 2);
+            var volume = Math.Clamp(value, 0f, 2f);
             Bass.ChannelSetAttribute(Decode, ChannelAttribute.Volume, volume);
         }
     }
-    public float Speed 
+
+    private float _baseFrequency;
+
+    public float Speed
     {
-        get => (float)Bass.ChannelGetAttribute(Decode, ChannelAttribute.Tempo) / 100f + 1f;
-        set => Bass.ChannelSetAttribute(Decode, ChannelAttribute.Tempo, (value - 1) * 100f);
+        get =>
+            (float)Bass.ChannelGetAttribute(
+                Decode,
+                ChannelAttribute.Frequency) / _baseFrequency;
+
+        set =>
+            Bass.ChannelSetAttribute(
+                Decode,
+                ChannelAttribute.Frequency,
+                _baseFrequency * value);
     }
 
-    public double Length => _length;
-
-    public AudioSample(string file)
+    public double Length
     {
-        Decode = Bass.CreateStream(file);
-        _length = Bass.ChannelBytes2Seconds(Decode, Bass.ChannelGetLength(Decode));
+        get
+        {
+            EnsureStream(nameof(Length));
+            return _length;
+        }
+    }
+
+    public AudioSample(string file, AudioSampleMode mode)
+    {
+        Mode = mode;
+
+        if (mode == AudioSampleMode.Stream)
+        {
+            _handle = Bass.CreateStream(file);
+            Decode = _handle;
+
+            _length = Bass.ChannelBytes2Seconds(
+                Decode,
+                Bass.ChannelGetLength(Decode));
+        }
+        else
+        {
+            _handle = Bass.SampleLoad(file, 0, 0, 2, BassFlags.SampleOverrideLongestPlaying);
+            Decode = Bass.SampleGetChannel(_handle);
+        }
+        _baseFrequency =
+            (float)Bass.ChannelGetAttribute(
+                Decode,
+                ChannelAttribute.Frequency);
     }
 
     public void Play()
     {
-        Bass.ChannelPlay(Decode);
+        if (Mode == AudioSampleMode.Stream)
+        {
+            Bass.ChannelPlay(Decode);
+        }
+        else
+        {
+            Decode = Bass.SampleGetChannel(_handle);
+            Bass.ChannelPlay(Decode, true);
+        }
     }
 
     public void Pause()
@@ -75,12 +127,32 @@ public class AudioSample
 
     public void PlayOneShot()
     {
-        Bass.ChannelSetPosition(Decode, 0);
-        Bass.ChannelPlay(Decode);
+        if (Mode == AudioSampleMode.Stream)
+        {
+            Bass.ChannelSetPosition(Decode, 0);
+            Bass.ChannelPlay(Decode, true);
+        }
+        else
+        {
+            Decode = Bass.SampleGetChannel(_handle);
+            Bass.ChannelPlay(Decode, true);
+        }
     }
 
     public void Dispose()
     {
-        Bass.StreamFree(Decode);
+        if (Mode == AudioSampleMode.Stream)
+            Bass.StreamFree(_handle);
+        else
+            Bass.SampleFree(_handle);
+    }
+
+    private void EnsureStream(string memberName)
+    {
+        if (Mode == AudioSampleMode.Sample)
+        {
+            throw new NotSupportedException(
+                $"{memberName} is not supported in Sample mode.");
+        }
     }
 }

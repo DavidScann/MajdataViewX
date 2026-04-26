@@ -2,8 +2,6 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using Cysharp.Threading.Tasks;
 using JetBrains.Annotations;
 using MajSimai;
 using ManagedBass;
@@ -16,6 +14,7 @@ public class AudioManager : MonoBehaviour
 
     [CanBeNull] private AudioSample TrackSample;
     [CanBeNull] private float[] TrackSampleData;
+    private float TrackSampleVolume;
     public bool IsTrackLoaded => TrackSample != null && TrackSampleData != null;
     
     //answer SFX
@@ -54,7 +53,10 @@ public class AudioManager : MonoBehaviour
     private void Awake()
     {
         Majdata<AudioManager>.Instance = this;
-        Bass.Init();
+        Bass.Configure(Configuration.UpdatePeriod, 5);
+        Bass.Configure(Configuration.PlaybackBufferLength, 10);
+        Bass.Init(-1, 48000);
+
         Bass.PluginLoad("bassmix");
         
         if (File.Exists(ResProvider.TrackSamplePath))
@@ -86,7 +88,7 @@ public class AudioManager : MonoBehaviour
                 "SFX", filename);
             
             //sample
-            var sample = new AudioSample(path);
+            var sample = new AudioSample(path, AudioSampleMode.Sample);
             sample.SampleType = filename switch
             {
                 var p when p.StartsWith("answer") => SampleType.Answer,
@@ -102,6 +104,35 @@ public class AudioManager : MonoBehaviour
             //data
             noteSfxSamplesData.Add(GetSampleDataFromFile(path));
         }
+    }
+
+    public void SetVolume(MajVolumeSetting v)
+    {
+        foreach (var sample in NoteSfxs)
+            switch (sample.SampleType)
+            {
+                case SampleType.Answer:
+                    sample.Volume = v.Answer;
+                    break;
+                case SampleType.Break:
+                    sample.Volume = v.Break;
+                    break;
+                case SampleType.Slide:
+                    sample.Volume = v.Slide;
+                    break;
+                case SampleType.Tap:
+                    sample.Volume = v.Tap;
+                    break;
+                case SampleType.Touch:
+                    sample.Volume = v.Touch;
+                    break;
+                case SampleType.Track:
+                default:
+                    sample.Volume = v.Track;
+                    break;
+            }
+
+        TrackSampleVolume = v.Track;
     }
     
     private void Start()
@@ -227,9 +258,9 @@ public class AudioManager : MonoBehaviour
         ResProvider.TrackSamplePath = path;
         
         TrackSample?.Dispose();
-        TrackSample = new AudioSample(path)
+        TrackSample = new AudioSample(path, AudioSampleMode.Stream)
         {
-            SampleType = SampleType.Track
+            SampleType = SampleType.Track,
         };
         TrackSampleData = GetSampleDataFromFile(path);
     }
@@ -238,6 +269,7 @@ public class AudioManager : MonoBehaviour
     {
         if (TrackSample == null) return;
         TrackSample.Speed = timeProvider.CurrentSpeed;
+        TrackSample.Volume = TrackSampleVolume;
         StartCoroutine(WaitForTrackAudioStart());
         
         IEnumerator WaitForTrackAudioStart()
