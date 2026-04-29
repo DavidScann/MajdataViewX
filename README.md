@@ -24,6 +24,7 @@
   "ButtonsBackground": "#99303030"
 }
 ```
+- **如果下载了runtime仍无法使用，试试这个链接 / If you still can't use it after downloading the runtime, try this link**: [runtime download](https://dotnet.microsoft.com/zh-cn/download/dotnet/thank-you/runtime-6.0.36-windows-x64-installer)
 
 ## 下载 / Download
 
