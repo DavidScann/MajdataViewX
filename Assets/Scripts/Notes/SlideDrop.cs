@@ -1,10 +1,16 @@
-﻿using System;
+﻿#nullable enable
+
+#region
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using MajSimai;
 using UnityEngine;
-using static UnityEngine.Networking.UnityWebRequest;
-#nullable enable
+using Random = UnityEngine.Random;
+
+#endregion
+
 public class SlideDrop : NoteLongBase, ICanShine
 {
     public int endPosition;
@@ -464,37 +470,12 @@ public class SlideDrop : NoteLongBase, ICanShine
     /// </summary>
     void Running()
     {
-        var startTiming = timeProvider.NoteTime - timeStart;
-        if (startTiming < 0f || isMine) 
+        if (timeProvider.NoteTime - timeStart < 0f || isMine) 
             return; 
         if (Majdata<InputManager>.Instance!.Mode is AutoPlayMode.Enable or AutoPlayMode.Random or AutoPlayMode.Disable)
             return;
-
-        var starRadius = 0.763736616f;
         var starPos = star_slide.transform.position;
-        var oldList = new List<Sensor>(triggerSensors);
-        triggerSensors.Clear();
-        foreach (var sensor in inputManager.sensors)
-        {
-            if (sensor.Group is SensorGroup.E or SensorGroup.D)
-                continue;
-
-            var s = (RectTransform)sensor.gameObject.transform;
-            var rCenter = s.position;
-            var rWidth = s.rect.width * s.lossyScale.x;
-            var rHeight = s.rect.height * s.lossyScale.y;
-
-            var radius = Math.Max(rWidth, rHeight) / 2;
-
-            if ((starPos - rCenter).sqrMagnitude <= (radius * radius + starRadius * starRadius))
-                triggerSensors.Add(sensor);
-        }
-        var untriggerSensors = oldList.Where(x => !triggerSensors.Contains(x));
-
-        foreach (var s in untriggerSensors)
-            inputManager.SetSensorOff(s, guid);
-        foreach (var s in triggerSensors)
-            inputManager.SetSensorOn(s, guid);
+        inputManager.WorldPositionHandle(guid.GetHashCode(), starPos);
     }
     /// <summary>
     /// Slide判定
@@ -694,7 +675,7 @@ public class SlideDrop : NoteLongBase, ICanShine
                     SetJust();
                     break;
                 case AutoPlayMode.Random:
-                    judgeResult = (JudgeType)UnityEngine.Random.Range(1, 14);
+                    judgeResult = (JudgeType)Random.Range(1, 14);
                     if (isMine)
                     {
                         if (judgeResult != JudgeType.Miss)

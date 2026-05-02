@@ -1,6 +1,12 @@
+#nullable enable
+
+#region
+
 using System;
 using UnityEngine;
-#nullable enable
+
+#endregion
+
 public class BreakShineController : MonoBehaviour
 {
     TimeProvider timeProvider;

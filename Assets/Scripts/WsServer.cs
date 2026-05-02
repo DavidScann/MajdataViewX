@@ -1,5 +1,7 @@
 ﻿#nullable enable
 
+#region
+
 using System;
 using System.Collections.Concurrent;
 using System.Diagnostics;
@@ -13,6 +15,8 @@ using UnityEngine.SceneManagement;
 using WebSocketSharp;
 using WebSocketSharp.Server;
 using Debug = UnityEngine.Debug;
+
+#endregion
 
 internal class WsServer: MonoBehaviour
 {

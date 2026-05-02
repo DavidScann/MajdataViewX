@@ -1,13 +1,14 @@
-﻿using Newtonsoft.Json;
+﻿#region
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Cysharp.Threading.Tasks;
+using MajSimai;
 using UnityEngine;
 using UnityEngine.UI;
-using System.Threading.Tasks;
-using System.Collections;
-using System.Diagnostics;
-using MajSimai;
+
+#endregion
 
 public class DataLoader : MonoBehaviour
 {
@@ -211,14 +212,11 @@ public class DataLoader : MonoBehaviour
         
         levelText.text = chart.Level;
         designText.text = chart.Designer;
-
-        foreach (var timingList in chart.NoteTimings)
-            objectCounter.CountNoteSum(timingList.Notes);
-        var lastNoteTime = chart.NoteTimings.Length > 0 ? chart.NoteTimings[^1].Timing : 0d;
-
-        foreach (var timing in chart.CommaTimings)
-            objectCounter.ReportMeterBpm(timing);
         
+        objectCounter.CountNoteSumAsync(chart).Forget();
+        objectCounter.ReportMeterBpmAsync(chart).Forget();
+        
+        var lastNoteTime = chart.NoteTimings.Length > 0 ? chart.NoteTimings[^1].Timing : 0d;
         LoadNotes(chart.NoteTimings, ignoreOffset, lastNoteTime);
     }
     
@@ -236,7 +234,7 @@ public class DataLoader : MonoBehaviour
             {
                 if (timing.Timing < ignoreOffset)
                 {
-                    objectCounter.CountNoteCount(timing.Notes);
+                    objectCounter.CountIgnoreNoteCountAsync(timing.Notes).Forget();
                     continue;
                 }
                 List<TouchDrop> members = new();
@@ -245,8 +243,8 @@ public class DataLoader : MonoBehaviour
                     var note = timing.Notes[i];
                     if (note.Type == SimaiNoteType.Tap)
                     {
-                        GameObject GOnote = null;
-                        TapBase NDCompo = null;
+                        GameObject GOnote;
+                        TapBase NDCompo;
                         
                         if (note.IsForceStar)
                         {
@@ -353,8 +351,8 @@ public class DataLoader : MonoBehaviour
                 if (members.Count != 0)
                 {
                     var sensorTypes = members.GroupBy(x => x.GetSensor())
-                                             .Select(x => x.Key)
-                                             .ToList();
+                        .Select(x => x.Key)
+                        .ToList();
                     List<List<SensorArea>> sensorGroups = new();
 
                     while (sensorTypes.Count > 0)
@@ -365,14 +363,14 @@ public class DataLoader : MonoBehaviour
                         existsGroup.AddRange(sensorGroups.FindAll(x => x.Any(y => groupMap.Contains(y))));
 
                         var groupMembers = existsGroup.SelectMany(x => x)
-                                                      .ToList();
+                            .ToList();
                         var newMembers = sensorTypes.FindAll(x => groupMap.Contains(x));
 
                         groupMembers.AddRange(newMembers);
                         groupMembers.Add(sensorType);
                         var newGroup = groupMembers.GroupBy(x => x)
-                                                   .Select(x => x.Key)
-                                                   .ToList();
+                            .Select(x => x.Key)
+                            .ToList();
 
                         foreach (var newMember in newGroup)
                             sensorTypes.Remove(newMember);
@@ -388,7 +386,7 @@ public class DataLoader : MonoBehaviour
                         touchGroups.Add(new TouchGroup()
                         {
                             Members = group.SelectMany(x => groupedMembers.Where(g => g.Key == x)
-                                                                          .SelectMany(g => g)).ToArray()
+                                .SelectMany(g => g)).ToArray()
                         });
                     }
                     foreach (var member in members)
@@ -432,7 +430,7 @@ public class DataLoader : MonoBehaviour
             {
                 GameObject.Find("ErrText").GetComponent<Text>().text =
                     "在第" + (timing.RawTextPositionY + 1) + "行发现问题：\n" + e.Message;
-                UnityEngine.Debug.LogError(e);
+                Debug.LogError(e);
             }
         }
     }
@@ -612,101 +610,101 @@ public class DataLoader : MonoBehaviour
     }
 
     private GameObject InstantiateSlide(SimaiTimingPoint timing, SimaiNote note, ConnSlideInfo info)
-         {
-             var GOnote = Instantiate(starPrefab, notes.transform);
-             var NDCompo = GOnote.GetComponent<StarDrop>();
-             if(!note.IsSlideNoHead)
-                 noteManager.AddNote(GOnote, noteIndex[note.StartPosition]++);
-             // note的图层顺序
-             NDCompo.noteSortOrder = noteSortOrder;
-             noteSortOrder -= NOTE_LAYER_COUNT[note.Type];
+    {
+        var GOnote = Instantiate(starPrefab, notes.transform);
+        var NDCompo = GOnote.GetComponent<StarDrop>();
+        if(!note.IsSlideNoHead)
+            noteManager.AddNote(GOnote, noteIndex[note.StartPosition]++);
+        // note的图层顺序
+        NDCompo.noteSortOrder = noteSortOrder;
+        noteSortOrder -= NOTE_LAYER_COUNT[note.Type];
      
-             NDCompo.rotateSpeed = (float)note.SlideTime;
-             NDCompo.isEx = note.IsEx;
-             NDCompo.isBreak = note.IsBreak;
-             NDCompo.isMine = note.IsMine;
-             NDCompo.tapLine = tapLine;
+        NDCompo.rotateSpeed = (float)note.SlideTime;
+        NDCompo.isEx = note.IsEx;
+        NDCompo.isBreak = note.IsBreak;
+        NDCompo.isMine = note.IsMine;
+        NDCompo.tapLine = tapLine;
      
-             string slideShape = detectShapeFromText(note.RawContent);
-             var isMirror = false;
-             if (slideShape.StartsWith("-"))
-             {
-                 isMirror = true;
-                 slideShape = slideShape.Substring(1);
-             }
-             int slideIndex = SLIDE_PREFAB_MAP[slideShape];
+        string slideShape = detectShapeFromText(note.RawContent);
+        var isMirror = false;
+        if (slideShape.StartsWith("-"))
+        {
+            isMirror = true;
+            slideShape = slideShape.Substring(1);
+        }
+        int slideIndex = SLIDE_PREFAB_MAP[slideShape];
      
-             var slide = Instantiate(slidePrefab[slideIndex], notes.transform);
-             var slide_star = Instantiate(star_slidePrefab, notes.transform);
-             slide_star.SetActive(false);
-             slide.SetActive(false);
-             NDCompo.slide = slide;
-             var SliCompo = slide.AddComponent<SlideDrop>();
+        var slide = Instantiate(slidePrefab[slideIndex], notes.transform);
+        var slide_star = Instantiate(star_slidePrefab, notes.transform);
+        slide_star.SetActive(false);
+        slide.SetActive(false);
+        NDCompo.slide = slide;
+        var SliCompo = slide.AddComponent<SlideDrop>();
      
-             SliCompo.slideType = slideShape;
-             SliCompo.areaStep = new List<int>(SLIDE_AREA_STEP_MAP[slideShape]);
-             SliCompo.smoothSlideAnime = smoothSlideAnime;
+        SliCompo.slideType = slideShape;
+        SliCompo.areaStep = new List<int>(SLIDE_AREA_STEP_MAP[slideShape]);
+        SliCompo.smoothSlideAnime = smoothSlideAnime;
      
-             if (timing.Notes.Length > 1)
-             {
-                 var notes = timing.Notes.ToList();
-                 NDCompo.isEach = true;
-                 if (notes.FindAll(o => o.Type == SimaiNoteType.Slide).Count > 1)
-                 {
-                     SliCompo.isEach = true;
-                 }
+        if (timing.Notes.Length > 1)
+        {
+            var notes = timing.Notes.ToList();
+            NDCompo.isEach = true;
+            if (notes.FindAll(o => o.Type == SimaiNoteType.Slide).Count > 1)
+            {
+                SliCompo.isEach = true;
+            }
      
-                 var count = notes.FindAll(
-                     o => o.Type == SimaiNoteType.Slide &&
-                          o.StartPosition == note.StartPosition).Count;
-                 if (count > 1)
-                 {
-                     NDCompo.isDouble = true;
-                     if (count == notes.Count)
-                         NDCompo.isEach = false;
-                     else
-                         NDCompo.isEach = true;
-                 }
-             }
+            var count = notes.FindAll(
+                o => o.Type == SimaiNoteType.Slide &&
+                     o.StartPosition == note.StartPosition).Count;
+            if (count > 1)
+            {
+                NDCompo.isDouble = true;
+                if (count == notes.Count)
+                    NDCompo.isEach = false;
+                else
+                    NDCompo.isEach = true;
+            }
+        }
      
-             SliCompo.ConnectInfo = info;
-             SliCompo.isBreak = note.IsSlideBreak;
-             SliCompo.isMine = note.IsMineSlide;
+        SliCompo.ConnectInfo = info;
+        SliCompo.isBreak = note.IsSlideBreak;
+        SliCompo.isMine = note.IsMineSlide;
              
-             NDCompo.isNoHead = note.IsSlideNoHead;
-             NDCompo.time = (float)timing.Timing;
-             NDCompo.startPosition = note.StartPosition;
-             NDCompo.speed = noteSpeed * timing.HSpeed;
+        NDCompo.isNoHead = note.IsSlideNoHead;
+        NDCompo.time = (float)timing.Timing;
+        NDCompo.startPosition = note.StartPosition;
+        NDCompo.speed = noteSpeed * timing.HSpeed;
      
      
-             SliCompo.isMirror = isMirror;
-             SliCompo.isJustR = detectJustType(note.RawContent, out int endPos);
-             SliCompo.endPosition = endPos;
-             if (slideIndex - 26 > 0 && slideIndex - 26 <= 8)
-             {
-                 // known slide sprite issue
-                 //    1 2 3 4 5 6 7 8
-                 // p  X X X X X X O O
-                 // q  X O O X X X X X
-                 var pqEndPos = slideIndex - 26;
-                 SliCompo.isSpecialFlip = isMirror == (pqEndPos == 7 || pqEndPos == 8);
-             }
-             else
-             {
-                 SliCompo.isSpecialFlip = isMirror;
-             }
-             SliCompo.speed = noteSpeed * timing.HSpeed;
-             SliCompo.timeStart = (float)timing.Timing;
-             SliCompo.startPosition = note.StartPosition;
-             SliCompo.star_slide = slide_star;
-             SliCompo.time = (float)note.SlideStartTime;
-             SliCompo.LastFor = (float)note.SlideTime;
-             //SliCompo.sortIndex = -7000 + (int)((lastNoteTime - timing.time) * -100) + sort * 5;
-             SliCompo.sortIndex = slideLayer;
-             slideLayer -= SLIDE_AREA_STEP_MAP[slideShape].Last();
-             //slideLayer += 5;
-             return slide;
-         }
+        SliCompo.isMirror = isMirror;
+        SliCompo.isJustR = detectJustType(note.RawContent, out int endPos);
+        SliCompo.endPosition = endPos;
+        if (slideIndex - 26 > 0 && slideIndex - 26 <= 8)
+        {
+            // known slide sprite issue
+            //    1 2 3 4 5 6 7 8
+            // p  X X X X X X O O
+            // q  X O O X X X X X
+            var pqEndPos = slideIndex - 26;
+            SliCompo.isSpecialFlip = isMirror == (pqEndPos == 7 || pqEndPos == 8);
+        }
+        else
+        {
+            SliCompo.isSpecialFlip = isMirror;
+        }
+        SliCompo.speed = noteSpeed * timing.HSpeed;
+        SliCompo.timeStart = (float)timing.Timing;
+        SliCompo.startPosition = note.StartPosition;
+        SliCompo.star_slide = slide_star;
+        SliCompo.time = (float)note.SlideStartTime;
+        SliCompo.LastFor = (float)note.SlideTime;
+        //SliCompo.sortIndex = -7000 + (int)((lastNoteTime - timing.time) * -100) + sort * 5;
+        SliCompo.sortIndex = slideLayer;
+        slideLayer -= SLIDE_AREA_STEP_MAP[slideShape].Last();
+        //slideLayer += 5;
+        return slide;
+    }
     
     private void InstantiateWifi(SimaiTimingPoint timing, SimaiNote note)
     {

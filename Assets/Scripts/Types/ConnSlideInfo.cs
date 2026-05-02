@@ -1,5 +1,10 @@
-﻿using UnityEngine;
-#nullable enable
+﻿#nullable enable
+
+#region
+
+using UnityEngine;
+
+#endregion
 
 public class ConnSlideInfo
 {

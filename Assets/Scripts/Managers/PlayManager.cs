@@ -1,15 +1,17 @@
-﻿using System;
-using System.Collections;
+﻿#nullable enable
+
+#region
+
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Threading.Tasks;
 using Cysharp.Threading.Tasks;
 using MajSimai;
 using Unity.Properties;
 using UnityEngine;
 
-#nullable enable
+#endregion
 
 public class PlayManager : MonoBehaviour
 {
@@ -141,8 +143,7 @@ public class PlayManager : MonoBehaviour
             loader.smoothSlideAnime = _setting.SmoothSlideAnime;
             loader.Load(_chart, startAt - offset, title, artist, difficulty);
             //UI
-            objectCounter.ComboSetActive(_setting.ComboStatusType);
-            objectCounter.SetUIType(_setting.UIType);
+            objectCounter.StartOutput(_setting.ComboStatusType, _setting.UIType);
             effectManager.SetDisplayMode(_setting.JudgeDisplayMode);
             //simulate
             Majdata<InputManager>.Instance!.Mode = _setting.AutoMode;

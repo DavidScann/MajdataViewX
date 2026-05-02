@@ -1,6 +1,11 @@
-﻿using System;
+﻿#nullable enable
+
+#region
+
+using System;
 using System.Linq;
-#nullable enable
+
+#endregion
 
 public class TouchGroup
 {

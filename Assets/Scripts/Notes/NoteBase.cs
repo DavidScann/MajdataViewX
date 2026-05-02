@@ -1,9 +1,12 @@
-using System;
-using System.Diagnostics;
-using UnityEngine;
-using UnityEngine.Serialization;
-
 #nullable enable
+
+#region
+
+using System;
+using UnityEngine;
+
+#endregion
+
 public class NoteBase : MonoBehaviour
 {
     protected TimeProvider timeProvider;

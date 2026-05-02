@@ -1,5 +1,9 @@
-﻿using UnityEngine;
+﻿#region
+
+using UnityEngine;
 using UnityEngine.UI;
+
+#endregion
 
 public class ToggleFullScreen : MonoBehaviour
 {

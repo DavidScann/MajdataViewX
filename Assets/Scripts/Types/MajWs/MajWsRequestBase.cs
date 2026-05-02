@@ -1,4 +1,3 @@
-using System;
 #nullable enable
 
 internal readonly struct MajWsRequestBase

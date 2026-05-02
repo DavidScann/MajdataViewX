@@ -1,7 +1,14 @@
-﻿using System;
+﻿#nullable enable
+
+#region
+
+using System;
 using MajSimai;
 using UnityEngine;
-#nullable enable
+using Random = UnityEngine.Random;
+
+#endregion
+
 public class TouchHoldDrop : NoteLongBase
 {
     public char areaPosition;
@@ -347,7 +354,7 @@ public class TouchHoldDrop : NoteLongBase
                 result = JudgeType.Perfect;
                 break;
             case AutoPlayMode.Random:
-                result = (JudgeType)UnityEngine.Random.Range(1, 14);
+                result = (JudgeType)Random.Range(1, 14);
                 break;
             case AutoPlayMode.DJAuto:
             case AutoPlayMode.Disable:

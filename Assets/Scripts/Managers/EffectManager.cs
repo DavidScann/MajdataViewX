@@ -1,7 +1,11 @@
-﻿using System;
+﻿#nullable enable
+
+#region
+
 using UnityEngine;
-using UnityEngine.UIElements;
-#nullable enable
+
+#endregion
+
 public class EffectManager : MonoBehaviour
 {
     public static bool showFL;

@@ -1,4 +1,4 @@
-public static class MineJudgeExtensions
+public static class JudgeTypeExtensions
 {
     public static JudgeType GetMineJudge(this JudgeType judge)
     {

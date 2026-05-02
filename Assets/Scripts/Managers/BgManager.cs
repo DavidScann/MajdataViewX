@@ -1,11 +1,13 @@
-﻿using System;
+﻿#nullable enable
+
+#region
+
 using System.Collections;
-using System.IO;
-using JetBrains.Annotations;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.Video;
-#nullable enable
+
+#endregion
 
 public class BgManager : MonoBehaviour
 {
@@ -41,12 +43,13 @@ public class BgManager : MonoBehaviour
     {
         timeProvider = Majdata<TimeProvider>.Instance!;
         
-        originalScaleX = gameObject.transform.localScale.x;
-        spriteRender = GetComponent<SpriteRenderer>();
-        videoPlayer = GetComponent<VideoPlayer>();
         jacketImage = GameObject.Find("Jacket").GetComponent<RawImage>();
         songDetail = GameObject.Find("CanvasSongDetail");
         songDetail.SetActive(false);
+        
+        originalScaleX = gameObject.transform.localScale.x;
+        spriteRender = GetComponent<SpriteRenderer>();
+        videoPlayer = GetComponent<VideoPlayer>();
         detailAnim = songDetail.GetComponent<Animator>();
     }
 
@@ -116,15 +119,17 @@ public class BgManager : MonoBehaviour
         IEnumerator WaitFumenStart()
         {
             videoPlayer.Prepare();
+            
+            //secret hack: if not so, the bg won't be set to defaultBg but full white
+            spriteRender.sprite =
+                Sprite.Create(new Texture2D(1080, 1080), new Rect(0, 0, 1080, 1080), new Vector2(0.5f, 0.5f));
+
             while (timeProvider.AudioTime <= 0) yield return new WaitForEndOfFrame();
             while (!videoPlayer.isPrepared) yield return new WaitForEndOfFrame();
             videoPlayer.Play();
             videoPlayer.time = timeProvider.AudioTime;
 
             var scale = videoPlayer.height / (float)videoPlayer.width;
-            spriteRender.sprite =
-                Sprite.Create(new Texture2D(1080, 1080), new Rect(0, 0, 1080, 1080), new Vector2(0.5f, 0.5f));
-        
             gameObject.transform.localScale = new Vector3(originalScaleX, originalScaleX * scale);
         }
     }

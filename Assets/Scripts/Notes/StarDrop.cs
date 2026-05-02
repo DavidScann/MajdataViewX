@@ -1,5 +1,11 @@
-﻿using UnityEngine;
-#nullable enable
+﻿#nullable enable
+
+#region
+
+using UnityEngine;
+
+#endregion
+
 public class StarDrop : TapBase
 {
     public float rotateSpeed = 1f;

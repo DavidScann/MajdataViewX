@@ -1,5 +1,9 @@
-﻿using System;
+﻿#region
+
+using System;
 using System.IO;
+
+#endregion
 
 public static class WavFileWriter
 {
