@@ -1,5 +1,9 @@
-﻿using System;
+﻿#region
+
+using System;
 using ManagedBass;
+
+#endregion
 
 public enum AudioSampleMode
 {

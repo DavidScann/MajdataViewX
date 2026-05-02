@@ -1,7 +1,9 @@
-﻿using System;
+﻿#region
+
 using System.IO;
 using UnityEngine;
-using UnityEngine.Serialization;
+
+#endregion
 
 public class SkinManager : MonoBehaviour
 {

@@ -1,5 +1,11 @@
-﻿using UnityEngine;
-#nullable enable
+﻿#nullable enable
+
+#region
+
+using UnityEngine;
+
+#endregion
+
 public class TapDrop : TapBase
 {
     private void Start()

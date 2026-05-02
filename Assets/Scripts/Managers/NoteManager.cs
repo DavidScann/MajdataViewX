@@ -1,9 +1,13 @@
-using System;
-using System.Collections;
+#nullable enable
+
+#region
+
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
-#nullable enable
+
+#endregion
+
 public class NoteManager : MonoBehaviour
 {
     public List<GameObject> notes = new();

@@ -1,7 +1,12 @@
-using System;
+#nullable enable
+
+#region
+
 using System.Collections.Generic;
 using UnityEngine;
-#nullable enable
+
+#endregion
+
 public class MultTouchHandler : MonoBehaviour
 {
     private readonly List<TouchDrop>[] touchSlots = new List<TouchDrop>[33]; // A1-8,B1-8,C,D1-8,E1-8

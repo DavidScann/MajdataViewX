@@ -1,9 +1,14 @@
+#nullable enable
+
+#region
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using TMPro;
 using UnityEngine;
-#nullable enable
+
+#endregion
+
 public class InputManager : MonoBehaviour
 {
     private AutoPlayMode _mode;
@@ -50,7 +55,7 @@ public class InputManager : MonoBehaviour
         //check keyboard and mouse input
         CheckButton();
         if (Input.GetMouseButton(0))
-            PositionHandle(-1, Input.mousePosition);
+            ScreenPositionHandle(-1, Input.mousePosition);
         else
             Untrigger(-1);
         
@@ -63,7 +68,7 @@ public class InputManager : MonoBehaviour
                     case TouchPhase.Began:
                     case TouchPhase.Moved:
                     case TouchPhase.Stationary:
-                        PositionHandle(touch.fingerId, touch.position);
+                        ScreenPositionHandle(touch.fingerId, touch.position);
                         break;
                     case TouchPhase.Ended:
                     case TouchPhase.Canceled:
@@ -114,7 +119,7 @@ public class InputManager : MonoBehaviour
     
     public void ClickSensor(Sensor sensor)
     {
-        StartCoroutine(sensor.Click());
+        sensor.Click();
     }
     public void SetSensorOn(Sensor sensor, Guid id)
     {
@@ -162,40 +167,49 @@ public class InputManager : MonoBehaviour
         triggerSensor.Clear();
     }
 
-    void PositionHandle(int id, Vector3 pos)
+    public void ScreenPositionHandle(int id, Vector3 pos)
     {
         var mainCamera = Camera.main!;
         var sPosition = pos;
-        sPosition.z = mainCamera.nearClipPlane;
-        var wPosition = mainCamera.ScreenToWorldPoint(sPosition);
-        wPosition.z = 0;
+        sPosition.z = 10f; //for parse
+        var wPos3 = mainCamera.ScreenToWorldPoint(sPosition);
+        var worldPos = new Vector2(wPos3.x, wPos3.y);
+        WorldPositionHandle(id, worldPos);
+    }
+
+    public void WorldPositionHandle(int id, Vector2 pos)
+    {
         if (!triggerSensors.ContainsKey(id))
             triggerSensors.Add(id, new());
-        
-        var starRadius = 0.763736616f;
-        var starPos = pos;
+    
+        const float HAND_RADIUS = 0.763736616f;
         var oldList = new List<Sensor>(triggerSensors[id]);
         triggerSensors[id].Clear();
-        foreach (var s in sensorObjs.Select(x => x.GetComponent<RectTransform>()))
-        {
-            var sensor = s.GetComponent<Sensor>();
 
-            var rCenter = s.position;
+        foreach (var sensor in sensors)
+        {
+            var s = (RectTransform)sensor.gameObject.transform;
+            
+            Vector2 rCenter = s.position; 
             var rWidth = s.rect.width * s.lossyScale.x;
             var rHeight = s.rect.height * s.lossyScale.y;
 
-            var radius = Math.Max(rWidth, rHeight) / 2;
-
-            if ((starPos - rCenter).sqrMagnitude <= (radius * radius + starRadius * starRadius))
+            var radius = Math.Max(rWidth, rHeight) / 2f;
+            
+            var combinedRadius = radius + HAND_RADIUS;
+            if ((pos - rCenter).sqrMagnitude <= (combinedRadius * combinedRadius))
+            {
                 triggerSensors[id].Add(sensor);
+            }
         }
+        
         var untriggerSensors = oldList.Where(x => !triggerSensors[id].Contains(x));
-
         foreach (var s in untriggerSensors)
             SetSensorOff(s, guid);
         foreach (var s in triggerSensors[id])
             SetSensorOn(s, guid);
     }
+    
     void CheckButton()
     {
         foreach (var button in buttons)

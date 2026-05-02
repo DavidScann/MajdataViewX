@@ -1,7 +1,10 @@
+#region
+
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+
+#endregion
 
 public class Sensor : MonoBehaviour
 {
@@ -80,11 +83,10 @@ public class Sensor : MonoBehaviour
             print($"Sensor:{Type} Off");
         }
     }
-    public IEnumerator Click()
+    public void Click()
     {
         var guid = Guid.NewGuid();
         SetOn(guid);
-        yield return new WaitForEndOfFrame();
         SetOff(guid);
     }
 

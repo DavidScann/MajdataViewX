@@ -1,6 +1,11 @@
 #nullable enable
+
+#region
+
 using System.Collections.Generic;
 using MajSimai;
+
+#endregion
 
 internal readonly struct MajWsRequestPlay
 {

@@ -1,8 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
+﻿#nullable enable
+
+#region
+
+using System;
 using System.Linq;
 
-#nullable enable
+#endregion
 
 public class SlideArea
 {

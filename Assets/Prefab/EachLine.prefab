@@ -53,7 +53,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 10754, guid: 0000000000000000f000000000000000, type: 0}
+  - {fileID: 2100000, guid: 58b71fdfceaec5b4c9eed8d4fa6fc443, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -99,10 +99,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   time: 0
   startPosition: 0
-  curvLength: 0
   speed: 0
-  obj1: {fileID: 0}
-  obj2: {fileID: 0}
+  curvLength: 0
   curvSprites:
   - {fileID: 21300000, guid: 20414cf64970db14b9881d4b08a0d0fa, type: 3}
   - {fileID: 21300000, guid: 9cad3999ab944ec41b26210eaa772b47, type: 3}

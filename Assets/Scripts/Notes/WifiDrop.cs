@@ -1,12 +1,16 @@
-﻿using System;
+﻿#nullable enable
+
+#region
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using MajSimai;
-using UnityEditor;
 using UnityEngine;
-using static UnityEngine.Networking.UnityWebRequest;
-#nullable enable
+using Random = UnityEngine.Random;
+
+#endregion
+
 public class WifiDrop : NoteLongBase, ICanShine
 {
     public GameObject star_slidePrefab;
@@ -362,35 +366,14 @@ public class WifiDrop : NoteLongBase, ICanShine
     }
     void Running()
     {
-        if (Majdata<InputManager>.Instance!.Mode is AutoPlayMode.Enable or AutoPlayMode.Random or AutoPlayMode.Disable || isMine)
+        if (timeProvider.NoteTime - timeStart < 0f || isMine) 
+            return; 
+        if (Majdata<InputManager>.Instance!.Mode is AutoPlayMode.Enable or AutoPlayMode.Random or AutoPlayMode.Disable)
             return;
         foreach (var star in star_slides)
         {
-            var starRadius = 0.763736616f;
             var starPos = star.transform.position;
-            var oldList = new List<Sensor>(triggerSensors[star]);
-            triggerSensors[star].Clear();
-            foreach (var sensor in inputManager.sensors)
-            {
-                if (sensor.Group is SensorGroup.E or SensorGroup.D)
-                    continue;
-
-                var s = (RectTransform)sensor.gameObject.transform;
-                var rCenter = s.position;
-                var rWidth = s.rect.width * s.lossyScale.x;
-                var rHeight = s.rect.height * s.lossyScale.y;
-
-                var radius = Math.Max(rWidth, rHeight) / 2;
-
-                if ((starPos - rCenter).sqrMagnitude <= (radius * radius + starRadius * starRadius))
-                    triggerSensors[star].Add(sensor);
-            }
-            var untriggerSensors = oldList.Where(x => !triggerSensors[star].Contains(x));
-
-            foreach (var s in untriggerSensors)
-                inputManager.SetSensorOff(s, guids[star]);
-            foreach (var s in triggerSensors[star])
-                inputManager.SetSensorOn(s, guids[star]);
+            inputManager.WorldPositionHandle(guid.GetHashCode(), starPos);
         }
     }
     // Update is called once per frame
@@ -548,7 +531,7 @@ public class WifiDrop : NoteLongBase, ICanShine
                 SetJust();
                 break;
             case AutoPlayMode.Random:
-                judgeResult = (JudgeType)UnityEngine.Random.Range(1, 14);
+                judgeResult = (JudgeType)Random.Range(1, 14);
                 if (isMine)
                 {
                     if (judgeResult != JudgeType.Miss)
@@ -572,7 +555,7 @@ public class WifiDrop : NoteLongBase, ICanShine
         if (isBreak && judgeResult == JudgeType.Perfect)
             slideOK.GetComponent<Animator>().runtimeAnimatorController = skinManager.Shine_JudgeBreak;
         if (!EffectManager.showLevel) slideOK.GetComponent<SpriteRenderer>().sprite = 
-                Sprite.Create(new Texture2D(0, 0), new Rect(0, 0, 0, 0), new Vector2(0.5f, 0.5f));
+            Sprite.Create(new Texture2D(0, 0), new Rect(0, 0, 0, 0), new Vector2(0.5f, 0.5f));
 
         slideOK.SetActive(true);
 
@@ -588,8 +571,8 @@ public class WifiDrop : NoteLongBase, ICanShine
     void ClearTriggeredSensor()
     {
         foreach (var star in star_slides)
-            foreach (var s in triggerSensors[star])
-                inputManager.SetSensorOff(s, guids[star]);
+        foreach (var s in triggerSensors[star])
+            inputManager.SetSensorOff(s, guids[star]);
     }
     private void setSlideBarAlpha(float alpha)
     {

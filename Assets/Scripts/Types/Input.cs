@@ -1,7 +1,11 @@
 ﻿#nullable enable
+
+#region
+
 using System;
 using UnityEngine;
 
+#endregion
 
 public struct InputEventArgs
 {

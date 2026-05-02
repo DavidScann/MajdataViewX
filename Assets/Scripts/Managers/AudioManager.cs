@@ -1,4 +1,6 @@
-﻿using System;
+﻿#region
+
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -7,6 +9,8 @@ using MajSimai;
 using ManagedBass;
 using ManagedBass.Mix;
 using UnityEngine;
+
+#endregion
 
 public class AudioManager : MonoBehaviour
 {

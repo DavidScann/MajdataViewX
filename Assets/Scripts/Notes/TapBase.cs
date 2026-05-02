@@ -1,7 +1,13 @@
-﻿using System;
+﻿#nullable enable
+
+#region
+
+using System;
 using MajSimai;
 using UnityEngine;
-#nullable enable
+using Random = UnityEngine.Random;
+
+#endregion
 
 public class TapBase : NoteBase
 {
@@ -66,7 +72,7 @@ public class TapBase : NoteBase
                     isJudged = true;
                     break;
                 case AutoPlayMode.Random:
-                    judgeResult = (JudgeType)UnityEngine.Random.Range(1, 14);
+                    judgeResult = (JudgeType)Random.Range(1, 14);
                     if (isMine)
                     {
                         if (judgeResult > JudgeType.Perfect) //Fast
@@ -166,11 +172,6 @@ public class TapBase : NoteBase
             inputManager.SetBusy(arg);
             
             Judge();
-            if (isJudged)
-            {
-                Destroy(tapLine);
-                Destroy(gameObject);
-            }
         }
     }
 

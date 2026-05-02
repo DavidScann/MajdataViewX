@@ -1,7 +1,11 @@
-﻿using System.IO.MemoryMappedFiles;
-using UnityEditor;
+﻿#nullable enable
+
+#region
+
 using UnityEngine;
-#nullable enable
+
+#endregion
+
 public class DestroySelf : MonoBehaviour
 {
     public bool ifDestroy;

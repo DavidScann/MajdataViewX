@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-public ref struct NoteScore
+﻿public ref struct NoteScore
 {
     public long TotalScore { get; set; }
     public long TotalExtraScore { get; set; }

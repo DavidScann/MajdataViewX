@@ -1,5 +1,11 @@
-﻿using UnityEngine;
-#nullable enable
+﻿#nullable enable
+
+#region
+
+using UnityEngine;
+
+#endregion
+
 public class DontDestroyOnLoad : MonoBehaviour
 {
     private void Start()

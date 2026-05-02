@@ -1,6 +1,12 @@
-﻿using System.IO;
+﻿#nullable enable
+
+#region
+
+using System.IO;
 using UnityEngine;
-#nullable enable
+
+#endregion
+
 public static class SpriteLoader
 {
     public static Sprite Load(string path)

@@ -1,5 +1,11 @@
-using UnityEngine;
 #nullable enable
+
+#region
+
+using UnityEngine;
+
+#endregion
+
 public class EachLineDrop : MonoBehaviour
 {
     //managers

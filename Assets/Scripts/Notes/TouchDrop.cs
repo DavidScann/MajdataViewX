@@ -1,8 +1,14 @@
-﻿using System;
+﻿#nullable enable
+
+#region
+
+using System;
 using MajSimai;
-using Unity.Burst.Intrinsics;
 using UnityEngine;
-#nullable enable
+using Random = UnityEngine.Random;
+
+#endregion
+
 public class TouchDrop : NoteBase
 {
     private MultTouchHandler multTouchHandler;
@@ -170,7 +176,7 @@ public class TouchDrop : NoteBase
                     isJudged = true;
                     break;
                 case AutoPlayMode.Random:
-                    judgeResult = (JudgeType)UnityEngine.Random.Range(1, 14);
+                    judgeResult = (JudgeType)Random.Range(1, 14);
                     if (isMine)
                     {
                         if (judgeResult > JudgeType.Perfect) //Fast

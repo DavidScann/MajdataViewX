@@ -1,7 +1,14 @@
-﻿using System;
+﻿#nullable enable
+
+#region
+
+using System;
 using MajSimai;
 using UnityEngine;
-#nullable enable
+using Random = UnityEngine.Random;
+
+#endregion
+
 public class HoldDrop : NoteLongBase
 {
     private EffectManager effectManager;
@@ -129,7 +136,7 @@ public class HoldDrop : NoteLongBase
                     if (!isJudged)
                     {
                         noteManager.NextNote(startPosition);
-                        judgeResult = (JudgeType)UnityEngine.Random.Range(1, 14);
+                        judgeResult = (JudgeType)Random.Range(1, 14);
                         if (isMine)
                         {
                             if (judgeResult > JudgeType.Perfect) //Fast
@@ -393,7 +400,7 @@ public class HoldDrop : NoteLongBase
                 result = JudgeType.Perfect;
                 break;
             case AutoPlayMode.Random:
-                result = (JudgeType)UnityEngine.Random.Range(1, 14);
+                result = (JudgeType)Random.Range(1, 14);
                 break;
             case AutoPlayMode.DJAuto:
             case AutoPlayMode.Disable:

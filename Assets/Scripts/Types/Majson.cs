@@ -1,5 +1,9 @@
-﻿using MajSimai;
+﻿#region
+
 using System.Collections.Generic;
+using MajSimai;
+
+#endregion
 
 internal class Majson
 {
@@ -15,7 +19,7 @@ internal class EditRequestjson
 {
     public float audioSpeed;
     public float backgroundCover;
-    public EditorComboIndicator comboStatusType;
+    public BgInfoDisplay comboStatusType;
     public EditorPlayMethod editorPlayMethod;
     public EditorControlMethod control;
     public JudgeDisplayMode judgeDisplayMode;
@@ -27,24 +31,19 @@ internal class EditRequestjson
     public bool smoothSlideAnime;
 }
 
-public enum EditorComboIndicator
+public enum BgInfoDisplay
 {
     None,
-
-    // List of viable indicators that won't be a static content.
-    // ScoreBorder, AchievementMaxDown, ScoreDownDeluxe are static.
     Combo,
-    ScoreClassic,
-    AchievementClassic,
-    AchievementDownClassic,
-    AchievementDeluxe = 11,
-    AchievementDownDeluxe,
-    ScoreDeluxe,
-
-    // Please prefix custom indicator with C
-    CScoreDedeluxe = 101,
-    CScoreDownDedeluxe,
-    MAX
+    Achievement_101,
+    Achievement_100,
+    Achievement,
+    AchievementClassical,
+    AchievementClassical_100,
+    DXScore,
+    S_Border,
+    SS_Border,
+    SSS_Border,
 }
 
 internal enum EditorControlMethod
