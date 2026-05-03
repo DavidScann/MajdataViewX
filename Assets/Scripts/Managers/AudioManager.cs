@@ -290,8 +290,6 @@ public class AudioManager : MonoBehaviour
         answerTimingPoints.Clear();
         for (var i = 0; i < noteSfxPlaybackRequests.Length; i++)
             noteSfxPlaybackRequests[i] = false;
-
-        recordingBuffer = null;
     }
     
     

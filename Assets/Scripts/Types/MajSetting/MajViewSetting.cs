@@ -8,5 +8,6 @@
     public JudgeDisplayMode JudgeDisplayMode { get; set; } = JudgeDisplayMode.Both;
     public AutoPlayMode AutoMode { get; set; } = AutoPlayMode.Enable;
     public int OutputFps { get; set; } = 60;
+    public bool UseAlpha { get; set; } = false;
     public UIType UIType { get; set; } = UIType.Legacy;
 }
