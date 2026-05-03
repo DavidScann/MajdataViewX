@@ -11,15 +11,14 @@ using UnityEngine;
 
 public class InputManager : MonoBehaviour
 {
-    private AutoPlayMode _mode;
     public AutoPlayMode Mode { get; set; }
     
     private Guid guid = Guid.NewGuid();
     
-    public List<GameObject> sensorObjs = new();
-    public List<Sensor> sensors = new();
+    public List<Sensor> Sensors = new();
+    public List<Button> Buttons = new();
+    
     public Dictionary<int,List<Sensor>> triggerSensors = new();
-    public List<Button> buttons = new();
     
     private void Awake()
     {
@@ -29,24 +28,23 @@ public class InputManager : MonoBehaviour
     private void Start()
     {
         //init sensors and buttons
-        var sManagerObj = GameObject.Find("Sensors");
-        for (var i = 0; i < sManagerObj.transform.childCount; i++)
+        var sensorsObj = GameObject.Find("Sensors");
+        for (var i = 0; i < sensorsObj.transform.childCount; i++)
         {
-            var obj = sManagerObj.transform.GetChild(i).gameObject;
-            sensorObjs.Add(obj);
-            sensors.Add(obj.GetComponent<Sensor>());
+            var obj = sensorsObj.transform.GetChild(i).gameObject;
+            Sensors.Add(obj.GetComponent<Sensor>());
         }
         
-        buttons = new(new Button[] 
+        Buttons = new(new Button[] 
         {
-            new(KeyCode.W, sensors[0]), //A1~8
-            new(KeyCode.E, sensors[1]),
-            new(KeyCode.D, sensors[2]),
-            new(KeyCode.C, sensors[3]),
-            new(KeyCode.X, sensors[4]),
-            new(KeyCode.Z, sensors[5]),
-            new(KeyCode.A, sensors[6]),
-            new(KeyCode.Q, sensors[7]),
+            new(KeyCode.W, Sensors[0]), //A1~8
+            new(KeyCode.E, Sensors[1]),
+            new(KeyCode.D, Sensors[2]),
+            new(KeyCode.C, Sensors[3]),
+            new(KeyCode.X, Sensors[4]),
+            new(KeyCode.Z, Sensors[5]),
+            new(KeyCode.A, Sensors[6]),
+            new(KeyCode.Q, Sensors[7]),
         });
     }
     
@@ -79,8 +77,8 @@ public class InputManager : MonoBehaviour
         }
     }
 
-    public Button GetButton(Sensor sensor) => buttons[(int)sensor.Type];
-    public Sensor GetSensor(SensorArea sensorArea) => sensors.Find(s => s.Type == sensorArea);
+    public Button GetButton(Sensor sensor) => Buttons[(int)sensor.Type];
+    public Sensor GetSensor(SensorArea sensorArea) => Sensors[(int)sensorArea];
     
     public void BindSensor(EventHandler<InputEventArgs> checker, Sensor sensor)
     {
@@ -116,20 +114,6 @@ public class InputManager : MonoBehaviour
         return sensor.Status == targetStatus;
     }
 
-    
-    public void ClickSensor(Sensor sensor)
-    {
-        sensor.Click();
-    }
-    public void SetSensorOn(Sensor sensor, Guid id)
-    {
-        sensor.SetOn(id);
-    }
-    public void SetSensorOff(Sensor sensor, Guid id)
-    {
-        sensor.SetOff(id);
-    }
-
     public void SetBusy(InputEventArgs args)
     {
         if(args.IsButton)
@@ -163,7 +147,7 @@ public class InputManager : MonoBehaviour
             return;
 
         foreach (var s in triggerSensor)
-            SetSensorOff(s, guid);
+            s.SetOff(guid);
         triggerSensor.Clear();
     }
 
@@ -182,11 +166,11 @@ public class InputManager : MonoBehaviour
         if (!triggerSensors.ContainsKey(id))
             triggerSensors.Add(id, new());
     
-        const float HAND_RADIUS = 0.763736616f;
+        const float HAND_RADIUS = 0.28f;
         var oldList = new List<Sensor>(triggerSensors[id]);
         triggerSensors[id].Clear();
 
-        foreach (var sensor in sensors)
+        foreach (var sensor in Sensors)
         {
             var s = (RectTransform)sensor.gameObject.transform;
             
@@ -205,14 +189,14 @@ public class InputManager : MonoBehaviour
         
         var untriggerSensors = oldList.Where(x => !triggerSensors[id].Contains(x));
         foreach (var s in untriggerSensors)
-            SetSensorOff(s, guid);
+            s.SetOff(guid);
         foreach (var s in triggerSensors[id])
-            SetSensorOn(s, guid);
+            s.SetOn(guid);
     }
     
     void CheckButton()
     {
-        foreach (var button in buttons)
+        foreach (var button in Buttons)
         {
             var nStatus = Input.GetKey(button.BindingKey) ? SensorStatus.On : SensorStatus.Off;
             var oStatus = button.Status;
@@ -235,12 +219,12 @@ public class InputManager : MonoBehaviour
     {
         triggerSensors.Clear();
 
-        foreach (var sensor in sensors)
+        foreach (var sensor in Sensors)
         {
             sensor.ForceReset();
         }
 
-        foreach (var button in buttons)
+        foreach (var button in Buttons)
         {
             button.Status = SensorStatus.Off;
             button.IsJudging = false;

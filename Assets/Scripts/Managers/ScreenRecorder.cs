@@ -49,92 +49,78 @@ public class ScreenRecorder : MonoBehaviour
     public void ResetState()
     {
         StopRecording();
+        errText.text = string.Empty;
     }
-
+    
     private IEnumerator CaptureScreen(string maidataPath, int fps)
     {
-        //BUG: maybe still has some problemSSSSSSSS...
-        // 分辨率偶数检查
+        // 1. 环境检查
         if (Screen.width % 2 != 0 || Screen.height % 2 != 0)
         {
             errText.text = $"无法渲染：分辨率 {Screen.width}x{Screen.height} 不是偶数。";
             yield break;
         }
-        
-        // args
-        var ffmpegPath = Application.streamingAssetsPath + "\\ffmpeg.exe";
+
+        // 2. 路径与参数准备
+        var ffmpegPath = Path.Combine(Application.streamingAssetsPath, "ffmpeg.exe");
         var wavName = "temp.wav";
-        var videoName = "temp.mov"; 
+        var videoName = "temp.mov"; // MOV 容器配合 qtrle 是支持 Alpha 且速度最快的组合
         var finalName = "out.mov";
-        
+
+        // -c:v qtrle (QuickTime Animation) 几乎不耗 CPU，支持 Alpha
         var outArgs = 
             "-hide_banner -y " +
             $"-f rawvideo -pix_fmt rgba -s {Screen.width}x{Screen.height} -r {fps} " +
             @"-i \\.\pipe\majdataRec " +
             "-vf vflip " +
-            "-c:v libvpx-vp9 -crf 25 -b:v 0 -pix_fmt yuva420p " + 
+            "-c:v qtrle " + 
             $"\"{videoName}\"";
-        
+
+        // 合并参数：MOV 支持封装原始 PCM (WAV) 音频，无需转码，极快
         var muxArgs = 
             "-hide_banner -y " +
             $"-i \"{videoName}\" -i \"{wavName}\" " +
-            "-c:v copy -c:a libopus -b:a 320k -shortest " +
+            "-c:v copy -c:a pcm_s16le -shortest " +
             $"\"{finalName}\"";
-        
-        var startInfo = new ProcessStartInfo(ffmpegPath)
-        {
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            WorkingDirectory = maidataPath
-        };
-        
-        // camera
+
+        // 3. 准备 RenderTexture 和 离线 Texture2D
         var rt = new RenderTexture(Screen.width, Screen.height, 24, RenderTextureFormat.ARGB32);
         rt.Create();
+        // 预分配 Texture2D，避免循环内 new 产生 GC
+        var cpuTex = new Texture2D(Screen.width, Screen.height, TextureFormat.RGBA32, false);
+    
         var camera = Camera.main;
+        var oldRT = camera.targetTexture;
         camera.targetTexture = rt;
 
-        // audio
         audioManager.PrepareRecordingBuffer();
-        
         IsRecording = true;
 
-        var frameQueue = new Queue<byte[]>();
-        var pendingFrameCount = 0;
         var touchHoldStartTime = 0f;
         var isTouchHoldRising = false;
-        using (var pipeServer = new NamedPipeServerStream("majdataRec", PipeDirection.Out, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous))
+
+        // 4. 启动管道（增加缓冲区大小到 16MB 提高吞吐量）
+        using (var pipeServer = new NamedPipeServerStream("majdataRec", PipeDirection.Out, 1, 
+                   PipeTransmissionMode.Byte, PipeOptions.Asynchronous, 1024 * 1024 * 16, 1024 * 1024 * 16))
         {
-            startInfo.Arguments = outArgs;
+            var startInfo = new ProcessStartInfo(ffmpegPath, outArgs)
+            {
+                UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = maidataPath
+            };
             var outProcess = Process.Start(startInfo);
-            pipeServer.WaitForConnection();
+            
+            // 等待 FFmpeg 连接
+            var connectTask = pipeServer.WaitForConnectionAsync();
+            while (!connectTask.IsCompleted) yield return null;
 
             using (var bw = new BinaryWriter(pipeServer))
             {
-                // writing thread
-                var writeTask = UniTask.RunOnThreadPool(() => {
-                    while (IsRecording || frameQueue.Count > 0 || pendingFrameCount > 0)
-                    {
-                        byte[] frame = null;
-                        lock (frameQueue)
-                        {
-                            if (frameQueue.Count > 0) frame = frameQueue.Dequeue();
-                        }
-                        if (frame != null)
-                        {
-                            bw.Write(frame);
-                            bw.Flush();
-                        }
-                        else { Thread.Sleep(1); }
-                    }
-                });
-                
-                // recording
+                // --- 录制主循环 ---
                 while (IsRecording && !outProcess.HasExited)
                 {
                     yield return new WaitForEndOfFrame();
-                    
-                    // audio
+
+                    // A. 处理音频逻辑 (完全保留你原始逻辑)
                     audioManager.UpdateAnswerSfx();
                     for (var i = 0; i < AudioManager.noteSfxPlaybackRequests.Length - 1; i++)
                     {
@@ -144,7 +130,11 @@ public class ScreenRecorder : MonoBehaviour
                         {
                             var isRequested = AudioManager.noteSfxPlaybackRequests[i];
                             if (isRequested && !isTouchHoldRising) { isTouchHoldRising = true; touchHoldStartTime = currentNoteTime; }
-                            else if (!isRequested && isTouchHoldRising) { isTouchHoldRising = false; audioManager.MixSfxToBuffer(AudioManager.TOUCHHOLD, touchHoldStartTime, currentNoteTime - touchHoldStartTime); }
+                            else if (!isRequested && isTouchHoldRising) 
+                            { 
+                                isTouchHoldRising = false; 
+                                audioManager.MixSfxToBuffer(AudioManager.TOUCHHOLD, touchHoldStartTime, currentNoteTime - touchHoldStartTime); 
+                            }
                         }
                         else if (AudioManager.noteSfxPlaybackRequests[i])
                         {
@@ -152,46 +142,40 @@ public class ScreenRecorder : MonoBehaviour
                             AudioManager.noteSfxPlaybackRequests[i] = false;
                         }
                     }
-                    
-                    // video
-                    Interlocked.Increment(ref pendingFrameCount);
-                    AsyncGPUReadback.Request(rt, 0, TextureFormat.RGBA32, (request) => 
-                    {
-                        if (!request.hasError)
-                        {
-                            var data = request.GetData<byte>().ToArray();
-                            lock (frameQueue) { frameQueue.Enqueue(data); }
-                        }
-                        Interlocked.Decrement(ref pendingFrameCount);
-                    });
+
+                    // B. 视频抓取与同步写入
+                    RenderTexture.active = rt;
+                    cpuTex.ReadPixels(new Rect(0, 0, Screen.width, Screen.height), 0, 0);
+                    bw.Write(cpuTex.GetRawTextureData());
                 }
-                
-                yield return new WaitUntil(() => pendingFrameCount == 0 && frameQueue.Count == 0);
-                yield return new WaitUntil(() => writeTask.Status.IsCompleted());
+                bw.Flush();
             }
-            
+
             if (!outProcess.HasExited) outProcess.WaitForExit();
-
-            // mux
-            audioManager.ExportFinalWav(Path.Combine(maidataPath, wavName));
-            
-            startInfo.Arguments = muxArgs;
-            var muxProcess = Process.Start(startInfo);
-            muxProcess.WaitForExit();
-
-            // camera
-            camera.targetTexture = null;
-            rt.Release();
-            
-            // output
-            var outPath = Path.Combine(maidataPath, finalName);
-            if (File.Exists(outPath))
-            {
-                errText.text = "渲染成功：" + finalName;
-                Process.Start("explorer", "/select,\"" + outPath + "\"");
-            }
         }
-        
+
+        // 5. 音频导出与最终合并
+        errText.text = "正在处理音频导出...";
+        audioManager.ExportFinalWav(Path.Combine(maidataPath, wavName));
+
+        errText.text = "正在执行最终合并 (Muxing)...";
+        var muxProcess = Process.Start(new ProcessStartInfo(ffmpegPath, muxArgs)
+        {
+            UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = maidataPath
+        });
+        muxProcess.WaitForExit();
+
+        // 6. 清理
+        camera.targetTexture = oldRT;
+        rt.Release();
+
+        var outPath = Path.Combine(maidataPath, finalName);
+        if (File.Exists(outPath))
+        {
+            errText.text = "渲染成功：" + finalName;
+            Process.Start("explorer", "/select,\"" + outPath + "\"");
+        }
+
         timeProvider.Pause();
         bgManager.PauseVideo();
     }

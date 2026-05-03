@@ -58,6 +58,7 @@ public class TouchHoldDrop : NoteLongBase
         
         holdEffect = Instantiate(holdEffect, notes);
         holdEffect.SetActive(false);
+        material = holdEffect.GetComponent<ParticleSystemRenderer>().material;
         
         firework = GameObject.Find("FireworkEffect");
         fireworkEffect = firework.GetComponent<Animator>();
@@ -125,11 +126,6 @@ public class TouchHoldDrop : NoteLongBase
             
             inputManager.SetBusy(arg);
             Judge();
-            if (isJudged)
-            {
-                inputManager.UnbindSensor(Check, sensor);
-                noteManager.NextTouch(GetSensor());
-            }
         }
     }
     void Judge()
@@ -200,7 +196,7 @@ public class TouchHoldDrop : NoteLongBase
                     return;
                 case AutoPlayMode.DJAuto:
                     if (!isJudged && !isMine)
-                        inputManager.SetSensorOn(sensor, guid);
+                        sensor.SetOn(guid);
                     break;
                 case AutoPlayMode.Random:
                     if (!isJudged)
@@ -394,7 +390,7 @@ public class TouchHoldDrop : NoteLongBase
             }
         }
         inputManager.UnbindSensor(Check, sensor);
-        inputManager.SetSensorOff(sensor, guid);
+        sensor.SetOff(guid);
         PlayJudgeEffect(result);
     }
 
@@ -446,7 +442,7 @@ public class TouchHoldDrop : NoteLongBase
             //get obj
             var obj = Instantiate(judgeEffect, Vector3.zero, transform.rotation);
             var judgeObj = obj.transform.GetChild(0);
-            if (sensor.Group != SensorGroup.C)
+            if (sensor.Type != SensorArea.C)
                 judgeObj.transform.position = GetPosition(-0.46f);
             else
                 judgeObj.transform.position = new Vector3(0, -0.6f, 0);
@@ -492,7 +488,7 @@ public class TouchHoldDrop : NoteLongBase
             //get obj
             var obj = Instantiate(judgeEffect, Vector3.zero, transform.rotation);
             var flObj = obj.transform.GetChild(0);
-            if (sensor.Group != SensorGroup.C)
+            if (sensor.Type != SensorArea.C)
                 flObj.transform.position = GetPosition(-0.92f);
             else
                 flObj.transform.position = new Vector3(0, -1.08f, 0);

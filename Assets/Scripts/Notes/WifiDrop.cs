@@ -572,7 +572,7 @@ public class WifiDrop : NoteLongBase, ICanShine
     {
         foreach (var star in star_slides)
         foreach (var s in triggerSensors[star])
-            inputManager.SetSensorOff(s, guids[star]);
+            s.SetOff(guids[star]);
     }
     private void setSlideBarAlpha(float alpha)
     {

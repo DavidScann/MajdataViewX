@@ -130,10 +130,6 @@ public class TouchDrop : NoteBase
             
             inputManager.SetBusy(arg);
             Judge();
-            if (isJudged)
-            {
-                Destroy(gameObject);
-            }
         }
     }
     private void FixedUpdate()
@@ -194,7 +190,7 @@ public class TouchDrop : NoteBase
                     if (isTriggered)
                         return;
                     if (!isMine) //mine buda
-                        inputManager.ClickSensor(sensor);
+                        sensor.Click();
                     isTriggered = true;
                     break;
                 case AutoPlayMode.Disable:
@@ -356,7 +352,7 @@ public class TouchDrop : NoteBase
             //get obj
             var obj = Instantiate(judgeEffect, Vector3.zero, transform.rotation);
             var judgeObj = obj.transform.GetChild(0);
-            if (sensor.Group != SensorGroup.C)
+            if (sensor.Type != SensorArea.C)
                 judgeObj.transform.position = GetPosition(-0.46f);
             else
                 judgeObj.transform.position = new Vector3(0, -0.6f, 0);
@@ -400,7 +396,7 @@ public class TouchDrop : NoteBase
             //get obj
             var obj = Instantiate(judgeEffect, Vector3.zero, transform.rotation);
             var flObj = obj.transform.GetChild(0);
-            if (sensor.Group != SensorGroup.C)
+            if (sensor.Type != SensorArea.C)
                 flObj.transform.position = GetPosition(-0.92f);
             else
                 flObj.transform.position = new Vector3(0, -1.08f, 0);

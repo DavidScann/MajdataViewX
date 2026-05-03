@@ -15,10 +15,8 @@ public class TapDrop : TapBase
         LoadSkin();
         spriteRenderer.forceRenderingOff = true;
         exSpriteRender.forceRenderingOff = true;
-        
-        sensor = GameObject.Find("Sensors")
-                                   .transform.GetChild(startPosition - 1)
-                                   .GetComponent<Sensor>();
+
+        sensor = inputManager.Sensors[startPosition - 1];
         inputManager.BindArea(Check, sensor);
         State = NoteStatus.Initialized;
     }

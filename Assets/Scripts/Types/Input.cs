@@ -9,7 +9,7 @@ using UnityEngine;
 
 public struct InputEventArgs
 {
-    public Sensor Sensor {  get; set; }
+    public Sensor Sensor { get; set; }
     public SensorStatus OldStatus { get; set; }
     public SensorStatus Status { get; set; }
     public bool IsButton { get; set; }

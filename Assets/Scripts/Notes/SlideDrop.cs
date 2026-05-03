@@ -474,8 +474,11 @@ public class SlideDrop : NoteLongBase, ICanShine
             return; 
         if (Majdata<InputManager>.Instance!.Mode is AutoPlayMode.Enable or AutoPlayMode.Random or AutoPlayMode.Disable)
             return;
-        var starPos = star_slide.transform.position;
-        inputManager.WorldPositionHandle(guid.GetHashCode(), starPos);
+        if (star_slide)
+        {
+            var starPos = star_slide.transform.position;
+            inputManager.WorldPositionHandle(guid.GetHashCode(), starPos);
+        }
     }
     /// <summary>
     /// Slide判定
@@ -652,7 +655,7 @@ public class SlideDrop : NoteLongBase, ICanShine
     void ClearTriggeredSensor()
     {
         foreach (var t in triggerSensors)
-            inputManager.SetSensorOff(t, guid);
+            t.SetOff(guid);
     }
     void OnDestroy()
     {

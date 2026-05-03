@@ -39,6 +39,7 @@ public class HoldDrop : NoteLongBase
         
         holdEffect = Instantiate(holdEffect, notes);
         holdEffect.SetActive(false);
+        material = holdEffect.GetComponent<ParticleSystemRenderer>().material;
 
         tapLine = Instantiate(tapLine, notes);
         tapLine.SetActive(false);
@@ -155,9 +156,6 @@ public class HoldDrop : NoteLongBase
                     PlayHoldEffect();
                     PlayJudgeSFX();
                     return;
-                case AutoPlayMode.Disable:
-                    inputManager.SetSensorOff(sensor, guid);
-                    break;
             }
         }
 
