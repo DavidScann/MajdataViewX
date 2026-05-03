@@ -582,8 +582,8 @@ public class SlideDrop : NoteLongBase, ICanShine
     {
         if (onlyStar)
         { 
-            star_slide = null!;
             Destroy(star_slide);
+            star_slide = null!;
         }
         else
         {

@@ -381,7 +381,7 @@ public class WifiDrop : NoteLongBase, ICanShine
         foreach (var star in star_slides)
         {
             var starPos = star.transform.position;
-            inputManager.WorldPositionHandle(guid.GetHashCode(), starPos);
+            inputManager.WorldPositionHandle(guids[star].GetHashCode(), starPos);
         }
     }
     // Update is called once per frame
