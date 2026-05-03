@@ -54,12 +54,12 @@ public class NoteLongBase : NoteBase
     
     [SerializeField]
     public GameObject holdEffect;
+    protected Material material;
     
     protected float GetRemainingTime() => MathF.Max(LastFor - GetJudgeTiming(),0);
 
     protected virtual void PlayHoldEffect()
     {
-        var material = holdEffect.GetComponent<ParticleSystemRenderer>().material;
         switch (judgeResult)
         {
             case JudgeType.LatePerfect2:

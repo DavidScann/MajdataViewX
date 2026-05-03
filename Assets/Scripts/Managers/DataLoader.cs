@@ -197,7 +197,6 @@ public class DataLoader : MonoBehaviour
 
     private void Start()
     {
-        Application.targetFrameRate = 120;
         objectCounter = Majdata<ObjectCounter>.Instance!;
         skinManager = Majdata<SkinManager>.Instance!;
         noteManager = Majdata<NoteManager>.Instance!;
