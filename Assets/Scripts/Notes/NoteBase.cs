@@ -18,7 +18,7 @@ public class NoteBase : MonoBehaviour
     
     public float time;
     public int startPosition;
-    public Sensor sensor;
+    public SensorType sensor;
     public float speed = 7;
     public int noteSortOrder;
 

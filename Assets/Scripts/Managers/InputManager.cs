@@ -15,8 +15,8 @@ public class InputManager : MonoBehaviour
     
     private Guid guid = Guid.NewGuid();
     
-    public List<Sensor> Sensors = new();
-    public List<Button> Buttons = new();
+    private List<Sensor> Sensors = new();
+    private List<Button> Buttons = new();
     
     public Dictionary<int,List<Sensor>> triggerSensors = new();
     
@@ -37,14 +37,14 @@ public class InputManager : MonoBehaviour
         
         Buttons = new(new Button[] 
         {
-            new(KeyCode.W, Sensors[0]), //A1~8
-            new(KeyCode.E, Sensors[1]),
-            new(KeyCode.D, Sensors[2]),
-            new(KeyCode.C, Sensors[3]),
-            new(KeyCode.X, Sensors[4]),
-            new(KeyCode.Z, Sensors[5]),
-            new(KeyCode.A, Sensors[6]),
-            new(KeyCode.Q, Sensors[7]),
+            new(KeyCode.W, SensorType.A1), //A1~8
+            new(KeyCode.E, SensorType.A2),
+            new(KeyCode.D, SensorType.A3),
+            new(KeyCode.C, SensorType.A4),
+            new(KeyCode.X, SensorType.A5),
+            new(KeyCode.Z, SensorType.A6),
+            new(KeyCode.A, SensorType.A7),
+            new(KeyCode.Q, SensorType.A8),
         });
     }
     
@@ -76,67 +76,100 @@ public class InputManager : MonoBehaviour
             }
         }
     }
-
-    public Button GetButton(Sensor sensor) => Buttons[(int)sensor.Type];
-    public Sensor GetSensor(SensorArea sensorArea) => Sensors[(int)sensorArea];
     
-    public void BindSensor(EventHandler<InputEventArgs> checker, Sensor sensor)
+    public static SensorType GetSensor(char areaPos, int startPos)
     {
-        sensor.OnStatusChanged += checker;
+        switch (areaPos)
+        {
+            case 'A':
+                return (SensorType)(startPos - 1);
+            case 'B':
+                return (SensorType)(startPos + 7);
+            case 'C':
+                return SensorType.C;
+            case 'D':
+                return (SensorType)(startPos + 16);
+            case 'E':
+                return (SensorType)(startPos + 24);
+            default:
+                return SensorType.A1;
+        }
     }
-    public void UnbindSensor(EventHandler<InputEventArgs> checker, Sensor sensor)
+    private Sensor GetSensor(SensorType type) => Sensors[(int)type];
+    private Button GetButton(SensorType type)
     {
-        sensor.OnStatusChanged -= checker;
-    }
-    public void BindArea(EventHandler<InputEventArgs> checker, Sensor sensor)
-    {
-        var button = GetButton(sensor);
-
-        sensor.OnStatusChanged += checker;
-        button.OnStatusChanged += checker;
-    }
-    public void UnbindArea(EventHandler<InputEventArgs> checker, Sensor sensor)
-    {
-        var button = GetButton(sensor);
-
-        sensor.OnStatusChanged -= checker;
-        button.OnStatusChanged -= checker;
+        var index = (int)type;
+        switch (type)
+        {
+            case >= SensorType.A1 and <= SensorType.A8:
+                return Buttons[index];
+            case >= SensorType.B1 and <= SensorType.B8:
+                return Buttons[index - 7];
+            case SensorType.C:
+            default:
+                return Buttons[0];
+            case >= SensorType.D1 and <= SensorType.D8:
+                return Buttons[index - 16];
+            case >= SensorType.E1 and <= SensorType.E8:
+                return Buttons[index - 24];
+        }
     }
     
+    public void BindSensor(EventHandler<InputEventArgs> checker, SensorType type)
+    {
+        GetSensor(type).OnStatusChanged += checker;
+    }
+    public void UnbindSensor(EventHandler<InputEventArgs> checker, SensorType type)
+    {
+        GetSensor(type).OnStatusChanged -= checker;
+    }
+    public void BindArea(EventHandler<InputEventArgs> checker, SensorType type)
+    {
+        GetSensor(type).OnStatusChanged += checker;
+        GetButton(type).OnStatusChanged += checker;
+    }
+    public void UnbindArea(EventHandler<InputEventArgs> checker, SensorType type)
+    {
+        GetSensor(type).OnStatusChanged -= checker;
+        GetButton(type).OnStatusChanged -= checker;
+    }
+
+
+    public bool CheckArea(SensorType type) =>
+        GetSensor(type).Status == SensorStatus.On ||
+        GetButton(type).Status == SensorStatus.On;
     
-    public bool CheckAreaStatus(Sensor sensor, SensorStatus targetStatus)
-    {
-        var button = GetButton(sensor);
-        return sensor.Status == targetStatus || button.Status == targetStatus; 
-    }
-    public bool CheckSensorStatus(Sensor sensor, SensorStatus targetStatus)
-    {
-        return sensor.Status == targetStatus;
-    }
+    public bool CheckSensor(SensorType type) => 
+        GetSensor(type).Status == SensorStatus.On;
+    
+    public void SetSensorOn(SensorType type, Guid guid) => 
+        GetSensor(type).SetOn(guid);
+    public void SetSensorOff(SensorType type, Guid guid) => 
+        GetSensor(type).SetOff(guid);
+    public void ClickSensor(SensorType type) => 
+        GetSensor(type).Click();
 
     public void SetBusy(InputEventArgs args)
     {
         if(args.IsButton)
         {
-            GetButton(args.Sensor).IsJudging = true;
+            GetButton(args.Type).IsJudging = true;
         }
         else
         {
-            args.Sensor.IsJudging = true;
+            GetSensor(args.Type).IsJudging = true;
         }
     }
     public bool IsIdle(InputEventArgs args)
     {
-        bool isIdle;
         if (args.IsButton)
         {
-            isIdle = GetButton(args.Sensor).IsJudging;
+            return !GetButton(args.Type).IsJudging;
         }
         else
         {
-            isIdle = !args.Sensor.IsJudging;
+            return !GetSensor(args.Type).IsJudging;
         }
-        return isIdle;
     }
     
     
@@ -166,7 +199,7 @@ public class InputManager : MonoBehaviour
         if (!triggerSensors.ContainsKey(id))
             triggerSensors.Add(id, new());
     
-        const float HAND_RADIUS = 0.28f;
+        const float HAND_RADIUS = 0.1f;
         var oldList = new List<Sensor>(triggerSensors[id]);
         triggerSensors[id].Clear();
 
@@ -193,25 +226,26 @@ public class InputManager : MonoBehaviour
         foreach (var s in triggerSensors[id])
             s.SetOn(guid);
     }
+
+    public void ClearTriggeredSensor(int id)
+    {
+        var oldList = new List<Sensor>(triggerSensors[id]);
+        triggerSensors[id].Clear();
+        var untriggerSensors = oldList.Where(x => !triggerSensors[id].Contains(x));
+        foreach (var s in untriggerSensors)
+            s.SetOff(guid);
+        foreach (var s in triggerSensors[id])
+            s.SetOn(guid);
+    }
     
     void CheckButton()
     {
         foreach (var button in Buttons)
         {
-            var nStatus = Input.GetKey(button.BindingKey) ? SensorStatus.On : SensorStatus.Off;
-            var oStatus = button.Status;
-            if (oStatus == nStatus) return;
-
-            print($"Key \"{button.BindingKey}\": {nStatus}");
-            button.PushEvent(new InputEventArgs()
-            {
-                Sensor = button.Sensor,
-                OldStatus = oStatus,
-                Status = nStatus,
-                IsButton = true
-            });
-            button.Status = nStatus;
-            button.IsJudging = false;
+            if (Input.GetKey(button.BindingKey))
+                button.SetOn(guid);
+            else
+                button.SetOff(guid);
         }
     }
 
@@ -220,14 +254,8 @@ public class InputManager : MonoBehaviour
         triggerSensors.Clear();
 
         foreach (var sensor in Sensors)
-        {
             sensor.ForceReset();
-        }
-
         foreach (var button in Buttons)
-        {
-            button.Status = SensorStatus.Off;
-            button.IsJudging = false;
-        }
+            button.ForceReset();
     }
 }

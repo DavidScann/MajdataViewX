@@ -289,6 +289,7 @@ public class PlayManager : MonoBehaviour
         Majdata<ScreenRecorder>.Instance!.ResetState();
         Majdata<ObjectCounter>.Instance!.ResetState();
         UniTask.WhenAll(Majdata<NoteManager>.Instance!.ResetState());
+        Majdata<MultTouchHandler>.Instance!.ResetState();
         Majdata<TimeProvider>.Instance!.ResetState();
         Majdata<AudioManager>.Instance!.ResetState();
         Majdata<ScreenRecorder>.Instance!.ResetState();

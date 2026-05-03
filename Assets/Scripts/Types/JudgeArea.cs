@@ -9,7 +9,7 @@ public class Area
 {
     public bool On = false;
     public bool Off = false;
-    public SensorArea Type;
+    public SensorType Type;
     public bool IsLast = false;
     public bool IsFinished
     {
@@ -62,8 +62,8 @@ public class JudgeArea
     
     List<Area> areas = new();
     public Area[] GetAreas() => areas.ToArray();
-    public SensorArea[] GetSensorTypes() => areas.Select(x => x.Type).ToArray();
-    public JudgeArea(List<SensorArea> types, int slideIndex, bool isLast)
+    public SensorType[] GetSensorTypes() => areas.Select(x => x.Type).ToArray();
+    public JudgeArea(List<SensorType> types, int slideIndex, bool isLast)
     {
         SlideIndex = slideIndex;
         foreach (var type in types)
@@ -86,7 +86,7 @@ public class JudgeArea
     {
         areas.ForEach(x => x.IsLast = false);
     }
-    public void Judge(SensorArea type, SensorStatus status)
+    public void Judge(SensorType type, SensorStatus status)
     {
         var areaList = areas.Where(x => x.Type == type);
 
@@ -96,7 +96,7 @@ public class JudgeArea
         var area = areaList.First();
         area.Judge(status);
     }
-    public void AddArea(SensorArea type, bool isLast = false)
+    public void AddArea(SensorType type, bool isLast = false)
     {
         if (areas.Any(x => x.Type == type))
             return;

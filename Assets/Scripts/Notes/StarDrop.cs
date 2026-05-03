@@ -28,9 +28,7 @@ public class StarDrop : TapBase
 
         if(!isNoHead)
         {
-            sensor = GameObject.Find("Sensors")
-                                   .transform.GetChild(startPosition - 1)
-                                   .GetComponent<Sensor>();
+            sensor = (SensorType)startPosition - 1;
             inputManager.BindArea(Check, sensor);
         }
         State = NoteStatus.Initialized;

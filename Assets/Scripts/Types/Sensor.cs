@@ -9,14 +9,13 @@ using UnityEngine;
 
 public class Sensor : MonoBehaviour
 {
-    public bool IsJudging { get; set; }
-    public SensorStatus Status = SensorStatus.Off;
-    public SensorArea Type;
+    [SerializeField]
+    public SensorType Type;
+    public SensorStatus Status { get; private set; } = SensorStatus.Off;
+    public bool IsJudging { get; set; } = false;
+    public event EventHandler<InputEventArgs> OnStatusChanged;
 
-    public event EventHandler<InputEventArgs> OnStatusChanged; //oStatus nStatus
-
-    List<Guid> tasks = new();
-    
+    private List<Guid> tasks = new();
     public void SetOn(Guid id)
     {
         if (tasks.Contains(id))
@@ -35,7 +34,7 @@ public class Sensor : MonoBehaviour
                 OnStatusChanged(this, new InputEventArgs()
                 {
                     IsButton = false,
-                    Sensor = this,
+                    Type = Type,
                     OldStatus = oStatus,
                     Status = nStatus
                 });
@@ -59,7 +58,7 @@ public class Sensor : MonoBehaviour
                 OnStatusChanged(this, new InputEventArgs()
                 {
                     IsButton = false,
-                    Sensor = this,
+                    Type = Type,
                     OldStatus = oStatus,
                     Status = nStatus
                 });

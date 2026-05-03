@@ -16,7 +16,7 @@ public class TapDrop : TapBase
         spriteRenderer.forceRenderingOff = true;
         exSpriteRender.forceRenderingOff = true;
 
-        sensor = inputManager.Sensors[startPosition - 1];
+        sensor = (SensorType)startPosition - 1;
         inputManager.BindArea(Check, sensor);
         State = NoteStatus.Initialized;
     }

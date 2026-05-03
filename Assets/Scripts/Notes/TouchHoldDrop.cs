@@ -81,9 +81,7 @@ public class TouchHoldDrop : NoteLongBase
         mask.frontSortingOrder = border.sortingOrder;
         mask.enabled = false;
 
-        sensor = GameObject.Find("Sensors")
-                                   .transform.GetChild((int)GetSensor())
-                                   .GetComponent<Sensor>();
+        sensor = InputManager.GetSensor(areaPosition, startPosition);
         inputManager.BindSensor(Check, sensor);
     }
 
@@ -115,7 +113,7 @@ public class TouchHoldDrop : NoteLongBase
 
     void Check(object sender, InputEventArgs arg)
     {
-        if (isJudged || !noteManager.CanJudge(gameObject, sensor.Type))
+        if (isJudged || !noteManager.CanJudge(gameObject, sensor))
             return;
         if (Majdata<InputManager>.Instance!.Mode is AutoPlayMode.Enable or AutoPlayMode.Random)
             return;
@@ -126,6 +124,11 @@ public class TouchHoldDrop : NoteLongBase
             
             inputManager.SetBusy(arg);
             Judge();
+            if (isJudged)
+            {
+                inputManager.UnbindArea(Check, sensor);
+                noteManager.NextTouch(sensor);
+            }
         }
     }
     void Judge()
@@ -196,7 +199,7 @@ public class TouchHoldDrop : NoteLongBase
                     return;
                 case AutoPlayMode.DJAuto:
                     if (!isJudged && !isMine)
-                        sensor.SetOn(guid);
+                        inputManager.SetSensorOn(sensor, guid);
                     break;
                 case AutoPlayMode.Random:
                     if (!isJudged)
@@ -231,7 +234,7 @@ public class TouchHoldDrop : NoteLongBase
             if (!timeProvider.IsStart) // 忽略暂停
                 return;
             
-            if (inputManager.CheckSensorStatus(sensor, SensorStatus.On))
+            if (inputManager.CheckSensor(sensor))
             {
                 _isTouched = true;
                 audioManager.PlayTouchHoldSound();
@@ -246,7 +249,7 @@ public class TouchHoldDrop : NoteLongBase
             if (remainingTime <= 0.2f) // 忽略尾部12帧
                 return;
 
-            var on = inputManager.CheckSensorStatus(sensor, SensorStatus.On);
+            var on = inputManager.CheckSensor(sensor);
             if (on)
             {
                 PlayHoldEffect();
@@ -367,8 +370,6 @@ public class TouchHoldDrop : NoteLongBase
 
         print($"TouchHold: {MathF.Round(percent * 100, 2)}%\nTotal Len : {MathF.Round(realityHT * 1000, 2)}ms");
         objectCounter.ReportResult(SimaiNoteType.TouchHold, result, isBreak);
-        if (!isJudged)
-            noteManager.NextTouch(GetSensor());
         if (isFirework && result != JudgeType.Miss)
         {
             fireworkEffect.SetTrigger("Fire");
@@ -389,8 +390,10 @@ public class TouchHoldDrop : NoteLongBase
                 audioManager.PlayTouchSound();
             }
         }
+        if (!isJudged)
+            noteManager.NextTouch(GetSensor());
+        inputManager.SetSensorOff(sensor, guid);
         inputManager.UnbindSensor(Check, sensor);
-        sensor.SetOff(guid);
         PlayJudgeEffect(result);
     }
 
@@ -442,7 +445,7 @@ public class TouchHoldDrop : NoteLongBase
             //get obj
             var obj = Instantiate(judgeEffect, Vector3.zero, transform.rotation);
             var judgeObj = obj.transform.GetChild(0);
-            if (sensor.Type != SensorArea.C)
+            if (sensor != SensorType.C)
                 judgeObj.transform.position = GetPosition(-0.46f);
             else
                 judgeObj.transform.position = new Vector3(0, -0.6f, 0);
@@ -488,7 +491,7 @@ public class TouchHoldDrop : NoteLongBase
             //get obj
             var obj = Instantiate(judgeEffect, Vector3.zero, transform.rotation);
             var flObj = obj.transform.GetChild(0);
-            if (sensor.Type != SensorArea.C)
+            if (sensor != SensorType.C)
                 flObj.transform.position = GetPosition(-0.92f);
             else
                 flObj.transform.position = new Vector3(0, -1.08f, 0);
@@ -527,7 +530,7 @@ public class TouchHoldDrop : NoteLongBase
     }
     private Quaternion GetRotation()
     {
-        if (sensor.Type == SensorArea.C)
+        if (sensor == SensorType.C)
             return Quaternion.Euler(Vector3.zero);
         var d = Vector3.zero - transform.position;
         var deg = 180 + Mathf.Atan2(d.x, d.y) * Mathf.Rad2Deg;
@@ -540,23 +543,23 @@ public class TouchHoldDrop : NoteLongBase
         return new Vector3(Mathf.Sin(angle), Mathf.Cos(angle));
     }
 
-    public SensorArea GetSensor() => GetSensor(areaPosition, startPosition);
-    public static SensorArea GetSensor(char areaPos, int startPos)
+    public SensorType GetSensor() => GetSensor(areaPosition, startPosition);
+    public static SensorType GetSensor(char areaPos, int startPos)
     {
         switch (areaPos)
         {
             case 'A':
-                return (SensorArea)(startPos - 1);
+                return (SensorType)(startPos - 1);
             case 'B':
-                return (SensorArea)(startPos + 7);
+                return (SensorType)(startPos + 7);
             case 'C':
-                return SensorArea.C;
+                return SensorType.C;
             case 'D':
-                return (SensorArea)(startPos + 16);
+                return (SensorType)(startPos + 16);
             case 'E':
-                return (SensorArea)(startPos + 24);
+                return (SensorType)(startPos + 24);
             default:
-                return SensorArea.A1;
+                return SensorType.A1;
         }
     }
     Vector3 GetAreaPos(int index, char area)
