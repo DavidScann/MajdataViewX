@@ -52,8 +52,7 @@ public class TouchDrop : NoteBase
         wholeDuration = 3.209385682f * Mathf.Pow(speed, -0.9549621752f);
         moveDuration = 0.8f * wholeDuration;
         displayDuration = 0.2f * wholeDuration;
-
-        var notes = GameObject.Find("Notes").transform;
+        
         noteManager = Majdata<NoteManager>.Instance!;
         timeProvider = Majdata<TimeProvider>.Instance!;
         multTouchHandler = Majdata<MultTouchHandler>.Instance!;
@@ -76,10 +75,8 @@ public class TouchDrop : NoteBase
         transform.position = GetAreaPos(startPosition, areaPosition);
         justEffect.SetActive(false);
         SetFanColor(new Color(1f, 1f, 1f, 0f));
-        
-        sensor = GameObject.Find("Sensors")
-                                   .transform.GetChild((int)GetSensor())
-                                   .GetComponent<Sensor>();
+
+        sensor = GetSensor();
         inputManager.BindSensor(Check, sensor);
     }
 
@@ -115,10 +112,9 @@ public class TouchDrop : NoteBase
 
     void Check(object sender,InputEventArgs arg)
     {
-        var type = GetSensor();
-        if (arg.Sensor != sensor)
+        if (arg.Type != sensor)
             return;
-        if (isJudged || !noteManager.CanJudge(gameObject, type))
+        if (isJudged || !noteManager.CanJudge(gameObject, sensor))
             return;
         if (Majdata<InputManager>.Instance!.Mode is AutoPlayMode.Enable or AutoPlayMode.Random)
             return;
@@ -160,7 +156,7 @@ public class TouchDrop : NoteBase
         else if (isJudged)
             Destroy(gameObject);
 
-        if (GetJudgeTiming() >= 0)
+        if (timeProvider.NoteTime - time >= 0)
         {
             switch (Majdata<InputManager>.Instance!.Mode)
             {
@@ -190,7 +186,7 @@ public class TouchDrop : NoteBase
                     if (isTriggered)
                         return;
                     if (!isMine) //mine buda
-                        sensor.Click();
+                        inputManager.ClickSensor(sensor);
                     isTriggered = true;
                     break;
                 case AutoPlayMode.Disable:
@@ -266,12 +262,6 @@ public class TouchDrop : NoteBase
         }
         else if (-timing < moveDuration)
         {
-            if (!isStarted)
-            {
-                isStarted = true;
-                multTouchHandler.RegisterTouch(this);
-            }
-
             SetFanColor(Color.white);
         }
 
@@ -305,7 +295,7 @@ public class TouchDrop : NoteBase
         if (GroupInfo is not null && judgeResult != JudgeType.Miss)
             GroupInfo.JudgeResult = judgeResult;
         objectCounter.ReportResult(SimaiNoteType.Touch, judgeResult, isBreak);
-        noteManager.NextTouch(sensor.Type);
+        noteManager.NextTouch(sensor);
 
         if (isFirework && judgeResult != JudgeType.Miss)
         {
@@ -352,7 +342,7 @@ public class TouchDrop : NoteBase
             //get obj
             var obj = Instantiate(judgeEffect, Vector3.zero, transform.rotation);
             var judgeObj = obj.transform.GetChild(0);
-            if (sensor.Type != SensorArea.C)
+            if (sensor != SensorType.C)
                 judgeObj.transform.position = GetPosition(-0.46f);
             else
                 judgeObj.transform.position = new Vector3(0, -0.6f, 0);
@@ -396,7 +386,7 @@ public class TouchDrop : NoteBase
             //get obj
             var obj = Instantiate(judgeEffect, Vector3.zero, transform.rotation);
             var flObj = obj.transform.GetChild(0);
-            if (sensor.Type != SensorArea.C)
+            if (sensor != SensorType.C)
                 flObj.transform.position = GetPosition(-0.92f);
             else
                 flObj.transform.position = new Vector3(0, -1.08f, 0);
@@ -432,7 +422,7 @@ public class TouchDrop : NoteBase
     }
     private Quaternion GetRotation()
     {
-        if (sensor.Type == SensorArea.C)
+        if (sensor == SensorType.C)
             return Quaternion.Euler(Vector3.zero);
         var d = Vector3.zero - transform.position;
         var deg = 180 + Mathf.Atan2(d.x, d.y) * Mathf.Rad2Deg;
@@ -445,25 +435,7 @@ public class TouchDrop : NoteBase
         return new Vector3(Mathf.Sin(angle), Mathf.Cos(angle));
     }
 
-    public SensorArea GetSensor() => GetSensor(areaPosition, startPosition);
-    public static SensorArea GetSensor(char areaPos, int startPos)
-    {
-        switch (areaPos)
-        {
-            case 'A':
-                return (SensorArea)(startPos - 1);
-            case 'B':
-                return (SensorArea)(startPos + 7);
-            case 'C':
-                return SensorArea.C;
-            case 'D':
-                return (SensorArea)(startPos + 16);
-            case 'E':
-                return (SensorArea)(startPos + 24);
-            default:
-                return SensorArea.A1;
-        }
-    }
+    public SensorType GetSensor() => InputManager.GetSensor(areaPosition, startPosition);
     
     private Vector3 GetAreaPos(int index, char area)
     {

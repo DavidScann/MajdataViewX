@@ -61,9 +61,7 @@ public class HoldDrop : NoteLongBase
         exSpriteRender.forceRenderingOff = true;
         holdEndRender.enabled = false;
 
-        sensor = GameObject.Find("Sensors")
-                                   .transform.GetChild(startPosition - 1)
-                                   .GetComponent<Sensor>();
+        sensor = (SensorType)startPosition - 1;
         inputManager.BindArea(Check, sensor);
     }
 
@@ -161,7 +159,7 @@ public class HoldDrop : NoteLongBase
 
         if (isJudged) // 头部判定完成后开始累计按压时长
         {
-            if (inputManager.CheckAreaStatus(sensor, SensorStatus.On)) isTouched = true;
+            if (inputManager.CheckArea(sensor)) isTouched = true;
             
             if (timing <= 0.1f) // 忽略头部6帧
                 return;
@@ -170,7 +168,7 @@ public class HoldDrop : NoteLongBase
             if (!timeProvider.IsStart || Majdata<InputManager>.Instance!.Mode is AutoPlayMode.Enable or AutoPlayMode.Random) // 忽略暂停
                 return;
             
-            if (inputManager.CheckAreaStatus(sensor,SensorStatus.On))
+            if (inputManager.CheckArea(sensor))
             {
                 PlayHoldEffect();
             }
@@ -190,7 +188,7 @@ public class HoldDrop : NoteLongBase
     }
     void Check(object sender, InputEventArgs arg)
     {
-        if (arg.Sensor != sensor)
+        if (arg.Type != sensor)
             return;
         if (isJudged || !noteManager.CanJudge(gameObject, startPosition))
             return;

@@ -3,7 +3,7 @@
     On,
     Off
 }
-public enum SensorArea
+public enum SensorType
 {
     A1,
     A2,

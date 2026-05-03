@@ -11,7 +11,7 @@ public static class SensorAreaExtensions
     /// </summary>
     /// <param name="source">current touch panel area</param>
     /// <param name="diff">specified difference</param>
-    public static SensorArea Diff(this SensorArea source, int diff)
+    public static SensorType Diff(this SensorType source, int diff)
     {
         diff = diff % 8;
         if (diff == 0)
@@ -28,26 +28,26 @@ public static class SensorAreaExtensions
         switch (group)
         {
             case SensorGroup.A:
-                return (SensorArea)result;
+                return (SensorType)result;
             case SensorGroup.B:
                 result += 8;
-                return (SensorArea)result;
+                return (SensorType)result;
             case SensorGroup.C:
                 return source;
             case SensorGroup.D:
                 result += 17;
-                return (SensorArea)result;
+                return (SensorType)result;
             // SensorGroup.E
             default:
                 result += 25;
-                return (SensorArea)result;
+                return (SensorType)result;
         }
     }
     /// <summary>
     /// Get the group where the touch panel area is located
     /// </summary>
     /// <param name="source"></param>
-    public static SensorGroup GetGroup(this SensorArea source)
+    public static SensorGroup GetGroup(this SensorType source)
     {
         var i = (int)source;
         if (i <= 7)
@@ -75,7 +75,7 @@ public static class SensorAreaExtensions
     /// Get the index of the touch panel area within the group
     /// </summary>
     /// <param name="source"></param>
-    public static int GetIndex(this SensorArea source)
+    public static int GetIndex(this SensorType source)
     {
         var group = source.GetGroup();
         return group switch
@@ -88,9 +88,9 @@ public static class SensorAreaExtensions
         };
     }
     
-    public static SensorArea Mirror(this SensorArea source, SensorArea baseLine)
+    public static SensorType Mirror(this SensorType source, SensorType baseLine)
     {
-        if (source == SensorArea.C || source.IsCollinearWith(baseLine))
+        if (source == SensorType.C || source.IsCollinearWith(baseLine))
         {
             return source;
         }
@@ -111,10 +111,10 @@ public static class SensorAreaExtensions
             {
                 var _baseLine = thisGroup switch
                 {
-                    SensorGroup.A => (SensorArea)(baseIndex - 1),
-                    SensorGroup.B => (SensorArea)(baseIndex - 1 + 8),
-                    SensorGroup.D => (SensorArea)(baseIndex - 1 + 17),
-                    SensorGroup.E => (SensorArea)(baseIndex - 1 + 25),
+                    SensorGroup.A => (SensorType)(baseIndex - 1),
+                    SensorGroup.B => (SensorType)(baseIndex - 1 + 8),
+                    SensorGroup.D => (SensorType)(baseIndex - 1 + 17),
+                    SensorGroup.E => (SensorType)(baseIndex - 1 + 25),
                     _ => throw new NotSupportedException("cnm")
                 };
                 return _baseLine.Diff(diff);
@@ -128,356 +128,356 @@ public static class SensorAreaExtensions
         {
             switch (baseLine)
             {
-                case SensorArea.D1:
-                case SensorArea.E1:
+                case SensorType.D1:
+                case SensorType.E1:
                     return source switch
                     {
-                        SensorArea.A1 => SensorArea.A8,
-                        SensorArea.A2 => SensorArea.A7,
-                        SensorArea.A3 => SensorArea.A6,
-                        SensorArea.A4 => SensorArea.A5,
-                        SensorArea.A5 => SensorArea.A4,
-                        SensorArea.A6 => SensorArea.A3,
-                        SensorArea.A7 => SensorArea.A2,
-                        SensorArea.A8 => SensorArea.A1,
-                        SensorArea.B1 => SensorArea.B8,
-                        SensorArea.B2 => SensorArea.B7,
-                        SensorArea.B3 => SensorArea.B6,
-                        SensorArea.B4 => SensorArea.B5,
-                        SensorArea.B5 => SensorArea.B4,
-                        SensorArea.B6 => SensorArea.B3,
-                        SensorArea.B7 => SensorArea.B2,
-                        SensorArea.B8 => SensorArea.B1,
+                        SensorType.A1 => SensorType.A8,
+                        SensorType.A2 => SensorType.A7,
+                        SensorType.A3 => SensorType.A6,
+                        SensorType.A4 => SensorType.A5,
+                        SensorType.A5 => SensorType.A4,
+                        SensorType.A6 => SensorType.A3,
+                        SensorType.A7 => SensorType.A2,
+                        SensorType.A8 => SensorType.A1,
+                        SensorType.B1 => SensorType.B8,
+                        SensorType.B2 => SensorType.B7,
+                        SensorType.B3 => SensorType.B6,
+                        SensorType.B4 => SensorType.B5,
+                        SensorType.B5 => SensorType.B4,
+                        SensorType.B6 => SensorType.B3,
+                        SensorType.B7 => SensorType.B2,
+                        SensorType.B8 => SensorType.B1,
                         _ => throw new NotSupportedException()
                     };
-                case SensorArea.D2:
-                case SensorArea.E2:
+                case SensorType.D2:
+                case SensorType.E2:
                     return source switch
                     {
-                        SensorArea.A2 => SensorArea.A1,
-                        SensorArea.A3 => SensorArea.A8,
-                        SensorArea.A4 => SensorArea.A7,
-                        SensorArea.A5 => SensorArea.A6,
-                        SensorArea.A6 => SensorArea.A5,
-                        SensorArea.A7 => SensorArea.A4,
-                        SensorArea.A8 => SensorArea.A3,
-                        SensorArea.A1 => SensorArea.A2,
-                        SensorArea.B2 => SensorArea.B1,
-                        SensorArea.B3 => SensorArea.B8,
-                        SensorArea.B4 => SensorArea.B7,
-                        SensorArea.B5 => SensorArea.B6,
-                        SensorArea.B6 => SensorArea.B5,
-                        SensorArea.B7 => SensorArea.B4,
-                        SensorArea.B8 => SensorArea.B3,
-                        SensorArea.B1 => SensorArea.B2,
+                        SensorType.A2 => SensorType.A1,
+                        SensorType.A3 => SensorType.A8,
+                        SensorType.A4 => SensorType.A7,
+                        SensorType.A5 => SensorType.A6,
+                        SensorType.A6 => SensorType.A5,
+                        SensorType.A7 => SensorType.A4,
+                        SensorType.A8 => SensorType.A3,
+                        SensorType.A1 => SensorType.A2,
+                        SensorType.B2 => SensorType.B1,
+                        SensorType.B3 => SensorType.B8,
+                        SensorType.B4 => SensorType.B7,
+                        SensorType.B5 => SensorType.B6,
+                        SensorType.B6 => SensorType.B5,
+                        SensorType.B7 => SensorType.B4,
+                        SensorType.B8 => SensorType.B3,
+                        SensorType.B1 => SensorType.B2,
                         _ => throw new NotSupportedException()
                     };
-                case SensorArea.D3:
-                case SensorArea.E3:
+                case SensorType.D3:
+                case SensorType.E3:
                     return source switch
                     {
-                        SensorArea.A3 => SensorArea.A2,
-                        SensorArea.A4 => SensorArea.A1,
-                        SensorArea.A5 => SensorArea.A8,
-                        SensorArea.A6 => SensorArea.A7,
-                        SensorArea.A7 => SensorArea.A6,
-                        SensorArea.A8 => SensorArea.A5,
-                        SensorArea.A1 => SensorArea.A4,
-                        SensorArea.A2 => SensorArea.A3,
-                        SensorArea.B3 => SensorArea.B2,
-                        SensorArea.B4 => SensorArea.B1,
-                        SensorArea.B5 => SensorArea.B8,
-                        SensorArea.B6 => SensorArea.B7,
-                        SensorArea.B7 => SensorArea.B6,
-                        SensorArea.B8 => SensorArea.B5,
-                        SensorArea.B1 => SensorArea.B4,
-                        SensorArea.B2 => SensorArea.B3,
+                        SensorType.A3 => SensorType.A2,
+                        SensorType.A4 => SensorType.A1,
+                        SensorType.A5 => SensorType.A8,
+                        SensorType.A6 => SensorType.A7,
+                        SensorType.A7 => SensorType.A6,
+                        SensorType.A8 => SensorType.A5,
+                        SensorType.A1 => SensorType.A4,
+                        SensorType.A2 => SensorType.A3,
+                        SensorType.B3 => SensorType.B2,
+                        SensorType.B4 => SensorType.B1,
+                        SensorType.B5 => SensorType.B8,
+                        SensorType.B6 => SensorType.B7,
+                        SensorType.B7 => SensorType.B6,
+                        SensorType.B8 => SensorType.B5,
+                        SensorType.B1 => SensorType.B4,
+                        SensorType.B2 => SensorType.B3,
                         _ => throw new NotSupportedException()
                     };
-                case SensorArea.D4:
-                case SensorArea.E4:
+                case SensorType.D4:
+                case SensorType.E4:
                     return source switch
                     {
-                        SensorArea.A4 => SensorArea.A3,
-                        SensorArea.A5 => SensorArea.A2,
-                        SensorArea.A6 => SensorArea.A1,
-                        SensorArea.A7 => SensorArea.A8,
-                        SensorArea.A8 => SensorArea.A7,
-                        SensorArea.A1 => SensorArea.A6,
-                        SensorArea.A2 => SensorArea.A5,
-                        SensorArea.A3 => SensorArea.A4,
-                        SensorArea.B4 => SensorArea.B3,
-                        SensorArea.B5 => SensorArea.B2,
-                        SensorArea.B6 => SensorArea.B1,
-                        SensorArea.B7 => SensorArea.B8,
-                        SensorArea.B8 => SensorArea.B7,
-                        SensorArea.B1 => SensorArea.B6,
-                        SensorArea.B2 => SensorArea.B5,
-                        SensorArea.B3 => SensorArea.B4,
+                        SensorType.A4 => SensorType.A3,
+                        SensorType.A5 => SensorType.A2,
+                        SensorType.A6 => SensorType.A1,
+                        SensorType.A7 => SensorType.A8,
+                        SensorType.A8 => SensorType.A7,
+                        SensorType.A1 => SensorType.A6,
+                        SensorType.A2 => SensorType.A5,
+                        SensorType.A3 => SensorType.A4,
+                        SensorType.B4 => SensorType.B3,
+                        SensorType.B5 => SensorType.B2,
+                        SensorType.B6 => SensorType.B1,
+                        SensorType.B7 => SensorType.B8,
+                        SensorType.B8 => SensorType.B7,
+                        SensorType.B1 => SensorType.B6,
+                        SensorType.B2 => SensorType.B5,
+                        SensorType.B3 => SensorType.B4,
                         _ => throw new NotSupportedException()
                     };
-                case SensorArea.D5:
-                case SensorArea.E5:
+                case SensorType.D5:
+                case SensorType.E5:
                     return source switch
                     {
-                        SensorArea.A5 => SensorArea.A4,
-                        SensorArea.A6 => SensorArea.A3,
-                        SensorArea.A7 => SensorArea.A2,
-                        SensorArea.A8 => SensorArea.A1,
-                        SensorArea.A1 => SensorArea.A8,
-                        SensorArea.A2 => SensorArea.A7,
-                        SensorArea.A3 => SensorArea.A6,
-                        SensorArea.A4 => SensorArea.A5,
-                        SensorArea.B5 => SensorArea.B4,
-                        SensorArea.B6 => SensorArea.B3,
-                        SensorArea.B7 => SensorArea.B2,
-                        SensorArea.B8 => SensorArea.B1,
-                        SensorArea.B1 => SensorArea.B8,
-                        SensorArea.B2 => SensorArea.B7,
-                        SensorArea.B3 => SensorArea.B6,
-                        SensorArea.B4 => SensorArea.B5,
+                        SensorType.A5 => SensorType.A4,
+                        SensorType.A6 => SensorType.A3,
+                        SensorType.A7 => SensorType.A2,
+                        SensorType.A8 => SensorType.A1,
+                        SensorType.A1 => SensorType.A8,
+                        SensorType.A2 => SensorType.A7,
+                        SensorType.A3 => SensorType.A6,
+                        SensorType.A4 => SensorType.A5,
+                        SensorType.B5 => SensorType.B4,
+                        SensorType.B6 => SensorType.B3,
+                        SensorType.B7 => SensorType.B2,
+                        SensorType.B8 => SensorType.B1,
+                        SensorType.B1 => SensorType.B8,
+                        SensorType.B2 => SensorType.B7,
+                        SensorType.B3 => SensorType.B6,
+                        SensorType.B4 => SensorType.B5,
                         _ => throw new NotSupportedException()
                     };
-                case SensorArea.D6:
-                case SensorArea.E6:
+                case SensorType.D6:
+                case SensorType.E6:
                     return source switch
                     {
-                        SensorArea.A6 => SensorArea.A5,
-                        SensorArea.A7 => SensorArea.A4,
-                        SensorArea.A8 => SensorArea.A3,
-                        SensorArea.A1 => SensorArea.A2,
-                        SensorArea.A2 => SensorArea.A1,
-                        SensorArea.A3 => SensorArea.A8,
-                        SensorArea.A4 => SensorArea.A7,
-                        SensorArea.A5 => SensorArea.A6,
-                        SensorArea.B6 => SensorArea.B5,
-                        SensorArea.B7 => SensorArea.B4,
-                        SensorArea.B8 => SensorArea.B3,
-                        SensorArea.B1 => SensorArea.B2,
-                        SensorArea.B2 => SensorArea.B1,
-                        SensorArea.B3 => SensorArea.B8,
-                        SensorArea.B4 => SensorArea.B7,
-                        SensorArea.B5 => SensorArea.B6,
+                        SensorType.A6 => SensorType.A5,
+                        SensorType.A7 => SensorType.A4,
+                        SensorType.A8 => SensorType.A3,
+                        SensorType.A1 => SensorType.A2,
+                        SensorType.A2 => SensorType.A1,
+                        SensorType.A3 => SensorType.A8,
+                        SensorType.A4 => SensorType.A7,
+                        SensorType.A5 => SensorType.A6,
+                        SensorType.B6 => SensorType.B5,
+                        SensorType.B7 => SensorType.B4,
+                        SensorType.B8 => SensorType.B3,
+                        SensorType.B1 => SensorType.B2,
+                        SensorType.B2 => SensorType.B1,
+                        SensorType.B3 => SensorType.B8,
+                        SensorType.B4 => SensorType.B7,
+                        SensorType.B5 => SensorType.B6,
                         _ => throw new NotSupportedException()
                     };
-                case SensorArea.D7:
-                case SensorArea.E7:
+                case SensorType.D7:
+                case SensorType.E7:
                     return source switch
                     {
-                        SensorArea.A7 => SensorArea.A6,
-                        SensorArea.A8 => SensorArea.A5,
-                        SensorArea.A1 => SensorArea.A4,
-                        SensorArea.A2 => SensorArea.A3,
-                        SensorArea.A3 => SensorArea.A2,
-                        SensorArea.A4 => SensorArea.A1,
-                        SensorArea.A5 => SensorArea.A8,
-                        SensorArea.A6 => SensorArea.A7,
-                        SensorArea.B7 => SensorArea.B6,
-                        SensorArea.B8 => SensorArea.B5,
-                        SensorArea.B1 => SensorArea.B4,
-                        SensorArea.B2 => SensorArea.B3,
-                        SensorArea.B3 => SensorArea.B2,
-                        SensorArea.B4 => SensorArea.B1,
-                        SensorArea.B5 => SensorArea.B8,
-                        SensorArea.B6 => SensorArea.B7,
+                        SensorType.A7 => SensorType.A6,
+                        SensorType.A8 => SensorType.A5,
+                        SensorType.A1 => SensorType.A4,
+                        SensorType.A2 => SensorType.A3,
+                        SensorType.A3 => SensorType.A2,
+                        SensorType.A4 => SensorType.A1,
+                        SensorType.A5 => SensorType.A8,
+                        SensorType.A6 => SensorType.A7,
+                        SensorType.B7 => SensorType.B6,
+                        SensorType.B8 => SensorType.B5,
+                        SensorType.B1 => SensorType.B4,
+                        SensorType.B2 => SensorType.B3,
+                        SensorType.B3 => SensorType.B2,
+                        SensorType.B4 => SensorType.B1,
+                        SensorType.B5 => SensorType.B8,
+                        SensorType.B6 => SensorType.B7,
                         _ => throw new NotSupportedException()
                     };
-                case SensorArea.D8:
-                case SensorArea.E8:
+                case SensorType.D8:
+                case SensorType.E8:
                     return source switch
                     {
-                        SensorArea.A8 => SensorArea.A7,
-                        SensorArea.A1 => SensorArea.A6,
-                        SensorArea.A2 => SensorArea.A5,
-                        SensorArea.A3 => SensorArea.A4,
-                        SensorArea.A4 => SensorArea.A3,
-                        SensorArea.A5 => SensorArea.A2,
-                        SensorArea.A6 => SensorArea.A1,
-                        SensorArea.A7 => SensorArea.A8,
-                        SensorArea.B8 => SensorArea.B7,
-                        SensorArea.B1 => SensorArea.B6,
-                        SensorArea.B2 => SensorArea.B5,
-                        SensorArea.B3 => SensorArea.B4,
-                        SensorArea.B4 => SensorArea.B3,
-                        SensorArea.B5 => SensorArea.B2,
-                        SensorArea.B6 => SensorArea.B1,
-                        SensorArea.B7 => SensorArea.B8,
+                        SensorType.A8 => SensorType.A7,
+                        SensorType.A1 => SensorType.A6,
+                        SensorType.A2 => SensorType.A5,
+                        SensorType.A3 => SensorType.A4,
+                        SensorType.A4 => SensorType.A3,
+                        SensorType.A5 => SensorType.A2,
+                        SensorType.A6 => SensorType.A1,
+                        SensorType.A7 => SensorType.A8,
+                        SensorType.B8 => SensorType.B7,
+                        SensorType.B1 => SensorType.B6,
+                        SensorType.B2 => SensorType.B5,
+                        SensorType.B3 => SensorType.B4,
+                        SensorType.B4 => SensorType.B3,
+                        SensorType.B5 => SensorType.B2,
+                        SensorType.B6 => SensorType.B1,
+                        SensorType.B7 => SensorType.B8,
                         _ => throw new NotSupportedException()
                     };
-                case SensorArea.A1:
-                case SensorArea.B1:
+                case SensorType.A1:
+                case SensorType.B1:
                     return source switch
                     {
-                        SensorArea.D1 => SensorArea.D2,
-                        SensorArea.D2 => SensorArea.D1,
-                        SensorArea.D3 => SensorArea.D8,
-                        SensorArea.D4 => SensorArea.D7,
-                        SensorArea.D5 => SensorArea.D6,
-                        SensorArea.D6 => SensorArea.D5,
-                        SensorArea.D7 => SensorArea.D4,
-                        SensorArea.D8 => SensorArea.D3,
-                        SensorArea.E1 => SensorArea.E2,
-                        SensorArea.E2 => SensorArea.E1,
-                        SensorArea.E3 => SensorArea.E8,
-                        SensorArea.E4 => SensorArea.E7,
-                        SensorArea.E5 => SensorArea.E6,
-                        SensorArea.E6 => SensorArea.E5,
-                        SensorArea.E7 => SensorArea.E4,
-                        SensorArea.E8 => SensorArea.E3,
+                        SensorType.D1 => SensorType.D2,
+                        SensorType.D2 => SensorType.D1,
+                        SensorType.D3 => SensorType.D8,
+                        SensorType.D4 => SensorType.D7,
+                        SensorType.D5 => SensorType.D6,
+                        SensorType.D6 => SensorType.D5,
+                        SensorType.D7 => SensorType.D4,
+                        SensorType.D8 => SensorType.D3,
+                        SensorType.E1 => SensorType.E2,
+                        SensorType.E2 => SensorType.E1,
+                        SensorType.E3 => SensorType.E8,
+                        SensorType.E4 => SensorType.E7,
+                        SensorType.E5 => SensorType.E6,
+                        SensorType.E6 => SensorType.E5,
+                        SensorType.E7 => SensorType.E4,
+                        SensorType.E8 => SensorType.E3,
                         _ => throw new NotSupportedException()
                     };
-                case SensorArea.A2:
-                case SensorArea.B2:
+                case SensorType.A2:
+                case SensorType.B2:
                     return source switch
                     {
-                        SensorArea.D3 => SensorArea.D2,
-                        SensorArea.D4 => SensorArea.D1,
-                        SensorArea.D5 => SensorArea.D8,
-                        SensorArea.D6 => SensorArea.D7,
-                        SensorArea.D7 => SensorArea.D6,
-                        SensorArea.D8 => SensorArea.D5,
-                        SensorArea.D1 => SensorArea.D4,
-                        SensorArea.D2 => SensorArea.D3,
-                        SensorArea.E3 => SensorArea.E2,
-                        SensorArea.E4 => SensorArea.E1,
-                        SensorArea.E5 => SensorArea.E8,
-                        SensorArea.E6 => SensorArea.E7,
-                        SensorArea.E7 => SensorArea.E6,
-                        SensorArea.E8 => SensorArea.E5,
-                        SensorArea.E1 => SensorArea.E4,
-                        SensorArea.E2 => SensorArea.E3,
+                        SensorType.D3 => SensorType.D2,
+                        SensorType.D4 => SensorType.D1,
+                        SensorType.D5 => SensorType.D8,
+                        SensorType.D6 => SensorType.D7,
+                        SensorType.D7 => SensorType.D6,
+                        SensorType.D8 => SensorType.D5,
+                        SensorType.D1 => SensorType.D4,
+                        SensorType.D2 => SensorType.D3,
+                        SensorType.E3 => SensorType.E2,
+                        SensorType.E4 => SensorType.E1,
+                        SensorType.E5 => SensorType.E8,
+                        SensorType.E6 => SensorType.E7,
+                        SensorType.E7 => SensorType.E6,
+                        SensorType.E8 => SensorType.E5,
+                        SensorType.E1 => SensorType.E4,
+                        SensorType.E2 => SensorType.E3,
                         _ => throw new NotSupportedException()
                     };
-                case SensorArea.A3:
-                case SensorArea.B3:
+                case SensorType.A3:
+                case SensorType.B3:
                     return source switch
                     {
-                        SensorArea.D4 => SensorArea.D3,
-                        SensorArea.D5 => SensorArea.D2,
-                        SensorArea.D6 => SensorArea.D1,
-                        SensorArea.D7 => SensorArea.D8,
-                        SensorArea.D8 => SensorArea.D7,
-                        SensorArea.D1 => SensorArea.D6,
-                        SensorArea.D2 => SensorArea.D5,
-                        SensorArea.D3 => SensorArea.D4,
-                        SensorArea.E4 => SensorArea.E3,
-                        SensorArea.E5 => SensorArea.E2,
-                        SensorArea.E6 => SensorArea.E1,
-                        SensorArea.E7 => SensorArea.E8,
-                        SensorArea.E8 => SensorArea.E7,
-                        SensorArea.E1 => SensorArea.E6,
-                        SensorArea.E2 => SensorArea.E5,
-                        SensorArea.E3 => SensorArea.E4,
+                        SensorType.D4 => SensorType.D3,
+                        SensorType.D5 => SensorType.D2,
+                        SensorType.D6 => SensorType.D1,
+                        SensorType.D7 => SensorType.D8,
+                        SensorType.D8 => SensorType.D7,
+                        SensorType.D1 => SensorType.D6,
+                        SensorType.D2 => SensorType.D5,
+                        SensorType.D3 => SensorType.D4,
+                        SensorType.E4 => SensorType.E3,
+                        SensorType.E5 => SensorType.E2,
+                        SensorType.E6 => SensorType.E1,
+                        SensorType.E7 => SensorType.E8,
+                        SensorType.E8 => SensorType.E7,
+                        SensorType.E1 => SensorType.E6,
+                        SensorType.E2 => SensorType.E5,
+                        SensorType.E3 => SensorType.E4,
                         _ => throw new NotSupportedException()
                     };
-                case SensorArea.A4:
-                case SensorArea.B4:
+                case SensorType.A4:
+                case SensorType.B4:
                     return source switch
                     {
-                        SensorArea.D5 => SensorArea.D4,
-                        SensorArea.D6 => SensorArea.D3,
-                        SensorArea.D7 => SensorArea.D2,
-                        SensorArea.D8 => SensorArea.D1,
-                        SensorArea.D1 => SensorArea.D8,
-                        SensorArea.D2 => SensorArea.D7,
-                        SensorArea.D3 => SensorArea.D6,
-                        SensorArea.D4 => SensorArea.D5,
-                        SensorArea.E5 => SensorArea.E4,
-                        SensorArea.E6 => SensorArea.E3,
-                        SensorArea.E7 => SensorArea.E2,
-                        SensorArea.E8 => SensorArea.E1,
-                        SensorArea.E1 => SensorArea.E8,
-                        SensorArea.E2 => SensorArea.E7,
-                        SensorArea.E3 => SensorArea.E6,
-                        SensorArea.E4 => SensorArea.E5,
+                        SensorType.D5 => SensorType.D4,
+                        SensorType.D6 => SensorType.D3,
+                        SensorType.D7 => SensorType.D2,
+                        SensorType.D8 => SensorType.D1,
+                        SensorType.D1 => SensorType.D8,
+                        SensorType.D2 => SensorType.D7,
+                        SensorType.D3 => SensorType.D6,
+                        SensorType.D4 => SensorType.D5,
+                        SensorType.E5 => SensorType.E4,
+                        SensorType.E6 => SensorType.E3,
+                        SensorType.E7 => SensorType.E2,
+                        SensorType.E8 => SensorType.E1,
+                        SensorType.E1 => SensorType.E8,
+                        SensorType.E2 => SensorType.E7,
+                        SensorType.E3 => SensorType.E6,
+                        SensorType.E4 => SensorType.E5,
                         _ => throw new NotSupportedException()
                     };
-                case SensorArea.A5:
-                case SensorArea.B5:
+                case SensorType.A5:
+                case SensorType.B5:
                     return source switch
                     {
-                        SensorArea.D6 => SensorArea.D5,
-                        SensorArea.D7 => SensorArea.D4,
-                        SensorArea.D8 => SensorArea.D3,
-                        SensorArea.D1 => SensorArea.D2,
-                        SensorArea.D2 => SensorArea.D1,
-                        SensorArea.D3 => SensorArea.D8,
-                        SensorArea.D4 => SensorArea.D7,
-                        SensorArea.D5 => SensorArea.D6,
-                        SensorArea.E6 => SensorArea.E5,
-                        SensorArea.E7 => SensorArea.E4,
-                        SensorArea.E8 => SensorArea.E3,
-                        SensorArea.E1 => SensorArea.E2,
-                        SensorArea.E2 => SensorArea.E1,
-                        SensorArea.E3 => SensorArea.E8,
-                        SensorArea.E4 => SensorArea.E7,
-                        SensorArea.E5 => SensorArea.E6,
+                        SensorType.D6 => SensorType.D5,
+                        SensorType.D7 => SensorType.D4,
+                        SensorType.D8 => SensorType.D3,
+                        SensorType.D1 => SensorType.D2,
+                        SensorType.D2 => SensorType.D1,
+                        SensorType.D3 => SensorType.D8,
+                        SensorType.D4 => SensorType.D7,
+                        SensorType.D5 => SensorType.D6,
+                        SensorType.E6 => SensorType.E5,
+                        SensorType.E7 => SensorType.E4,
+                        SensorType.E8 => SensorType.E3,
+                        SensorType.E1 => SensorType.E2,
+                        SensorType.E2 => SensorType.E1,
+                        SensorType.E3 => SensorType.E8,
+                        SensorType.E4 => SensorType.E7,
+                        SensorType.E5 => SensorType.E6,
                         _ => throw new NotSupportedException()
                     };
-                case SensorArea.A6:
-                case SensorArea.B6:
+                case SensorType.A6:
+                case SensorType.B6:
                     return source switch
                     {
-                        SensorArea.D7 => SensorArea.D6,
-                        SensorArea.D8 => SensorArea.D5,
-                        SensorArea.D1 => SensorArea.D4,
-                        SensorArea.D2 => SensorArea.D3,
-                        SensorArea.D3 => SensorArea.D2,
-                        SensorArea.D4 => SensorArea.D1,
-                        SensorArea.D5 => SensorArea.D8,
-                        SensorArea.D6 => SensorArea.D7,
-                        SensorArea.E7 => SensorArea.E6,
-                        SensorArea.E8 => SensorArea.E5,
-                        SensorArea.E1 => SensorArea.E4,
-                        SensorArea.E2 => SensorArea.E3,
-                        SensorArea.E3 => SensorArea.E2,
-                        SensorArea.E4 => SensorArea.E1,
-                        SensorArea.E5 => SensorArea.E8,
-                        SensorArea.E6 => SensorArea.E7,
+                        SensorType.D7 => SensorType.D6,
+                        SensorType.D8 => SensorType.D5,
+                        SensorType.D1 => SensorType.D4,
+                        SensorType.D2 => SensorType.D3,
+                        SensorType.D3 => SensorType.D2,
+                        SensorType.D4 => SensorType.D1,
+                        SensorType.D5 => SensorType.D8,
+                        SensorType.D6 => SensorType.D7,
+                        SensorType.E7 => SensorType.E6,
+                        SensorType.E8 => SensorType.E5,
+                        SensorType.E1 => SensorType.E4,
+                        SensorType.E2 => SensorType.E3,
+                        SensorType.E3 => SensorType.E2,
+                        SensorType.E4 => SensorType.E1,
+                        SensorType.E5 => SensorType.E8,
+                        SensorType.E6 => SensorType.E7,
                         _ => throw new NotSupportedException()
                     };
-                case SensorArea.A7:
-                case SensorArea.B7:
+                case SensorType.A7:
+                case SensorType.B7:
                     return source switch
                     {
-                        SensorArea.D8 => SensorArea.D7,
-                        SensorArea.D1 => SensorArea.D6,
-                        SensorArea.D2 => SensorArea.D5,
-                        SensorArea.D3 => SensorArea.D4,
-                        SensorArea.D4 => SensorArea.D3,
-                        SensorArea.D5 => SensorArea.D2,
-                        SensorArea.D6 => SensorArea.D1,
-                        SensorArea.D7 => SensorArea.D8,
-                        SensorArea.E8 => SensorArea.E7,
-                        SensorArea.E1 => SensorArea.E6,
-                        SensorArea.E2 => SensorArea.E5,
-                        SensorArea.E3 => SensorArea.E4,
-                        SensorArea.E4 => SensorArea.E3,
-                        SensorArea.E5 => SensorArea.E2,
-                        SensorArea.E6 => SensorArea.E1,
-                        SensorArea.E7 => SensorArea.E8,
+                        SensorType.D8 => SensorType.D7,
+                        SensorType.D1 => SensorType.D6,
+                        SensorType.D2 => SensorType.D5,
+                        SensorType.D3 => SensorType.D4,
+                        SensorType.D4 => SensorType.D3,
+                        SensorType.D5 => SensorType.D2,
+                        SensorType.D6 => SensorType.D1,
+                        SensorType.D7 => SensorType.D8,
+                        SensorType.E8 => SensorType.E7,
+                        SensorType.E1 => SensorType.E6,
+                        SensorType.E2 => SensorType.E5,
+                        SensorType.E3 => SensorType.E4,
+                        SensorType.E4 => SensorType.E3,
+                        SensorType.E5 => SensorType.E2,
+                        SensorType.E6 => SensorType.E1,
+                        SensorType.E7 => SensorType.E8,
                         _ => throw new NotSupportedException()
                     };
-                case SensorArea.A8:
-                case SensorArea.B8:
+                case SensorType.A8:
+                case SensorType.B8:
                     return source switch
                     {
-                        SensorArea.D1 => SensorArea.D8,
-                        SensorArea.D2 => SensorArea.D7,
-                        SensorArea.D3 => SensorArea.D6,
-                        SensorArea.D4 => SensorArea.D5,
-                        SensorArea.D5 => SensorArea.D4,
-                        SensorArea.D6 => SensorArea.D3,
-                        SensorArea.D7 => SensorArea.D2,
-                        SensorArea.D8 => SensorArea.D1,
-                        SensorArea.E1 => SensorArea.E8,
-                        SensorArea.E2 => SensorArea.E7,
-                        SensorArea.E3 => SensorArea.E6,
-                        SensorArea.E4 => SensorArea.E5,
-                        SensorArea.E5 => SensorArea.E4,
-                        SensorArea.E6 => SensorArea.E3,
-                        SensorArea.E7 => SensorArea.E2,
-                        SensorArea.E8 => SensorArea.E1,
+                        SensorType.D1 => SensorType.D8,
+                        SensorType.D2 => SensorType.D7,
+                        SensorType.D3 => SensorType.D6,
+                        SensorType.D4 => SensorType.D5,
+                        SensorType.D5 => SensorType.D4,
+                        SensorType.D6 => SensorType.D3,
+                        SensorType.D7 => SensorType.D2,
+                        SensorType.D8 => SensorType.D1,
+                        SensorType.E1 => SensorType.E8,
+                        SensorType.E2 => SensorType.E7,
+                        SensorType.E3 => SensorType.E6,
+                        SensorType.E4 => SensorType.E5,
+                        SensorType.E5 => SensorType.E4,
+                        SensorType.E6 => SensorType.E3,
+                        SensorType.E7 => SensorType.E2,
+                        SensorType.E8 => SensorType.E1,
                         _ => throw new NotSupportedException()
                     };
                 default:
@@ -485,7 +485,7 @@ public static class SensorAreaExtensions
             }
         }
     }
-    public static bool IsCollinearWith(this SensorArea source, SensorArea target)
+    public static bool IsCollinearWith(this SensorType source, SensorType target)
     {
         var thisGroup = source.GetGroup();
         var targetGroup = target.GetGroup();

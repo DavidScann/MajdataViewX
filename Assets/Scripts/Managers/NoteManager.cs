@@ -15,7 +15,7 @@ public class NoteManager : MonoBehaviour
     public Dictionary<int, int> noteIndex = new();
 
     public Dictionary<GameObject, int> touchOrder = new();
-    public Dictionary<SensorArea, int> touchIndex = new();
+    public Dictionary<SensorType, int> touchIndex = new();
 
     private void Awake()
     {
@@ -25,7 +25,7 @@ public class NoteManager : MonoBehaviour
     public void AddNote(GameObject obj,int index) => noteOrder.Add(obj, index);
     public void AddTouch(GameObject obj,int index) => touchOrder.Add(obj, index);
     public void NextNote(int pos) => noteIndex[pos]++;
-    public void NextTouch(SensorArea pos) => touchIndex[pos]++;
+    public void NextTouch(SensorType pos) => touchIndex[pos]++;
     
     public void Refresh()
     {
@@ -77,7 +77,7 @@ public class NoteManager : MonoBehaviour
         return index <= nowIndex;
     }
 
-    public bool CanJudge(GameObject obj,SensorArea t)
+    public bool CanJudge(GameObject obj,SensorType t)
     {
         if (!touchOrder.ContainsKey(obj))
             return false;

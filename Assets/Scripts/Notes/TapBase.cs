@@ -157,13 +157,13 @@ public class TapBase : NoteBase
 
     protected void Check(object sender, InputEventArgs arg)
     {
-        if (arg.Sensor != sensor)
+        if (arg.Type != sensor)
             return;
         if (isJudged || !noteManager.CanJudge(gameObject, startPosition))
             return;
         if (Majdata<InputManager>.Instance!.Mode is AutoPlayMode.Enable or AutoPlayMode.Random)
             return;
-
+        
         if (arg.IsClick)
         {
             if (!inputManager.IsIdle(arg))

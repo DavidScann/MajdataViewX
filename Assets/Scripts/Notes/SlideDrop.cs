@@ -19,10 +19,8 @@ public class SlideDrop : NoteLongBase, ICanShine
     public bool isJustR;
     public bool isSpecialFlip; // fixes known star problem
     
-    public float timeStart;
+    public float startTime;
     public int sortIndex;
-    public float fadeInTime;
-    public float fullFadeInTime;
     
     public ConnSlideInfo ConnectInfo = new();
     public List<int> areaStep = new();
@@ -31,13 +29,13 @@ public class SlideDrop : NoteLongBase, ICanShine
     public string slideType;
 
     private float arriveTime = -1;
-    private List<Sensor> boundSensors = new();
-    private List<Sensor> triggerSensors = new(); // AutoPlay; 标记已触发的Sensor 
+    private List<SensorType> boundSensors = new();
+    private List<SensorType> triggerSensors = new(); // AutoPlay; 标记已触发的Sensor 
     private List<SlideArea> judgeQueue = new(); // 判定队列(目前剩余的)
     private List<SlideArea> _judgeQueue = new(); // 判定队列
 
-    public bool isFinished => judgeQueue.Count == 0; 
-    public bool isPendingFinish => judgeQueue.Count == 1;
+    public bool IsFinished => judgeQueue.Count == 0; 
+    public bool IsPendingFinish => judgeQueue.Count == 1;
 
     public GameObject star_slide;
     private SpriteRenderer starRenderer;
@@ -51,7 +49,9 @@ public class SlideDrop : NoteLongBase, ICanShine
     bool canShine = false;
     bool canCheck = false;
     bool isChecking = false;
+    float fadeInTime;
     float judgeTiming; // 正解帧
+    float forceJudgeTime; 
     bool isInitialized = false; //防止重复初始化
     bool isDestroying = false; // 防止重复销毁
     bool isSoundPlayed = false;
@@ -178,7 +178,7 @@ public class SlideDrop : NoteLongBase, ICanShine
         fadeInTime = -3.926913f / speed;
         // Slide完全淡入时机
         // 正常情况下应为负值；速度过高将忽略淡入
-        fullFadeInTime = Math.Min(fadeInTime + 0.2f, 0);
+        var fullFadeInTime = Math.Min(fadeInTime + 0.2f, 0);
         var interval = fullFadeInTime - fadeInTime;
         fadeInAnimator = this.GetComponent<Animator>();
         //淡入时机与正解帧间隔小于200ms时，加快淡入动画的播放速度; interval永不为0
@@ -189,7 +189,7 @@ public class SlideDrop : NoteLongBase, ICanShine
         var table = SlideTables.FindTableByName(slideType);
         if (isMirror)
         {
-            table!.Mirror(SensorArea.A1);
+            table!.Mirror(SensorType.A1);
         }
         var diff = Math.Abs(1 - startPosition);
         if (diff != 0)
@@ -202,42 +202,13 @@ public class SlideDrop : NoteLongBase, ICanShine
         {
             if (ConnectInfo.IsGroupPartEnd)
             {
-                judgeQueue.LastOrDefault().SetIsLast();
+                judgeQueue.LastOrDefault()!.SetIsLast();
             }
             else
             {
-                judgeQueue.LastOrDefault().SetNonLast();
+                judgeQueue.LastOrDefault()!.SetNonLast();
             }
-            UpdateJudgeQueue();
-        }
-
-        _judgeQueue = new(judgeQueue);
-
-        foreach (var area in judgeQueue.SelectMany(x => x.Areas))
-            boundSensors.Add(inputManager.GetSensor(area));
-        
-        foreach (var boundSensor in boundSensors)
-            inputManager.BindSensor(Check, boundSensor);
-        
-        //judge timing
-        if( (ConnectInfo.IsConnSlide && ConnectInfo.IsGroupPartEnd) || 
-            !ConnectInfo.IsConnSlide)
-        {
-            judgeTiming = time + LastFor * CalJudgeTiming();
-        }
-        else
-        {
-            LastFor = (ConnectInfo.TotalLength / ConnectInfo.TotalSlideLen) * GetSlideLength();
-            if(!ConnectInfo.IsGroupPartHead)
-            {
-                var parent = ConnectInfo.Parent!.GetComponent<SlideDrop>();
-                time = parent.time + parent.LastFor;
-                judgeTiming = time + LastFor * CalJudgeTiming();
-            }
-        }
-
-        void UpdateJudgeQueue()
-        {
+            
             if (ConnectInfo.TotalJudgeQueueLen < 4)
             {
                 if (ConnectInfo.IsGroupPartHead)
@@ -259,6 +230,22 @@ public class SlideDrop : NoteLongBase, ICanShine
                 }
             }
         }
+
+        _judgeQueue = new(judgeQueue);
+
+        foreach (var area in judgeQueue.SelectMany(x => x.Areas))
+        {
+            boundSensors.Add(area);
+            inputManager.BindSensor(Check, area);
+        }
+        
+        //judge timing
+        if (ConnectInfo.IsGroupPartEnd || !ConnectInfo.IsConnSlide)
+        {
+            var percent = table.Const;
+            judgeTiming = time + LastFor * (1 - percent);
+            forceJudgeTime = LastFor * percent;
+        }
     }
 
     /// <summary>
@@ -277,47 +264,41 @@ public class SlideDrop : NoteLongBase, ICanShine
         if (Majdata<InputManager>.Instance!.Mode is AutoPlayMode.Enable or AutoPlayMode.Random)
             return;
 
-        // time      是Slide启动的时间点
-        // timeStart 是Slide完全显示但未启动
-        // LastFor   是Slide的时值
+        // time        是Slide启动的时间点
+        // startTiming 是Slide完全显示但未启动
+        var start = timeProvider.NoteTime - startTime;
         var timing = timeProvider.NoteTime - time;
-        var startTiming = timeProvider.NoteTime - timeStart;
-        var forceJudgeTiming = time + LastFor + (isMine ? 0 : 0.6); //mine一到就判
-
+        var forceJudge = timing - LastFor - forceJudgeTime;
+        
         if (ConnectInfo.IsConnSlide)
         {
-            if (ConnectInfo.IsGroupPartHead && startTiming >= -0.05f)
+            if (ConnectInfo.IsGroupPartHead && start >= -0.05f)
                 canCheck = true;
             else if (!ConnectInfo.IsGroupPartHead)
                 canCheck = ConnectInfo.ParentFinished || ConnectInfo.ParentPendingFinish;
         }
-        else if (startTiming >= -0.05f)
+        else if (start >= -0.05f)
             canCheck = true;
 
         if (timing > 0)
             Running();
 
         //此处对mine音符的处理：一进judge就判定为miss并销毁，能进too late就判为perfect
-        if (ConnectInfo.IsConnSlide)
+        if (ConnectInfo.IsGroupPartEnd || !ConnectInfo.IsConnSlide)
         {
-            if(ConnectInfo.IsGroupPartEnd && isFinished)
+            if (IsFinished)
             {
                 HideBar(areaStep.LastOrDefault());
                 Judge();
             }
-            else if (ConnectInfo.IsGroupPartEnd && timeProvider.NoteTime - forceJudgeTiming >= 0)
+            else if (forceJudge >= 0)
+            {
                 TooLateJudge();
-            else if(isFinished)
-                HideBar(areaStep.LastOrDefault());
+            }
         }
-        else if (isFinished)
+        else if (IsFinished)
         {
             HideBar(areaStep.LastOrDefault());
-            Judge();
-        }
-        else if (timeProvider.NoteTime - forceJudgeTiming >= 0)
-        {
-            TooLateJudge();
         }
     }
     // Update is called once per frame
@@ -325,12 +306,12 @@ public class SlideDrop : NoteLongBase, ICanShine
     {
         if (star_slide == null)
         {
-            if (isFinished)
+            if (IsFinished)
                 DestroySelf();
             return;
         }
         // Slide淡入期间，不透明度从0到0.55耗时200ms
-        var startiming = timeProvider.NoteTime - timeStart;
+        var startiming = timeProvider.NoteTime - startTime;
         if (startiming <= 0f)
         {
             if (startiming >= -0.05f)
@@ -357,7 +338,7 @@ public class SlideDrop : NoteLongBase, ICanShine
             else
             {
                 // 只有当它是一个起点Slide（而非Slide Group中的子部分）的时候，才会有开始的星星渐入动画
-                alpha = 1f - -timing / (time - timeStart);
+                alpha = 1f - -timing / (time - startTime);
                 alpha = alpha > 1f ? 1f : alpha;
                 alpha = alpha < 0f ? 0f : alpha;                
             }
@@ -390,7 +371,7 @@ public class SlideDrop : NoteLongBase, ICanShine
     /// </summary>
     public void Check()
     {
-        if (!canCheck || isChecking || isFinished)
+        if (!canCheck || isChecking || IsFinished)
             return;
         if (Majdata<InputManager>.Instance!.Mode is AutoPlayMode.Enable or AutoPlayMode.Random)
             return;
@@ -412,8 +393,7 @@ public class SlideDrop : NoteLongBase, ICanShine
             second = judgeQueue[1];
         foreach (var t in first.Areas)
         {
-            var sensor = inputManager.GetSensor(t);
-            first.Judge(sensor.Status);
+            first.Judge(inputManager.CheckSensor(t));
         }
         
         if (first.On)
@@ -426,8 +406,7 @@ public class SlideDrop : NoteLongBase, ICanShine
             var sType = second.Areas;
             foreach (var t in sType)
             {
-                var sensor = inputManager.GetSensor(t);
-                second.Judge(sensor.Status);
+                second.Judge(inputManager.CheckSensor(t));
             }
 
             if (second.IsFinished)
@@ -470,7 +449,7 @@ public class SlideDrop : NoteLongBase, ICanShine
     /// </summary>
     void Running()
     {
-        if (timeProvider.NoteTime - timeStart < 0f || isMine) 
+        if (timeProvider.NoteTime - startTime < 0f || isMine) 
             return; 
         if (Majdata<InputManager>.Instance!.Mode is AutoPlayMode.Enable or AutoPlayMode.Random or AutoPlayMode.Disable)
             return;
@@ -495,7 +474,7 @@ public class SlideDrop : NoteLongBase, ICanShine
         }
         if (!ConnectInfo.IsGroupPartEnd && ConnectInfo.IsConnSlide)
             return;
-        var starTiming = timeStart + (time - timeStart) * 0.75;
+        var starTiming = startTime + (time - startTime) * 0.75;
         var stayTime = (time + LastFor) - judgeTiming; // 停留时间
         if (!isJudged)
         {
@@ -576,35 +555,6 @@ public class SlideDrop : NoteLongBase, ICanShine
         }
     }
     /// <summary>
-    /// 计算引导Star进入最后一个判定区的时机
-    /// </summary>
-    /// <returns>正解帧 (单位: s)</returns>
-    float CalJudgeTiming()
-    {
-        var s = inputManager.GetSensor(judgeQueue.Last().Areas[0]).gameObject.transform as RectTransform;
-        var starRadius = 0.763736616f;
-        var rCenter = s.position;
-        var rWidth = s.rect.width * s.lossyScale.x;
-        var rHeight = s.rect.height * s.lossyScale.y;
-
-        var radius = Math.Max(rWidth, rHeight) / 2;
-        for (var process = 0.85f; process < 1; process += 0.01f)
-        {
-            var indexProcess = (slidePositions.Count - 1) * process;
-            var index = (int)indexProcess;
-            var pos = indexProcess - index;
-
-            var a = slidePositions[index + 1];
-            var b = slidePositions[index];
-            var ba = a - b;
-            var newPos = ba * pos + b;
-
-            if ((newPos - rCenter).sqrMagnitude <= (radius * radius + starRadius * starRadius))
-                return process;
-        }
-        return 0.9f;
-    }
-    /// <summary>
     /// 强制将Slide判定为TooLate并销毁
     /// </summary>
     void TooLateJudge()
@@ -632,9 +582,8 @@ public class SlideDrop : NoteLongBase, ICanShine
     {
         if (onlyStar)
         { 
-            Destroy(star_slide);
             star_slide = null!;
-            ClearTriggeredSensor();
+            Destroy(star_slide);
         }
         else
         {
@@ -649,19 +598,12 @@ public class SlideDrop : NoteLongBase, ICanShine
             Destroy(gameObject);
         }
     }
-    /// <summary>
-    /// 清空所有已触发的Sensor
-    /// </summary>
-    void ClearTriggeredSensor()
-    {
-        foreach (var t in triggerSensors)
-            t.SetOff(guid);
-    }
     void OnDestroy()
     {
         if (PlayManager.IsReloading) return;
         if (isDestroying)
             return;
+        isDestroying = true;
         if (ConnectInfo.Parent != null)
             Destroy(ConnectInfo.Parent);
         if(star_slide != null)
@@ -703,20 +645,19 @@ public class SlideDrop : NoteLongBase, ICanShine
             objectCounter.ReportResult(SimaiNoteType.Slide, judgeResult, isBreak);
             if (isBreak && judgeResult == JudgeType.Perfect)
                 slideOK.GetComponent<Animator>().runtimeAnimatorController = skinManager.Shine_JudgeBreak;
-            if (!EffectManager.showLevel) slideOK.GetComponent<SpriteRenderer>().sprite =
-                    Sprite.Create(new Texture2D(0, 0), new Rect(0, 0, 0, 0), new Vector2(0.5f, 0.5f));
-
-            slideOK.SetActive(true);
+            if (EffectManager.showLevel)
+            {
+                slideOK.SetActive(true);
+            }
         }
         else
         {
             // 如果不是组内最后一个 那么也要将判定条删掉
             Destroy(slideOK);
         }
-        foreach (var sensor in boundSensors)
-            inputManager.UnbindSensor(Check, sensor);
-        ClearTriggeredSensor();
-        isDestroying = true;
+        foreach (var t in boundSensors)
+            inputManager.UnbindSensor(Check, t);
+        inputManager.ClearTriggeredSensor(guid.GetHashCode());
     }
     /// <summary>
     /// 更新引导Star状态
@@ -754,7 +695,7 @@ public class SlideDrop : NoteLongBase, ICanShine
             applyStarRotation(slideRotations.LastOrDefault());
             if (ConnectInfo.IsConnSlide && !ConnectInfo.IsGroupPartEnd)
                 DestroySelf(true);
-            else if (isFinished && isJudged)
+            else if (IsFinished && isJudged)
                 DestroySelf();
         }
         else
@@ -772,7 +713,7 @@ public class SlideDrop : NoteLongBase, ICanShine
                 var dAngle = Mathf.DeltaAngle(_b, _a) * pos;
                 dAngle = Mathf.Abs(dAngle);
                 var newRotation = Quaternion.Euler(0f, 0f,
-                                Mathf.MoveTowardsAngle(_b, _a, dAngle));
+                    Mathf.MoveTowardsAngle(_b, _a, dAngle));
                 applyStarRotation(newRotation);
             }
         } 

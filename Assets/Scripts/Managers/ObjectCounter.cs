@@ -604,7 +604,7 @@ public class ObjectCounter : MonoBehaviour
         {
             case BgInfoDisplay.Combo:
             {
-                objCombo.text = combo > 0 ? 
+                statusCombo.text = combo > 0 ? 
                     combo.ToString() : string.Empty;
             }
                 break;

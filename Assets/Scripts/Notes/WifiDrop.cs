@@ -7,34 +7,33 @@ using System.Collections.Generic;
 using System.Linq;
 using MajSimai;
 using UnityEngine;
+using UnityEngine.Serialization;
 using Random = UnityEngine.Random;
 
 #endregion
 
 public class WifiDrop : NoteLongBase, ICanShine
 {
-    public GameObject star_slidePrefab;
+    [SerializeField]
+    GameObject star_slidePrefab;
     
     public bool isJustR;
-    public float timeStart;
+    public float startTime;
     public int endPosition;
     public int sortIndex;
-    public float fadeInTime;
-    public float fullFadeInTime;
 
 
-    public List<int> areaStep = new List<int>();
+    public List<int> areaStep = new();
     public bool smoothSlideAnime = false;
 
     private float arriveTime = -1;
-    private List<GameObject> sensors = new();
-    private List<Sensor> boundSensors = new();
+    private List<SensorType> boundSensors = new();
     private List<List<SlideArea>> judgeQueues = new(3);
-    private Dictionary<GameObject, List<Sensor>> triggerSensors = new();
+    private Dictionary<GameObject, List<SensorType>> triggerSensors = new();
     
-    private bool isFinished => judgeQueues.All(x => x.Count == 0);
+    private bool IsFinished => judgeQueues.All(x => x.Count == 0);
     
-    private Animator fadeInAnimator = null;
+    private Animator fadeInAnimator;
     private readonly GameObject[] star_slides = new GameObject[3];
     private readonly SpriteRenderer[] star_Renderer = new SpriteRenderer[3];
     private readonly List<SpriteRenderer> sbRender = new();
@@ -49,6 +48,9 @@ public class WifiDrop : NoteLongBase, ICanShine
     bool isChecking = false;
     bool canCheck = false;
     bool isSoundPlayed = false;
+    float fadeInTime;
+    float judgeTiming; // 正解帧
+    float forceJudgeTime; 
     Dictionary<GameObject, Guid> guids = new();
 
 
@@ -66,7 +68,7 @@ public class WifiDrop : NoteLongBase, ICanShine
         fadeInTime = -3.926913f / speed;
         // Slide完全淡入时机
         // 正常情况下应为负值；速度过高将忽略淡入
-        fullFadeInTime = Math.Min(fadeInTime + 0.2f, 0);
+        var fullFadeInTime = Math.Min(fadeInTime + 0.2f, 0);
         var interval = fullFadeInTime - fadeInTime;
         fadeInAnimator = this.GetComponent<Animator>();
         fadeInAnimator.speed = 0.2f / interval; //淡入时机与正解帧间隔小于200ms时，加快淡入动画的播放速度; interval永不为0
@@ -168,11 +170,19 @@ public class WifiDrop : NoteLongBase, ICanShine
         judgeQueues.Add(table.Center.ToList());
         judgeQueues.Add(table.Right.ToList());
         
-        foreach (var area in judgeQueues.SelectMany(y => y.SelectMany(x => x.Areas)))
-            boundSensors.Add(inputManager.GetSensor(area));
-        
-        foreach (var boundSensor in boundSensors)
-            inputManager.BindSensor(Check, boundSensor);
+        //judge timing
+        var percent = table.Const;
+        judgeTiming = time + LastFor * (1 - percent);
+        forceJudgeTime = LastFor * percent;
+
+        foreach (var judgeQueue in judgeQueues)
+        {
+            foreach (var area in judgeQueue.SelectMany(x => x.Areas))
+            {
+                boundSensors.Add(area);
+                inputManager.BindSensor(Check, area);
+            }
+        }
     }
     private void FixedUpdate()
     {
@@ -180,20 +190,20 @@ public class WifiDrop : NoteLongBase, ICanShine
         // timeStart 是Slide完全显示但未启动
         // LastFor   是Slide的时值
         var timing = timeProvider.NoteTime - time;
-        var startTiming = timeProvider.NoteTime - timeStart;
-        var forceJudgeTiming = time + LastFor + (isMine ? 0 : 0.6); //mine头一到就判
-
+        var startTiming = timeProvider.NoteTime - this.startTime;
+        var forceJudge = timing - LastFor - forceJudgeTime;
+        
         if (startTiming >= -0.05f)
             canCheck = true;
         else if (timing > 0)
             Running();        
         
-        if (isFinished)
+        if (IsFinished)
         {
             HideBar(areaStep.LastOrDefault());
             Judge();
         }
-        else if (timeProvider.NoteTime - forceJudgeTiming >= 0)
+        else if (forceJudge >= 0)
             TooLateJudge();
     }
     int GetLastIndex()
@@ -222,7 +232,7 @@ public class WifiDrop : NoteLongBase, ICanShine
     public void Check(object sender, InputEventArgs arg) => CheckAll();
     void CheckAll()
     {
-        if (isFinished || isChecking || !canCheck)
+        if (IsFinished || isChecking || !canCheck)
             return;
         if (Majdata<InputManager>.Instance!.Mode is AutoPlayMode.Enable or AutoPlayMode.Random)
             return;
@@ -248,8 +258,7 @@ public class WifiDrop : NoteLongBase, ICanShine
         var fType = first.Areas;
         foreach (var t in fType)
         {
-            var sensor = inputManager.GetSensor(t);
-            first.Judge(sensor.Status);
+            first.Judge(inputManager.CheckSensor(t));
         }
         
         if (first.On)
@@ -262,8 +271,7 @@ public class WifiDrop : NoteLongBase, ICanShine
             var sType = second.Areas;
             foreach (var t in sType)
             {
-                var sensor = inputManager.GetSensor(t);
-                second.Judge(sensor.Status);
+                second.Judge(inputManager.CheckSensor(t));
             }
 
             if (second.IsFinished)
@@ -286,7 +294,7 @@ public class WifiDrop : NoteLongBase, ICanShine
             judgeQueue = judgeQueue.Skip(1).ToList();
             return;
         }
-        if (!isFinished)
+        if (!IsFinished)
             HideBar(GetLastIndex());
 
     }
@@ -301,7 +309,7 @@ public class WifiDrop : NoteLongBase, ICanShine
             return;
         }
         var timing = timeProvider.NoteTime - time;
-        var starTiming = timeStart + (time - timeStart) * 0.667;
+        var starTiming = startTime + (time - startTime) * 0.667;
         var pTime = LastFor / areaStep.Last();
         var judgeTime = time + pTime * (areaStep.LastOrDefault() - 2.1f);// 正解帧
         var stayTime = (time + LastFor) - judgeTime; // 停留时间
@@ -366,7 +374,7 @@ public class WifiDrop : NoteLongBase, ICanShine
     }
     void Running()
     {
-        if (timeProvider.NoteTime - timeStart < 0f || isMine) 
+        if (timeProvider.NoteTime - startTime < 0f || isMine) 
             return; 
         if (Majdata<InputManager>.Instance!.Mode is AutoPlayMode.Enable or AutoPlayMode.Random or AutoPlayMode.Disable)
             return;
@@ -380,7 +388,7 @@ public class WifiDrop : NoteLongBase, ICanShine
     private void Update()
     {
         // Wifi Slide淡入期间，不透明度从0到1耗时200ms
-        var startiming = timeProvider.NoteTime - timeStart;
+        var startiming = timeProvider.NoteTime - startTime;
         if (startiming <= 0f)
         {
             if (startiming >= -0.05f)
@@ -403,7 +411,7 @@ public class WifiDrop : NoteLongBase, ICanShine
         {
             canShine = true;
             float alpha;
-            alpha = 1f - -timing / (time - timeStart);
+            alpha = 1f - -timing / (time - startTime);
             alpha = alpha > 1f ? 1f : alpha;
             alpha = alpha < 0f ? 0f : alpha;
 
@@ -451,7 +459,7 @@ public class WifiDrop : NoteLongBase, ICanShine
                     judgeQueues.Clear();
                     return;
             }
-            if (isFinished && isJudged)
+            if (IsFinished && isJudged)
                 DestroySelf();
         }
         else
@@ -520,6 +528,7 @@ public class WifiDrop : NoteLongBase, ICanShine
         if (PlayManager.IsReloading) return;
         if (isDestroying)
             return;
+        isDestroying = true;
 
         switch (Majdata<InputManager>.Instance!.Mode)
         {
@@ -560,10 +569,9 @@ public class WifiDrop : NoteLongBase, ICanShine
         slideOK.SetActive(true);
 
         
-        foreach (var sensor in boundSensors)
-            inputManager.UnbindSensor(Check, sensor);
+        foreach (var t in boundSensors)
+            inputManager.UnbindSensor(Check, t);
         ClearTriggeredSensor();
-        isDestroying = true;
     }
     /// <summary>
     /// 清空所有已触发的Sensor
@@ -571,8 +579,7 @@ public class WifiDrop : NoteLongBase, ICanShine
     void ClearTriggeredSensor()
     {
         foreach (var star in star_slides)
-        foreach (var s in triggerSensors[star])
-            s.SetOff(guids[star]);
+            inputManager.ClearTriggeredSensor(guids[star].GetHashCode());
     }
     private void setSlideBarAlpha(float alpha)
     {

@@ -23,14 +23,14 @@ public class MultTouchHandler : MonoBehaviour
 
     public void RegisterTouch(TouchDrop obj)
     {
-        var areaIndex = (int)obj.sensor.Type;
+        var areaIndex = (int)obj.sensor;
         obj.setLayer(touchSlots[areaIndex].Count);
         touchSlots[areaIndex].Add(obj);
     }
 
     public void CancelTouch(TouchDrop obj)
     {
-        var areaIndex = (int)obj.sensor.Type;
+        var areaIndex = (int)obj.sensor;
         var touchSlot = touchSlots[areaIndex];
 
         if (touchSlot.Count != 0)

@@ -69,7 +69,7 @@ public class ConnSlideInfo
             if (Parent == null)
                 return true;
             else
-                return Parent.GetComponent<SlideDrop>().isFinished;
+                return Parent.GetComponent<SlideDrop>().IsFinished;
         }
     }
 
@@ -83,7 +83,7 @@ public class ConnSlideInfo
             if (Parent == null)
                 return false;
             else
-                return Parent.GetComponent<SlideDrop>().isPendingFinish;
+                return Parent.GetComponent<SlideDrop>().IsPendingFinish;
         }
     }
 
