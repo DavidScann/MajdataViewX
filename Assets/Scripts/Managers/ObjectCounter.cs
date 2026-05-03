@@ -75,6 +75,54 @@ public class ObjectCounter : MonoBehaviour
         0.0000,  // acc (+)
     };
 
+    private double ClassicRateFromCount
+    {
+        get
+        {
+            // 提取公约数 500，简化系数：
+            // Tap(1), Hold(2), Slide(3), Touch(1), Break(5.2 / 5.0)
+            // Break 的权重在分子是 2600 (5.2倍)，分母是 2500 (5.0倍)
+            var currentScore = TapFinishedCount +
+                                  HoldFinishedCount * 2.0 +
+                                  SlideFinishedCount * 3.0 +
+                                  TouchFinishedCount * 1.0 +
+                                  BreakFinishedCount * 5.2;
+
+            var totalScore = TapSum +
+                                HoldSum * 2.0 +
+                                SlideSum * 3.0 +
+                                TouchSum * 1.0 +
+                                BreakSum * 5.0;
+            
+            if (totalScore <= 0) return 0.0;
+            var rate = (currentScore / totalScore) * 100.0;
+            return Math.Round(rate, 4);
+        }
+    }
+    
+    private double DeluxeRateFromCount
+    {
+        get
+        {
+            var currentDeluxe = TapFinishedCount +
+                                   HoldFinishedCount * 2.0 +
+                                   SlideFinishedCount * 3.0 +
+                                   TouchFinishedCount * 1.0 +
+                                   BreakFinishedCount * 5.0;
+
+            var totalDeluxe = TapSum +
+                                 HoldSum * 2.0 +
+                                 SlideSum * 3.0 +
+                                 TouchSum * 1.0 +
+                                 BreakSum * 5.0;
+            
+            var baseRate = totalDeluxe > 0 ? (currentDeluxe / totalDeluxe) * 100.0 : 0.0;
+            var breakBonus = BreakSum > 0 ? (double)BreakFinishedCount / BreakSum : 0.0;
+            var finalRate = baseRate + breakBonus;
+            
+            return Math.Round(finalRate, 4);
+        }
+    }
     long cPerfectCount = 0;
     long perfectCount = 0;
     long greatCount = 0;
@@ -709,9 +757,9 @@ public class ObjectCounter : MonoBehaviour
             
             objectRate.text = string.Format(
                 "FiNALE  Rate:\n" +
-                $"{accRate[0]:000.00}   %\n" +
+                $"{ClassicRateFromCount:000.00}   %\n" +
                 "DELUXE Rate:\n" +
-                $"{accRate[4]:000.0000} % "
+                $"{DeluxeRateFromCount:000.0000} % "
             );
             
             judgeResultCount.text = $"{cPerfectCount}\n" +
@@ -732,7 +780,7 @@ public class ObjectCounter : MonoBehaviour
                 $"{BreakFinishedCount} / {BreakSum}\n" +
                 $"{NoteFinishedCount} / {NoteSum}";
             
-            var rate = accRate[4];
+            var rate = DeluxeRateFromCount;
             var intPart = (int)rate;
             var fracPart = (rate - intPart) * 10000;
             objRate.text =
