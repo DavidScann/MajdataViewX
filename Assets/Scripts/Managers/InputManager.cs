@@ -229,6 +229,7 @@ public class InputManager : MonoBehaviour
 
     public void ClearTriggeredSensor(int id)
     {
+        if (!triggerSensors.ContainsKey(id)) return;
         var oldList = new List<Sensor>(triggerSensors[id]);
         triggerSensors[id].Clear();
         var untriggerSensors = oldList.Where(x => !triggerSensors[id].Contains(x));

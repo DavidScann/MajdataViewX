@@ -183,7 +183,7 @@ public class PlayManager : MonoBehaviour
                     
                     Majdata<AllPerfectManager>.Instance!.enabled = true;
                     timeProvider.SetStartTime(startAt, offset, speed, playmode, _setting.OutputFps);
-                    screenRecorder.StartRecording(maidataPath, _setting.OutputFps);
+                    screenRecorder.StartRecording(maidataPath, _setting.OutputFps, _setting.UseAlpha);
                     break;
             }
             

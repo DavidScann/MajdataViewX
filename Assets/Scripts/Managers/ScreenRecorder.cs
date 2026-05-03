@@ -36,9 +36,9 @@ public class ScreenRecorder : MonoBehaviour
         errText = GameObject.Find("ErrText").GetComponent<Text>();
     }
 
-    public void StartRecording(string maidataPath, int fps)
+    public void StartRecording(string maidataPath, int fps, bool useAlpha)
     {
-        StartCoroutine(CaptureScreen(maidataPath, fps));
+        StartCoroutine(CaptureScreen(maidataPath, fps, useAlpha));
     }
 
     public void StopRecording()
@@ -52,7 +52,7 @@ public class ScreenRecorder : MonoBehaviour
         errText.text = string.Empty;
     }
     
-    private IEnumerator CaptureScreen(string maidataPath, int fps)
+    private IEnumerator CaptureScreen(string maidataPath, int fps, bool useAlpha)
     {
         // 1. 环境检查
         if (Screen.width % 2 != 0 || Screen.height % 2 != 0)
@@ -64,23 +64,28 @@ public class ScreenRecorder : MonoBehaviour
         // 2. 路径与参数准备
         var ffmpegPath = Path.Combine(Application.streamingAssetsPath, "ffmpeg.exe");
         var wavName = "temp.wav";
-        var videoName = "temp.mov"; // MOV 容器配合 qtrle 是支持 Alpha 且速度最快的组合
-        var finalName = "out.mov";
+        var videoName = useAlpha ? "temp.webm" : "temp.mp4";
+        var finalName = useAlpha ? "out.webm" : "out.mp4";
 
-        // -c:v qtrle (QuickTime Animation) 几乎不耗 CPU，支持 Alpha
+        // 透明：VP9 (deadline realtime 提高速度, yuva420p 保留 Alpha)
+        // 不透明：x264 (ultrafast 提高速度, yuv420p 体积最小)
+        var videoCodecArgs = useAlpha 
+            ? "-c:v libvpx-vp9 -deadline realtime -cpu-used 8 -crf 22 -b:v 0 -pix_fmt yuva420p " 
+            : "-c:v libx264 -preset ultrafast -crf 20 -pix_fmt yuv420p ";
         var outArgs = 
             "-hide_banner -y " +
             $"-f rawvideo -pix_fmt rgba -s {Screen.width}x{Screen.height} -r {fps} " +
             @"-i \\.\pipe\majdataRec " +
             "-vf vflip " +
-            "-c:v qtrle " + 
+            videoCodecArgs +
             $"\"{videoName}\"";
-
-        // 合并参数：MOV 支持封装原始 PCM (WAV) 音频，无需转码，极快
+        
+        //WebM => libopus，MP4 => aac
+        var audioCodec = useAlpha ? "libopus" : "aac";
         var muxArgs = 
             "-hide_banner -y " +
             $"-i \"{videoName}\" -i \"{wavName}\" " +
-            "-c:v copy -c:a pcm_s16le -shortest " +
+            $"-c:v copy -c:a {audioCodec} -b:a 320k -shortest " +
             $"\"{finalName}\"";
 
         // 3. 准备 RenderTexture 和 离线 Texture2D
