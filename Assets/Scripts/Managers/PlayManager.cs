@@ -221,6 +221,7 @@ public class PlayManager : MonoBehaviour
             bgManager.ContinueVideo();
             
             audioManager.PlayTrack();
+            audioManager.ResumeTouchHoldSound();
             
             _state = ViewStatus.Playing;
         }
@@ -247,6 +248,7 @@ public class PlayManager : MonoBehaviour
             bgManager.PauseVideo();
             
             audioManager.PauseTrack();
+            audioManager.PauseTouchHoldSound();
             
             _state = ViewStatus.Paused;
         }

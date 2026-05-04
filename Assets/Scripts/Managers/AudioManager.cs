@@ -428,6 +428,17 @@ public class AudioManager : MonoBehaviour
     {
         noteSfxPlaybackRequests[TOUCHHOLD] = true;
     }
+
+    public void PauseTouchHoldSound()
+    {
+        if (isTouchHoldRiserPlaying)
+            NoteSfxs[TOUCHHOLD].Pause(); //seen as still playing
+    }
+    public void ResumeTouchHoldSound()
+    {
+        if (isTouchHoldRiserPlaying)
+            NoteSfxs[TOUCHHOLD].Play();
+    }
     public void StopTouchHoldSound()
     {
         noteSfxPlaybackRequests[TOUCHHOLD] = false;
