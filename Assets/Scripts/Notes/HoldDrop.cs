@@ -23,7 +23,7 @@ public class HoldDrop : NoteLongBase
     private SpriteRenderer exSpriteRender;
 
     private bool isTouched = false; //for mine judge
-    private bool isPlayedJudgeSFX = false; //for Enable / Random mode
+    private bool isPlayedSFX = false; //for Enable / Random mode
 
 
     private void Start()
@@ -125,7 +125,7 @@ public class HoldDrop : NoteLongBase
                     isJudged = true;
                     isTouched = true; //算是点到了
                     PlayHoldEffect();
-                    PlayJudgeSFX();
+                    PlaySFX();
                     break;
                 case AutoPlayMode.DJAuto:
                     if (!isJudged && !isMine) //mine buda
@@ -152,7 +152,7 @@ public class HoldDrop : NoteLongBase
                         isJudged = true;
                     }
                     PlayHoldEffect();
-                    PlayJudgeSFX();
+                    PlaySFX();
                     return;
             }
         }
@@ -258,7 +258,7 @@ public class HoldDrop : NoteLongBase
         judgeResult = result;
         isJudged = true;
         PlayHoldEffect();
-        PlayJudgeSFX();
+        PlaySFX();
     }
     
     private void Update()
@@ -413,7 +413,7 @@ public class HoldDrop : NoteLongBase
 
         effectManager.PlayEffect(startPosition, isBreak, result);
         effectManager.PlayFastLate(startPosition, result);
-        PlaySFX();
+        PlayJudgeSFX();
         print($"Hold: {MathF.Round(percent * 100,2)}%\nTotal Len : {MathF.Round(realityHT * 1000,2)}ms");
 
         objectCounter.ReportResult(SimaiNoteType.Hold, result, isBreak);
@@ -462,14 +462,13 @@ public class HoldDrop : NoteLongBase
     
     private void PlayJudgeSFX()
     {
-        if (isPlayedJudgeSFX) return;
-
         audioManager.PlayTapSound(judgeResult, false, false);
-        isPlayedJudgeSFX = true;
     }
 
     private void PlaySFX()
     {
+        if (isPlayedSFX) return;
         audioManager.PlayTapSound(judgeResult, isEx, isBreak);
+        isPlayedSFX = true;
     }
 }
