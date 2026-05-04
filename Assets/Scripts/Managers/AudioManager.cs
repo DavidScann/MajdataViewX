@@ -8,6 +8,7 @@ using JetBrains.Annotations;
 using MajSimai;
 using ManagedBass;
 using ManagedBass.Mix;
+using UnityEditor.Search;
 using UnityEngine;
 
 #endregion
@@ -24,12 +25,13 @@ public class AudioManager : MonoBehaviour
     //answer SFX
     List<AnswerTimingPoint> answerTimingPoints = new();
     //note SFX
-    public static bool[] noteSfxPlaybackRequests = new bool[15];
-    List<AudioSample> NoteSfxs = new(15);
+    public static bool[] noteSfxPlaybackRequests = new bool[16];
+    List<AudioSample> NoteSfxs = new(16);
     
     //SFX for recording
-    private List<float[]> noteSfxSamplesData = new(15);
+    private List<float[]> noteSfxSamplesData = new(16);
     private float[] recordingBuffer; 
+    private int[] sfxPlayPointers = new int[16]; //-1 is not playing
     
     const int SAMPLERATE = 44100;
     const int CHANNELS = 2;
@@ -51,6 +53,7 @@ public class AudioManager : MonoBehaviour
     public const int ANSWER = 12;
     public const int ANSWER_CLOCK = 13;
     public const int TRACK_START = 14;
+    public const int ALL_PERFECT = 15;
     
     private bool isTouchHoldRiserPlaying = false;
 
@@ -64,6 +67,7 @@ public class AudioManager : MonoBehaviour
         Bass.PluginLoad("bassmix");
         
         //Note SFX
+        var sfxPath = Path.Combine(new DirectoryInfo(Application.dataPath).Parent!.FullName, "SFX");
         foreach (var filename in new []
                  {
                      "tap_perfect.wav",
@@ -80,13 +84,12 @@ public class AudioManager : MonoBehaviour
                      "touch_hanabi.wav",
                      "answer.wav",
                      "answer_clock.wav",
-                     "track_start.wav"
+                     "track_start.wav",
+                     "all_perfect.wav"
                  })
         {
-            var path = Path.Combine(new DirectoryInfo(Application.dataPath).Parent!.FullName, 
-                "SFX", filename);
-            
             //sample
+            var path = Path.Combine(sfxPath, filename);
             var sample = new AudioSample(path, AudioSampleMode.Sample);
             sample.SampleType = filename switch
             {
@@ -233,6 +236,9 @@ public class AudioManager : MonoBehaviour
                 case TRACK_START:
                     if (isRequested) NoteSfxs[TRACK_START].PlayOneShot();
                     break;
+                case ALL_PERFECT:
+                    if (isRequested) NoteSfxs[ALL_PERFECT].PlayOneShot();
+                    break;
             }
         }
         //clear
@@ -333,8 +339,8 @@ public class AudioManager : MonoBehaviour
         rawTimings.Sort();
 
         answerTimingPoints.Clear();
-        float lastAddedTime = -1f;
-        float epsilon = 0.001f; // 1ms 阈值
+        var lastAddedTime = -1f;
+        var epsilon = 0.001f; // 1ms 阈值
 
         foreach (var t in rawTimings)
         {
@@ -469,30 +475,54 @@ public class AudioManager : MonoBehaviour
         var size = (int)(totalLen * SAMPLERATE * CHANNELS);
         recordingBuffer = new float[size];
         Array.Clear(recordingBuffer, 0, recordingBuffer.Length);
+        for (var i = 0; i < 15; i++) sfxPlayPointers[i] = -1; // 初始化指针
     }
     
-    public void MixSfxToBuffer(int index, float? startTime = null, float? duration = null)
+    public void TriggerSfxRecording(int index)
     {
         if (index < 0 || index >= noteSfxSamplesData.Count) return;
+        sfxPlayPointers[index] = 0;
+    }
+    public void StopSfxRecording(int index)
+    {
+        if (index < 0 || index >= noteSfxSamplesData.Count) return;
+        sfxPlayPointers[index] = -1;
+    }
     
-        var sfx = noteSfxSamplesData[index];
-        var vol = NoteSfxs[index].Volume <= 0 ? 1.0f : NoteSfxs[index].Volume;
+    public void UpdateSfxRecording(float deltaTime, float currentNoteTime)
+    {
+        // 计算当前帧在 buffer 中的起始采样位置
+        var bufferStartPos = (int)((currentNoteTime + TimeProvider.SONG_DETAIL_OFFSET) * SAMPLERATE) * CHANNELS;
+        // 这一帧应该写入的采样长度
+        var samplesToCopy = (int)(deltaTime * SAMPLERATE) * CHANNELS;
 
-        startTime ??= Majdata<TimeProvider>.Instance!.NoteTime;
-        var startPos = (int)((startTime + TimeProvider.SONG_DETAIL_OFFSET) * SAMPLERATE) * CHANNELS;
+        for (var i = 0; i < 15; i++)
+        {
+            if (sfxPlayPointers[i] == -1) continue;
+
+            var sfxData = noteSfxSamplesData[i];
+            var vol = NoteSfxs[i].Volume <= 0 ? 1.0f : NoteSfxs[i].Volume;
+
+            for (var j = 0; j < samplesToCopy; j++)
+            {
+                var sfxIdx = sfxPlayPointers[i] + j;
+                if (sfxIdx < sfxData.Length)
+                {
+                    if (bufferStartPos + j < recordingBuffer.Length)
+                    {
+                        // 同种类指针重置，不会自叠加
+                        recordingBuffer[bufferStartPos + j] += sfxData[sfxIdx] * vol;
+                    }
+                }
+                else
+                {
+                    sfxPlayPointers[i] = -1;
+                    break;
+                }
+            }
         
-        var samplesToMix = sfx.Length;
-        if (duration.HasValue)
-        {
-            // 时长转采样数 (时长 * 采样率 * 声道)
-            var durationSamples = (int)(duration.Value * SAMPLERATE) * CHANNELS;
-            samplesToMix = Math.Min(sfx.Length, durationSamples);
-        }
-
-        for (var i = 0; i < samplesToMix; i++)
-        {
-            if (startPos + i < recordingBuffer.Length)
-                recordingBuffer[startPos + i] += sfx[i] * vol;
+            if (sfxPlayPointers[i] != -1)
+                sfxPlayPointers[i] += samplesToCopy;
         }
     }
     
