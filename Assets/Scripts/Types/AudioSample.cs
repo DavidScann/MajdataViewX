@@ -1,7 +1,9 @@
 ﻿#region
 
 using System;
+using System.IO;
 using ManagedBass;
+using UnityEngine;
 
 #endregion
 
@@ -91,7 +93,7 @@ public class AudioSample : IDisposable
     public AudioSample(string file, AudioSampleMode mode)
     {
         Mode = mode;
-
+        
         if (mode == AudioSampleMode.Stream)
         {
             _handle = Bass.CreateStream(file);
@@ -103,7 +105,7 @@ public class AudioSample : IDisposable
         }
         else
         {
-            _handle = Bass.SampleLoad(file, 0, 0, 2, BassFlags.SampleOverrideLongestPlaying);
+            _handle = Bass.SampleLoad(file, 0, 0, 1, BassFlags.SampleOverrideLongestPlaying);
             Decode = Bass.SampleGetChannel(_handle);
         }
         _baseFrequency =

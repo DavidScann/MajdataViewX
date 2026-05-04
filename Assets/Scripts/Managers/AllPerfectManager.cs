@@ -41,6 +41,7 @@ public class AllPerfectManager : MonoBehaviour
             {
                 AllPerfect.gameObject.SetActive(true);
                 AllPerfect.SetTrigger("playAllPerfect");
+                AudioManager.noteSfxPlaybackRequests[AudioManager.ALL_PERFECT] = true;
                 isPlayed = true;
             }
         }
