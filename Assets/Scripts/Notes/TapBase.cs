@@ -52,13 +52,11 @@ public class TapBase : NoteBase
         {
             judgeResult = JudgeType.Miss;
             isJudged = true;
-            Destroy(tapLine);
-            Destroy(gameObject);
+            DestroySelf();
         }
         else if (isJudged)
         {
-            Destroy(tapLine);
-            Destroy(gameObject);
+            DestroySelf();
         }
         else if (timing >= -0.01f)
         {
@@ -227,14 +225,18 @@ public class TapBase : NoteBase
         judgeResult = result;
         isJudged = true;
     }
-
-    protected virtual void OnDestroy()
+    protected virtual void DestroySelf()
+    {
+        audioManager.PlayTapSound(judgeResult, isEx, isBreak);
+        Destroy(tapLine);
+        Destroy(gameObject);
+    }
+    private void OnDestroy()
     {
         if (PlayManager.IsReloading) return;
         var effectManager = Majdata<EffectManager>.Instance!;
         effectManager.PlayEffect(startPosition, isBreak, judgeResult);
         effectManager.PlayFastLate(startPosition, judgeResult);
-        audioManager.PlayTapSound(judgeResult, isEx, isBreak);
         noteManager.NextNote(startPosition);
         objectCounter.ReportResult(SimaiNoteType.Tap, judgeResult, isBreak);
         inputManager.UnbindArea(Check, sensor);

@@ -104,9 +104,7 @@ public class HoldDrop : NoteLongBase
 
         if (remainingTime == 0 && isJudged) // Hold完成后Destroy
         {
-            Destroy(tapLine);
-            Destroy(holdEffect);
-            Destroy(gameObject);
+            DestroySelf();
         }
         else if(timing >= -0.01f)
         {
@@ -346,6 +344,14 @@ public class HoldDrop : NoteLongBase
         tapLine.transform.localScale = new Vector3(lineScale, lineScale, 1f);
         exSpriteRender.size = spriteRenderer.size;
     }
+
+    private void DestroySelf()
+    {
+        PlayJudgeSFX();
+        Destroy(tapLine);
+        Destroy(holdEffect);
+        Destroy(gameObject);
+    }
     private void OnDestroy()
     {
         if (PlayManager.IsReloading) return;
@@ -413,7 +419,6 @@ public class HoldDrop : NoteLongBase
 
         effectManager.PlayEffect(startPosition, isBreak, result);
         effectManager.PlayFastLate(startPosition, result);
-        PlayJudgeSFX();
         print($"Hold: {MathF.Round(percent * 100,2)}%\nTotal Len : {MathF.Round(realityHT * 1000,2)}ms");
 
         objectCounter.ReportResult(SimaiNoteType.Hold, result, isBreak);

@@ -516,6 +516,11 @@ public class WifiDrop : NoteLongBase, ICanShine
     public bool CanShine() => canShine;
     void DestroySelf()
     {
+        if (isBreak && 
+            judgeResult == JudgeType.Perfect)
+        {
+            audioManager.PlayBreakSlideEndSound();
+        }
         foreach (GameObject obj in slideBars)
             obj.SetActive(false);
 
@@ -554,11 +559,6 @@ public class WifiDrop : NoteLongBase, ICanShine
                 }
                 SetJust();
                 break;
-        }
-        if (isBreak && 
-            judgeResult == JudgeType.Perfect)
-        {
-            audioManager.PlayBreakSlideEndSound();
         }
         objectCounter.ReportResult(SimaiNoteType.Slide, judgeResult, isBreak);
         if (isBreak && judgeResult == JudgeType.Perfect)
