@@ -134,8 +134,7 @@ public class StarDrop : TapBase
                             slide.SetActive(true);
                             if(isNoHead)
                             {
-                                Destroy(tapLine);
-                                Destroy(gameObject);
+                                DestroySelf();
                                 return;
                             }
                         }
@@ -170,9 +169,10 @@ public class StarDrop : TapBase
         else if (isFakeStarRotate)
             transform.Rotate(0f, 0f, 400f * Time.deltaTime);  
     }
-    protected override void OnDestroy()
+
+    protected override void DestroySelf()
     {
         if (!isNoHead || isFakeStar)
-            base.OnDestroy();
+            base.DestroySelf();
     }
 }

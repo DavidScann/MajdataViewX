@@ -143,7 +143,7 @@ public class TouchDrop : NoteBase
                 {
                     isJudged = true;
                     judgeResult = (JudgeType)GroupInfo.JudgeResult;
-                    Destroy(gameObject);
+                    DestroySelf();
                 }
             }
         }
@@ -151,10 +151,13 @@ public class TouchDrop : NoteBase
         {
             judgeResult = JudgeType.Miss;
             isJudged = true;
-            Destroy(gameObject);
+            DestroySelf();
         }
         else if (isJudged)
-            Destroy(gameObject);
+        {
+            DestroySelf();
+        }
+
 
         if (timeProvider.NoteTime - time >= 0)
         {
@@ -272,11 +275,9 @@ public class TouchDrop : NoteBase
             fans[i].transform.localPosition = pos;
         }
     }
-    private void OnDestroy()
+
+    private void DestroySelf()
     {
-        if (PlayManager.IsReloading) return;
-        multTouchHandler.CancelTouch(this);
-        PlayJudgeEffect();
         if (judgeResult != JudgeType.Miss)
         {
             if (isBreak)
@@ -292,6 +293,13 @@ public class TouchDrop : NoteBase
                 audioManager.PlayTouchSound();
             }
         }
+        Destroy(gameObject);
+    }
+    private void OnDestroy()
+    {
+        if (PlayManager.IsReloading) return;
+        multTouchHandler.CancelTouch(this);
+        PlayJudgeEffect();
         if (GroupInfo is not null && judgeResult != JudgeType.Miss)
             GroupInfo.JudgeResult = judgeResult;
         objectCounter.ReportResult(SimaiNoteType.Touch, judgeResult, isBreak);
@@ -383,7 +391,12 @@ public class TouchDrop : NoteBase
         //show fast late
         if (EffectManager.showFL)
         {
+            if (judgeResult is JudgeType.Miss or JudgeType.Perfect)
+            {
+                return;
+            }
             //get obj
+            var customSkin = GameObject.Find("Outline").GetComponent<SkinManager>();
             var obj = Instantiate(judgeEffect, Vector3.zero, transform.rotation);
             var flObj = obj.transform.GetChild(0);
             if (sensor != SensorType.C)
@@ -392,15 +405,7 @@ public class TouchDrop : NoteBase
                 flObj.transform.position = new Vector3(0, -1.08f, 0);
             flObj.GetChild(0).transform.rotation = GetRotation();
             var flAnim = obj.GetComponent<Animator>();
-
             //show
-            var customSkin = GameObject.Find("Outline").GetComponent<SkinManager>();
-            if (judgeResult == JudgeType.Miss || judgeResult == JudgeType.Perfect)
-            {
-                obj.SetActive(false);
-                Destroy(obj);
-                return;
-            }
             obj.SetActive(true);
             if (judgeResult > JudgeType.Perfect) //Fast
                 obj.transform.GetChild(0).GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = customSkin.FastText;

@@ -580,6 +580,7 @@ public class SlideDrop : NoteLongBase, ICanShine
     /// <param name="onlyStar"></param>
     void DestroySelf(bool onlyStar = false)
     {
+        PlayJudgeSFX();
         if (onlyStar)
         { 
             Destroy(star_slide);
@@ -635,12 +636,7 @@ public class SlideDrop : NoteLongBase, ICanShine
                     SetJust();
                     break;
             }
-            if ((ConnectInfo.IsGroupPartHead || !ConnectInfo.IsConnSlide) && 
-                isBreak && 
-                judgeResult == JudgeType.Perfect)
-            {
-                audioManager.PlayBreakSlideEndSound();
-            }
+
             // 只有组内最后一个Slide完成 才会显示判定条并增加总数
             objectCounter.ReportResult(SimaiNoteType.Slide, judgeResult, isBreak);
             if (isBreak && judgeResult == JudgeType.Perfect)
@@ -747,7 +743,16 @@ public class SlideDrop : NoteLongBase, ICanShine
         else
             star_slide.transform.rotation = newRotation;
     }
-    
+
+    private void PlayJudgeSFX()
+    {
+        if ((ConnectInfo.IsGroupPartHead || !ConnectInfo.IsConnSlide) && 
+            isBreak && 
+            judgeResult == JudgeType.Perfect)
+        {
+            audioManager.PlayBreakSlideEndSound();
+        }
+    }
     private void PlaySFX()
     {
         if (isSoundPlayed) return;
@@ -758,5 +763,6 @@ public class SlideDrop : NoteLongBase, ICanShine
             audioManager.PlaySlideSound(isBreak);
         }
     }
+    
     public bool CanShine() => canShine;
 }

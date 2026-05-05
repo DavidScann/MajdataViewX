@@ -175,8 +175,7 @@ public class TouchHoldDrop : NoteLongBase
 
         if (remainingTime == 0 && isJudged)
         {
-            Destroy(holdEffect);
-            Destroy(gameObject);
+            DestroySelf();
         }
         else if (timing >= -0.01f)
         {
@@ -302,9 +301,30 @@ public class TouchHoldDrop : NoteLongBase
             fans[i].transform.localPosition = pos;
         }
     }
-    private void OnDestroy()
+
+    private void DestroySelf()
     {
         audioManager.StopTouchHoldSound();
+        if (judgeResult != JudgeType.Miss)
+        {
+            if (isBreak)
+            {
+                audioManager.PlayTapSound(judgeResult, false, isBreak);
+            }
+            else if (isFirework)
+            {
+                audioManager.PlayHanabiSound();
+            }
+            else
+            {
+                audioManager.PlayTouchSound();
+            }
+        }
+        Destroy(holdEffect);
+        Destroy(gameObject);
+    }
+    private void OnDestroy()
+    {
         if (PlayManager.IsReloading) return;
         var realityHT = LastFor - 0.45f - (judgeDiff / 1000f);
         var percent = Math.Clamp((realityHT - playerIdleTime) / realityHT, 0, 1);
@@ -374,21 +394,6 @@ public class TouchHoldDrop : NoteLongBase
         {
             fireworkEffect.SetTrigger("Fire");
             firework.transform.position = transform.position;
-        }
-        if (judgeResult != JudgeType.Miss)
-        {
-            if (isBreak)
-            {
-                audioManager.PlayTapSound(judgeResult, false, isBreak);
-            }
-            else if (isFirework)
-            {
-                audioManager.PlayHanabiSound();
-            }
-            else
-            {
-                audioManager.PlayTouchSound();
-            }
         }
         if (!isJudged)
             noteManager.NextTouch(GetSensor());
@@ -488,7 +493,12 @@ public class TouchHoldDrop : NoteLongBase
         //show fastlate
         if (EffectManager.showFL)
         {
+            if (judgeResult == JudgeType.Miss || judgeResult == JudgeType.Perfect)
+            {
+                return;
+            }
             //get obj
+            var customSkin = GameObject.Find("Outline").GetComponent<SkinManager>();
             var obj = Instantiate(judgeEffect, Vector3.zero, transform.rotation);
             var flObj = obj.transform.GetChild(0);
             if (sensor != SensorType.C)
@@ -497,15 +507,7 @@ public class TouchHoldDrop : NoteLongBase
                 flObj.transform.position = new Vector3(0, -1.08f, 0);
             flObj.GetChild(0).transform.rotation = GetRotation();
             var flAnim = obj.GetComponent<Animator>();
-
             //show
-            var customSkin = GameObject.Find("Outline").GetComponent<SkinManager>();
-            if (judgeResult == JudgeType.Miss || judgeResult == JudgeType.Perfect)
-            {
-                obj.SetActive(false);
-                Destroy(obj);
-                return;
-            }
             obj.SetActive(true);
             if (judgeResult > JudgeType.Perfect) //Fast
                 obj.transform.GetChild(0).GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = customSkin.FastText;
