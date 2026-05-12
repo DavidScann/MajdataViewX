@@ -30,6 +30,8 @@ public class AudioManager : MonoBehaviour
     //SFX for recording
     private List<float[]> noteSfxSamplesData = new(16);
     private float[] recordingBuffer; 
+    private float recordingInitialAudioTime;
+    private float recordingSpeed = 1f;
     private int[] sfxPlayPointers = new int[16]; //-1 is not playing
 
     public double GlobalAudioOffset { get; private set; }
@@ -314,12 +316,15 @@ public class AudioManager : MonoBehaviour
             firstBpm = chart.NoteTimings[0].Bpm;
         }
 
-        var interval = 60 / firstBpm;
-
-        for (var i = 0; i < clockCount; i++)
+        answerTimingPoints.Clear();
+        if (firstBpm > 0f)
         {
-            var timing = i * interval;
-            answerTimingPoints.Add(new AnswerTimingPoint(timing, true));
+            var interval = 60 / firstBpm;
+            for (var i = 0; i < clockCount; i++)
+            {
+                var timing = i * interval;
+                answerTimingPoints.Add(new AnswerTimingPoint(timing, true));
+            }
         }
 
         //Generate AnswerSounds
@@ -342,7 +347,6 @@ public class AudioManager : MonoBehaviour
         
         rawTimings.Sort();
 
-        answerTimingPoints.Clear();
         var lastAddedTime = -1f;
         var epsilon = 0.001f; // 1ms 阈值
 
@@ -473,13 +477,18 @@ public class AudioManager : MonoBehaviour
     
     //recording control
     
-    public void PrepareRecordingBuffer()
+    public void PrepareRecordingBuffer(float initialAudioTime, float speed)
     {
-        var totalLen = TrackSample!.Length + 13; // 留给开头5秒和结尾AP音效
+        recordingInitialAudioTime = initialAudioTime;
+        recordingSpeed = Math.Max(speed, 0.01f);
+        var trackOffset = TRACK_ANSWER_PLAYBACK_OFFSET_SEC + (float)GlobalAudioOffset;
+        var trackOutputStartTime = trackOffset - recordingInitialAudioTime;
+        var leadAndTail = Math.Max(TimeProvider.SONG_DETAIL_OFFSET + 8f, trackOutputStartTime + 8f);
+        var totalLen = TrackSample!.Length / recordingSpeed + leadAndTail; // 留给开头演出和结尾AP音效
         var size = (int)(totalLen * SAMPLERATE * CHANNELS);
         recordingBuffer = new float[size];
         Array.Clear(recordingBuffer, 0, recordingBuffer.Length);
-        for (var i = 0; i < 15; i++) sfxPlayPointers[i] = -1; // 初始化指针
+        for (var i = 0; i < sfxPlayPointers.Length; i++) sfxPlayPointers[i] = -1; // 初始化指针
     }
     
     public void TriggerSfxRecording(int index)
@@ -493,29 +502,31 @@ public class AudioManager : MonoBehaviour
         sfxPlayPointers[index] = -1;
     }
     
-    public void UpdateSfxRecording(float deltaTime, float currentNoteTime)
+    public void UpdateSfxRecording(float deltaTime, float recordingElapsedTime)
     {
         // 计算当前帧在 buffer 中的起始采样位置
-        var bufferStartPos = (int)((currentNoteTime + TimeProvider.SONG_DETAIL_OFFSET) * SAMPLERATE) * CHANNELS;
+        var bufferStartPos = (int)(recordingElapsedTime * SAMPLERATE) * CHANNELS;
         // 这一帧应该写入的采样长度
         var samplesToCopy = (int)(deltaTime * SAMPLERATE) * CHANNELS;
 
-        for (var i = 0; i < 15; i++)
+        for (var i = 0; i < sfxPlayPointers.Length; i++)
         {
-            if (sfxPlayPointers[i] == -1) continue;
+            if (i == TRACK_START || sfxPlayPointers[i] == -1) continue;
 
             var sfxData = noteSfxSamplesData[i];
-            var vol = NoteSfxs[i].Volume <= 0 ? 1.0f : NoteSfxs[i].Volume;
+            var vol = NoteSfxs[i].Volume;
 
             for (var j = 0; j < samplesToCopy; j++)
             {
                 var sfxIdx = sfxPlayPointers[i] + j;
                 if (sfxIdx < sfxData.Length)
                 {
-                    if (bufferStartPos + j < recordingBuffer.Length)
+                    var dstIdx = bufferStartPos + j;
+                    if (dstIdx >= 0 && dstIdx < recordingBuffer.Length)
                     {
                         // 同种类指针重置，不会自叠加
-                        recordingBuffer[bufferStartPos + j] += sfxData[sfxIdx] * vol;
+                        var mixed = recordingBuffer[dstIdx] + sfxData[sfxIdx] * vol;
+                        recordingBuffer[dstIdx] = Math.Clamp(mixed, -1.0f, 1.0f);
                     }
                 }
                 else
@@ -537,18 +548,37 @@ public class AudioManager : MonoBehaviour
         for (var i = 0; i < trackStartSampleData.Length; i++)
         {
             if (i < recordingBuffer.Length)
-                recordingBuffer[i] = trackStartSampleData[i] * NoteSfxs[TRACK_START].Volume;
+            {
+                var mixed = recordingBuffer[i] + trackStartSampleData[i] * NoteSfxs[TRACK_START].Volume;
+                recordingBuffer[i] = Math.Clamp(mixed, -1.0f, 1.0f);
+            }
         }
 
         
-        // BGM
-        var bgmStartSample = (int)(TimeProvider.SONG_DETAIL_OFFSET * SAMPLERATE) * CHANNELS;
-        for (var i = 0; i < TrackSampleData.Length; i++)
+        // BGM: mirror PlayTrack(), whose sample position is AudioTime - (global offset + 1 frame),
+        // and whose playback rate follows TimeProvider.CurrentSpeed.
+        var trackOffset = TRACK_ANSWER_PLAYBACK_OFFSET_SEC + (float)GlobalAudioOffset;
+        var initialTrackSec = recordingInitialAudioTime - trackOffset;
+        var trackFrameCount = TrackSampleData.Length / CHANNELS;
+        var recordingFrameCount = recordingBuffer.Length / CHANNELS;
+
+        for (var dstFrame = 0; dstFrame < recordingFrameCount; dstFrame++)
         {
-            if (bgmStartSample + i < recordingBuffer.Length)
+            var srcFrame = (initialTrackSec * SAMPLERATE) + dstFrame * recordingSpeed;
+            if (srcFrame < 0) continue;
+            if (srcFrame >= trackFrameCount - 1) break;
+
+            var srcFrameFloor = (int)srcFrame;
+            var t = srcFrame - srcFrameFloor;
+            var srcIdx = srcFrameFloor * CHANNELS;
+            var nextSrcIdx = srcIdx + CHANNELS;
+            var dstIdx = dstFrame * CHANNELS;
+
+            for (var ch = 0; ch < CHANNELS; ch++)
             {
-                var s = recordingBuffer[bgmStartSample + i] + TrackSampleData[i];
-                recordingBuffer[bgmStartSample + i] = Math.Clamp(s, -1.0f, 1.0f);
+                var sample = Mathf.Lerp(TrackSampleData[srcIdx + ch], TrackSampleData[nextSrcIdx + ch], t);
+                var mixed = recordingBuffer[dstIdx + ch] + sample * TrackSampleVolume;
+                recordingBuffer[dstIdx + ch] = Math.Clamp(mixed, -1.0f, 1.0f);
             }
         }
         
