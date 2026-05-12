@@ -45,6 +45,7 @@ public class PlayManager : MonoBehaviour
     private AudioManager audioManager;
 
     private SpriteRenderer bgCover;
+    private GameObject canvasButtons;
     
     private void Awake()
     {
@@ -63,6 +64,7 @@ public class PlayManager : MonoBehaviour
         effectManager = Majdata<EffectManager>.Instance!;
         audioManager = Majdata<AudioManager>.Instance!;
         bgCover = GameObject.Find("BackgroundCover").GetComponent<SpriteRenderer>();
+        canvasButtons = GameObject.Find("CanvasButtons");
         
         _state = CheckIsLoaded() ? ViewStatus.Loaded : ViewStatus.Idle;
     }
@@ -175,7 +177,7 @@ public class PlayManager : MonoBehaviour
                 case PlaybackMode.Record:
                     bgManager.PlaySongDetail();
                     
-                    GameObject.Find("CanvasButtons").SetActive(false);
+                    canvasButtons.SetActive(false);
                     if (!Directory.Exists(maidataPath))
                     {
                         throw new InvalidPathException($"maidata path is required");
@@ -184,6 +186,7 @@ public class PlayManager : MonoBehaviour
                     Majdata<AllPerfectManager>.Instance!.enabled = true;
                     timeProvider.SetStartTime(startAt, offset, speed, playmode, _setting.OutputFps);
                     screenRecorder.StartRecording(maidataPath, _setting.OutputFps, _setting.UseAlpha);
+                    canvasButtons.SetActive(true);
                     break;
             }
             
