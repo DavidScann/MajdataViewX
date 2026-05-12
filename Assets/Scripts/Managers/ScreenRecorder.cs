@@ -1,14 +1,10 @@
 #region
 
 using System.Collections;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Pipes;
-using System.Threading;
-using Cysharp.Threading.Tasks;
 using UnityEngine;
-using UnityEngine.Rendering;
 using UnityEngine.UI;
 
 #endregion
@@ -38,6 +34,7 @@ public class ScreenRecorder : MonoBehaviour
 
     public void StartRecording(string maidataPath, int fps, bool useAlpha)
     {
+        if (IsRecording) StopRecording();
         StartCoroutine(CaptureScreen(maidataPath, fps, useAlpha));
     }
 
@@ -63,6 +60,7 @@ public class ScreenRecorder : MonoBehaviour
 
         // 2. args
         var ffmpegPath = Path.Combine(Application.streamingAssetsPath, "ffmpeg.exe");
+        var pipeName = $"majdataRec_{Process.GetCurrentProcess().Id}_{System.Guid.NewGuid():N}";
         var wavName = "temp.wav";
         var videoName = useAlpha ? "temp.webm" : "temp.mp4";
         var finalName = useAlpha ? "out.webm" : "out.mp4";
@@ -75,7 +73,7 @@ public class ScreenRecorder : MonoBehaviour
         var outArgs =
             "-hide_banner -y " +
             $"-f rawvideo -pix_fmt rgba -s {Screen.width}x{Screen.height} -r {fps} " +
-            @"-i \\.\pipe\majdataRec " +
+            $@"-i \\.\pipe\{pipeName} " +
             "-vf vflip " +
             videoCodecArgs +
             $"\"{videoName}\"";
@@ -95,85 +93,112 @@ public class ScreenRecorder : MonoBehaviour
         var cpuTex = new Texture2D(Screen.width, Screen.height, TextureFormat.RGBA32, false);
 
         var camera = Camera.main;
-        var oldRT = camera.targetTexture;
-        camera.targetTexture = rt;
+        var oldRT = camera != null ? camera.targetTexture : null;
+        if (useAlpha && camera != null)
+            camera.targetTexture = rt;
 
-        audioManager.PrepareRecordingBuffer();
+        audioManager.PrepareRecordingBuffer(timeProvider.AudioTime, timeProvider.CurrentSpeed);
         IsRecording = true;
 
-        var touchHoldStartTime = 0f;
         var isTouchHoldRising = false;
 
         var deltaTime = 1.0f / fps; // duration per frame
+        var recordingElapsedTime = 0f;
+        var videoEncodeSucceeded = false;
 
         // 4. recording
-        using (var pipeServer = new NamedPipeServerStream("majdataRec", PipeDirection.Out, 1,
-                   PipeTransmissionMode.Byte, PipeOptions.Asynchronous, 1024 * 1024 * 16, 1024 * 1024 * 16))
+        try
         {
-            var startInfo = new ProcessStartInfo(ffmpegPath, outArgs)
+            using (var pipeServer = new NamedPipeServerStream(pipeName, PipeDirection.Out, 1,
+                       PipeTransmissionMode.Byte, PipeOptions.Asynchronous, 1024 * 1024 * 16, 1024 * 1024 * 16))
             {
-                UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = maidataPath
-            };
-            var outProcess = Process.Start(startInfo);
-
-            // 等待 FFmpeg 连接
-            var connectTask = pipeServer.WaitForConnectionAsync();
-            while (!connectTask.IsCompleted) yield return null;
-
-            using (var bw = new BinaryWriter(pipeServer))
-            {
-                while (IsRecording && !outProcess.HasExited)
+                var startInfo = new ProcessStartInfo(ffmpegPath, outArgs)
                 {
-                    yield return new WaitForEndOfFrame();
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    WorkingDirectory = maidataPath
+                };
+                var outProcess = Process.Start(startInfo);
 
-                    // Audio
-                    var currentNoteTime = Majdata<TimeProvider>.Instance!.NoteTime;
-                    audioManager.UpdateAnswerSfx();
-                    for (var i = 0; i < AudioManager.noteSfxPlaybackRequests.Length; i++)
+                // 等待 FFmpeg 连接
+                var connectTask = pipeServer.WaitForConnectionAsync();
+                while (!connectTask.IsCompleted) yield return null;
+
+                using (var bw = new BinaryWriter(pipeServer))
+                {
+                    while (IsRecording && !outProcess.HasExited)
                     {
-                        if (i == AudioManager.TRACK_START) continue;
-                        
-                        if (i == AudioManager.TOUCHHOLD)
-                        {
-                            var isRequested = AudioManager.noteSfxPlaybackRequests[i];
-                            if (isRequested)
-                            {
-                                if (!isTouchHoldRising)
-                                {
-                                    isTouchHoldRising = true;
-                                    audioManager.TriggerSfxRecording(AudioManager.TOUCHHOLD);
-                                }
-                                // TouchHold 不重置指针，让它继续播
-                            }
-                            else
-                            {
-                                if (isTouchHoldRising)
-                                {
-                                    isTouchHoldRising = false;
-                                    audioManager.StopSfxRecording(AudioManager.TOUCHHOLD); // 停止播放
-                                }
-                            }
-                        }
-                        else if (AudioManager.noteSfxPlaybackRequests[i])
-                        {
-                            // 重置指针
-                            audioManager.TriggerSfxRecording(i);
-                            AudioManager.noteSfxPlaybackRequests[i] = false;
-                        }
-                    }
-                    audioManager.UpdateSfxRecording(deltaTime, currentNoteTime);
+                        yield return new WaitForEndOfFrame();
 
-                    // Video
-                    RenderTexture.active = rt;
-                    cpuTex.ReadPixels(new Rect(0, 0, Screen.width, Screen.height), 0, 0);
-                    bw.Write(cpuTex.GetRawTextureData());
+                        // Audio
+                        audioManager.UpdateAnswerSfx();
+                        for (var i = 0; i < AudioManager.noteSfxPlaybackRequests.Length; i++)
+                        {
+                            if (i == AudioManager.TRACK_START) continue;
+
+                            if (i == AudioManager.TOUCHHOLD)
+                            {
+                                var isRequested = AudioManager.noteSfxPlaybackRequests[i];
+                                if (isRequested)
+                                {
+                                    if (!isTouchHoldRising)
+                                    {
+                                        isTouchHoldRising = true;
+                                        audioManager.TriggerSfxRecording(AudioManager.TOUCHHOLD);
+                                    }
+                                    // TouchHold 不重置指针，让它继续播
+                                }
+                                else
+                                {
+                                    if (isTouchHoldRising)
+                                    {
+                                        isTouchHoldRising = false;
+                                        audioManager.StopSfxRecording(AudioManager.TOUCHHOLD); // 停止播放
+                                    }
+                                }
+                            }
+                            else if (AudioManager.noteSfxPlaybackRequests[i])
+                            {
+                                // 重置指针
+                                audioManager.TriggerSfxRecording(i);
+                                AudioManager.noteSfxPlaybackRequests[i] = false;
+                            }
+                        }
+                        audioManager.UpdateSfxRecording(deltaTime, recordingElapsedTime);
+
+                        // Video
+                        if (useAlpha)
+                        {
+                            RenderTexture.active = rt;
+                        }
+                        else
+                        {
+                            RenderTexture.active = null;
+                        }
+                        cpuTex.ReadPixels(new Rect(0, 0, Screen.width, Screen.height), 0, 0);
+                        bw.Write(cpuTex.GetRawTextureData());
+                        recordingElapsedTime += deltaTime;
+                    }
+
+                    bw.Flush();
                 }
 
-                bw.Flush();
+                if (!outProcess.HasExited) outProcess.WaitForExit();
+                videoEncodeSucceeded = outProcess.ExitCode == 0;
+                if (!videoEncodeSucceeded)
+                    errText.text = $"视频编码失败，FFmpeg 退出码：{outProcess.ExitCode}";
             }
-
-            if (!outProcess.HasExited) outProcess.WaitForExit();
         }
+        finally
+        {
+            if (camera != null) camera.targetTexture = oldRT;
+            RenderTexture.active = null;
+            rt.Release();
+            Destroy(rt);
+            Destroy(cpuTex);
+        }
+
+        if (!videoEncodeSucceeded) yield break;
 
         // 5. audio export and mux
         errText.text = "正在处理音频导出...";
@@ -187,9 +212,6 @@ public class ScreenRecorder : MonoBehaviour
         muxProcess.WaitForExit();
 
         // 6. clean up
-        camera.targetTexture = oldRT;
-        rt.Release();
-
         var outPath = Path.Combine(maidataPath, finalName);
         if (File.Exists(outPath))
         {
