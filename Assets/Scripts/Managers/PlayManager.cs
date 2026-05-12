@@ -74,7 +74,7 @@ public class PlayManager : MonoBehaviour
     public void Setting(MajViewSetting setting, MajVolumeSetting volumeSetting)
     {
         _setting = setting;
-        audioManager.SetVolume(volumeSetting);
+        audioManager.Setting(setting.GlobalAudioOffset, volumeSetting);
     }
     
     public async UniTask LoadAsync(string audioPath, string bgPath, string? pvPath)

@@ -31,6 +31,8 @@ public class AudioManager : MonoBehaviour
     private List<float[]> noteSfxSamplesData = new(16);
     private float[] recordingBuffer; 
     private int[] sfxPlayPointers = new int[16]; //-1 is not playing
+
+    public double GlobalAudioOffset { get; private set; }
     
     const int SAMPLERATE = 44100;
     const int CHANNELS = 2;
@@ -59,9 +61,9 @@ public class AudioManager : MonoBehaviour
     private void Awake()
     {
         Majdata<AudioManager>.Instance = this;
-        Bass.Configure(Configuration.UpdatePeriod, 5);
-        Bass.Configure(Configuration.PlaybackBufferLength, 10);
-        Bass.Init(-1, 48000);
+        Bass.Configure(Configuration.UpdatePeriod, 20);
+        Bass.Configure(Configuration.PlaybackBufferLength, 40);
+        Bass.Init(-1, 44100);
 
         Bass.PluginLoad("bassmix");
         
@@ -107,8 +109,10 @@ public class AudioManager : MonoBehaviour
         }
     }
 
-    public void SetVolume(MajVolumeSetting v)
+    public void Setting(double globalAudioOffset, MajVolumeSetting v)
     {
+        GlobalAudioOffset = globalAudioOffset;
+        
         foreach (var sample in NoteSfxs)
             switch (sample.SampleType)
             {
@@ -276,9 +280,10 @@ public class AudioManager : MonoBehaviour
         
         IEnumerator WaitForTrackAudioStart()
         {
-            while (Majdata<TimeProvider>.Instance!.AudioTime < TRACK_ANSWER_PLAYBACK_OFFSET_SEC) yield return null;
+            var offset = TRACK_ANSWER_PLAYBACK_OFFSET_SEC + GlobalAudioOffset;
+            while (Majdata<TimeProvider>.Instance!.AudioTime < offset) yield return null;
         
-            TrackSample!.CurrentSec = Majdata<TimeProvider>.Instance!.AudioTime;
+            TrackSample!.CurrentSec = Majdata<TimeProvider>.Instance!.AudioTime - offset;
             TrackSample.Play();
         }
     }
