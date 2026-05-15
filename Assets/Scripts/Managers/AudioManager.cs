@@ -7,7 +7,8 @@ using System.IO;
 using JetBrains.Annotations;
 using MajSimai;
 using ManagedBass;
-using ManagedBass.Mix;
+using Unity.Collections;
+using Unity.Jobs;
 using UnityEngine;
 
 #endregion
@@ -59,15 +60,12 @@ public class AudioManager : MonoBehaviour
     public const int ALL_PERFECT = 15;
     
     private bool isTouchHoldRiserPlaying = false;
-
     private void Awake()
     {
         Majdata<AudioManager>.Instance = this;
         Bass.Configure(Configuration.UpdatePeriod, 20);
         Bass.Configure(Configuration.PlaybackBufferLength, 40);
         Bass.Init(-1, 44100);
-
-        Bass.PluginLoad("bassmix");
         
         //Note SFX
         var sfxPath = Path.Combine(new DirectoryInfo(Application.dataPath).Parent!.FullName, "SFX");
@@ -589,24 +587,39 @@ public class AudioManager : MonoBehaviour
 
     private float[] GetSampleDataFromFile(string path)
     { 
-        var sourceStream = Bass.CreateStream(path, 0, 0, BassFlags.Decode | BassFlags.Float);
-        if (sourceStream == 0) return Array.Empty<float>();
-        
-        var mixer = BassMix.CreateMixerStream(SAMPLERATE, CHANNELS, BassFlags.Decode | BassFlags.Float);
-        
-        BassMix.MixerAddChannel(mixer, sourceStream, BassFlags.Default);
-        
-        var lenBytes = Bass.ChannelGetLength(sourceStream);
-        var duration = Bass.ChannelBytes2Seconds(sourceStream, lenBytes);
-        var targetLenBytes = Bass.ChannelSeconds2Bytes(mixer, duration);
+        var stream = Bass.CreateStream(path, 0, 0, BassFlags.Decode | BassFlags.Float);
+        if (stream == 0) return Array.Empty<float>();
 
-        var buffer = new float[targetLenBytes / 4];
-        Bass.ChannelGetData(mixer, buffer, (int)targetLenBytes);
+        var info = Bass.ChannelGetInfo(stream);
+        var lenBytes = Bass.ChannelGetLength(stream);
+        var rawData = new float[lenBytes / 4];
+        Bass.ChannelGetData(stream, rawData, (int)lenBytes);
+        Bass.StreamFree(stream);
         
-        Bass.StreamFree(mixer);
-        Bass.StreamFree(sourceStream);
+        var ratio = (float)info.Frequency / SAMPLERATE;
+        var sourceFrames = rawData.Length / 2;
+        var targetFrames = (int)(sourceFrames / ratio);
+        var sourceNative = new NativeArray<float>(rawData, Allocator.TempJob);
+        var outputNative = new NativeArray<float>(targetFrames * 2, Allocator.TempJob);
+        
+        // re-poem：本来不想接触job burst这些很搞，vibe也基本上只能学表面的东西的，
+        //          但是好像效果不错，先抄了再说，留个记号以后争取深入深入。
+        new AudioResampleJob
+        {
+            Source = sourceNative,
+            Output = outputNative,
+            Ratio = ratio,
+            TargetFrames = targetFrames,
+            SrcFrameLimit = (rawData.Length / 2) - 1
+        }.Run();
 
-        return buffer;
+        var result = new float[outputNative.Length];
+        outputNative.CopyTo(result);
+
+        sourceNative.Dispose();
+        outputNative.Dispose();
+
+        return result;
     }
 
     private class AnswerTimingPoint
