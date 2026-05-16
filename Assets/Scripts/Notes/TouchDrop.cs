@@ -293,6 +293,7 @@ public class TouchDrop : NoteBase
                 audioManager.PlayTouchSound();
             }
         }
+        noteManager.RemoveNote(this);
         Destroy(gameObject);
     }
     private void OnDestroy()
@@ -303,7 +304,6 @@ public class TouchDrop : NoteBase
         if (GroupInfo is not null && judgeResult != JudgeType.Miss)
             GroupInfo.JudgeResult = judgeResult;
         objectCounter.ReportResult(SimaiNoteType.Touch, judgeResult, isBreak);
-        noteManager.NextTouch(sensor);
 
         if (isFirework && judgeResult != JudgeType.Miss)
         {

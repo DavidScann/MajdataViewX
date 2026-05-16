@@ -173,6 +173,21 @@ public class StarDrop : TapBase
     protected override void DestroySelf()
     {
         if (!isNoHead || isFakeStar)
+        {
             base.DestroySelf();
+        }
+        else
+        {
+            noteManager.RemoveNote(this);
+            Destroy(tapLine);
+            Destroy(gameObject);
+        }
     }
+
+    protected override void OnDestroy()
+    {
+        if (isNoHead) return;
+        
+        base.OnDestroy();
+    } 
 }

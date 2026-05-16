@@ -10,62 +10,45 @@ using UnityEngine;
 
 public class NoteManager : MonoBehaviour
 {
-    public List<GameObject> notes = new();
-    public Dictionary<GameObject, int> noteOrder = new();
-    public Dictionary<int, int> noteIndex = new();
+    public List<NoteBase> LoadedNotes { get; private set; } = new();
+    
+    private Dictionary<GameObject, int> noteOrder = new();
+    private Dictionary<int, int> noteIndex = new();
 
-    public Dictionary<GameObject, int> touchOrder = new();
-    public Dictionary<SensorType, int> touchIndex = new();
+    private Dictionary<GameObject, int> touchOrder = new();
+    private Dictionary<SensorType, int> touchIndex = new();
 
     private void Awake()
     {
         Majdata<NoteManager>.Instance = this;
     }
-    
-    public void AddNote(GameObject obj,int index) => noteOrder.Add(obj, index);
-    public void AddTouch(GameObject obj,int index) => touchOrder.Add(obj, index);
+
+    public void AddNote(NoteBase note, int index, bool addToOrder = true)
+    {
+        LoadedNotes.Add(note);
+        if (addToOrder)
+            noteOrder.Add(note.gameObject, index);
+    }
+    public void AddTouch(NoteBase note, int index)
+    {
+        LoadedNotes.Add(note);
+        touchOrder.Add(note.gameObject, index);
+    }
+
     public void NextNote(int pos) => noteIndex[pos]++;
     public void NextTouch(SensorType pos) => touchIndex[pos]++;
-    
-    public void Refresh()
+
+    public void RemoveNote(NoteBase note)
     {
-        ResetIndex();
-        var count = transform.childCount;
-        for (int i = 0; i < count; i++)
-        {
-            var child = transform.GetChild(i);
-            var tap = child.GetComponent<TapDrop>();
-            var hold = child.GetComponent<HoldDrop>();
-            var star = child.GetComponent<StarDrop>();
-            var touch = child.GetComponent<TouchDrop>();
-            var touchHold = child.GetComponent<TouchHoldDrop>();
-
-            if (tap != null)
-                noteOrder.Add(tap.gameObject, noteIndex[tap.startPosition]++);
-            else if (hold != null)
-                noteOrder.Add(hold.gameObject, noteIndex[hold.startPosition]++);
-            else if (star != null && !star.isNoHead)
-                noteOrder.Add(star.gameObject, noteIndex[star.startPosition]++);
-            else if (touch != null)
-                touchOrder.Add(touch.gameObject, touchIndex[touch.GetSensor()]++);
-            else if(touchHold != null)
-                touchOrder.Add(touchHold.gameObject, touchIndex[touchHold.GetSensor()]++);
-
-            notes.Add(child.gameObject);
-        }
+        LoadedNotes.Remove(note);
     }
-    void ResetIndex()
+    
+    public void ResetIndex()
     {
-        noteIndex.Clear();
-        touchIndex.Clear();
-        for (int i = 1; i < 9; i++)
-            noteIndex.Add(i, 0);
-        var sensorParent = GameObject.Find("Sensors");
-        var count = sensorParent.transform.childCount;
-        for (int i = 0; i < count; i++)
-            touchIndex.Add(sensorParent.transform
-                                       .GetChild(i)
-                                       .GetComponent<Sensor>().Type, 0);
+        for (var i = 1; i < 9; i++)
+            noteIndex[i] = 0;
+        for (var i = 0; i < 33; i++)
+            touchIndex[(SensorType)i] = 0;
     }
     public bool CanJudge(GameObject obj, int pos)
     {
@@ -89,17 +72,16 @@ public class NoteManager : MonoBehaviour
 
     public async UniTask ResetState()
     {       
-        notes.Clear();
+        LoadedNotes.Clear();
         noteOrder.Clear();
         touchOrder.Clear();
-        noteIndex.Clear();
-        touchIndex.Clear(); 
+        ResetIndex();
         
+        //clear notes
         for (var i = 0; i < transform.childCount; i++)
         {
             Destroy(transform.GetChild(i).gameObject);
         }
-
         await UniTask.WaitUntil(() => transform.childCount == 0);
 
         PlayManager.IsReloading = false;

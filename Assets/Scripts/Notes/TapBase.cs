@@ -228,10 +228,11 @@ public class TapBase : NoteBase
     protected virtual void DestroySelf()
     {
         audioManager.PlayTapSound(judgeResult, isEx, isBreak);
+        noteManager.RemoveNote(this);
         Destroy(tapLine);
         Destroy(gameObject);
     }
-    private void OnDestroy()
+    protected virtual void OnDestroy()
     {
         if (PlayManager.IsReloading) return;
         var effectManager = Majdata<EffectManager>.Instance!;
