@@ -90,6 +90,10 @@ public class AudioSample : IDisposable
         }
     }
 
+    public PlaybackState State => Bass.ChannelIsActive(Decode);
+
+    public bool IsPlaying => State == PlaybackState.Playing;
+
     public AudioSample(string file, AudioSampleMode mode)
     {
         Mode = mode;

@@ -50,11 +50,19 @@ public class TimeProvider : MonoBehaviour
     {
         return NoteTime * 1000 / 16.6667f;
     }
-    //BUG: time goes faster
+
     public void SetStartTime(double _startAt, double _offset, float _speed, PlaybackMode mode, int fps = 60)
     {
+        IsStart = false;
+        IsRecord = false;
+        AudioTime = 0f;
+        NoteTime = 0f;
+        accumulated = 0f;
+        Time.timeScale = 1f;
+
         startAt = (float)_startAt;
         offset = (float)_offset;
+        speed = _speed;
 
         switch (mode)
         {
@@ -94,9 +102,21 @@ public class TimeProvider : MonoBehaviour
         if (!IsStart) return;
 
         var now = IsRecord ? Time.time : Time.realtimeSinceStartup;
-        accumulated += (now - startRealtime) * speed;
+        accumulated += IsRecord
+            ? now - startRealtime
+            : (now - startRealtime) * speed;
 
         IsStart = false;
+    }
+
+    public void SyncAudioTime(float syncedAudioTime)
+    {
+        if (!IsStart || IsRecord) return;
+
+        AudioTime = syncedAudioTime;
+        NoteTime = AudioTime - offset;
+        accumulated = AudioTime - startAt;
+        startRealtime = Time.realtimeSinceStartup;
     }
 
     public void Resume(float? _speed)
