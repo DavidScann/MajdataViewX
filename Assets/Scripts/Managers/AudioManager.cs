@@ -169,6 +169,8 @@ public class AudioManager : MonoBehaviour
     private void Update()
     {
         if (timeProvider.IsRecord) return;
+
+        SyncTimeProviderToTrack();
         
         UpdateAnswerSfx();
         
@@ -250,6 +252,14 @@ public class AudioManager : MonoBehaviour
             if (i != TOUCHHOLD) //manual control
                 noteSfxPlaybackRequests[i] = false;
         }
+    }
+
+    private void SyncTimeProviderToTrack()
+    {
+        if (TrackSample == null || !TrackSample.IsPlaying) return;
+
+        var offset = TRACK_ANSWER_PLAYBACK_OFFSET_SEC + GlobalAudioOffset;
+        timeProvider.SyncAudioTime((float)(TrackSample.CurrentSec + offset));
     }
 
     private void OnDestroy()

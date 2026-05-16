@@ -1,9 +1,8 @@
-﻿#region
+#region
 
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using Cysharp.Threading.Tasks;
 using MajSimai;
 using UnityEngine;
@@ -50,6 +49,10 @@ public class DataLoader : MonoBehaviour
     public Text designText;
     public RawImage cardImage;
     public Color[] diffColors = new Color[7];
+
+    private const double StreamingCreatePreloadTime = 10;
+    private const double StreamingActivePreloadTime = 5;
+    private const double StreamingFrameBudgetMs = 4;
 
     private int slideLayer = -1;
     private int noteSortOrder = 0;
@@ -210,7 +213,7 @@ public class DataLoader : MonoBehaviour
             touchIndex.Add((SensorType)i, 0); 
     }
     
-    public void Load(SimaiChart chart, double ignoreOffset, string title, string artist, int diff)
+    public async UniTask Load(SimaiChart chart, double ignoreOffset, string title, string artist, int diff)
     {
         titleText.text = title;
         artistText.text = artist;
@@ -225,8 +228,9 @@ public class DataLoader : MonoBehaviour
         
         noteManager.ResetIndex();
         streamingRunning = true;
-        StreamingCreate(chart.NoteTimings.ToArray(), ignoreOffset).Forget();
-        StreamingSetActive().Forget();
+        var timings = chart.NoteTimings.ToArray();
+        StreamingSetActive(ignoreOffset).Forget();
+        await StreamingCreate(timings, ignoreOffset);
     }
     
     private async UniTask StreamingCreate(SimaiTimingPoint[] timings, double ignoreOffset)
@@ -242,46 +246,91 @@ public class DataLoader : MonoBehaviour
             i++;
         }
         
-        const double preloadTime = 20;
-        
+        i = await LoadStreamingWindow(timings, i, ignoreOffset, StreamingCreatePreloadTime);
+        ContinueStreamingCreate(timings, i, ignoreOffset, StreamingCreatePreloadTime).Forget();
+    }
+
+    private async UniTask ContinueStreamingCreate(SimaiTimingPoint[] timings, int startIndex, double ignoreOffset, double preloadTime)
+    {
+        var i = startIndex;
+
         while (i < timings.Length && streamingRunning)
         {
-            double now = Majdata<TimeProvider>.Instance!.NoteTime;
-            
-            while (i < timings.Length)
-            {
-                var timing = timings[i];
-
-                if (timing.Timing - now > preloadTime)
-                    break;
-                
-                await LoadTiming(timing);
-                
-                i++;
-            }
-            
+            i = await LoadStreamingWindow(timings, i, ignoreOffset, preloadTime);
             await UniTask.Yield();
         }
     }
-    private async UniTask StreamingSetActive()
-    {
-        const double preloadTime = 5;
 
+    private async UniTask<int> LoadStreamingWindow(SimaiTimingPoint[] timings, int startIndex, double fallbackTime, double preloadTime)
+    {
+        var i = startIndex;
+        var now = GetStreamingTime(fallbackTime);
+        var frameStart = GetTimestamp();
+
+        while (i < timings.Length && streamingRunning)
+        {
+            var timing = timings[i];
+
+            if (timing.Timing - now > preloadTime)
+                break;
+
+            await LoadTiming(timing);
+            i++;
+
+            if (!IsFrameBudgetExceeded(frameStart))
+                continue;
+
+            await UniTask.Yield();
+            frameStart = GetTimestamp();
+            now = GetStreamingTime(fallbackTime);
+        }
+
+        return i;
+    }
+
+    private async UniTask StreamingSetActive(double fallbackTime)
+    {
         while (streamingRunning)
         {
-            double now = Majdata<TimeProvider>.Instance!.NoteTime;
+            var now = GetStreamingTime(fallbackTime);
+            var frameStart = GetTimestamp();
             
-            foreach (var note in noteManager.LoadedNotes)
+            for (var i = 0; i < noteManager.LoadedNotes.Count; i++)
             {
-                if (note.time - now > preloadTime)
+                var note = noteManager.LoadedNotes[i];
+                if (note.time - now > StreamingActivePreloadTime)
                     break;
 
                 if (!note.gameObject.activeSelf)
                     note.gameObject.SetActive(true);
+
+                if (!IsFrameBudgetExceeded(frameStart))
+                    continue;
+
+                await UniTask.Yield();
+                frameStart = GetTimestamp();
+                now = GetStreamingTime(fallbackTime);
             }
 
             await UniTask.Yield();
         }
+    }
+
+    private static long GetTimestamp()
+    {
+        return System.Diagnostics.Stopwatch.GetTimestamp();
+    }
+
+    private static bool IsFrameBudgetExceeded(long frameStart)
+    {
+        var elapsedMs = (GetTimestamp() - frameStart) * 1000d / System.Diagnostics.Stopwatch.Frequency;
+        return elapsedMs >= StreamingFrameBudgetMs;
+    }
+
+    private double GetStreamingTime(double fallbackTime)
+    {
+        var timeProvider = Majdata<TimeProvider>.Instance!;
+        return timeProvider.IsStart ? timeProvider.NoteTime : fallbackTime;
     }
 
     private async UniTask LoadTiming(SimaiTimingPoint timing)
