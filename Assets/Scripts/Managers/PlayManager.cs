@@ -143,7 +143,6 @@ public class PlayManager : MonoBehaviour
             loader.noteSpeed = (float)(107.25 / (71.4184491 * Mathf.Pow(_setting.TapSpeed + 0.9975f, -0.985558604f)));
             loader.touchSpeed = _setting.TouchSpeed;
             loader.smoothSlideAnime = _setting.SmoothSlideAnime;
-            loader.Load(_chart, startAt - offset, title, artist, difficulty);
             //UI
             objectCounter.StartOutput(_setting.ComboStatusType, _setting.UIType);
             effectManager.SetDisplayMode(_setting.JudgeDisplayMode);
@@ -162,11 +161,15 @@ public class PlayManager : MonoBehaviour
             switch (playmode)
             {
                 case PlaybackMode.Normal:
+                    loader.Load(_chart, startAt - offset, title, artist, difficulty);
+                    
                     Majdata<AllPerfectManager>.Instance!.enabled = false;
                     timeProvider.SetStartTime(startAt, offset, speed, playmode);
                     audioManager.PlayTrack();
                     break;
                 case PlaybackMode.IncludeOp:
+                    loader.Load(_chart, startAt - offset, title, artist, difficulty);
+                    
                     bgManager.PlaySongDetail();
                     AudioManager.noteSfxPlaybackRequests[AudioManager.TRACK_START] = true; //track_start
 
@@ -175,9 +178,11 @@ public class PlayManager : MonoBehaviour
                     audioManager.PlayTrack();
                     break;
                 case PlaybackMode.Record:
+                    loader.Load(_chart, startAt - offset, title, artist, difficulty);
+                    
                     bgManager.PlaySongDetail();
                     
-                    canvasButtons.SetActive(false); //TODO: This doesnt work
+                    canvasButtons.SetActive(false);
                     if (!Directory.Exists(maidataPath))
                     {
                         throw new InvalidPathException($"maidata path is required");

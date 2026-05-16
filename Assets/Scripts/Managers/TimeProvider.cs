@@ -50,7 +50,7 @@ public class TimeProvider : MonoBehaviour
     {
         return NoteTime * 1000 / 16.6667f;
     }
-    
+    //BUG: time goes faster
     public void SetStartTime(double _startAt, double _offset, float _speed, PlaybackMode mode, int fps = 60)
     {
         startAt = (float)_startAt;
