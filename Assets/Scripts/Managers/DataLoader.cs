@@ -1,4 +1,4 @@
-﻿#region
+#region
 
 using System;
 using System.Collections.Generic;
@@ -209,7 +209,7 @@ public class DataLoader : MonoBehaviour
             touchIndex.Add((SensorType)i, 0); 
     }
     
-    public UniTask Load(SimaiChart chart, double ignoreOffset, string title, string artist, int diff, bool waitInitialPreload = false)
+    public async UniTask Load(SimaiChart chart, double ignoreOffset, string title, string artist, int diff)
     {
         titleText.text = title;
         artistText.text = artist;
@@ -226,15 +226,10 @@ public class DataLoader : MonoBehaviour
         streamingRunning = true;
         var timings = chart.NoteTimings.ToArray();
         StreamingSetActive(ignoreOffset).Forget();
-
-        if (waitInitialPreload)
-            return StreamingCreate(timings, ignoreOffset, true);
-
-        StreamingCreate(timings, ignoreOffset, false).Forget();
-        return UniTask.CompletedTask;
+        await StreamingCreate(timings, ignoreOffset);
     }
     
-    private async UniTask StreamingCreate(SimaiTimingPoint[] timings, double ignoreOffset, bool returnAfterInitialPreload)
+    private async UniTask StreamingCreate(SimaiTimingPoint[] timings, double ignoreOffset)
     {
         var i = 0;
 
@@ -247,16 +242,9 @@ public class DataLoader : MonoBehaviour
             i++;
         }
         
-        const double preloadTime = 20;
+        const double preloadTime = 10;
         i = await LoadStreamingWindow(timings, i, GetStreamingTime(ignoreOffset), preloadTime);
-
-        if (returnAfterInitialPreload)
-        {
-            ContinueStreamingCreate(timings, i, ignoreOffset, preloadTime).Forget();
-            return;
-        }
-
-        await ContinueStreamingCreate(timings, i, ignoreOffset, preloadTime);
+        ContinueStreamingCreate(timings, i, ignoreOffset, preloadTime).Forget();
     }
 
     private async UniTask ContinueStreamingCreate(SimaiTimingPoint[] timings, int startIndex, double ignoreOffset, double preloadTime)

@@ -161,14 +161,14 @@ public class PlayManager : MonoBehaviour
             switch (playmode)
             {
                 case PlaybackMode.Normal:
-                    loader.Load(_chart, startAt - offset, title, artist, difficulty).Forget();
+                    await loader.Load(_chart, startAt - offset, title, artist, difficulty);
                     
                     Majdata<AllPerfectManager>.Instance!.enabled = false;
                     timeProvider.SetStartTime(startAt, offset, speed, playmode);
                     audioManager.PlayTrack();
                     break;
                 case PlaybackMode.IncludeOp:
-                    loader.Load(_chart, startAt - offset, title, artist, difficulty).Forget();
+                    await loader.Load(_chart, startAt - offset, title, artist, difficulty);
 
                     bgManager.PlaySongDetail();
                     AudioManager.noteSfxPlaybackRequests[AudioManager.TRACK_START] = true; //track_start
@@ -184,7 +184,7 @@ public class PlayManager : MonoBehaviour
                         throw new InvalidPathException($"maidata path is required");
                     }
 
-                    await loader.Load(_chart, startAt - offset, title, artist, difficulty, true);
+                    await loader.Load(_chart, startAt - offset, title, artist, difficulty);
 
                     bgManager.PlaySongDetail();
                     
