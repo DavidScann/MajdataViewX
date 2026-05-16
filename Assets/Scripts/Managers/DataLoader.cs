@@ -50,6 +50,10 @@ public class DataLoader : MonoBehaviour
     public RawImage cardImage;
     public Color[] diffColors = new Color[7];
 
+    private const double StreamingCreatePreloadTime = 10;
+    private const double StreamingActivePreloadTime = 5;
+    private const double StreamingFrameBudgetMs = 4;
+
     private int slideLayer = -1;
     private int noteSortOrder = 0;
 
@@ -242,9 +246,8 @@ public class DataLoader : MonoBehaviour
             i++;
         }
         
-        const double preloadTime = 10;
-        i = await LoadStreamingWindow(timings, i, GetStreamingTime(ignoreOffset), preloadTime);
-        ContinueStreamingCreate(timings, i, ignoreOffset, preloadTime).Forget();
+        i = await LoadStreamingWindow(timings, i, ignoreOffset, StreamingCreatePreloadTime);
+        ContinueStreamingCreate(timings, i, ignoreOffset, StreamingCreatePreloadTime).Forget();
     }
 
     private async UniTask ContinueStreamingCreate(SimaiTimingPoint[] timings, int startIndex, double ignoreOffset, double preloadTime)
@@ -253,14 +256,16 @@ public class DataLoader : MonoBehaviour
 
         while (i < timings.Length && streamingRunning)
         {
-            i = await LoadStreamingWindow(timings, i, GetStreamingTime(ignoreOffset), preloadTime);
+            i = await LoadStreamingWindow(timings, i, ignoreOffset, preloadTime);
             await UniTask.Yield();
         }
     }
 
-    private async UniTask<int> LoadStreamingWindow(SimaiTimingPoint[] timings, int startIndex, double now, double preloadTime)
+    private async UniTask<int> LoadStreamingWindow(SimaiTimingPoint[] timings, int startIndex, double fallbackTime, double preloadTime)
     {
         var i = startIndex;
+        var now = GetStreamingTime(fallbackTime);
+        var frameStart = GetTimestamp();
 
         while (i < timings.Length && streamingRunning)
         {
@@ -271,6 +276,13 @@ public class DataLoader : MonoBehaviour
 
             await LoadTiming(timing);
             i++;
+
+            if (!IsFrameBudgetExceeded(frameStart))
+                continue;
+
+            await UniTask.Yield();
+            frameStart = GetTimestamp();
+            now = GetStreamingTime(fallbackTime);
         }
 
         return i;
@@ -278,23 +290,41 @@ public class DataLoader : MonoBehaviour
 
     private async UniTask StreamingSetActive(double fallbackTime)
     {
-        const double preloadTime = 5;
-
         while (streamingRunning)
         {
             var now = GetStreamingTime(fallbackTime);
+            var frameStart = GetTimestamp();
             
-            foreach (var note in noteManager.LoadedNotes)
+            for (var i = 0; i < noteManager.LoadedNotes.Count; i++)
             {
-                if (note.time - now > preloadTime)
+                var note = noteManager.LoadedNotes[i];
+                if (note.time - now > StreamingActivePreloadTime)
                     break;
 
                 if (!note.gameObject.activeSelf)
                     note.gameObject.SetActive(true);
+
+                if (!IsFrameBudgetExceeded(frameStart))
+                    continue;
+
+                await UniTask.Yield();
+                frameStart = GetTimestamp();
+                now = GetStreamingTime(fallbackTime);
             }
 
             await UniTask.Yield();
         }
+    }
+
+    private static long GetTimestamp()
+    {
+        return System.Diagnostics.Stopwatch.GetTimestamp();
+    }
+
+    private static bool IsFrameBudgetExceeded(long frameStart)
+    {
+        var elapsedMs = (GetTimestamp() - frameStart) * 1000d / System.Diagnostics.Stopwatch.Frequency;
+        return elapsedMs >= StreamingFrameBudgetMs;
     }
 
     private double GetStreamingTime(double fallbackTime)
