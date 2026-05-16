@@ -3,7 +3,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using Cysharp.Threading.Tasks;
 using MajSimai;
 using UnityEngine;
@@ -41,8 +40,6 @@ public class DataLoader : MonoBehaviour
     Dictionary<int, int> noteIndex = new();
     Dictionary<SensorType, int> touchIndex = new();
     private bool streamingRunning;
-    private bool initialPreloadComplete;
-    private int streamingVersion;
     List<TouchDrop> touchMembers = new();
     
     public Text diffText;
@@ -212,7 +209,7 @@ public class DataLoader : MonoBehaviour
             touchIndex.Add((SensorType)i, 0); 
     }
     
-    public void Load(SimaiChart chart, double ignoreOffset, string title, string artist, int diff)
+    public UniTask Load(SimaiChart chart, double ignoreOffset, string title, string artist, int diff, bool waitInitialPreload = false)
     {
         titleText.text = title;
         artistText.text = artist;
@@ -226,23 +223,22 @@ public class DataLoader : MonoBehaviour
         objectCounter.ReportMeterBpmAsync(chart).Forget();
         
         noteManager.ResetIndex();
-        initialPreloadComplete = false;
         streamingRunning = true;
-        var version = ++streamingVersion;
-        StreamingCreate(chart.NoteTimings.ToArray(), ignoreOffset, version).Forget();
-        StreamingSetActive(version, ignoreOffset).Forget();
-    }
+        var timings = chart.NoteTimings.ToArray();
+        StreamingSetActive(ignoreOffset).Forget();
 
-    public async UniTask WaitForInitialPreloadAsync()
-    {
-        await UniTask.WaitUntil(() => initialPreloadComplete || !streamingRunning);
+        if (waitInitialPreload)
+            return StreamingCreate(timings, ignoreOffset, true);
+
+        StreamingCreate(timings, ignoreOffset, false).Forget();
+        return UniTask.CompletedTask;
     }
     
-    private async UniTask StreamingCreate(SimaiTimingPoint[] timings, double ignoreOffset, int version)
+    private async UniTask StreamingCreate(SimaiTimingPoint[] timings, double ignoreOffset, bool returnAfterInitialPreload)
     {
         var i = 0;
 
-        while (i < timings.Length && timings[i].Timing < ignoreOffset && version == streamingVersion)
+        while (i < timings.Length && timings[i].Timing < ignoreOffset)
         {
             objectCounter
                 .CountIgnoreNoteCountAsync(timings[i].Notes)
@@ -252,41 +248,51 @@ public class DataLoader : MonoBehaviour
         }
         
         const double preloadTime = 20;
-        var isFirstPreload = true;
-        
-        while (i < timings.Length && streamingRunning && version == streamingVersion)
+        i = await LoadStreamingWindow(timings, i, GetStreamingTime(ignoreOffset), preloadTime);
+
+        if (returnAfterInitialPreload)
         {
-            var now = GetStreamingTime(ignoreOffset);
-            
-            while (i < timings.Length)
-            {
-                var timing = timings[i];
-
-                if (timing.Timing - now > preloadTime)
-                    break;
-                
-                await LoadTiming(timing);
-                
-                i++;
-            }
-
-            if (isFirstPreload && version == streamingVersion)
-            {
-                initialPreloadComplete = true;
-                isFirstPreload = false;
-            }
-            
-            await UniTask.Yield();
+            ContinueStreamingCreate(timings, i, ignoreOffset, preloadTime).Forget();
+            return;
         }
 
-        if (version == streamingVersion)
-            initialPreloadComplete = true;
+        await ContinueStreamingCreate(timings, i, ignoreOffset, preloadTime);
     }
-    private async UniTask StreamingSetActive(int version, double fallbackTime)
+
+    private async UniTask ContinueStreamingCreate(SimaiTimingPoint[] timings, int startIndex, double ignoreOffset, double preloadTime)
+    {
+        var i = startIndex;
+
+        while (i < timings.Length && streamingRunning)
+        {
+            i = await LoadStreamingWindow(timings, i, GetStreamingTime(ignoreOffset), preloadTime);
+            await UniTask.Yield();
+        }
+    }
+
+    private async UniTask<int> LoadStreamingWindow(SimaiTimingPoint[] timings, int startIndex, double now, double preloadTime)
+    {
+        var i = startIndex;
+
+        while (i < timings.Length && streamingRunning)
+        {
+            var timing = timings[i];
+
+            if (timing.Timing - now > preloadTime)
+                break;
+
+            await LoadTiming(timing);
+            i++;
+        }
+
+        return i;
+    }
+
+    private async UniTask StreamingSetActive(double fallbackTime)
     {
         const double preloadTime = 5;
 
-        while (streamingRunning && version == streamingVersion)
+        while (streamingRunning)
         {
             var now = GetStreamingTime(fallbackTime);
             
@@ -1190,8 +1196,6 @@ public class DataLoader : MonoBehaviour
     {
         loadedData = null;
         streamingRunning = false;
-        initialPreloadComplete = false;
-        streamingVersion++;
         for (var i = 1; i < 9; i++)
             noteIndex[i] = 0;
         for (var i = 0; i < 33; i++)
