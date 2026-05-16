@@ -4,6 +4,7 @@ using System.Collections;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Pipes;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -32,10 +33,10 @@ public class ScreenRecorder : MonoBehaviour
         errText = GameObject.Find("ErrText").GetComponent<Text>();
     }
 
-    public void StartRecording(string maidataPath, int fps, bool useAlpha)
+    public async UniTask StartRecording(string maidataPath, int fps, bool useAlpha)
     {
         if (IsRecording) StopRecording();
-        StartCoroutine(CaptureScreen(maidataPath, fps, useAlpha));
+        await CaptureScreen(maidataPath, fps, useAlpha);
     }
 
     public void StopRecording()
@@ -49,13 +50,13 @@ public class ScreenRecorder : MonoBehaviour
         errText.text = string.Empty;
     }
 
-    private IEnumerator CaptureScreen(string maidataPath, int fps, bool useAlpha)
+    private async UniTask CaptureScreen(string maidataPath, int fps, bool useAlpha)
     {
         // 1. check
         if (Screen.width % 2 != 0 || Screen.height % 2 != 0)
         {
             errText.text = $"无法渲染：分辨率 {Screen.width}x{Screen.height} 不是偶数。";
-            yield break;
+            return;
         }
 
         // 2. args
@@ -122,13 +123,13 @@ public class ScreenRecorder : MonoBehaviour
 
                 // 等待 FFmpeg 连接
                 var connectTask = pipeServer.WaitForConnectionAsync();
-                while (!connectTask.IsCompleted) yield return null;
+                while (!connectTask.IsCompleted) await UniTask.Yield();
 
                 using (var bw = new BinaryWriter(pipeServer))
                 {
                     while (IsRecording && !outProcess.HasExited)
                     {
-                        yield return new WaitForEndOfFrame();
+                        await UniTask.WaitForEndOfFrame(this);
 
                         // Audio
                         audioManager.UpdateAnswerSfx();
@@ -191,14 +192,18 @@ public class ScreenRecorder : MonoBehaviour
         }
         finally
         {
-            if (camera != null) camera.targetTexture = oldRT;
+            camera.targetTexture = oldRT;
             RenderTexture.active = null;
             rt.Release();
             Destroy(rt);
             Destroy(cpuTex);
         }
 
-        if (!videoEncodeSucceeded) yield break;
+        if (!videoEncodeSucceeded)
+        {
+            errText.text = "video encode failed";
+            return;
+        }
 
         // 5. audio export and mux
         errText.text = "正在处理音频导出...";

@@ -177,7 +177,7 @@ public class PlayManager : MonoBehaviour
                 case PlaybackMode.Record:
                     bgManager.PlaySongDetail();
                     
-                    canvasButtons.SetActive(false);
+                    canvasButtons.SetActive(false); //TODO: This doesnt work
                     if (!Directory.Exists(maidataPath))
                     {
                         throw new InvalidPathException($"maidata path is required");
@@ -185,9 +185,15 @@ public class PlayManager : MonoBehaviour
                     
                     Majdata<AllPerfectManager>.Instance!.enabled = true;
                     timeProvider.SetStartTime(startAt, offset, speed, playmode, _setting.OutputFps);
-                    screenRecorder.StartRecording(maidataPath, _setting.OutputFps, _setting.UseAlpha);
-                    canvasButtons.SetActive(true);
-                    break;
+                    _state = ViewStatus.Playing;
+                    screenRecorder.StartRecording(maidataPath, 
+                        _setting.OutputFps, 
+                        _setting.UseAlpha).ContinueWith(() =>
+                    {
+                        canvasButtons.SetActive(true);
+                        _state = ViewStatus.Loaded;
+                    }).Forget();
+                    return true; //directly return
             }
             
             //save last speed for resume
