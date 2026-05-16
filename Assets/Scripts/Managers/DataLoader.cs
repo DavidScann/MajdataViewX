@@ -41,6 +41,8 @@ public class DataLoader : MonoBehaviour
     Dictionary<int, int> noteIndex = new();
     Dictionary<SensorType, int> touchIndex = new();
     private bool streamingRunning;
+    private bool initialPreloadComplete;
+    private int streamingVersion;
     List<TouchDrop> touchMembers = new();
     
     public Text diffText;
@@ -224,16 +226,23 @@ public class DataLoader : MonoBehaviour
         objectCounter.ReportMeterBpmAsync(chart).Forget();
         
         noteManager.ResetIndex();
+        initialPreloadComplete = false;
         streamingRunning = true;
-        StreamingCreate(chart.NoteTimings.ToArray(), ignoreOffset).Forget();
-        StreamingSetActive().Forget();
+        var version = ++streamingVersion;
+        StreamingCreate(chart.NoteTimings.ToArray(), ignoreOffset, version).Forget();
+        StreamingSetActive(version, ignoreOffset).Forget();
+    }
+
+    public async UniTask WaitForInitialPreloadAsync()
+    {
+        await UniTask.WaitUntil(() => initialPreloadComplete || !streamingRunning);
     }
     
-    private async UniTask StreamingCreate(SimaiTimingPoint[] timings, double ignoreOffset)
+    private async UniTask StreamingCreate(SimaiTimingPoint[] timings, double ignoreOffset, int version)
     {
         var i = 0;
 
-        while (i < timings.Length && timings[i].Timing < ignoreOffset)
+        while (i < timings.Length && timings[i].Timing < ignoreOffset && version == streamingVersion)
         {
             objectCounter
                 .CountIgnoreNoteCountAsync(timings[i].Notes)
@@ -243,10 +252,11 @@ public class DataLoader : MonoBehaviour
         }
         
         const double preloadTime = 20;
+        var isFirstPreload = true;
         
-        while (i < timings.Length && streamingRunning)
+        while (i < timings.Length && streamingRunning && version == streamingVersion)
         {
-            double now = Majdata<TimeProvider>.Instance!.NoteTime;
+            var now = GetStreamingTime(ignoreOffset);
             
             while (i < timings.Length)
             {
@@ -259,17 +269,26 @@ public class DataLoader : MonoBehaviour
                 
                 i++;
             }
+
+            if (isFirstPreload && version == streamingVersion)
+            {
+                initialPreloadComplete = true;
+                isFirstPreload = false;
+            }
             
             await UniTask.Yield();
         }
+
+        if (version == streamingVersion)
+            initialPreloadComplete = true;
     }
-    private async UniTask StreamingSetActive()
+    private async UniTask StreamingSetActive(int version, double fallbackTime)
     {
         const double preloadTime = 5;
 
-        while (streamingRunning)
+        while (streamingRunning && version == streamingVersion)
         {
-            double now = Majdata<TimeProvider>.Instance!.NoteTime;
+            var now = GetStreamingTime(fallbackTime);
             
             foreach (var note in noteManager.LoadedNotes)
             {
@@ -282,6 +301,12 @@ public class DataLoader : MonoBehaviour
 
             await UniTask.Yield();
         }
+    }
+
+    private double GetStreamingTime(double fallbackTime)
+    {
+        var timeProvider = Majdata<TimeProvider>.Instance!;
+        return timeProvider.IsStart ? timeProvider.NoteTime : fallbackTime;
     }
 
     private async UniTask LoadTiming(SimaiTimingPoint timing)
@@ -1165,6 +1190,8 @@ public class DataLoader : MonoBehaviour
     {
         loadedData = null;
         streamingRunning = false;
+        initialPreloadComplete = false;
+        streamingVersion++;
         for (var i = 1; i < 9; i++)
             noteIndex[i] = 0;
         for (var i = 0; i < 33; i++)

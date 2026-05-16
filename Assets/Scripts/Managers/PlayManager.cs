@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 
 #region
 
@@ -169,7 +169,7 @@ public class PlayManager : MonoBehaviour
                     break;
                 case PlaybackMode.IncludeOp:
                     loader.Load(_chart, startAt - offset, title, artist, difficulty);
-                    
+
                     bgManager.PlaySongDetail();
                     AudioManager.noteSfxPlaybackRequests[AudioManager.TRACK_START] = true; //track_start
 
@@ -178,18 +178,20 @@ public class PlayManager : MonoBehaviour
                     audioManager.PlayTrack();
                     break;
                 case PlaybackMode.Record:
-                    loader.Load(_chart, startAt - offset, title, artist, difficulty);
-                    
-                    bgManager.PlaySongDetail();
-                    
                     canvasButtons.SetActive(false);
                     if (!Directory.Exists(maidataPath))
                     {
                         throw new InvalidPathException($"maidata path is required");
                     }
+
+                    loader.Load(_chart, startAt - offset, title, artist, difficulty);
+                    await loader.WaitForInitialPreloadAsync();
+
+                    bgManager.PlaySongDetail();
                     
                     Majdata<AllPerfectManager>.Instance!.enabled = true;
                     timeProvider.SetStartTime(startAt, offset, speed, playmode, _setting.OutputFps);
+                    timeProvider.Pause();
                     _state = ViewStatus.Playing;
                     screenRecorder.StartRecording(maidataPath, 
                         _setting.OutputFps, 
