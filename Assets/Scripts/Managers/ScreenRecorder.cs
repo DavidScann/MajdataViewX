@@ -125,6 +125,8 @@ public class ScreenRecorder : MonoBehaviour
                 var connectTask = pipeServer.WaitForConnectionAsync();
                 while (!connectTask.IsCompleted) await UniTask.Yield();
 
+                timeProvider.Resume(null);
+
                 using (var bw = new BinaryWriter(pipeServer))
                 {
                     while (IsRecording && !outProcess.HasExited)
