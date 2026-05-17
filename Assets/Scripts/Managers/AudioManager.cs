@@ -563,9 +563,7 @@ public class AudioManager : MonoBehaviour
         }
 
         
-        // BGM: mirror PlayTrack(), whose sample position is AudioTime - (global offset + 1 frame),
-        // and whose playback rate follows TimeProvider.CurrentSpeed.
-        var trackOffset = TRACK_ANSWER_PLAYBACK_OFFSET_SEC + (float)GlobalAudioOffset;
+        var trackOffset = TRACK_ANSWER_PLAYBACK_OFFSET_SEC + (float)GlobalAudioOffset + 5;
         var initialTrackSec = recordingInitialAudioTime - trackOffset;
         var trackFrameCount = TrackSampleData.Length / CHANNELS;
         var recordingFrameCount = recordingBuffer.Length / CHANNELS;

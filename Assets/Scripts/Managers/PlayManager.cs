@@ -189,12 +189,14 @@ public class PlayManager : MonoBehaviour
                     bgManager.PlaySongDetail();
                     
                     Majdata<AllPerfectManager>.Instance!.enabled = true;
-                    timeProvider.SetStartTime(startAt, offset, speed, playmode, _setting.OutputFps);
-                    timeProvider.Pause();
                     _state = ViewStatus.Playing;
                     screenRecorder.StartRecording(maidataPath, 
                         _setting.OutputFps, 
-                        _setting.UseAlpha).ContinueWith(() =>
+                        _setting.UseAlpha,
+                        () =>
+                        {
+                            timeProvider.SetStartTime(startAt, offset, speed, playmode, _setting.OutputFps);
+                        }).ContinueWith(() =>
                     {
                         canvasButtons.SetActive(true);
                         _state = ViewStatus.Loaded;
@@ -287,6 +289,8 @@ public class PlayManager : MonoBehaviour
             
             audioManager.StopTrack();
             screenRecorder.StopRecording();
+            //if not so, the last frame will be like after ResetAllManagers
+            await UniTask.Yield(); 
             
             IsReloading = true;
             ResetAllManagers();
