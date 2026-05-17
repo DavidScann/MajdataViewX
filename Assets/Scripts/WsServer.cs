@@ -45,7 +45,7 @@ internal class WsServer: MonoBehaviour
         if (File.Exists(neoPath) && 
             Process.GetProcessesByName("MajdataEdit-Neo").Length <= 0)
         {
-            Process.Start(neoPath);
+            ProcessUtils.Start(neoPath, null, neoPath);
         }
     }
     
