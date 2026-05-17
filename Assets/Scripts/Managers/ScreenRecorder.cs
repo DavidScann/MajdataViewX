@@ -1,8 +1,6 @@
 #region
 
 using System;
-using System.Collections;
-using System.Diagnostics;
 using System.IO;
 using System.IO.Pipes;
 using Cysharp.Threading.Tasks;
@@ -35,7 +33,7 @@ public class ScreenRecorder : MonoBehaviour
         errText = GameObject.Find("ErrText").GetComponent<Text>();
     }
 
-    public async UniTask StartRecording(string maidataPath, 
+    public async UniTask StartRecording(string maidataPath,
         int fps, bool useAlpha, [CanBeNull] Action onStart = null)
     {
         await CaptureScreen(maidataPath, fps, useAlpha, onStart);
@@ -52,9 +50,10 @@ public class ScreenRecorder : MonoBehaviour
         errText.text = string.Empty;
     }
 
-    private async UniTask CaptureScreen(string maidataPath, 
+    private async UniTask CaptureScreen(string maidataPath,
         int fps, bool useAlpha, [CanBeNull] Action onStart = null)
     {
+        //成功的情况下不需要调用errText.text，一路走下去根本看不见错误提示
         // 1. check
         if (Screen.width % 2 != 0 || Screen.height % 2 != 0)
         {
@@ -64,7 +63,7 @@ public class ScreenRecorder : MonoBehaviour
 
         // 2. args
         var ffmpegPath = Path.Combine(Application.streamingAssetsPath, "ffmpeg.exe");
-        var pipeName = $"majdataRec_{Process.GetCurrentProcess().Id}_{System.Guid.NewGuid():N}";
+        var pipeName = $"majdataRec_{ProcessUtils.CurrentProcessId}_{System.Guid.NewGuid():N}";
         var wavName = "temp.wav";
         var videoName = useAlpha ? "temp.webm" : "temp.mp4";
         var finalName = useAlpha ? "out.webm" : "out.mp4";
@@ -111,27 +110,27 @@ public class ScreenRecorder : MonoBehaviour
         var videoEncodeSucceeded = false;
 
         // 4. recording
+        IntPtr ffmpegProcessHandle = IntPtr.Zero;
         try
         {
             using (var pipeServer = new NamedPipeServerStream(pipeName, PipeDirection.Out, 1,
-                       PipeTransmissionMode.Byte, PipeOptions.Asynchronous, 1024 * 1024 * 16, 1024 * 1024 * 16))
+                       PipeTransmissionMode.Byte, PipeOptions.None, 1024 * 1024 * 16, 1024 * 1024 * 16))
             {
-                var startInfo = new ProcessStartInfo(ffmpegPath, outArgs)
+                var (started, handle) = ProcessUtils.Start(ffmpegPath, outArgs, maidataPath);
+                if (!started)
                 {
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    WorkingDirectory = maidataPath
-                };
-                var outProcess = Process.Start(startInfo);
+                    errText.text = "无法启动 FFmpeg";
+                    return;
+                }
+                ffmpegProcessHandle = handle;
 
                 // 等待 FFmpeg 连接
-                var connectTask = pipeServer.WaitForConnectionAsync();
-                while (!connectTask.IsCompleted) await UniTask.Yield();
+                pipeServer.WaitForConnection();
 
                 using (var bw = new BinaryWriter(pipeServer))
                 {
                     onStart?.Invoke();
-                    while (IsRecording && !outProcess.HasExited)
+                    while (IsRecording && !ProcessUtils.HasExited(ffmpegProcessHandle, out _))
                     {
                         await UniTask.WaitForEndOfFrame(this);
 
@@ -188,14 +187,16 @@ public class ScreenRecorder : MonoBehaviour
                     bw.Flush();
                 }
 
-                if (!outProcess.HasExited) outProcess.WaitForExit();
-                videoEncodeSucceeded = outProcess.ExitCode == 0;
+                // 等待 FFmpeg 完成
+                var exitCode = ProcessUtils.WaitForExit(ffmpegProcessHandle);
+                videoEncodeSucceeded = exitCode == 0;
                 if (!videoEncodeSucceeded)
-                    errText.text = $"视频编码失败，FFmpeg 退出码：{outProcess.ExitCode}";
+                    errText.text = $"视频编码失败，FFmpeg 退出码：{exitCode}";
             }
         }
         finally
         {
+            ProcessUtils.CloseProcessHandle(ffmpegProcessHandle);
             camera.targetTexture = oldRT;
             RenderTexture.active = null;
             rt.Release();
@@ -210,22 +211,23 @@ public class ScreenRecorder : MonoBehaviour
         }
 
         // 5. audio export and mux
-        errText.text = "正在处理音频导出...";
+        //errText.text = "正在处理音频导出...";
         audioManager.ExportFinalWav(Path.Combine(maidataPath, wavName));
 
-        errText.text = "正在执行最终合并 (Muxing)...";
-        var muxProcess = Process.Start(new ProcessStartInfo(ffmpegPath, muxArgs)
+        //errText.text = "正在执行最终合并 (Muxing)...";
+        var (muxStarted, muxExitCode) = ProcessUtils.StartAndWait(ffmpegPath, muxArgs, maidataPath);
+        if (!muxStarted)
         {
-            UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = maidataPath
-        });
-        muxProcess.WaitForExit();
+            errText.text = $"无法启动 Muxing 进程，错误码：{muxExitCode}";
+            return;
+        }
 
         // 6. clean up
         var outPath = Path.Combine(maidataPath, finalName);
         if (File.Exists(outPath))
         {
-            errText.text = "渲染成功：" + finalName;
-            Process.Start("explorer", "/select,\"" + outPath + "\"");
+            //errText.text = "渲染成功：" + finalName;
+            ProcessUtils.ShowInExplorer(outPath);
         }
 
         timeProvider.Pause();
