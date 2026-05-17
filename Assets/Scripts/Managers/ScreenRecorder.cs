@@ -1,10 +1,12 @@
 #region
 
+using System;
 using System.Collections;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Pipes;
 using Cysharp.Threading.Tasks;
+using JetBrains.Annotations;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -33,10 +35,10 @@ public class ScreenRecorder : MonoBehaviour
         errText = GameObject.Find("ErrText").GetComponent<Text>();
     }
 
-    public async UniTask StartRecording(string maidataPath, int fps, bool useAlpha)
+    public async UniTask StartRecording(string maidataPath, 
+        int fps, bool useAlpha, [CanBeNull] Action onStart = null)
     {
-        if (IsRecording) StopRecording();
-        await CaptureScreen(maidataPath, fps, useAlpha);
+        await CaptureScreen(maidataPath, fps, useAlpha, onStart);
     }
 
     public void StopRecording()
@@ -50,7 +52,8 @@ public class ScreenRecorder : MonoBehaviour
         errText.text = string.Empty;
     }
 
-    private async UniTask CaptureScreen(string maidataPath, int fps, bool useAlpha)
+    private async UniTask CaptureScreen(string maidataPath, 
+        int fps, bool useAlpha, [CanBeNull] Action onStart = null)
     {
         // 1. check
         if (Screen.width % 2 != 0 || Screen.height % 2 != 0)
@@ -125,10 +128,9 @@ public class ScreenRecorder : MonoBehaviour
                 var connectTask = pipeServer.WaitForConnectionAsync();
                 while (!connectTask.IsCompleted) await UniTask.Yield();
 
-                timeProvider.Resume(null);
-
                 using (var bw = new BinaryWriter(pipeServer))
                 {
+                    onStart?.Invoke();
                     while (IsRecording && !outProcess.HasExited)
                     {
                         await UniTask.WaitForEndOfFrame(this);
