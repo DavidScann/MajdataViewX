@@ -21,27 +21,27 @@ public class AudioManager : MonoBehaviour
     [CanBeNull] private float[] TrackSampleData;
     private float TrackSampleVolume;
     public bool IsTrackLoaded => TrackSample != null && TrackSampleData != null;
-    
+
     //answer SFX
     List<AnswerTimingPoint> answerTimingPoints = new();
     //note SFX
     public static bool[] noteSfxPlaybackRequests = new bool[16];
     List<AudioSample> NoteSfxs = new(16);
-    
+
     //SFX for recording
     private List<float[]> noteSfxSamplesData = new(16);
-    private float[] recordingBuffer; 
+    private float[] recordingBuffer;
     private float recordingInitialAudioTime;
     private float recordingSpeed = 1f;
     private int[] sfxPlayPointers = new int[16]; //-1 is not playing
 
     public double GlobalAudioOffset { get; private set; }
-    
+
     const int SAMPLERATE = 44100;
     const int CHANNELS = 2;
-    
+
     const float TRACK_ANSWER_PLAYBACK_OFFSET_SEC = (16.66666f * 1) / 1000;
-    
+
     public const int TAP_PERFECT = 0;
     public const int TAP_GREAT = 1;
     public const int TAP_GOOD = 2;
@@ -58,7 +58,7 @@ public class AudioManager : MonoBehaviour
     public const int ANSWER_CLOCK = 13;
     public const int TRACK_START = 14;
     public const int ALL_PERFECT = 15;
-    
+
     private bool isTouchHoldRiserPlaying = false;
     private void Awake()
     {
@@ -66,28 +66,28 @@ public class AudioManager : MonoBehaviour
         Bass.Configure(Configuration.UpdatePeriod, 20);
         Bass.Configure(Configuration.PlaybackBufferLength, 40);
         Bass.Init(-1, 44100);
-        
+
         //Note SFX
         var sfxPath = Path.Combine(new DirectoryInfo(Application.dataPath).Parent!.FullName, "SFX");
-        foreach (var filename in new []
-                 {
-                     "tap_perfect.wav",
-                     "tap_great.wav",
-                     "tap_good.wav",
-                     "tap_ex.wav",
-                     "break_tap.wav",
-                     "break.wav",
-                     "slide.wav",
-                     "slide_break_start.wav",
-                     "slide_break_slide.wav",
-                     "touch.wav",
-                     "touch_Hold_riser.wav",
-                     "touch_hanabi.wav",
-                     "answer.wav",
-                     "answer_clock.wav",
-                     "track_start.wav",
-                     "all_perfect.wav"
-                 })
+        foreach (var filename in new[]
+                {
+                    "tap_perfect.wav",
+                    "tap_great.wav",
+                    "tap_good.wav",
+                    "tap_ex.wav",
+                    "break_tap.wav",
+                    "break.wav",
+                    "slide.wav",
+                    "slide_break_start.wav",
+                    "slide_break_slide.wav",
+                    "touch.wav",
+                    "touch_Hold_riser.wav",
+                    "touch_hanabi.wav",
+                    "answer.wav",
+                    "answer_clock.wav",
+                    "track_start.wav",
+                    "all_perfect.wav"
+                })
         {
             //sample
             var path = Path.Combine(sfxPath, filename);
@@ -112,7 +112,7 @@ public class AudioManager : MonoBehaviour
     public void Setting(double globalAudioOffset, MajVolumeSetting v)
     {
         GlobalAudioOffset = globalAudioOffset;
-        
+
         foreach (var sample in NoteSfxs)
             switch (sample.SampleType)
             {
@@ -139,7 +139,7 @@ public class AudioManager : MonoBehaviour
 
         TrackSampleVolume = v.Track;
     }
-    
+
     private void Start()
     {
         timeProvider = Majdata<TimeProvider>.Instance!;
@@ -150,9 +150,9 @@ public class AudioManager : MonoBehaviour
         for (var i = 0; i < answerTimingPoints.Count; i++)
         {
             var timing = answerTimingPoints[i];
-            
+
             if (timing.IsPlayed) continue;
-            
+
             var thisFrameSec = Majdata<TimeProvider>.Instance!.NoteTime;
 
             var delta = thisFrameSec - (timing.Timing + TRACK_ANSWER_PLAYBACK_OFFSET_SEC);
@@ -165,15 +165,15 @@ public class AudioManager : MonoBehaviour
             }
         }
     }
-    
+
     private void Update()
     {
         if (timeProvider.IsRecord) return;
 
         SyncTimeProviderToTrack();
-        
+
         UpdateAnswerSfx();
-        
+
         for (var i = 0; i < noteSfxPlaybackRequests.Length; i++)
         {
             var isRequested = noteSfxPlaybackRequests[i];
@@ -267,10 +267,10 @@ public class AudioManager : MonoBehaviour
         Bass.Stop();
         Bass.Free();
     }
-    
-    
+
+
     //track control
-    
+
     public void LoadTrack(string path)
     {
         TrackSample?.Dispose();
@@ -280,26 +280,26 @@ public class AudioManager : MonoBehaviour
         };
         TrackSampleData = GetSampleDataFromFile(path);
     }
-    
+
     public void PlayTrack()
     {
         if (TrackSample == null) return;
         TrackSample.Speed = timeProvider.CurrentSpeed;
         TrackSample.Volume = TrackSampleVolume;
         StartCoroutine(WaitForTrackAudioStart());
-        
+
         IEnumerator WaitForTrackAudioStart()
         {
             var offset = TRACK_ANSWER_PLAYBACK_OFFSET_SEC + GlobalAudioOffset;
             while (Majdata<TimeProvider>.Instance!.AudioTime < offset) yield return null;
-        
+
             TrackSample!.CurrentSec = Majdata<TimeProvider>.Instance!.AudioTime - offset;
             TrackSample.Play();
         }
     }
-    
+
     public void PauseTrack() => TrackSample?.Pause();
-    
+
     public void StopTrack() => TrackSample?.Stop();
 
     public void ResetState()
@@ -311,8 +311,8 @@ public class AudioManager : MonoBehaviour
         for (var i = 0; i < noteSfxPlaybackRequests.Length; i++)
             noteSfxPlaybackRequests[i] = false;
     }
-    
-    
+
+
     //Sfx control
 
     public void GenerateAnswerSFX(SimaiChart chart, int clockCount = 0)
@@ -342,7 +342,7 @@ public class AudioManager : MonoBehaviour
         {
             var startTiming = (float)timingPoint.Timing;
             rawTimings.Add(startTiming);
-            
+
             var holds = Array.FindAll(timingPoint.Notes,
                 o => o.Type is SimaiNoteType.Hold or SimaiNoteType.TouchHold);
 
@@ -352,7 +352,7 @@ public class AudioManager : MonoBehaviour
                 rawTimings.Add(endTiming);
             }
         }
-        
+
         rawTimings.Sort();
 
         var lastAddedTime = -1f;
@@ -377,7 +377,7 @@ public class AudioManager : MonoBehaviour
             {
                 noteSfxPlaybackRequests[TAP_EX] = true;
             }
-        
+
             switch (judgeType)
             {
                 case JudgeType.LateGood:
@@ -404,7 +404,7 @@ public class AudioManager : MonoBehaviour
             }
             return;
         }
-        
+
         if (isEx)
         {
             noteSfxPlaybackRequests[TAP_EX] = true;
@@ -437,7 +437,7 @@ public class AudioManager : MonoBehaviour
                 break;
         }
     }
-    
+
     public void PlayTouchSound()
     {
         noteSfxPlaybackRequests[TOUCH] = true;
@@ -481,10 +481,10 @@ public class AudioManager : MonoBehaviour
         noteSfxPlaybackRequests[BREAK_SLIDE_JUDGE] = true;
         noteSfxPlaybackRequests[BREAK_SFX] = true;
     }
-    
-    
+
+
     //recording control
-    
+
     public void PrepareRecordingBuffer(float initialAudioTime, float speed)
     {
         recordingInitialAudioTime = initialAudioTime;
@@ -498,7 +498,7 @@ public class AudioManager : MonoBehaviour
         Array.Clear(recordingBuffer, 0, recordingBuffer.Length);
         for (var i = 0; i < sfxPlayPointers.Length; i++) sfxPlayPointers[i] = -1; // 初始化指针
     }
-    
+
     public void TriggerSfxRecording(int index)
     {
         if (index < 0 || index >= noteSfxSamplesData.Count) return;
@@ -509,7 +509,7 @@ public class AudioManager : MonoBehaviour
         if (index < 0 || index >= noteSfxSamplesData.Count) return;
         sfxPlayPointers[index] = -1;
     }
-    
+
     public void UpdateSfxRecording(float deltaTime, float recordingElapsedTime)
     {
         // 计算当前帧在 buffer 中的起始采样位置
@@ -543,12 +543,12 @@ public class AudioManager : MonoBehaviour
                     break;
                 }
             }
-        
+
             if (sfxPlayPointers[i] != -1)
                 sfxPlayPointers[i] += samplesToCopy;
         }
     }
-    
+
     public void ExportFinalWav(string outputPath)
     {
         // track start
@@ -562,7 +562,7 @@ public class AudioManager : MonoBehaviour
             }
         }
 
-        
+
         var trackOffset = TRACK_ANSWER_PLAYBACK_OFFSET_SEC + (float)GlobalAudioOffset + 5;
         var initialTrackSec = recordingInitialAudioTime - trackOffset;
         var trackFrameCount = TrackSampleData.Length / CHANNELS;
@@ -587,14 +587,14 @@ public class AudioManager : MonoBehaviour
                 recordingBuffer[dstIdx + ch] = Math.Clamp(mixed, -1.0f, 1.0f);
             }
         }
-        
+
         WavFileWriter.WriteFile(outputPath, SAMPLERATE, CHANNELS, recordingBuffer);
     }
 
 
 
     private float[] GetSampleDataFromFile(string path)
-    { 
+    {
         var stream = Bass.CreateStream(path, 0, 0, BassFlags.Decode | BassFlags.Float);
         if (stream == 0) return Array.Empty<float>();
 
@@ -603,13 +603,13 @@ public class AudioManager : MonoBehaviour
         var rawData = new float[lenBytes / 4];
         Bass.ChannelGetData(stream, rawData, (int)lenBytes);
         Bass.StreamFree(stream);
-        
+
         var ratio = (float)info.Frequency / SAMPLERATE;
         var sourceFrames = rawData.Length / 2;
         var targetFrames = (int)(sourceFrames / ratio);
         var sourceNative = new NativeArray<float>(rawData, Allocator.TempJob);
         var outputNative = new NativeArray<float>(targetFrames * 2, Allocator.TempJob);
-        
+
         // re-poem：本来不想接触job burst这些很搞，vibe也基本上只能学表面的东西的，
         //          但是好像效果不错，先抄了再说，留个记号以后争取深入深入。
         new AudioResampleJob

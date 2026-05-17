@@ -9,9 +9,9 @@ public static class WavFileWriter
 {
     public static void WriteFile(string filePath, int sampleRate, int channels, float[] dataSource)
     {
-        using var fs = new FileStream(filePath, FileMode.Create);
+        using var fs = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None, 65536);
         using var bw = new BinaryWriter(fs);
-        
+
         bw.Write("RIFF".ToCharArray());
         bw.Write(36 + dataSource.Length * 2);
         bw.Write("WAVE".ToCharArray());
@@ -26,10 +26,13 @@ public static class WavFileWriter
         bw.Write("data".ToCharArray());
         bw.Write(dataSource.Length * 2);
 
-        foreach (float sample in dataSource)
+        var buffer = new byte[dataSource.Length * 2];
+        for (int i = 0; i < dataSource.Length; i++)
         {
-            short s = (short)(Math.Clamp(sample, -1f, 1f) * 32767);
-            bw.Write(s);
+            short s = (short)(Math.Clamp(dataSource[i], -1f, 1f) * 32767);
+            buffer[i * 2] = (byte)s;
+            buffer[i * 2 + 1] = (byte)(s >> 8);
         }
+        bw.Write(buffer);
     }
 }
