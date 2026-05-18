@@ -16,7 +16,7 @@ public class WifiDrop : NoteLongBase, ICanShine
 {
     [SerializeField]
     GameObject star_slidePrefab;
-    
+
     public bool isJustR;
     public float startTime;
     public int endPosition;
@@ -30,9 +30,9 @@ public class WifiDrop : NoteLongBase, ICanShine
     private List<SensorType> boundSensors = new();
     private List<List<SlideArea>> judgeQueues = new(3);
     private Dictionary<GameObject, List<SensorType>> triggerSensors = new();
-    
+
     private bool IsFinished => judgeQueues.All(x => x.Count == 0);
-    
+
     private Animator fadeInAnimator;
     private readonly GameObject[] star_slides = new GameObject[3];
     private readonly SpriteRenderer[] star_Renderer = new SpriteRenderer[3];
@@ -50,7 +50,7 @@ public class WifiDrop : NoteLongBase, ICanShine
     bool isSoundPlayed = false;
     float fadeInTime;
     float judgeTiming; // 正解帧
-    float forceJudgeTime; 
+    float forceJudgeTime;
     Dictionary<GameObject, Guid> guids = new();
 
 
@@ -62,7 +62,7 @@ public class WifiDrop : NoteLongBase, ICanShine
         inputManager = Majdata<InputManager>.Instance!;
         audioManager = Majdata<AudioManager>.Instance!;
         var notes = GameObject.Find("Notes").transform;
-        
+
         // 计算Slide淡入时机
         // 在8.0速时应当提前300ms显示Slide
         fadeInTime = -3.926913f / speed;
@@ -84,7 +84,7 @@ public class WifiDrop : NoteLongBase, ICanShine
             if (isBreak) star_Renderer[i].sprite = skinManager.Star_Break;
             if (isEach) star_Renderer[i].sprite = skinManager.Star_Each;
             if (isMine) star_Renderer[i].sprite = skinManager.Star_Mine;
-            
+
             star_slides[i].transform.rotation = Quaternion.Euler(0, 0, -22.5f * (8 + i + 2 * (startPosition - 1)));
             star_slides[i].SetActive(false);
         }
@@ -112,7 +112,7 @@ public class WifiDrop : NoteLongBase, ICanShine
 
         if (isBreak)
         {
-            foreach(var star in star_slides)
+            foreach (var star in star_slides)
             {
                 var renderer = star.GetComponent<SpriteRenderer>();
                 renderer.material = skinManager.BreakMaterial;
@@ -127,7 +127,7 @@ public class WifiDrop : NoteLongBase, ICanShine
         slideOK.transform.SetParent(transform.parent);
         SlidePositionStart = getPositionFromDistance(4.8f);
 
-        
+
         //bars skin
         for (var i = 0; i < slideBars.Count; i++)
         {
@@ -151,13 +151,13 @@ public class WifiDrop : NoteLongBase, ICanShine
             {
                 sr.sprite = skinManager.Wifi_Mine[i];
             }
-                
+
             sbRender.Add(sr);
             sr.color = new Color(1f, 1f, 1f, 0f);
             sr.sortingOrder = sortIndex--;
             sr.sortingLayerName = "Slide";
         }
-        
+
         foreach (var star in star_slides)
         {
             triggerSensors.Add(star, new());
@@ -169,7 +169,7 @@ public class WifiDrop : NoteLongBase, ICanShine
         judgeQueues.Add(table.Left.ToList());
         judgeQueues.Add(table.Center.ToList());
         judgeQueues.Add(table.Right.ToList());
-        
+
         //judge timing
         var percent = table.Const;
         judgeTiming = time + LastFor * (1 - percent);
@@ -192,16 +192,17 @@ public class WifiDrop : NoteLongBase, ICanShine
         var timing = timeProvider.NoteTime - time;
         var startTiming = timeProvider.NoteTime - this.startTime;
         var forceJudge = timing - LastFor - forceJudgeTime;
-        
+
         if (startTiming >= -0.05f)
             canCheck = true;
-        else if (timing > 0)
-            Running();        
+
+        Running();
         
         if (IsFinished)
         {
             HideBar(areaStep.LastOrDefault());
             Judge();
+            DestroySelf();
         }
         else if (forceJudge >= 0)
             TooLateJudge();
@@ -210,8 +211,8 @@ public class WifiDrop : NoteLongBase, ICanShine
     {
         if (judgeQueues.All(x => x.Count == 0))
             return areaStep.LastOrDefault();
-        
-        return areaStep[4 - judgeQueues.Select(q => q.Count).Min()];
+
+        return areaStep[4 - judgeQueues.Max(q => q.Count)];
     }
     void TooLateJudge()
     {
@@ -250,7 +251,7 @@ public class WifiDrop : NoteLongBase, ICanShine
         if (judgeQueue.Count == 0)
             return;
 
-        var first = judgeQueue.First(); 
+        var first = judgeQueue.First();
         SlideArea? second = null;
 
         if (judgeQueue.Count >= 2)
@@ -260,7 +261,7 @@ public class WifiDrop : NoteLongBase, ICanShine
         {
             first.Judge(inputManager.CheckSensor(t));
         }
-        
+
         if (first.On)
         {
             PlaySFX();
@@ -296,7 +297,6 @@ public class WifiDrop : NoteLongBase, ICanShine
         }
         if (!IsFinished)
             HideBar(GetLastIndex());
-
     }
     void Judge()
     {
@@ -361,10 +361,6 @@ public class WifiDrop : NoteLongBase, ICanShine
             SetJust();
             isJudged = true;
         }
-        else if (arriveTime < starTiming && timeProvider.NoteTime >= starTiming + stayTime * 0.667)
-            DestroySelf();
-        else if (arriveTime >= starTiming && timeProvider.NoteTime >= arriveTime + stayTime * 0.667)
-            DestroySelf();
     }
     void HideBar(int endIndex)
     {
@@ -374,8 +370,8 @@ public class WifiDrop : NoteLongBase, ICanShine
     }
     void Running()
     {
-        if (timeProvider.NoteTime - startTime < 0f || isMine) 
-            return; 
+        if (timeProvider.NoteTime - time < 0f || isMine)
+            return;
         if (Majdata<InputManager>.Instance!.Mode is AutoPlayMode.Enable or AutoPlayMode.Random or AutoPlayMode.Disable)
             return;
         foreach (var star in star_slides)
@@ -425,7 +421,6 @@ public class WifiDrop : NoteLongBase, ICanShine
         else
         {
             UpdateStar();
-            Running();
         }
         CheckAll();
     }
@@ -516,7 +511,7 @@ public class WifiDrop : NoteLongBase, ICanShine
     public bool CanShine() => canShine;
     void DestroySelf()
     {
-        if (isBreak && 
+        if (isBreak &&
             judgeResult == JudgeType.Perfect)
         {
             audioManager.PlayBreakSlideEndSound();
@@ -535,6 +530,7 @@ public class WifiDrop : NoteLongBase, ICanShine
             return;
         isDestroying = true;
 
+        ClearTriggeredSensor();
         switch (Majdata<InputManager>.Instance!.Mode)
         {
             case AutoPlayMode.Enable:
@@ -563,15 +559,14 @@ public class WifiDrop : NoteLongBase, ICanShine
         objectCounter.ReportResult(SimaiNoteType.Slide, judgeResult, isBreak);
         if (isBreak && judgeResult == JudgeType.Perfect)
             slideOK.GetComponent<Animator>().runtimeAnimatorController = skinManager.Shine_JudgeBreak;
-        if (!EffectManager.showLevel) slideOK.GetComponent<SpriteRenderer>().sprite = 
+        if (!EffectManager.showLevel) slideOK.GetComponent<SpriteRenderer>().sprite =
             Sprite.Create(new Texture2D(0, 0), new Rect(0, 0, 0, 0), new Vector2(0.5f, 0.5f));
 
         slideOK.SetActive(true);
 
-        
+
         foreach (var t in boundSensors)
             inputManager.UnbindSensor(Check, t);
-        ClearTriggeredSensor();
     }
     /// <summary>
     /// 清空所有已触发的Sensor
@@ -593,7 +588,7 @@ public class WifiDrop : NoteLongBase, ICanShine
     private void PlaySFX()
     {
         if (isSoundPlayed) return;
-        
+
         isSoundPlayed = true;
         audioManager.PlaySlideSound(isBreak);
     }

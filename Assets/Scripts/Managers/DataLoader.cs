@@ -15,12 +15,12 @@ public class DataLoader : MonoBehaviour
     private SkinManager skinManager;
     private ObjectCounter objectCounter;
     NoteManager noteManager;
-    
+
     public float noteSpeed = 7f;
     public float touchSpeed = 7.5f;
     public bool smoothSlideAnime = false;
-    
-    
+
+
     //SerializeField
     public GameObject tapPrefab;
     public GameObject holdPrefab;
@@ -33,15 +33,15 @@ public class DataLoader : MonoBehaviour
     // public GameObject mineLine;
     public GameObject notes;
     public GameObject star_slidePrefab;
-    
+
     public GameObject[] slidePrefab;
-    
+
     Majson loadedData = null;
     Dictionary<int, int> noteIndex = new();
     Dictionary<SensorType, int> touchIndex = new();
     private bool streamingRunning;
     List<TouchDrop> touchMembers = new();
-    
+
     public Text diffText;
     public Text levelText;
     public Text titleText;
@@ -210,29 +210,29 @@ public class DataLoader : MonoBehaviour
         for (var i = 1; i < 9; i++)
             noteIndex.Add(i, 0);
         for (var i = 0; i < 33; i++)
-            touchIndex.Add((SensorType)i, 0); 
+            touchIndex.Add((SensorType)i, 0);
     }
-    
+
     public async UniTask Load(SimaiChart chart, double ignoreOffset, string title, string artist, int diff)
     {
         titleText.text = title;
         artistText.text = artist;
         diffText.text = GetDifficultyText(diff);
         cardImage.color = diffColors[diff];
-        
+
         levelText.text = chart.Level;
         designText.text = chart.Designer;
-        
+
         objectCounter.CountNoteSumAsync(chart).Forget();
         objectCounter.ReportMeterBpmAsync(chart).Forget();
-        
+
         noteManager.ResetIndex();
         streamingRunning = true;
         var timings = chart.NoteTimings.ToArray();
         StreamingSetActive(ignoreOffset).Forget();
         await StreamingCreate(timings, ignoreOffset);
     }
-    
+
     private async UniTask StreamingCreate(SimaiTimingPoint[] timings, double ignoreOffset)
     {
         var i = 0;
@@ -245,7 +245,7 @@ public class DataLoader : MonoBehaviour
 
             i++;
         }
-        
+
         i = await LoadStreamingWindow(timings, i, ignoreOffset, StreamingCreatePreloadTime);
         ContinueStreamingCreate(timings, i, ignoreOffset, StreamingCreatePreloadTime).Forget();
     }
@@ -294,7 +294,7 @@ public class DataLoader : MonoBehaviour
         {
             var now = GetStreamingTime(fallbackTime);
             var frameStart = GetTimestamp();
-            
+
             for (var i = 0; i < noteManager.LoadedNotes.Count; i++)
             {
                 var note = noteManager.LoadedNotes[i];
@@ -371,6 +371,7 @@ public class DataLoader : MonoBehaviour
                 NDCompo.startPosition = note.StartPosition;
                 NDCompo.speed = noteSpeed * timing.HSpeed;
 
+                noteManager.AddLoadedNote(NDCompo);
                 noteManager.AddNote(NDCompo, noteIndex[note.StartPosition]++);
                 GOnote.SetActive(false);
             }
@@ -393,6 +394,7 @@ public class DataLoader : MonoBehaviour
                 NDCompo.isMine = note.IsMine;
                 NDCompo.tapLine = tapLine;
 
+                noteManager.AddLoadedNote(NDCompo);
                 noteManager.AddNote(NDCompo, noteIndex[note.StartPosition]++);
                 GOnote.SetActive(false);
             }
@@ -415,6 +417,7 @@ public class DataLoader : MonoBehaviour
                 NDCompo.areaPosition = note.TouchArea;
                 NDCompo.startPosition = note.StartPosition;
 
+                noteManager.AddLoadedNote(NDCompo);
                 noteManager.AddTouch(NDCompo, touchIndex[NDCompo.GetSensor()]++);
                 GOnote.SetActive(false);
             }
@@ -442,6 +445,7 @@ public class DataLoader : MonoBehaviour
                 NDCompo.isMine = note.IsMine;
                 NDCompo.GroupInfo = null;
 
+                noteManager.AddLoadedNote(NDCompo);
                 noteManager.AddTouch(NDCompo, touchIndex[NDCompo.GetSensor()]++);
                 GOnote.SetActive(false);
             }
@@ -449,7 +453,7 @@ public class DataLoader : MonoBehaviour
             else if (note.Type == SimaiNoteType.Slide)
                 InstantiateStarGroup(timing, note); // 星星组
         }
-        
+
         //touch group handle
         if (touchMembers.Count != 0)
         {
@@ -495,7 +499,7 @@ public class DataLoader : MonoBehaviour
             foreach (var member in touchMembers)
                 member.GroupInfo = touchGroups.Find(x => x.Members.Any(y => y == member));
         }
-        
+
         //each handle
         var eachNotes = timing.Notes.ToList().FindAll(o =>
             o.Type != SimaiNoteType.Touch && o.Type != SimaiNoteType.TouchHold);
@@ -697,7 +701,8 @@ public class DataLoader : MonoBehaviour
                 judgeQueueLen += table!.JudgeQueue.Length - 1;
             }
         }
-        subSlides.ForEach(s => {
+        subSlides.ForEach(s =>
+        {
             s.ConnectInfo.TotalSlideLen = totalSlideLen;
             s.ConnectInfo.TotalJudgeQueueLen = judgeQueueLen;
             s.Initialize();
@@ -710,18 +715,19 @@ public class DataLoader : MonoBehaviour
         GOnote.SetActive(false);
         var NDCompo = GOnote.GetComponent<StarDrop>();
         //无头星星的头只用来叫醒slide
-        noteManager.AddNote(NDCompo, noteIndex[note.StartPosition]++, !note.IsSlideNoHead);
+        noteManager.AddLoadedNote(NDCompo);
+        if (!note.IsSlideNoHead) noteManager.AddNote(NDCompo, noteIndex[note.StartPosition]++);
 
         // note的图层顺序
         NDCompo.noteSortOrder = noteSortOrder;
         noteSortOrder -= NOTE_LAYER_COUNT[note.Type];
-     
+
         NDCompo.rotateSpeed = (float)note.SlideTime;
         NDCompo.isEx = note.IsEx;
         NDCompo.isBreak = note.IsBreak;
         NDCompo.isMine = note.IsMine;
         NDCompo.tapLine = tapLine;
-     
+
         var slideShape = detectShapeFromText(note.RawContent);
         var isMirror = false;
         if (slideShape.StartsWith("-"))
@@ -730,18 +736,18 @@ public class DataLoader : MonoBehaviour
             slideShape = slideShape.Substring(1);
         }
         var slideIndex = SLIDE_PREFAB_MAP[slideShape];
-     
+
         var slide = Instantiate(slidePrefab[slideIndex], notes.transform);
         var slide_star = Instantiate(star_slidePrefab, notes.transform);
         slide_star.SetActive(false);
         slide.SetActive(false);
         NDCompo.slide = slide;
         var SliCompo = slide.AddComponent<SlideDrop>();
-     
+
         SliCompo.slideType = slideShape;
         SliCompo.areaStep = new List<int>(SLIDE_AREA_STEP_MAP[slideShape]);
         SliCompo.smoothSlideAnime = smoothSlideAnime;
-     
+
         if (timing.Notes.Length > 1)
         {
             var notes = timing.Notes.ToList();
@@ -750,7 +756,7 @@ public class DataLoader : MonoBehaviour
             {
                 SliCompo.isEach = true;
             }
-     
+
             var count = notes.FindAll(
                 o => o.Type == SimaiNoteType.Slide &&
                      o.StartPosition == note.StartPosition).Count;
@@ -763,17 +769,17 @@ public class DataLoader : MonoBehaviour
                     NDCompo.isEach = true;
             }
         }
-     
+
         SliCompo.ConnectInfo = info;
         SliCompo.isBreak = note.IsSlideBreak;
         SliCompo.isMine = note.IsMineSlide;
-             
+
         NDCompo.isNoHead = note.IsSlideNoHead;
         NDCompo.time = (float)timing.Timing;
         NDCompo.startPosition = note.StartPosition;
         NDCompo.speed = noteSpeed * timing.HSpeed;
-     
-     
+
+
         SliCompo.isMirror = isMirror;
         SliCompo.isJustR = detectJustType(note.RawContent, out int endPos);
         SliCompo.endPosition = endPos;
@@ -802,7 +808,7 @@ public class DataLoader : MonoBehaviour
         //slideLayer += 5;
         return slide;
     }
-    
+
     private void InstantiateWifi(SimaiTimingPoint timing, SimaiNote note)
     {
         var str = note.RawContent.Substring(0, 3);
@@ -818,8 +824,8 @@ public class DataLoader : MonoBehaviour
         GOnote.SetActive(false);
         var NDCompo = GOnote.GetComponent<StarDrop>();
         //无头星星的头只用来叫醒slide
-        noteManager.AddNote(NDCompo, noteIndex[note.StartPosition]++, !note.IsSlideNoHead);
-
+        noteManager.AddLoadedNote(NDCompo);
+        if (!note.IsSlideNoHead) noteManager.AddNote(NDCompo, noteIndex[note.StartPosition]++);
 
         // note的图层顺序
         NDCompo.noteSortOrder = noteSortOrder;
@@ -830,7 +836,7 @@ public class DataLoader : MonoBehaviour
         NDCompo.isBreak = note.IsBreak;
         NDCompo.isMine = note.IsMine;
         NDCompo.tapLine = tapLine;
-        
+
         var slideWifi = Instantiate(slidePrefab[SLIDE_PREFAB_MAP["wifi"]], notes.transform);
         slideWifi.SetActive(false);
         NDCompo.slide = slideWifi;
@@ -879,10 +885,10 @@ public class DataLoader : MonoBehaviour
         WifiCompo.sortIndex = slideLayer;
         slideLayer -= SLIDE_AREA_STEP_MAP["wifi"].Last();
     }
-    
-    
+
+
     //helper
-    
+
     private bool detectJustType(string content, out int endPos)
     {
         // > < ^ V w
@@ -1197,7 +1203,7 @@ public class DataLoader : MonoBehaviour
         if (key == 8) return 2;
         throw new Exception("Keys out of range: " + key);
     }
-    
+
     public static string GetDifficultyText(int index)
     {
         if (index == 0) return "EASY";
@@ -1217,7 +1223,7 @@ public class DataLoader : MonoBehaviour
         for (var i = 1; i < 9; i++)
             noteIndex[i] = 0;
         for (var i = 0; i < 33; i++)
-            touchIndex[(SensorType)i] = 0; 
+            touchIndex[(SensorType)i] = 0;
         slideLayer = -1;
         noteSortOrder = 0;
     }

@@ -12,9 +12,9 @@ using Random = UnityEngine.Random;
 public class HoldDrop : NoteLongBase
 {
     private EffectManager effectManager;
-    
+
     public GameObject tapLine;
-    
+
     private Animator animator;
     private bool holdAnimStart;
     private SpriteRenderer lineSpriteRender;
@@ -36,17 +36,17 @@ public class HoldDrop : NoteLongBase
         inputManager = Majdata<InputManager>.Instance!;
         effectManager = Majdata<EffectManager>.Instance!;
         audioManager = Majdata<AudioManager>.Instance!;
-        
+
         holdEffect = Instantiate(holdEffect, notes);
         holdEffect.SetActive(false);
         material = holdEffect.GetComponent<ParticleSystemRenderer>().material;
 
         tapLine = Instantiate(tapLine, notes);
         tapLine.SetActive(false);
-        
+
         animator = GetComponent<Animator>();
         animator.enabled = false;
-        
+
         lineSpriteRender = tapLine.GetComponent<SpriteRenderer>();
         spriteRenderer = GetComponent<SpriteRenderer>();
         holdEndRender = transform.GetChild(1).GetComponent<SpriteRenderer>();
@@ -106,18 +106,18 @@ public class HoldDrop : NoteLongBase
         {
             DestroySelf();
         }
-        else if(timing >= -0.01f)
+        else if (timing >= -0.01f)
         {
             // AutoPlay相关
             switch (Majdata<InputManager>.Instance!.Mode)
             {
                 case AutoPlayMode.Enable:
-                    if(!isJudged)
+                    if (!isJudged)
                         noteManager.NextNote(startPosition);
 
                     if (isMine)
                         judgeResult = JudgeType.Miss;
-                    else 
+                    else
                         judgeResult = JudgeType.Perfect;
 
                     isJudged = true;
@@ -139,14 +139,14 @@ public class HoldDrop : NoteLongBase
                             if (judgeResult > JudgeType.Perfect) //Fast
                             {
                                 judgeResult = JudgeType.Miss;
-                            } 
+                            }
                             else
                             {
                                 judgeResult = JudgeType.Perfect;
                             }
 
                             if (judgeResult != JudgeType.Miss) isTouched = true; //必有摸
-                        } 
+                        }
                         isJudged = true;
                     }
                     PlayHoldEffect();
@@ -158,14 +158,14 @@ public class HoldDrop : NoteLongBase
         if (isJudged) // 头部判定完成后开始累计按压时长
         {
             if (inputManager.CheckArea(sensor)) isTouched = true;
-            
+
             if (timing <= 0.1f) // 忽略头部6帧
                 return;
             if (remainingTime <= 0.2f) // 忽略尾部12帧
                 return;
             if (!timeProvider.IsStart || Majdata<InputManager>.Instance!.Mode is AutoPlayMode.Enable or AutoPlayMode.Random) // 忽略暂停
                 return;
-            
+
             if (inputManager.CheckArea(sensor))
             {
                 PlayHoldEffect();
@@ -192,12 +192,12 @@ public class HoldDrop : NoteLongBase
             return;
         if (Majdata<InputManager>.Instance!.Mode is AutoPlayMode.Enable or AutoPlayMode.Random)
             return;
-        
+
         if (arg.IsClick)
         {
             if (!inputManager.IsIdle(arg))
                 return;
-            
+
             inputManager.SetBusy(arg);
             Judge();
             if (isJudged)
@@ -258,7 +258,7 @@ public class HoldDrop : NoteLongBase
         PlayHoldEffect();
         PlaySFX();
     }
-    
+
     private void Update()
     {
         var timing = GetJudgeTiming();
@@ -277,7 +277,7 @@ public class HoldDrop : NoteLongBase
 
         var holdTime = timing - LastFor;
         var holdDistance = holdTime * speed + 4.8f;
-        if (holdTime >= 0 || 
+        if (holdTime >= 0 ||
             holdTime >= 0 && LastFor <= 0.15f)
         {
             tapLine.transform.localScale = new Vector3(1f, 1f, 1f);
@@ -291,7 +291,7 @@ public class HoldDrop : NoteLongBase
         holdEffect.transform.position = getPositionFromDistance(4.8f);
 
         if (isBreak &&
-            !holdAnimStart && 
+            !holdAnimStart &&
             !isJudged)
         {
             var extra = Math.Max(Mathf.Sin(timeProvider.GetFrame() * 0.17f) * 0.5f, 0);
@@ -307,7 +307,7 @@ public class HoldDrop : NoteLongBase
             spriteRenderer.size = new Vector2(1.22f, 1.42f);
             distance = 1.225f;
             var pos = getPositionFromDistance(distance);
-            transform.position = pos;            
+            transform.position = pos;
         }
         else
         {
@@ -348,7 +348,7 @@ public class HoldDrop : NoteLongBase
     private void DestroySelf()
     {
         PlayJudgeSFX();
-        noteManager.RemoveNote(this);
+        noteManager.RemoveLoadedNote(this);
         Destroy(tapLine);
         Destroy(holdEffect);
         Destroy(gameObject);
@@ -359,11 +359,11 @@ public class HoldDrop : NoteLongBase
         var realityHT = LastFor - 0.3f - (judgeDiff / 1000f);
         var percent = Math.Clamp((realityHT - playerIdleTime) / realityHT, 0, 1);
         var result = judgeResult; //头判
-        if(realityHT > 0)
+        if (realityHT > 0)
         {
             if (percent >= 1f)
             {
-                if(judgeResult == JudgeType.Miss)
+                if (judgeResult == JudgeType.Miss)
                     result = JudgeType.LateGood;
                 else if (Math.Abs((int)judgeResult - 7) == 6)
                     result = (int)judgeResult < 7 ? JudgeType.LateGreat : JudgeType.FastGreat;
@@ -420,7 +420,7 @@ public class HoldDrop : NoteLongBase
 
         effectManager.PlayEffect(startPosition, isBreak, result);
         effectManager.PlayFastLate(startPosition, result);
-        print($"Hold: {MathF.Round(percent * 100,2)}%\nTotal Len : {MathF.Round(realityHT * 1000,2)}ms");
+        print($"Hold: {MathF.Round(percent * 100, 2)}%\nTotal Len : {MathF.Round(realityHT * 1000, 2)}ms");
 
         objectCounter.ReportResult(SimaiNoteType.Hold, result, isBreak);
         if (!isJudged)
@@ -465,7 +465,7 @@ public class HoldDrop : NoteLongBase
         spriteRenderer.sprite = skinManager.Hold_Off;
     }
 
-    
+
     private void PlayJudgeSFX()
     {
         audioManager.PlayTapSound(judgeResult, false, false);

@@ -18,14 +18,14 @@ public class SlideDrop : NoteLongBase, ICanShine
     public bool isMirror;
     public bool isJustR;
     public bool isSpecialFlip; // fixes known star problem
-    
+
     public float startTime;
     public int sortIndex;
-    
+
     public ConnSlideInfo ConnectInfo = new();
     public List<int> areaStep = new();
     public bool smoothSlideAnime = false;
-    
+
     public string slideType;
 
     private float arriveTime = -1;
@@ -34,12 +34,12 @@ public class SlideDrop : NoteLongBase, ICanShine
     private List<SlideArea> judgeQueue = new(); // 判定队列(目前剩余的)
     private List<SlideArea> _judgeQueue = new(); // 判定队列
 
-    public bool IsFinished => judgeQueue.Count == 0; 
+    public bool IsFinished => judgeQueue.Count == 0;
     public bool IsPendingFinish => judgeQueue.Count == 1;
 
     public GameObject star_slide;
     private SpriteRenderer starRenderer;
-    
+
     private readonly List<GameObject> slideBars = new();
     private readonly List<Vector3> slidePositions = new();
     private readonly List<Quaternion> slideRotations = new();
@@ -51,7 +51,7 @@ public class SlideDrop : NoteLongBase, ICanShine
     bool isChecking = false;
     float fadeInTime;
     float judgeTiming; // 正解帧
-    float forceJudgeTime; 
+    float forceJudgeTime;
     bool isInitialized = false; //防止重复初始化
     bool isDestroying = false; // 防止重复销毁
     bool isSoundPlayed = false;
@@ -64,13 +64,13 @@ public class SlideDrop : NoteLongBase, ICanShine
         if (isInitialized)
             return;
         isInitialized = true;
-        
+
         objectCounter = Majdata<ObjectCounter>.Instance!;
         skinManager = Majdata<SkinManager>.Instance!;
         timeProvider = Majdata<TimeProvider>.Instance!;
         inputManager = Majdata<InputManager>.Instance!;
         audioManager = Majdata<AudioManager>.Instance!;
-        
+
         //star
         starRenderer = star_slide.GetComponent<SpriteRenderer>();
         starRenderer.sprite = skinManager.Star;
@@ -87,9 +87,9 @@ public class SlideDrop : NoteLongBase, ICanShine
         }
 
         //bars
-        for (var i = 0; i < transform.childCount - 1; i++) 
+        for (var i = 0; i < transform.childCount - 1; i++)
             slideBars.Add(transform.GetChild(i).gameObject);
-        
+
         //slideok
         slideOK = transform.GetChild(transform.childCount - 1).gameObject; //slideok is the last one        
         if (isMirror)
@@ -122,7 +122,7 @@ public class SlideDrop : NoteLongBase, ICanShine
         }
         slideOK.SetActive(false);
         slideOK.transform.SetParent(transform.parent);
-        
+
         //bars
         slidePositions.Add(getPositionFromDistance(4.8f));
         foreach (var bars in slideBars)
@@ -130,7 +130,7 @@ public class SlideDrop : NoteLongBase, ICanShine
             slidePositions.Add(bars.transform.position);
             slideRotations.Add(Quaternion.Euler(bars.transform.rotation.eulerAngles + new Vector3(0f, 0f, 18f)));
         }
-        
+
         //bars pos
         var endPos = getPositionFromDistance(4.8f, endPosition);
         var x = slidePositions.LastOrDefault() - Vector3.zero;
@@ -139,11 +139,11 @@ public class SlideDrop : NoteLongBase, ICanShine
         var offset = slideRotations.TakeLast(1).First().eulerAngles - slideRotations.TakeLast(2).First().eulerAngles;
         if (offset.z < 0)
             angle = -angle;
-            
+
         var q = slideRotations.LastOrDefault() * Quaternion.Euler(0, 0, angle);
         slidePositions.Add(endPos);
         slideRotations.Add(q);
-        
+
         //bars skin
         foreach (var gm in slideBars)
         {
@@ -184,7 +184,7 @@ public class SlideDrop : NoteLongBase, ICanShine
         //淡入时机与正解帧间隔小于200ms时，加快淡入动画的播放速度; interval永不为0
         fadeInAnimator.speed = 0.2f / interval;
         fadeInAnimator.SetTrigger("slide");
-        
+
         //judgeQueue
         var table = SlideTables.FindTableByName(slideType);
         if (isMirror)
@@ -208,7 +208,7 @@ public class SlideDrop : NoteLongBase, ICanShine
             {
                 judgeQueue.LastOrDefault()!.SetNonLast();
             }
-            
+
             if (ConnectInfo.TotalJudgeQueueLen < 4)
             {
                 if (ConnectInfo.IsGroupPartHead)
@@ -238,7 +238,7 @@ public class SlideDrop : NoteLongBase, ICanShine
             boundSensors.Add(area);
             inputManager.BindSensor(Check, area);
         }
-        
+
         //judge timing
         if (ConnectInfo.IsGroupPartEnd || !ConnectInfo.IsConnSlide)
         {
@@ -258,7 +258,7 @@ public class SlideDrop : NoteLongBase, ICanShine
             return;
         judgeQueue.Clear();
     }
-    
+
     private void FixedUpdate()
     {
         if (Majdata<InputManager>.Instance!.Mode is AutoPlayMode.Enable or AutoPlayMode.Random)
@@ -269,7 +269,7 @@ public class SlideDrop : NoteLongBase, ICanShine
         var start = timeProvider.NoteTime - startTime;
         var timing = timeProvider.NoteTime - time;
         var forceJudge = timing - LastFor - forceJudgeTime;
-        
+
         if (ConnectInfo.IsConnSlide)
         {
             if (ConnectInfo.IsGroupPartHead && start >= -0.05f)
@@ -280,8 +280,7 @@ public class SlideDrop : NoteLongBase, ICanShine
         else if (start >= -0.05f)
             canCheck = true;
 
-        if (timing > 0)
-            Running();
+        Running();
 
         //此处对mine音符的处理：一进judge就判定为miss并销毁，能进too late就判为perfect
         if (ConnectInfo.IsGroupPartEnd || !ConnectInfo.IsConnSlide)
@@ -304,12 +303,11 @@ public class SlideDrop : NoteLongBase, ICanShine
     // Update is called once per frame
     private void Update()
     {
+        if (IsFinished)
+            DestroySelf();
         if (star_slide == null)
-        {
-            if (IsFinished)
-                DestroySelf();
             return;
-        }
+
         // Slide淡入期间，不透明度从0到0.55耗时200ms
         var startiming = timeProvider.NoteTime - startTime;
         if (startiming <= 0f)
@@ -322,7 +320,7 @@ public class SlideDrop : NoteLongBase, ICanShine
             else if (!fadeInAnimator.enabled && startiming >= fadeInTime)
                 fadeInAnimator.enabled = true;
             return;
-            
+
         }
         fadeInAnimator.enabled = false;
         setSlideBarAlpha(1f);
@@ -340,7 +338,7 @@ public class SlideDrop : NoteLongBase, ICanShine
                 // 只有当它是一个起点Slide（而非Slide Group中的子部分）的时候，才会有开始的星星渐入动画
                 alpha = 1f - -timing / (time - startTime);
                 alpha = alpha > 1f ? 1f : alpha;
-                alpha = alpha < 0f ? 0f : alpha;                
+                alpha = alpha < 0f ? 0f : alpha;
             }
 
             starRenderer.color = new Color(1, 1, 1, alpha);
@@ -351,7 +349,6 @@ public class SlideDrop : NoteLongBase, ICanShine
         else
         {
             UpdateStar();
-            Running();
         }
         Check();
     }
@@ -364,7 +361,7 @@ public class SlideDrop : NoteLongBase, ICanShine
         return Math.Max(slideBars.Count, 1);
     }
 
-    
+
     public void Check(object sender, InputEventArgs arg) => Check();
     /// <summary>
     /// 判定队列检查
@@ -375,9 +372,9 @@ public class SlideDrop : NoteLongBase, ICanShine
             return;
         if (Majdata<InputManager>.Instance!.Mode is AutoPlayMode.Enable or AutoPlayMode.Random)
             return;
-        
+
         isChecking = true;
-        
+
         //parent conn slide
         if (ConnectInfo.Parent != null && judgeQueue.Count < _judgeQueue.Count)
         {
@@ -395,7 +392,7 @@ public class SlideDrop : NoteLongBase, ICanShine
         {
             first.Judge(inputManager.CheckSensor(t));
         }
-        
+
         if (first.On)
         {
             PlaySFX();
@@ -431,7 +428,7 @@ public class SlideDrop : NoteLongBase, ICanShine
             isChecking = false;
             return;
         }
-        
+
         isChecking = false;
     }
     void HideBar(int endIndex)
@@ -440,7 +437,7 @@ public class SlideDrop : NoteLongBase, ICanShine
         for (int i = 0; i <= endIndex; i++)
             slideBars[i].SetActive(false);
     }
-    
+
     /// <summary>
     /// AutoPlay
     /// <para>
@@ -449,8 +446,8 @@ public class SlideDrop : NoteLongBase, ICanShine
     /// </summary>
     void Running()
     {
-        if (timeProvider.NoteTime - startTime < 0f || isMine) 
-            return; 
+        if (timeProvider.NoteTime - time < 0f || isMine)
+            return;
         if (Majdata<InputManager>.Instance!.Mode is AutoPlayMode.Enable or AutoPlayMode.Random or AutoPlayMode.Disable)
             return;
         if (star_slide)
@@ -479,14 +476,14 @@ public class SlideDrop : NoteLongBase, ICanShine
         if (!isJudged)
         {
             arriveTime = timeProvider.NoteTime;
-            var triggerTime = timeProvider.NoteTime;           
+            var triggerTime = timeProvider.NoteTime;
 
             const float totalInterval = 1.2f; // 秒
             const float nPInterval = 0.4666667f; // Perfect基础区间
 
             float extInterval = MathF.Min(stayTime / 4, 0.733333f);           // Perfect额外区间
             float pInterval = MathF.Min(nPInterval + extInterval, totalInterval);// Perfect总区间
-            var ext = MathF.Max(extInterval - 0.4f,0);
+            var ext = MathF.Max(extInterval - 0.4f, 0);
             float grInterval = MathF.Max(0.4f - extInterval, 0);        // Great总区间
             float gdInterval = MathF.Max(0.3333334f - ext, 0); // Good总区间
 
@@ -502,9 +499,9 @@ public class SlideDrop : NoteLongBase, ICanShine
             var gd = gdInterval / 2;
             diff = MathF.Abs(diff);
 
-            if( gr == 0 )
+            if (gr == 0)
             {
-                if(diff >= p)
+                if (diff >= p)
                     judge = isFast ? JudgeType.FastGood : JudgeType.LateGood;
                 else
                     judge = JudgeType.Perfect;
@@ -517,16 +514,12 @@ public class SlideDrop : NoteLongBase, ICanShine
                     judge = isFast ? JudgeType.FastGreat : JudgeType.LateGreat;
                 else
                     judge = JudgeType.Perfect;
-            }            
-            print($"Slide diff : {MathF.Round(diff * 1000,2)} ms");
+            }
+            print($"Slide diff : {MathF.Round(diff * 1000, 2)} ms");
             judgeResult = judge ?? JudgeType.Miss;
             SetJust();
             isJudged = true;
         }
-        else if (arriveTime < starTiming && timeProvider.NoteTime >= starTiming + stayTime * 0.8)
-            DestroySelf();
-        else if (arriveTime >= starTiming && timeProvider.NoteTime >= arriveTime + stayTime * 0.8)
-            DestroySelf();
     }
     void SetJust()
     {
@@ -582,13 +575,13 @@ public class SlideDrop : NoteLongBase, ICanShine
     {
         PlayJudgeSFX();
         if (onlyStar)
-        { 
+        {
             Destroy(star_slide);
             star_slide = null!;
         }
         else
         {
-            if(ConnectInfo.Parent != null)
+            if (ConnectInfo.Parent != null)
                 Destroy(ConnectInfo.Parent);
 
             foreach (var obj in slideBars)
@@ -607,11 +600,13 @@ public class SlideDrop : NoteLongBase, ICanShine
         isDestroying = true;
         if (ConnectInfo.Parent != null)
             Destroy(ConnectInfo.Parent);
-        if(star_slide != null)
+        if (star_slide != null)
             Destroy(star_slide);
+
+        inputManager.ClearTriggeredSensor(guid.GetHashCode());
         if (ConnectInfo.IsGroupPartEnd || !ConnectInfo.IsConnSlide)
         {
-            switch(Majdata<InputManager>.Instance!.Mode)
+            switch (Majdata<InputManager>.Instance!.Mode)
             {
                 case AutoPlayMode.Enable:
                     if (isMine)
@@ -653,7 +648,6 @@ public class SlideDrop : NoteLongBase, ICanShine
         }
         foreach (var t in boundSensors)
             inputManager.UnbindSensor(Check, t);
-        inputManager.ClearTriggeredSensor(guid.GetHashCode());
     }
     /// <summary>
     /// 更新引导Star状态
@@ -670,7 +664,7 @@ public class SlideDrop : NoteLongBase, ICanShine
         var index = (int)indexProcess;
         var pos = indexProcess - index;
 
-        if(process >= 1f)
+        if (process >= 1f)
         {
             switch (Majdata<InputManager>.Instance!.Mode)
             {
@@ -712,8 +706,8 @@ public class SlideDrop : NoteLongBase, ICanShine
                     Mathf.MoveTowardsAngle(_b, _a, dAngle));
                 applyStarRotation(newRotation);
             }
-        } 
-        switch(Majdata<InputManager>.Instance!.Mode)
+        }
+        switch (Majdata<InputManager>.Instance!.Mode)
         {
             case AutoPlayMode.Enable:
                 judgeQueue = judgeQueue.Skip((int)(process * (judgeQueue.Count - 1))).ToList();
@@ -729,7 +723,7 @@ public class SlideDrop : NoteLongBase, ICanShine
                 break;
         }
     }
-   
+
     private void setSlideBarAlpha(float alpha)
     {
         foreach (var gm in slideBars) gm.GetComponent<SpriteRenderer>().color = new Color(1f, 1f, 1f, alpha);
@@ -746,8 +740,8 @@ public class SlideDrop : NoteLongBase, ICanShine
 
     private void PlayJudgeSFX()
     {
-        if ((ConnectInfo.IsGroupPartHead || !ConnectInfo.IsConnSlide) && 
-            isBreak && 
+        if ((ConnectInfo.IsGroupPartHead || !ConnectInfo.IsConnSlide) &&
+            isBreak &&
             judgeResult == JudgeType.Perfect)
         {
             audioManager.PlayBreakSlideEndSound();
@@ -756,13 +750,13 @@ public class SlideDrop : NoteLongBase, ICanShine
     private void PlaySFX()
     {
         if (isSoundPlayed) return;
-        
+
         if (ConnectInfo.IsGroupPartHead || !ConnectInfo.IsConnSlide)
         {
             isSoundPlayed = true;
             audioManager.PlaySlideSound(isBreak);
         }
     }
-    
+
     public bool CanShine() => canShine;
 }

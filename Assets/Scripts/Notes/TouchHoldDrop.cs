@@ -13,7 +13,7 @@ public class TouchHoldDrop : NoteLongBase
 {
     public char areaPosition;
     public bool isFirework;
-    
+
     [SerializeField]
     GameObject touchEffect;
     [SerializeField]
@@ -22,21 +22,21 @@ public class TouchHoldDrop : NoteLongBase
     GameObject gd_TouchEffect;
     [SerializeField]
     GameObject judgeEffect;
-    
+
     [SerializeField]
     GameObject[] fans = new GameObject[6]; //01,02,03,04,point,border
     [SerializeField]
     SpriteMask mask;
-    
+
     private SpriteRenderer[] fansRenderers = new SpriteRenderer[5];
     private SpriteRenderer border;
     private GameObject firework;
     private Animator fireworkEffect;
-    
+
     private float wholeDuration;
     private float moveDuration;
     private float displayDuration;
-    
+
     private bool _isTouched = false; //for mine judge
     private Sprite _borderSprite;
     private bool isSfxPlaying;
@@ -55,14 +55,14 @@ public class TouchHoldDrop : NoteLongBase
         inputManager = Majdata<InputManager>.Instance!;
         skinManager = Majdata<SkinManager>.Instance!;
         audioManager = Majdata<AudioManager>.Instance!;
-        
+
         holdEffect = Instantiate(holdEffect, notes);
         holdEffect.SetActive(false);
         material = holdEffect.GetComponent<ParticleSystemRenderer>().material;
-        
+
         firework = GameObject.Find("FireworkEffect");
         fireworkEffect = firework.GetComponent<Animator>();
-        
+
         for (var i = 0; i < 5; i++)
         {
             fansRenderers[i] = fans[i].GetComponent<SpriteRenderer>();
@@ -70,11 +70,11 @@ public class TouchHoldDrop : NoteLongBase
         }
         border = fans[5].GetComponent<SpriteRenderer>();
         border.sortingOrder += noteSortOrder;
-        
+
         LoadSkin();
-        
+
         transform.position = GetAreaPos(startPosition, areaPosition);
-        
+
         SetFanColor(new Color(1f, 1f, 1f, 0f));
 
         mask.backSortingOrder = border.sortingOrder - 1;
@@ -87,7 +87,7 @@ public class TouchHoldDrop : NoteLongBase
 
     private void LoadSkin()
     {
-        for (var i = 0; i < 4; i++) 
+        for (var i = 0; i < 4; i++)
             fansRenderers[i].sprite = skinManager.TouchHold[i];
         fansRenderers[4].sprite = skinManager.TouchPoint; //point
         border.sprite = _borderSprite = skinManager.TouchHold_Border;
@@ -97,14 +97,14 @@ public class TouchHoldDrop : NoteLongBase
         }
         if (isBreak)
         {
-            for (var i = 0; i < 4; i++) 
+            for (var i = 0; i < 4; i++)
                 fansRenderers[i].sprite = skinManager.TouchHold_Break[i];
             fansRenderers[4].sprite = skinManager.TouchPoint_Break;
             border.sprite = _borderSprite = skinManager.TouchHold_Border_Break;
         }
         if (isMine)
         {
-            for (var i = 0; i < 4; i++) 
+            for (var i = 0; i < 4; i++)
                 fansRenderers[i].sprite = skinManager.TouchHold_Mine[i];
             fansRenderers[4].sprite = skinManager.TouchPoint_Mine;
             border.sprite = _borderSprite = skinManager.TouchHold_Border_Mine;
@@ -121,7 +121,7 @@ public class TouchHoldDrop : NoteLongBase
         {
             if (!inputManager.IsIdle(arg))
                 return;
-            
+
             inputManager.SetBusy(arg);
             Judge();
             if (isJudged)
@@ -175,6 +175,7 @@ public class TouchHoldDrop : NoteLongBase
 
         if (remainingTime == 0 && isJudged)
         {
+            inputManager.SetSensorOff(sensor, guid);
             DestroySelf();
         }
         else if (timing >= -0.01f)
@@ -232,8 +233,10 @@ public class TouchHoldDrop : NoteLongBase
         {
             if (!timeProvider.IsStart) // 忽略暂停
                 return;
-            
-            if (inputManager.CheckSensor(sensor))
+
+            var on = inputManager.CheckSensor(sensor);
+
+            if (on)
             {
                 _isTouched = true;
                 audioManager.PlayTouchHoldSound();
@@ -242,13 +245,12 @@ public class TouchHoldDrop : NoteLongBase
             {
                 audioManager.StopTouchHoldSound();
             }
-            
+
             if (timing <= 0.25f) // 忽略头部15帧
                 return;
             if (remainingTime <= 0.2f) // 忽略尾部12帧
                 return;
 
-            var on = inputManager.CheckSensor(sensor);
             if (on)
             {
                 PlayHoldEffect();
@@ -290,7 +292,7 @@ public class TouchHoldDrop : NoteLongBase
         }
 
         if (float.IsNaN(distance)) distance = 0f;
-        if (distance == 0f)
+        if (timing >= 0f)
         {
             //holdEffect.SetActive(true);
             holdEffect.transform.position = transform.position;
@@ -304,7 +306,6 @@ public class TouchHoldDrop : NoteLongBase
 
     private void DestroySelf()
     {
-        audioManager.StopTouchHoldSound();
         if (judgeResult != JudgeType.Miss)
         {
             if (isBreak)
@@ -320,17 +321,18 @@ public class TouchHoldDrop : NoteLongBase
                 audioManager.PlayTouchSound();
             }
         }
-        noteManager.RemoveNote(this);
+        noteManager.RemoveLoadedNote(this);
         Destroy(holdEffect);
         Destroy(gameObject);
     }
     private void OnDestroy()
     {
         if (PlayManager.IsReloading) return;
+        audioManager.StopTouchHoldSound();
         var realityHT = LastFor - 0.45f - (judgeDiff / 1000f);
         var percent = Math.Clamp((realityHT - playerIdleTime) / realityHT, 0, 1);
         JudgeType result = judgeResult;
-        if (realityHT > 0) 
+        if (realityHT > 0)
         {
             if (percent >= 1f)
             {
@@ -398,7 +400,6 @@ public class TouchHoldDrop : NoteLongBase
         }
         if (!isJudged)
             noteManager.NextTouch(GetSensor());
-        inputManager.SetSensorOff(sensor, guid);
         inputManager.UnbindSensor(Check, sensor);
         PlayJudgeEffect(result);
     }
