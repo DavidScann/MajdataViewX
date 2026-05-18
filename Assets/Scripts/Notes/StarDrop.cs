@@ -16,7 +16,7 @@ public class StarDrop : TapBase
     public bool isFakeStarRotate = false;
 
     public GameObject slide;
-    
+
     private void Start()
     {
         PreLoad();
@@ -26,7 +26,7 @@ public class StarDrop : TapBase
         spriteRenderer.forceRenderingOff = true;
         exSpriteRender.forceRenderingOff = true;
 
-        if(!isNoHead)
+        if (!isNoHead)
         {
             sensor = (SensorType)startPosition - 1;
             inputManager.BindArea(Check, sensor);
@@ -108,12 +108,12 @@ public class StarDrop : TapBase
                 if (destScale >= 0f)
                 {
 
-                    if(!isNoHead)
+                    if (!isNoHead)
                         tapLine.transform.rotation = Quaternion.Euler(0, 0, -22.5f + -45f * (startPosition - 1));
                     State = NoteStatus.Pending;
                     goto case NoteStatus.Pending;
                 }
-                
+
                 transform.localScale = new Vector3(0, 0);
                 return;
             case NoteStatus.Pending:
@@ -132,7 +132,7 @@ public class StarDrop : TapBase
                         if (!isFakeStar && !slide.activeSelf)
                         {
                             slide.SetActive(true);
-                            if(isNoHead)
+                            if (isNoHead)
                             {
                                 DestroySelf();
                                 return;
@@ -167,7 +167,7 @@ public class StarDrop : TapBase
         if (timeProvider.IsStart && !isFakeStar && rotateSpeed != 0)
             transform.Rotate(0f, 0f, -180f * Time.deltaTime * songSpeed / rotateSpeed);
         else if (isFakeStarRotate)
-            transform.Rotate(0f, 0f, 400f * Time.deltaTime);  
+            transform.Rotate(0f, 0f, 400f * Time.deltaTime);
     }
 
     protected override void DestroySelf()
@@ -178,7 +178,7 @@ public class StarDrop : TapBase
         }
         else
         {
-            noteManager.RemoveNote(this);
+            noteManager.RemoveLoadedNote(this);
             Destroy(tapLine);
             Destroy(gameObject);
         }
@@ -187,7 +187,7 @@ public class StarDrop : TapBase
     protected override void OnDestroy()
     {
         if (isNoHead) return;
-        
+
         base.OnDestroy();
-    } 
+    }
 }

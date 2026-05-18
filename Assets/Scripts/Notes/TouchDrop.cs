@@ -12,11 +12,11 @@ using Random = UnityEngine.Random;
 public class TouchDrop : NoteBase
 {
     private MultTouchHandler multTouchHandler;
-    
+
     public char areaPosition;
     public bool isFirework;
     public TouchGroup? GroupInfo;
-    
+
     [SerializeField]
     GameObject justEffect;
     [SerializeField]
@@ -32,27 +32,27 @@ public class TouchDrop : NoteBase
     GameObject gd_TouchEffect;
     [SerializeField]
     GameObject judgeEffect;
-    
+
     [SerializeField]
     GameObject[] fans = new GameObject[7]; //01,02,03,04,point,border_02,border_03
-    
+
     private SpriteRenderer[] fansRenderers = new SpriteRenderer[7];
     private GameObject firework;
     private Animator fireworkEffect;
-    
+
     private float wholeDuration;
     private float moveDuration;
     private float displayDuration;
     private bool isStarted;
     private int layer;
     private bool isTriggered = false;
-    
+
     void Start()
     {
         wholeDuration = 3.209385682f * Mathf.Pow(speed, -0.9549621752f);
         moveDuration = 0.8f * wholeDuration;
         displayDuration = 0.2f * wholeDuration;
-        
+
         noteManager = Majdata<NoteManager>.Instance!;
         timeProvider = Majdata<TimeProvider>.Instance!;
         multTouchHandler = Majdata<MultTouchHandler>.Instance!;
@@ -60,10 +60,10 @@ public class TouchDrop : NoteBase
         inputManager = Majdata<InputManager>.Instance!;
         skinManager = Majdata<SkinManager>.Instance!;
         audioManager = Majdata<AudioManager>.Instance!;
-        
+
         firework = GameObject.Find("FireworkEffect");
         fireworkEffect = firework.GetComponent<Animator>();
-        
+
         for (var i = 0; i < 7; i++)
         {
             fansRenderers[i] = fans[i].GetComponent<SpriteRenderer>();
@@ -71,7 +71,7 @@ public class TouchDrop : NoteBase
         }
 
         LoadSkin();
-        
+
         transform.position = GetAreaPos(startPosition, areaPosition);
         justEffect.SetActive(false);
         SetFanColor(new Color(1f, 1f, 1f, 0f));
@@ -110,7 +110,7 @@ public class TouchDrop : NoteBase
         justEffect.GetComponent<SpriteRenderer>().sprite = skinManager.TouchJust;
     }
 
-    void Check(object sender,InputEventArgs arg)
+    void Check(object sender, InputEventArgs arg)
     {
         if (arg.Type != sensor)
             return;
@@ -118,12 +118,12 @@ public class TouchDrop : NoteBase
             return;
         if (Majdata<InputManager>.Instance!.Mode is AutoPlayMode.Enable or AutoPlayMode.Random)
             return;
-        
+
         if (arg.IsClick)
         {
             if (!inputManager.IsIdle(arg))
                 return;
-            
+
             inputManager.SetBusy(arg);
             Judge();
         }
@@ -241,7 +241,7 @@ public class TouchDrop : NoteBase
 
         if (timing >= 0)
         {
-            var _pow = -Mathf.Exp(- 0.85f) + 0.42f;
+            var _pow = -Mathf.Exp(-0.85f) + 0.42f;
             var _distance = Mathf.Clamp(_pow, 0f, 0.4f);
             for (var i = 0; i < 4; i++)
             {
@@ -293,13 +293,14 @@ public class TouchDrop : NoteBase
                 audioManager.PlayTouchSound();
             }
         }
-        noteManager.RemoveNote(this);
+        noteManager.RemoveLoadedNote(this);
         Destroy(gameObject);
     }
     private void OnDestroy()
     {
         if (PlayManager.IsReloading) return;
         multTouchHandler.CancelTouch(this);
+        noteManager.NextTouch(sensor);
         PlayJudgeEffect();
         if (GroupInfo is not null && judgeResult != JudgeType.Miss)
             GroupInfo.JudgeResult = judgeResult;
@@ -414,7 +415,7 @@ public class TouchDrop : NoteBase
             flAnim.SetTrigger("touch");
         }
     }
-    
+
     /// <summary>
     /// 获取当前坐标指定距离的坐标
     /// <para>方向：原点</para>
@@ -441,7 +442,7 @@ public class TouchDrop : NoteBase
     }
 
     public SensorType GetSensor() => InputManager.GetSensor(areaPosition, startPosition);
-    
+
     private Vector3 GetAreaPos(int index, char area)
     {
         // AreaDistance: 

@@ -11,7 +11,7 @@ using UnityEngine;
 public class NoteManager : MonoBehaviour
 {
     public List<NoteBase> LoadedNotes { get; private set; } = new();
-    
+
     private Dictionary<GameObject, int> noteOrder = new();
     private Dictionary<int, int> noteIndex = new();
 
@@ -23,26 +23,27 @@ public class NoteManager : MonoBehaviour
         Majdata<NoteManager>.Instance = this;
     }
 
-    public void AddNote(NoteBase note, int index, bool addToOrder = true)
+    public void AddLoadedNote(NoteBase note)
     {
         LoadedNotes.Add(note);
-        if (addToOrder)
-            noteOrder.Add(note.gameObject, index);
+    }
+    public void AddNote(NoteBase note, int index)
+    {
+        noteOrder.Add(note.gameObject, index);
     }
     public void AddTouch(NoteBase note, int index)
     {
-        LoadedNotes.Add(note);
         touchOrder.Add(note.gameObject, index);
     }
 
     public void NextNote(int pos) => noteIndex[pos]++;
     public void NextTouch(SensorType pos) => touchIndex[pos]++;
 
-    public void RemoveNote(NoteBase note)
+    public void RemoveLoadedNote(NoteBase note)
     {
         LoadedNotes.Remove(note);
     }
-    
+
     public void ResetIndex()
     {
         for (var i = 1; i < 9; i++)
@@ -60,7 +61,7 @@ public class NoteManager : MonoBehaviour
         return index <= nowIndex;
     }
 
-    public bool CanJudge(GameObject obj,SensorType t)
+    public bool CanJudge(GameObject obj, SensorType t)
     {
         if (!touchOrder.ContainsKey(obj))
             return false;
@@ -71,12 +72,12 @@ public class NoteManager : MonoBehaviour
     }
 
     public async UniTask ResetState()
-    {       
+    {
         LoadedNotes.Clear();
         noteOrder.Clear();
         touchOrder.Clear();
         ResetIndex();
-        
+
         //clear notes
         for (var i = 0; i < transform.childCount; i++)
         {

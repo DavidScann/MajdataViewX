@@ -12,11 +12,11 @@ using Random = UnityEngine.Random;
 public class TapBase : NoteBase
 {
     public GameObject tapLine;
-    
+
     protected SpriteRenderer spriteRenderer;
     protected SpriteRenderer exSpriteRender;
     protected SpriteRenderer lineSpriteRenderer;
-    
+
     protected bool isTriggered = false;
 
     protected void PreLoad()
@@ -28,14 +28,14 @@ public class TapBase : NoteBase
         inputManager = Majdata<InputManager>.Instance!;
         skinManager = Majdata<SkinManager>.Instance!;
         audioManager = Majdata<AudioManager>.Instance!;
-        
+
         tapLine = Instantiate(tapLine, notes);
         tapLine.SetActive(false);
-        
+
         spriteRenderer = GetComponent<SpriteRenderer>();
         lineSpriteRenderer = tapLine.GetComponent<SpriteRenderer>();
         exSpriteRender = transform.GetChild(0).GetComponent<SpriteRenderer>();
-        
+
         spriteRenderer.sortingOrder += noteSortOrder;
         exSpriteRender.sortingOrder += noteSortOrder;
     }
@@ -113,34 +113,34 @@ public class TapBase : NoteBase
                     State = NoteStatus.Pending;
                     goto case NoteStatus.Pending;
                 }
-                
+
                 transform.localScale = new Vector3(0, 0);
                 return;
             case NoteStatus.Pending:
-            {
-                if (destScale > 0.3f)
-                    tapLine.SetActive(true);
-                if (distance < 1.225f)
                 {
-                    transform.localScale = new Vector3(destScale, destScale);
-                    transform.position = getPositionFromDistance(1.225f);
-                    var lineScale = Mathf.Abs(1.225f / 4.8f);
-                    tapLine.transform.localScale = new Vector3(lineScale, lineScale, 1f);
+                    if (destScale > 0.3f)
+                        tapLine.SetActive(true);
+                    if (distance < 1.225f)
+                    {
+                        transform.localScale = new Vector3(destScale, destScale);
+                        transform.position = getPositionFromDistance(1.225f);
+                        var lineScale = Mathf.Abs(1.225f / 4.8f);
+                        tapLine.transform.localScale = new Vector3(lineScale, lineScale, 1f);
+                    }
+                    else
+                    {
+                        State = NoteStatus.Running;
+                        goto case NoteStatus.Running;
+                    }
                 }
-                else
-                {
-                    State = NoteStatus.Running;
-                    goto case NoteStatus.Running;
-                }
-            }
                 break;
             case NoteStatus.Running:
-            {
-                transform.position = getPositionFromDistance(distance);
-                transform.localScale = new Vector3(1f, 1f);
-                var lineScale = Mathf.Abs(distance / 4.8f);
-                tapLine.transform.localScale = new Vector3(lineScale, lineScale, 1f);
-            }
+                {
+                    transform.position = getPositionFromDistance(distance);
+                    transform.localScale = new Vector3(1f, 1f);
+                    var lineScale = Mathf.Abs(distance / 4.8f);
+                    tapLine.transform.localScale = new Vector3(lineScale, lineScale, 1f);
+                }
                 break;
         }
 
@@ -161,14 +161,13 @@ public class TapBase : NoteBase
             return;
         if (Majdata<InputManager>.Instance!.Mode is AutoPlayMode.Enable or AutoPlayMode.Random)
             return;
-        
+
         if (arg.IsClick)
         {
             if (!inputManager.IsIdle(arg))
                 return;
-            
             inputManager.SetBusy(arg);
-            
+
             Judge();
         }
     }
@@ -228,7 +227,7 @@ public class TapBase : NoteBase
     protected virtual void DestroySelf()
     {
         audioManager.PlayTapSound(judgeResult, isEx, isBreak);
-        noteManager.RemoveNote(this);
+        noteManager.RemoveLoadedNote(this);
         Destroy(tapLine);
         Destroy(gameObject);
     }
