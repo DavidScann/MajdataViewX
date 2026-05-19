@@ -190,14 +190,14 @@ public class WifiDrop : NoteLongBase, ICanShine
         // timeStart 是Slide完全显示但未启动
         // LastFor   是Slide的时值
         var timing = timeProvider.NoteTime - time;
-        var startTiming = timeProvider.NoteTime - this.startTime;
+        var startTiming = timeProvider.NoteTime - startTime;
         var forceJudge = timing - LastFor - forceJudgeTime;
 
         if (startTiming >= -0.05f)
             canCheck = true;
 
         Running();
-        
+
         if (IsFinished)
         {
             HideBar(areaStep.LastOrDefault());
@@ -383,16 +383,32 @@ public class WifiDrop : NoteLongBase, ICanShine
     // Update is called once per frame
     private void Update()
     {
-        // Wifi Slide淡入期间，不透明度从0到1耗时200ms
-        var startiming = timeProvider.NoteTime - startTime;
-        if (startiming <= 0f)
+        var timing = timeProvider.NoteTime - startTime;
+        var stiming = timeProvider.NoteTime - time;
+        var remaining = Math.Max(LastFor - timing, 0);
+
+        var fakeTiming = timeProvider.FakeNoteTime - timeProvider.GetPositionAtTime(startTime);
+        var fakesTiming = timeProvider.FakeNoteTime - timeProvider.GetPositionAtTime(time);
+        var fakeLastfor = timeProvider.GetPositionAtTime(time + LastFor) - timeProvider.GetPositionAtTime(time);
+        var fakeRemaining = Math.Max(fakeLastfor - fakeTiming, 0);
+
+        if (!usingSV)
         {
-            if (startiming >= -0.05f)
+            fakeTiming = timing;
+            fakesTiming = stiming;
+            fakeRemaining = remaining;
+            fakeLastfor = LastFor;
+        }
+
+        // Wifi Slide淡入期间，不透明度从0到1耗时200ms
+        if (fakeTiming <= 0f)
+        {
+            if (fakeTiming >= -0.05f)
             {
                 fadeInAnimator.enabled = false;
                 setSlideBarAlpha(1f);
             }
-            else if (!fadeInAnimator.enabled && startiming >= fadeInTime)
+            else if (!fadeInAnimator.enabled && fakeTiming >= fadeInTime)
                 fadeInAnimator.enabled = true;
             return;
         }
@@ -402,12 +418,11 @@ public class WifiDrop : NoteLongBase, ICanShine
         foreach (var star in star_slides)
             star.SetActive(true);
 
-        var timing = timeProvider.NoteTime - time;
-        if (timing <= 0f)
+        if (fakesTiming <= 0f)
         {
             canShine = true;
             float alpha;
-            alpha = 1f - -timing / (time - startTime);
+            alpha = 1f - -fakesTiming / (time - startTime);
             alpha = alpha > 1f ? 1f : alpha;
             alpha = alpha < 0f ? 0f : alpha;
 
@@ -420,68 +435,63 @@ public class WifiDrop : NoteLongBase, ICanShine
         }
         else
         {
-            UpdateStar();
-        }
-        CheckAll();
-    }
-    void UpdateStar()
-    {
-        var timing = timeProvider.NoteTime - time;
-        var process = 1f - (LastFor - timing) / LastFor;
-        if (LastFor == 0) process = 1;
-        var pos = (slideBars.Count - 1) * process;
+            var process = MathF.Min((fakeLastfor - fakeRemaining) / fakeLastfor, 1);
+            if (fakeLastfor == 0) process = 1;
+            var pos = (slideBars.Count - 1) * process;
 
-        if (process >= 1)
-        {
-            for (var i = 0; i < star_slides.Length; i++)
+            if (process >= 1)
             {
-                star_Renderer[i].color = Color.white;
-                star_slides[i].transform.position = SlidePositionEnd[i];
-                star_slides[i].transform.localScale = new Vector3(1.5f, 1.5f, 1.5f);
+                for (var i = 0; i < star_slides.Length; i++)
+                {
+                    star_Renderer[i].color = Color.white;
+                    star_slides[i].transform.position = SlidePositionEnd[i];
+                    star_slides[i].transform.localScale = new Vector3(1.5f, 1.5f, 1.5f);
+                }
+                switch (Majdata<InputManager>.Instance!.Mode)
+                {
+                    case AutoPlayMode.Enable:
+                        if (smoothSlideAnime) HideBar((int)pos + 1);
+                        else HideBar(areaStep[(int)(process * (areaStep.Count - 1))]);
+                        DestroySelf();
+                        judgeQueues.Clear();
+                        return;
+                    case AutoPlayMode.Random:
+                        var barIndex = areaStep[(int)(process * (areaStep.Count - 1))];
+                        HideBar(barIndex);
+                        DestroySelf();
+                        judgeQueues.Clear();
+                        return;
+                }
+                if (IsFinished && isJudged)
+                    DestroySelf();
+            }
+            else
+            {
+                for (var i = 0; i < star_slides.Length; i++)
+                {
+                    star_Renderer[i].color = Color.white;
+                    star_slides[i].transform.position =
+                        (SlidePositionEnd[i] - SlidePositionStart) * process + SlidePositionStart; //TODO add some runhua
+                    star_slides[i].transform.localScale = new Vector3(1.5f, 1.5f, 1.5f);
+                }
             }
             switch (Majdata<InputManager>.Instance!.Mode)
             {
                 case AutoPlayMode.Enable:
+                    judgeQueues = judgeQueues.Skip((int)(process * (judgeQueues.Count - 1))).ToList();
                     if (smoothSlideAnime) HideBar((int)pos + 1);
                     else HideBar(areaStep[(int)(process * (areaStep.Count - 1))]);
-                    DestroySelf();
-                    judgeQueues.Clear();
-                    return;
+                    PlaySFX();
+                    break;
                 case AutoPlayMode.Random:
+                    judgeQueues = judgeQueues.Skip((int)(process * (judgeQueues.Count - 1))).ToList();
                     var barIndex = areaStep[(int)(process * (areaStep.Count - 1))];
                     HideBar(barIndex);
-                    DestroySelf();
-                    judgeQueues.Clear();
-                    return;
-            }
-            if (IsFinished && isJudged)
-                DestroySelf();
-        }
-        else
-        {
-            for (var i = 0; i < star_slides.Length; i++)
-            {
-                star_Renderer[i].color = Color.white;
-                star_slides[i].transform.position =
-                    (SlidePositionEnd[i] - SlidePositionStart) * process + SlidePositionStart; //TODO add some runhua
-                star_slides[i].transform.localScale = new Vector3(1.5f, 1.5f, 1.5f);
+                    PlaySFX();
+                    break;
             }
         }
-        switch (Majdata<InputManager>.Instance!.Mode)
-        {
-            case AutoPlayMode.Enable:
-                judgeQueues = judgeQueues.Skip((int)(process * (judgeQueues.Count - 1))).ToList();
-                if (smoothSlideAnime) HideBar((int)pos + 1);
-                else HideBar(areaStep[(int)(process * (areaStep.Count - 1))]);
-                PlaySFX();
-                break;
-            case AutoPlayMode.Random:
-                judgeQueues = judgeQueues.Skip((int)(process * (judgeQueues.Count - 1))).ToList();
-                var barIndex = areaStep[(int)(process * (areaStep.Count - 1))];
-                HideBar(barIndex);
-                PlaySFX();
-                break;
-        }
+        CheckAll();
     }
     void SetJust()
     {

@@ -98,14 +98,26 @@ public class StarDrop : TapBase
     protected override void Update()
     {
         var songSpeed = timeProvider.CurrentSpeed;
-        var judgeTiming = GetJudgeTiming();
-        var distance = judgeTiming * speed + 4.8f;
+
+        var timing = timeProvider.NoteTime - time;
+        var distance = timing * speed + 4.8f;
         var destScale = distance * 0.4f + 0.51f;
+
+        var fakeTiming = timeProvider.FakeNoteTime - timeProvider.GetPositionAtTime(time);
+        var fakeDistance = fakeTiming * speed + 4.8f;
+        var fakeDestScale = fakeDistance * 0.4f + 0.51f;
+
+        if (!usingSV)
+        {
+            //fakeTiming = timing;
+            fakeDistance = distance;
+            fakeDestScale = destScale;
+        }
 
         switch (State)
         {
             case NoteStatus.Initialized:
-                if (destScale >= 0f)
+                if (fakeDestScale >= 0f)
                 {
 
                     if (!isNoHead)
@@ -118,11 +130,11 @@ public class StarDrop : TapBase
                 return;
             case NoteStatus.Pending:
                 {
-                    if (destScale > 0.3f && !isNoHead)
+                    if (fakeDestScale > 0.3f && !isNoHead)
                         tapLine.SetActive(true);
-                    if (distance < 1.225f)
+                    if (fakeDistance < 1.225f)
                     {
-                        transform.localScale = new Vector3(destScale, destScale);
+                        transform.localScale = new Vector3(fakeDestScale, fakeDestScale);
                         transform.position = getPositionFromDistance(1.225f);
                         var lineScale = Mathf.Abs(1.225f / 4.8f);
                         tapLine.transform.localScale = new Vector3(lineScale, lineScale, 1f);
@@ -145,9 +157,9 @@ public class StarDrop : TapBase
                 break;
             case NoteStatus.Running:
                 {
-                    transform.position = getPositionFromDistance(distance);
+                    transform.position = getPositionFromDistance(fakeDistance);
                     transform.localScale = new Vector3(1f, 1f);
-                    var lineScale = Mathf.Abs(distance / 4.8f);
+                    var lineScale = Mathf.Abs(fakeDistance / 4.8f);
                     tapLine.transform.localScale = new Vector3(lineScale, lineScale, 1f);
                 }
                 break;

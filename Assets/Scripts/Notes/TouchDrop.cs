@@ -130,12 +130,13 @@ public class TouchDrop : NoteBase
     }
     private void FixedUpdate()
     {
-        if (isMine && !isJudged && GetJudgeTiming() >= 0.016667f)
+        var timing = timeProvider.NoteTime - time;
+        if (isMine && !isJudged && timing >= 0.016667f)
         {
             judgeResult = JudgeType.Perfect;
             isJudged = true;
         }
-        else if (!isJudged && GetJudgeTiming() <= 0.316667f)
+        else if (!isJudged && timing <= 0.316667f)
         {
             if (GroupInfo is not null)
             {
@@ -233,13 +234,21 @@ public class TouchDrop : NoteBase
     private void Update()
     {
         var timing = timeProvider.NoteTime - time;
-
-        //var timing = time;
-        //var pow = Mathf.Pow(-timing * speed, 0.1f)-0.4f;
-        var pow = -Mathf.Exp(8 * (timing * 0.4f / moveDuration) - 0.85f) + 0.42f;
+        var pow = -Mathf.Exp(8 * (timing * 0.43f / moveDuration) - 0.85f) + 0.42f;
         var distance = Mathf.Clamp(pow, 0f, 0.4f);
 
-        if (timing >= 0)
+        var fakeTiming = timeProvider.FakeNoteTime - timeProvider.GetPositionAtTime(time);
+        var fakePow = -Mathf.Exp(8 * (fakeTiming * 0.43f / moveDuration) - 0.85f) + 0.42f;
+        var fakeDistance = Mathf.Clamp(fakePow, 0f, 0.4f);
+
+        if (!usingSV)
+        {
+            fakeTiming = timing;
+            fakePow = pow;
+            fakeDistance = distance;
+        }
+
+        if (fakeTiming >= 0)
         {
             var _pow = -Mathf.Exp(-0.85f) + 0.42f;
             var _distance = Mathf.Clamp(_pow, 0f, 0.4f);
@@ -251,9 +260,9 @@ public class TouchDrop : NoteBase
             return;
         }
 
-        if (timing > -0.02f) justEffect.SetActive(true);
+        if (fakeTiming > -0.02f) justEffect.SetActive(true);
 
-        if (-timing <= wholeDuration && -timing > moveDuration)
+        if (-fakeTiming <= wholeDuration && -fakeTiming > moveDuration)
         {
             if (!isStarted)
             {
@@ -261,17 +270,17 @@ public class TouchDrop : NoteBase
                 multTouchHandler.RegisterTouch(this);
             }
 
-            SetFanColor(new Color(1f, 1f, 1f, Mathf.Clamp((wholeDuration + timing) / displayDuration, 0f, 1f)));
+            SetFanColor(new Color(1f, 1f, 1f, Mathf.Clamp((wholeDuration + fakeTiming) / displayDuration, 0f, 1f)));
         }
-        else if (-timing < moveDuration)
+        else if (-fakeTiming < moveDuration)
         {
             SetFanColor(Color.white);
         }
 
-        if (float.IsNaN(distance)) distance = 0f;
+        if (float.IsNaN(fakeDistance)) fakeDistance = 0f;
         for (var i = 0; i < 4; i++)
         {
-            var pos = (0.226f + distance) * GetAngle(i);
+            var pos = (0.226f + fakeDistance) * GetAngle(i);
             fans[i].transform.localPosition = pos;
         }
     }

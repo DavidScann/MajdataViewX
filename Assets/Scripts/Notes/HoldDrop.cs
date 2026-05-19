@@ -99,7 +99,7 @@ public class HoldDrop : NoteLongBase
 
     private void FixedUpdate()
     {
-        var timing = GetJudgeTiming();
+        var timing = timeProvider.NoteTime - time;
         var remainingTime = GetRemainingTime();
 
         if (remainingTime == 0 && isJudged) // Hold完成后Destroy
@@ -261,24 +261,39 @@ public class HoldDrop : NoteLongBase
 
     private void Update()
     {
-        var timing = GetJudgeTiming();
+        var timing = timeProvider.NoteTime - time;
         var distance = timing * speed + 4.8f;
         var destScale = distance * 0.4f + 0.51f;
-        if (destScale < 0f)
+        var holdTime = timing - LastFor;
+        var holdDistance = holdTime * speed + 4.8f;
+
+        var fakeTiming = timeProvider.FakeNoteTime - timeProvider.GetPositionAtTime(time);
+        var fakeDistance = fakeTiming * speed + 4.8f;
+        var fakeDestScale = fakeDistance * 0.4f + 0.51f;
+        var fakeLastfor = timeProvider.GetPositionAtTime(time + LastFor) - timeProvider.GetPositionAtTime(time);
+        var fakeHoldTime = fakeTiming - fakeLastfor;
+        var fakeHoldDistance = fakeHoldTime * speed + 4.8f;
+
+        if (!usingSV)
         {
-            destScale = 0f;
+            //fakeTiming = timing;
+            fakeDistance = distance;
+            fakeDestScale = destScale;
+            fakeHoldTime = holdTime;
+            fakeHoldDistance = holdDistance;
+        }
+
+        if (fakeDestScale < 0f)
+        {
             return;
         }
 
         spriteRenderer.forceRenderingOff = false;
         if (isEx) exSpriteRender.forceRenderingOff = false;
-
         spriteRenderer.size = new Vector2(1.22f, 1.4f);
 
-        var holdTime = timing - LastFor;
-        var holdDistance = holdTime * speed + 4.8f;
-        if (holdTime >= 0 ||
-            holdTime >= 0 && LastFor <= 0.15f)
+        if (fakeHoldTime >= 0 ||
+            fakeHoldTime >= 0 && LastFor <= 0.15f)
         {
             tapLine.transform.localScale = new Vector3(1f, 1f, 1f);
             transform.position = getPositionFromDistance(4.8f);
@@ -299,47 +314,47 @@ public class HoldDrop : NoteLongBase
         }
 
 
-        if (destScale > 0.3f) tapLine.SetActive(true);
+        if (fakeDestScale > 0.3f) tapLine.SetActive(true);
 
-        if (distance < 1.225f)
+        if (fakeDistance < 1.225f)
         {
-            transform.localScale = new Vector3(destScale, destScale);
+            transform.localScale = new Vector3(fakeDestScale, fakeDestScale);
             spriteRenderer.size = new Vector2(1.22f, 1.42f);
-            distance = 1.225f;
-            var pos = getPositionFromDistance(distance);
+            fakeDistance = 1.225f;
+            var pos = getPositionFromDistance(fakeDistance);
             transform.position = pos;
         }
         else
         {
-            if (holdDistance < 1.225f && distance >= 4.8f) // 头到达 尾未出现
+            if (fakeHoldDistance < 1.225f && fakeDistance >= 4.8f) // 头到达 尾未出现
             {
-                holdDistance = 1.225f;
-                distance = 4.8f;
+                fakeHoldDistance = 1.225f;
+                fakeDistance = 4.8f;
             }
-            else if (holdDistance < 1.225f && distance < 4.8f) // 头未到达 尾未出现
+            else if (fakeHoldDistance < 1.225f && fakeDistance < 4.8f) // 头未到达 尾未出现
             {
-                holdDistance = 1.225f;
+                fakeHoldDistance = 1.225f;
             }
-            else if (holdDistance >= 1.225f && distance >= 4.8f) // 头到达 尾出现
+            else if (fakeHoldDistance >= 1.225f && fakeDistance >= 4.8f) // 头到达 尾出现
             {
-                distance = 4.8f;
+                fakeDistance = 4.8f;
 
                 holdEndRender.enabled = true;
             }
-            else if (holdDistance >= 1.225f && distance < 4.8f) // 头未到达 尾出现
+            else if (fakeHoldDistance >= 1.225f && fakeDistance < 4.8f) // 头未到达 尾出现
             {
                 holdEndRender.enabled = true;
             }
 
-            var dis = (distance - holdDistance) / 2 + holdDistance;
+            var dis = (fakeDistance - fakeHoldDistance) / 2 + fakeHoldDistance;
             transform.position = getPositionFromDistance(dis); //0.325
-            var size = distance - holdDistance + 1.4f;
+            var size = fakeDistance - fakeHoldDistance + 1.4f;
             spriteRenderer.size = new Vector2(1.22f, size);
             holdEndRender.transform.localPosition = new Vector3(0f, 0.6825f - size / 2);
             transform.localScale = new Vector3(1f, 1f);
         }
 
-        var lineScale = Mathf.Abs(distance / 4.8f);
+        var lineScale = Mathf.Abs(fakeDistance / 4.8f);
         lineScale = lineScale >= 1f ? 1f : lineScale;
         tapLine.transform.localScale = new Vector3(lineScale, lineScale, 1f);
         exSpriteRender.size = spriteRenderer.size;
@@ -435,7 +450,7 @@ public class HoldDrop : NoteLongBase
         Majdata<EffectManager>.Instance!.ResetEffect(startPosition - 1);
         if (LastFor <= 0.3)
             return;
-        if (!holdAnimStart && GetJudgeTiming() >= 0.1f && !isMine)//忽略开头6帧与结尾12帧和mine
+        if (!holdAnimStart && timeProvider.NoteTime - time >= 0.1f && !isMine)//忽略开头6帧与结尾12帧和mine
         {
             holdAnimStart = true;
 
