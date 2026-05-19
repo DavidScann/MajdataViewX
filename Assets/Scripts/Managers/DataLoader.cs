@@ -226,6 +226,8 @@ public class DataLoader : MonoBehaviour
         objectCounter.CountNoteSumAsync(chart).Forget();
         objectCounter.ReportMeterBpmAsync(chart).Forget();
 
+        Majdata<TimeProvider>.Instance.LoadSV(chart.CommaTimings);
+
         noteManager.ResetIndex();
         streamingRunning = true;
         var timings = chart.NoteTimings.ToArray();
@@ -366,6 +368,7 @@ public class DataLoader : MonoBehaviour
                 NDCompo.isBreak = note.IsBreak;
                 NDCompo.isEx = note.IsEx;
                 NDCompo.isMine = note.IsMine;
+                NDCompo.usingSV = note.UsingSV;
                 NDCompo.tapLine = tapLine;
                 NDCompo.time = (float)timing.Timing;
                 NDCompo.startPosition = note.StartPosition;
@@ -392,6 +395,7 @@ public class DataLoader : MonoBehaviour
                 NDCompo.isEx = note.IsEx;
                 NDCompo.isBreak = note.IsBreak;
                 NDCompo.isMine = note.IsMine;
+                NDCompo.usingSV = note.UsingSV;
                 NDCompo.tapLine = tapLine;
 
                 noteManager.AddLoadedNote(NDCompo);
@@ -414,6 +418,7 @@ public class DataLoader : MonoBehaviour
                 NDCompo.isFirework = note.IsHanabi;
                 NDCompo.isBreak = note.IsBreak;
                 NDCompo.isMine = note.IsMine;
+                NDCompo.usingSV = note.UsingSV;
                 NDCompo.areaPosition = note.TouchArea;
                 NDCompo.startPosition = note.StartPosition;
 
@@ -443,6 +448,7 @@ public class DataLoader : MonoBehaviour
                 NDCompo.isFirework = note.IsHanabi;
                 NDCompo.isBreak = note.IsBreak;
                 NDCompo.isMine = note.IsMine;
+                NDCompo.usingSV = note.UsingSV;
                 NDCompo.GroupInfo = null;
 
                 noteManager.AddLoadedNote(NDCompo);
@@ -638,6 +644,7 @@ public class DataLoader : MonoBehaviour
             o.IsSlideBreak = note.IsSlideBreak;
             o.IsMine = note.IsMine;
             o.IsMineSlide = note.IsMineSlide;
+            o.UsingSV = note.UsingSV;
             o.IsSlideNoHead = true;
         });
         subSlide[0].IsSlideNoHead = note.IsSlideNoHead;
@@ -657,7 +664,7 @@ public class DataLoader : MonoBehaviour
 
         GameObject parent = null;
         List<SlideDrop> subSlides = new();
-        float totalLen = (float)subSlide.Select(x => x.SlideTime).Sum();
+        float totalLen = (float)subSlide.Sum(x => x.SlideTime);
         for (var i = 0; i <= subSlide.Count - 1; i++)
         {
             bool isConn = subSlide.Count != 1;
@@ -726,6 +733,7 @@ public class DataLoader : MonoBehaviour
         NDCompo.isEx = note.IsEx;
         NDCompo.isBreak = note.IsBreak;
         NDCompo.isMine = note.IsMine;
+        NDCompo.usingSV = note.UsingSV;
         NDCompo.tapLine = tapLine;
 
         var slideShape = detectShapeFromText(note.RawContent);
@@ -773,6 +781,7 @@ public class DataLoader : MonoBehaviour
         SliCompo.ConnectInfo = info;
         SliCompo.isBreak = note.IsSlideBreak;
         SliCompo.isMine = note.IsMineSlide;
+        SliCompo.usingSV = note.UsingSV;
 
         NDCompo.isNoHead = note.IsSlideNoHead;
         NDCompo.time = (float)timing.Timing;
@@ -835,6 +844,7 @@ public class DataLoader : MonoBehaviour
         NDCompo.isEx = note.IsEx;
         NDCompo.isBreak = note.IsBreak;
         NDCompo.isMine = note.IsMine;
+        NDCompo.usingSV = note.UsingSV;
         NDCompo.tapLine = tapLine;
 
         var slideWifi = Instantiate(slidePrefab[SLIDE_PREFAB_MAP["wifi"]], notes.transform);
@@ -869,7 +879,7 @@ public class DataLoader : MonoBehaviour
 
         WifiCompo.isBreak = note.IsSlideBreak;
         WifiCompo.isMine = note.IsMineSlide;
-
+        WifiCompo.usingSV = note.UsingSV;
         NDCompo.isNoHead = note.IsSlideNoHead;
         NDCompo.time = (float)timing.Timing;
         NDCompo.startPosition = note.StartPosition;

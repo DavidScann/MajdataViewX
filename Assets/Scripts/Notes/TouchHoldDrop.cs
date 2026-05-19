@@ -171,7 +171,7 @@ public class TouchHoldDrop : NoteLongBase
     private void FixedUpdate()
     {
         var remainingTime = GetRemainingTime();
-        var timing = GetJudgeTiming();
+        var timing = timeProvider.NoteTime - time;
 
         if (remainingTime == 0 && isJudged)
         {
@@ -273,26 +273,39 @@ public class TouchHoldDrop : NoteLongBase
     // Update is called once per frame
     private void Update()
     {
-        var timing = GetJudgeTiming();
-        var pow = -Mathf.Exp(8 * (timing * 0.4f / moveDuration) - 0.85f) + 0.42f;
+        var timing = timeProvider.NoteTime - time;
+        var pow = -Mathf.Exp(8 * (timing * 0.43f / moveDuration) - 0.85f) + 0.42f;
         var distance = Mathf.Clamp(pow, 0f, 0.4f);
 
-        if (-timing <= wholeDuration && -timing > moveDuration)
+        var fakeTiming = timeProvider.FakeNoteTime - timeProvider.GetPositionAtTime(time);
+        var fakePow = -Mathf.Exp(8 * (fakeTiming * 0.43f / moveDuration) - 0.85f) + 0.42f;
+        var fakeDistance = Mathf.Clamp(fakePow, 0f, 0.4f);
+        var fakeLastFor = timeProvider.GetPositionAtTime(time + LastFor) - timeProvider.GetPositionAtTime(time);
+
+        if (!usingSV)
         {
-            SetFanColor(new Color(1f, 1f, 1f, Mathf.Clamp((wholeDuration + timing) / displayDuration, 0f, 1f)));
+            fakeTiming = timing;
+            fakePow = pow;
+            fakeDistance = distance;
+            fakeLastFor = LastFor;
+        }
+
+        if (-fakeTiming <= wholeDuration && -fakeTiming > moveDuration)
+        {
+            SetFanColor(new Color(1f, 1f, 1f, Mathf.Clamp((wholeDuration + fakeTiming) / displayDuration, 0f, 1f)));
             fans[5].SetActive(false);
             mask.enabled = false;
         }
-        else if (-timing < moveDuration)
+        else if (-fakeTiming < moveDuration)
         {
             fans[5].SetActive(true);
             mask.enabled = true;
             SetFanColor(Color.white);
-            mask.alphaCutoff = Mathf.Clamp(0.91f * (1 - (LastFor - timing) / LastFor), 0f, 1f);
+            mask.alphaCutoff = Mathf.Clamp(0.91f * (1 - (fakeLastFor - fakeTiming) / fakeLastFor), 0f, 1f);
         }
 
         if (float.IsNaN(distance)) distance = 0f;
-        if (timing >= 0f)
+        if (fakeTiming >= 0f)
         {
             //holdEffect.SetActive(true);
             holdEffect.transform.position = transform.position;

@@ -15,7 +15,7 @@ public class NoteBase : MonoBehaviour
     protected InputManager inputManager;
     protected SkinManager skinManager;
     protected AudioManager audioManager;
-    
+
     public float time;
     public int startPosition;
     public SensorType sensor;
@@ -26,16 +26,16 @@ public class NoteBase : MonoBehaviour
     public bool isEx;
     public bool isBreak;
     public bool isMine;
+    public bool usingSV;
 
-    
+
     protected NoteStatus State { get; set; } = NoteStatus.Start;
-    
+
     protected Guid guid = Guid.NewGuid();
     protected JudgeType judgeResult;
     protected bool isJudged = false;
     private JudgeType _judgeResult;
-    
-    protected float GetJudgeTiming() => timeProvider.NoteTime - time;
+
     protected Vector3 getPositionFromDistance(float distance) => getPositionFromDistance(distance, startPosition);
     protected Vector3 getPositionFromDistance(float distance, int position)
     {
@@ -48,15 +48,15 @@ public class NoteBase : MonoBehaviour
 public class NoteLongBase : NoteBase
 {
     public float LastFor = 1f;
-    
+
     protected float playerIdleTime = 0;
     protected float judgeDiff = -1;
-    
+
     [SerializeField]
     public GameObject holdEffect;
     protected Material material;
-    
-    protected float GetRemainingTime() => MathF.Max(LastFor - GetJudgeTiming(),0);
+
+    protected float GetRemainingTime() => MathF.Max(LastFor - (timeProvider.NoteTime - time), 0);
 
     protected virtual void PlayHoldEffect()
     {
@@ -87,7 +87,7 @@ public class NoteLongBase : NoteBase
             default:
                 break;
         }
-        holdEffect.SetActive(true);        
+        holdEffect.SetActive(true);
     }
     protected virtual void StopHoldEffect()
     {

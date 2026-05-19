@@ -308,16 +308,33 @@ public class SlideDrop : NoteLongBase, ICanShine
         if (star_slide == null)
             return;
 
-        // Slide淡入期间，不透明度从0到0.55耗时200ms
-        var startiming = timeProvider.NoteTime - startTime;
-        if (startiming <= 0f)
+
+        var timing = timeProvider.NoteTime - startTime;
+        var stiming = timeProvider.NoteTime - time;
+        var remaining = Math.Max(LastFor - timing, 0);
+
+        var fakeTiming = timeProvider.FakeNoteTime - timeProvider.GetPositionAtTime(startTime);
+        var fakesTiming = timeProvider.FakeNoteTime - timeProvider.GetPositionAtTime(time);
+        var fakeLastfor = timeProvider.GetPositionAtTime(time + LastFor) - timeProvider.GetPositionAtTime(time);
+        var fakeRemaining = Math.Max(fakeLastfor - fakeTiming, 0);
+
+        if (!usingSV)
         {
-            if (startiming >= -0.05f)
+            fakeTiming = timing;
+            fakesTiming = stiming;
+            fakeRemaining = remaining;
+            fakeLastfor = LastFor;
+        }
+
+        // Slide淡入期间，不透明度从0到0.55耗时200ms
+        if (fakeTiming <= 0f)
+        {
+            if (fakeTiming >= -0.05f)
             {
                 fadeInAnimator.enabled = false;
                 setSlideBarAlpha(1f);
             }
-            else if (!fadeInAnimator.enabled && startiming >= fadeInTime)
+            else if (!fadeInAnimator.enabled && fakeTiming >= fadeInTime)
                 fadeInAnimator.enabled = true;
             return;
 
@@ -326,8 +343,7 @@ public class SlideDrop : NoteLongBase, ICanShine
         setSlideBarAlpha(1f);
 
         star_slide.SetActive(true);
-        var timing = timeProvider.NoteTime - time;
-        if (timing <= 0f)
+        if (fakesTiming <= 0f)
         {
             canShine = true;
             float alpha;
@@ -336,7 +352,7 @@ public class SlideDrop : NoteLongBase, ICanShine
             else
             {
                 // 只有当它是一个起点Slide（而非Slide Group中的子部分）的时候，才会有开始的星星渐入动画
-                alpha = 1f - -timing / (time - startTime);
+                alpha = 1f - -fakesTiming / (time - startTime);
                 alpha = alpha > 1f ? 1f : alpha;
                 alpha = alpha < 0f ? 0f : alpha;
             }
@@ -348,7 +364,73 @@ public class SlideDrop : NoteLongBase, ICanShine
         }
         else
         {
-            UpdateStar();
+            starRenderer.color = Color.white;
+            star_slide.transform.localScale = new Vector3(1.5f, 1.5f, 1.5f);
+
+            var process = MathF.Min((fakeLastfor - fakeRemaining) / fakeLastfor, 1);
+            if (fakeLastfor == 0) process = 1;
+            var indexProcess = (slidePositions.Count - 1) * process;
+            var index = (int)indexProcess;
+            var pos = indexProcess - index;
+
+            if (process >= 1f)
+            {
+                switch (Majdata<InputManager>.Instance!.Mode)
+                {
+                    case AutoPlayMode.Enable:
+                        if (smoothSlideAnime) HideBar(index + 1);
+                        else HideBar(areaStep[(int)(process * (areaStep.Count - 1))]);
+                        DestroySelf();
+                        judgeQueue.Clear();
+                        return;
+                    case AutoPlayMode.Random:
+                        var barIndex = areaStep[(int)(process * (areaStep.Count - 1))];
+                        HideBar(barIndex);
+                        DestroySelf();
+                        judgeQueue.Clear();
+                        return;
+                }
+                star_slide.transform.position = slidePositions.LastOrDefault();
+                applyStarRotation(slideRotations.LastOrDefault());
+                if (ConnectInfo.IsConnSlide && !ConnectInfo.IsGroupPartEnd)
+                    DestroySelf(true);
+                else if (IsFinished && isJudged)
+                    DestroySelf();
+            }
+            else
+            {
+                var a = slidePositions[index + 1];
+                var b = slidePositions[index];
+                var ba = a - b;
+                var newPos = ba * pos + b;
+
+                star_slide.transform.position = newPos;
+                if (index < slideRotations.Count - 1)
+                {
+                    var _a = slideRotations[index + 1].eulerAngles.z;
+                    var _b = slideRotations[index].eulerAngles.z;
+                    var dAngle = Mathf.DeltaAngle(_b, _a) * pos;
+                    dAngle = Mathf.Abs(dAngle);
+                    var newRotation = Quaternion.Euler(0f, 0f,
+                        Mathf.MoveTowardsAngle(_b, _a, dAngle));
+                    applyStarRotation(newRotation);
+                }
+            }
+            switch (Majdata<InputManager>.Instance!.Mode)
+            {
+                case AutoPlayMode.Enable:
+                    judgeQueue = judgeQueue.Skip((int)(process * (judgeQueue.Count - 1))).ToList();
+                    if (smoothSlideAnime) HideBar(index + 1);
+                    else HideBar(areaStep[(int)(process * (areaStep.Count - 1))]);
+                    PlaySFX();
+                    break;
+                case AutoPlayMode.Random:
+                    judgeQueue = judgeQueue.Skip((int)(process * (judgeQueue.Count - 1))).ToList();
+                    var barIndex = areaStep[(int)(process * (areaStep.Count - 1))];
+                    HideBar(barIndex);
+                    PlaySFX();
+                    break;
+            }
         }
         Check();
     }
@@ -471,8 +553,12 @@ public class SlideDrop : NoteLongBase, ICanShine
         }
         if (!ConnectInfo.IsGroupPartEnd && ConnectInfo.IsConnSlide)
             return;
-        var starTiming = startTime + (time - startTime) * 0.75;
-        var stayTime = (time + LastFor) - judgeTiming; // 停留时间
+        var stayTime = time + LastFor - judgeTiming; // 停留时间
+        if (usingSV)
+        {
+            judgeTiming = timeProvider.GetPositionAtTime(judgeTiming);
+            stayTime = timeProvider.GetPositionAtTime(stayTime);
+        }
         if (!isJudged)
         {
             arriveTime = timeProvider.NoteTime;
@@ -648,80 +734,6 @@ public class SlideDrop : NoteLongBase, ICanShine
         }
         foreach (var t in boundSensors)
             inputManager.UnbindSensor(Check, t);
-    }
-    /// <summary>
-    /// 更新引导Star状态
-    /// <para>包括位置，角度</para>
-    /// </summary>
-    void UpdateStar()
-    {
-        starRenderer.color = Color.white;
-        star_slide.transform.localScale = new Vector3(1.5f, 1.5f, 1.5f);
-
-        var process = MathF.Min((LastFor - GetRemainingTime()) / LastFor, 1);
-        if (LastFor == 0) process = 1;
-        var indexProcess = (slidePositions.Count - 1) * process;
-        var index = (int)indexProcess;
-        var pos = indexProcess - index;
-
-        if (process >= 1f)
-        {
-            switch (Majdata<InputManager>.Instance!.Mode)
-            {
-                case AutoPlayMode.Enable:
-                    if (smoothSlideAnime) HideBar(index + 1);
-                    else HideBar(areaStep[(int)(process * (areaStep.Count - 1))]);
-                    DestroySelf();
-                    judgeQueue.Clear();
-                    return;
-                case AutoPlayMode.Random:
-                    var barIndex = areaStep[(int)(process * (areaStep.Count - 1))];
-                    HideBar(barIndex);
-                    DestroySelf();
-                    judgeQueue.Clear();
-                    return;
-            }
-            star_slide.transform.position = slidePositions.LastOrDefault();
-            applyStarRotation(slideRotations.LastOrDefault());
-            if (ConnectInfo.IsConnSlide && !ConnectInfo.IsGroupPartEnd)
-                DestroySelf(true);
-            else if (IsFinished && isJudged)
-                DestroySelf();
-        }
-        else
-        {
-            var a = slidePositions[index + 1];
-            var b = slidePositions[index];
-            var ba = a - b;
-            var newPos = ba * pos + b;
-
-            star_slide.transform.position = newPos;
-            if (index < slideRotations.Count - 1)
-            {
-                var _a = slideRotations[index + 1].eulerAngles.z;
-                var _b = slideRotations[index].eulerAngles.z;
-                var dAngle = Mathf.DeltaAngle(_b, _a) * pos;
-                dAngle = Mathf.Abs(dAngle);
-                var newRotation = Quaternion.Euler(0f, 0f,
-                    Mathf.MoveTowardsAngle(_b, _a, dAngle));
-                applyStarRotation(newRotation);
-            }
-        }
-        switch (Majdata<InputManager>.Instance!.Mode)
-        {
-            case AutoPlayMode.Enable:
-                judgeQueue = judgeQueue.Skip((int)(process * (judgeQueue.Count - 1))).ToList();
-                if (smoothSlideAnime) HideBar(index + 1);
-                else HideBar(areaStep[(int)(process * (areaStep.Count - 1))]);
-                PlaySFX();
-                break;
-            case AutoPlayMode.Random:
-                judgeQueue = judgeQueue.Skip((int)(process * (judgeQueue.Count - 1))).ToList();
-                var barIndex = areaStep[(int)(process * (areaStep.Count - 1))];
-                HideBar(barIndex);
-                PlaySFX();
-                break;
-        }
     }
 
     private void setSlideBarAlpha(float alpha)
