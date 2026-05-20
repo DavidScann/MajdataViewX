@@ -19,6 +19,7 @@ public class DataLoader : MonoBehaviour
     public float noteSpeed = 7f;
     public float touchSpeed = 7.5f;
     public bool smoothSlideAnime = false;
+    public bool legacySlideLayer = false;
 
 
     //SerializeField
@@ -213,7 +214,8 @@ public class DataLoader : MonoBehaviour
             touchIndex.Add((SensorType)i, 0);
     }
 
-    public async UniTask Load(SimaiChart chart, double ignoreOffset, string title, string artist, int diff)
+    public async UniTask Load(SimaiChart chart,
+    double ignoreOffset, string title, string artist, int diff, bool legacySlideLayer)
     {
         titleText.text = title;
         artistText.text = artist;
@@ -222,6 +224,7 @@ public class DataLoader : MonoBehaviour
 
         levelText.text = chart.Level;
         designText.text = chart.Designer;
+        this.legacySlideLayer = legacySlideLayer;
 
         objectCounter.CountNoteSumAsync(chart).Forget();
         objectCounter.ReportMeterBpmAsync(chart).Forget();
@@ -813,8 +816,10 @@ public class DataLoader : MonoBehaviour
         SliCompo.LastFor = (float)note.SlideTime;
         //SliCompo.sortIndex = -7000 + (int)((lastNoteTime - timing.time) * -100) + sort * 5;
         SliCompo.sortIndex = slideLayer;
-        slideLayer -= SLIDE_AREA_STEP_MAP[slideShape].Last();
-        //slideLayer += 5;
+        if (legacySlideLayer)
+            slideLayer -= SLIDE_AREA_STEP_MAP[slideShape].Last();
+        else
+            slideLayer += 5;
         return slide;
     }
 
@@ -893,7 +898,10 @@ public class DataLoader : MonoBehaviour
         WifiCompo.time = (float)note.SlideStartTime;
         WifiCompo.LastFor = (float)note.SlideTime;
         WifiCompo.sortIndex = slideLayer;
-        slideLayer -= SLIDE_AREA_STEP_MAP["wifi"].Last();
+        if (legacySlideLayer)
+            slideLayer -= SLIDE_AREA_STEP_MAP["wifi"].Last();
+        else
+            slideLayer += 5;
     }
 
 
