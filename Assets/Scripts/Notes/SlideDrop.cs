@@ -55,6 +55,7 @@ public class SlideDrop : NoteLongBase, ICanShine
     bool isInitialized = false; //防止重复初始化
     bool isDestroying = false; // 防止重复销毁
     bool isSoundPlayed = false;
+    bool isDestroyed = false;
 
     /// <summary>
     /// Slide初始化
@@ -259,7 +260,7 @@ public class SlideDrop : NoteLongBase, ICanShine
         judgeQueue.Clear();
     }
 
-    private void FixedUpdate()
+    private void Update()
     {
         if (Majdata<InputManager>.Instance!.Mode is AutoPlayMode.Enable or AutoPlayMode.Random)
             return;
@@ -280,8 +281,6 @@ public class SlideDrop : NoteLongBase, ICanShine
         else if (start >= -0.05f)
             canCheck = true;
 
-        Running();
-
         //此处对mine音符的处理：一进judge就判定为miss并销毁，能进too late就判为perfect
         if (ConnectInfo.IsGroupPartEnd || !ConnectInfo.IsConnSlide)
         {
@@ -289,25 +288,26 @@ public class SlideDrop : NoteLongBase, ICanShine
             {
                 HideBar(areaStep.LastOrDefault());
                 Judge();
+                DestroySelf();
             }
             else if (forceJudge >= 0)
             {
                 TooLateJudge();
+                DestroySelf();
             }
         }
         else if (IsFinished)
         {
             HideBar(areaStep.LastOrDefault());
+            DestroySelf(true);
         }
+
+        Running();
     }
     // Update is called once per frame
-    private void Update()
+    private void FixedUpdate()
     {
-        if (IsFinished)
-            DestroySelf();
-        if (star_slide == null)
-            return;
-
+        if (isDestroyed) return;
 
         var timing = timeProvider.NoteTime - startTime;
         var stiming = timeProvider.NoteTime - time;
@@ -546,9 +546,7 @@ public class SlideDrop : NoteLongBase, ICanShine
         if (isMine)
         {
             judgeResult = JudgeType.Miss;
-            SetJust();
             isJudged = true;
-            DestroySelf();
             return;
         }
         if (!ConnectInfo.IsGroupPartEnd && ConnectInfo.IsConnSlide)
@@ -603,7 +601,6 @@ public class SlideDrop : NoteLongBase, ICanShine
             }
             print($"Slide diff : {MathF.Round(diff * 1000, 2)} ms");
             judgeResult = judge ?? JudgeType.Miss;
-            SetJust();
             isJudged = true;
         }
     }
@@ -642,7 +639,6 @@ public class SlideDrop : NoteLongBase, ICanShine
         {
             judgeResult = JudgeType.Perfect;
             isJudged = true;
-            DestroySelf();
             return;
         }
         if (judgeQueue.Count == 1)
@@ -650,7 +646,6 @@ public class SlideDrop : NoteLongBase, ICanShine
         else
             slideOK.GetComponent<LoadJustSprite>().setMiss();
         isJudged = true;
-        DestroySelf();
     }
     /// <summary>
     /// 销毁当前Slide
@@ -659,6 +654,9 @@ public class SlideDrop : NoteLongBase, ICanShine
     /// <param name="onlyStar"></param>
     void DestroySelf(bool onlyStar = false)
     {
+        if (isDestroyed)
+            return;
+        isDestroyed = true;
         PlayJudgeSFX();
         if (onlyStar)
         {
