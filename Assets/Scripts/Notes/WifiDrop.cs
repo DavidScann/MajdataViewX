@@ -48,6 +48,7 @@ public class WifiDrop : NoteLongBase, ICanShine
     bool isChecking = false;
     bool canCheck = false;
     bool isSoundPlayed = false;
+    bool isDestroyed = false;
     float fadeInTime;
     float judgeTiming; // 正解帧
     float forceJudgeTime;
@@ -303,9 +304,7 @@ public class WifiDrop : NoteLongBase, ICanShine
         if (isMine)
         {
             judgeResult = JudgeType.Miss;
-            SetJust();
             isJudged = true;
-            DestroySelf();
             return;
         }
         var timing = timeProvider.NoteTime - time;
@@ -358,7 +357,6 @@ public class WifiDrop : NoteLongBase, ICanShine
 
             print($"diff : {diff} ms");
             judgeResult = (JudgeType)judge;
-            SetJust();
             isJudged = true;
         }
     }
@@ -521,6 +519,9 @@ public class WifiDrop : NoteLongBase, ICanShine
     public bool CanShine() => canShine;
     void DestroySelf()
     {
+        if (isDestroyed)
+            return;
+        isDestroyed = true;
         if (isBreak &&
             judgeResult == JudgeType.Perfect)
         {
