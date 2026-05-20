@@ -546,6 +546,7 @@ public class SlideDrop : NoteLongBase, ICanShine
         if (isMine)
         {
             judgeResult = JudgeType.Miss;
+            SetJust();
             isJudged = true;
             return;
         }
@@ -602,6 +603,7 @@ public class SlideDrop : NoteLongBase, ICanShine
             print($"Slide diff : {MathF.Round(diff * 1000, 2)} ms");
             judgeResult = judge ?? JudgeType.Miss;
             isJudged = true;
+            SetJust();
         }
     }
     void SetJust()
@@ -638,6 +640,7 @@ public class SlideDrop : NoteLongBase, ICanShine
         if (isMine)
         {
             judgeResult = JudgeType.Perfect;
+            SetJust();
             isJudged = true;
             return;
         }
@@ -645,6 +648,7 @@ public class SlideDrop : NoteLongBase, ICanShine
             slideOK.GetComponent<LoadJustSprite>().setLateGd();
         else
             slideOK.GetComponent<LoadJustSprite>().setMiss();
+        SetJust();
         isJudged = true;
     }
     /// <summary>

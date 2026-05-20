@@ -221,6 +221,7 @@ public class WifiDrop : NoteLongBase, ICanShine
         {
             judgeResult = JudgeType.Perfect;
             isJudged = true;
+            SetJust();
             DestroySelf();
             return;
         }
@@ -229,6 +230,7 @@ public class WifiDrop : NoteLongBase, ICanShine
         else
             slideOK.GetComponent<LoadJustSprite>().setMiss();
         isJudged = true;
+        SetJust();
         DestroySelf();
     }
     public void Check(object sender, InputEventArgs arg) => CheckAll();
@@ -304,6 +306,7 @@ public class WifiDrop : NoteLongBase, ICanShine
         if (isMine)
         {
             judgeResult = JudgeType.Miss;
+            SetJust();
             isJudged = true;
             return;
         }
@@ -357,6 +360,7 @@ public class WifiDrop : NoteLongBase, ICanShine
 
             print($"diff : {diff} ms");
             judgeResult = (JudgeType)judge;
+            SetJust();
             isJudged = true;
         }
     }
