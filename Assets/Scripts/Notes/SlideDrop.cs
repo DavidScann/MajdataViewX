@@ -322,8 +322,8 @@ public class SlideDrop : NoteLongBase, ICanShine
         {
             fakeTiming = timing;
             fakesTiming = stiming;
-            fakeRemaining = remaining;
             fakeLastfor = LastFor;
+            fakeRemaining = remaining;
         }
 
         // Slide淡入期间，不透明度从0到0.55耗时200ms
@@ -367,8 +367,8 @@ public class SlideDrop : NoteLongBase, ICanShine
             starRenderer.color = Color.white;
             star_slide.transform.localScale = new Vector3(1.5f, 1.5f, 1.5f);
 
-            var process = MathF.Min((fakeLastfor - fakeRemaining) / fakeLastfor, 1);
-            if (fakeLastfor == 0) process = 1;
+            var process = (fakeLastfor - fakesTiming) / fakeLastfor;
+            process = Math.Max(1f - process, 0);
             var indexProcess = (slidePositions.Count - 1) * process;
             var index = (int)indexProcess;
             var pos = indexProcess - index;

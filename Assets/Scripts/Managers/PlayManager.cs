@@ -25,17 +25,17 @@ public class PlayManager : MonoBehaviour
     public static bool IsReloading;
 
     private static SimaiChart _chart = SimaiChart.Empty;
-    
+
     private static ViewStatus _state = ViewStatus.Idle;
     private static string _errMsg = string.Empty;
     private static float _thisFrameSec = 0f;
-    
+
     private static double? _trackTime;
     private static double? _offset;
     private static float? _speed;
- 
+
     private static MajViewSetting _setting = new();
-    
+
     private DataLoader loader;
     private TimeProvider timeProvider;
     private BgManager bgManager;
@@ -46,7 +46,7 @@ public class PlayManager : MonoBehaviour
 
     private SpriteRenderer bgCover;
     private GameObject canvasButtons;
-    
+
     private void Awake()
     {
         Majdata<PlayManager>.Instance = this;
@@ -55,7 +55,7 @@ public class PlayManager : MonoBehaviour
     private void Start()
     {
         IsReloading = false;
-        
+
         loader = Majdata<DataLoader>.Instance!;
         timeProvider = Majdata<TimeProvider>.Instance!;
         bgManager = Majdata<BgManager>.Instance!;
@@ -65,33 +65,33 @@ public class PlayManager : MonoBehaviour
         audioManager = Majdata<AudioManager>.Instance!;
         bgCover = GameObject.Find("BackgroundCover").GetComponent<SpriteRenderer>();
         canvasButtons = GameObject.Find("CanvasButtons");
-        
+
         _state = CheckIsLoaded() ? ViewStatus.Loaded : ViewStatus.Idle;
     }
 
     private bool CheckIsLoaded() => audioManager.IsTrackLoaded &&
                                     bgManager.IsBgLoaded &&
                                     bgManager.IsVideoLoaded;
-    
+
     public void Setting(MajViewSetting setting, MajVolumeSetting volumeSetting)
     {
         _setting = setting;
         audioManager.Setting(setting.GlobalAudioOffset, volumeSetting);
     }
-    
+
     public async UniTask LoadAsync(string audioPath, string bgPath, string? pvPath)
     {
         while (_state is ViewStatus.Busy)
             await UniTask.Yield();
         _state = ViewStatus.Busy;
-        
+
         try
         {
             await UniTask.SwitchToMainThread();
-            
+
             //audio
             audioManager.LoadTrack(audioPath);
-            
+
             //bg
             if (File.Exists(bgPath))
             {
@@ -102,7 +102,7 @@ public class PlayManager : MonoBehaviour
             {
                 BgManager.hasBg = false;
             }
-            
+
             //video
             if (pvPath is not null && File.Exists(pvPath))
             {
@@ -113,7 +113,7 @@ public class PlayManager : MonoBehaviour
             {
                 BgManager.hasVideo = false;
             }
-                
+
             _state = ViewStatus.Loaded;
         }
         catch (Exception ex)
@@ -123,16 +123,17 @@ public class PlayManager : MonoBehaviour
             throw;
         }
     }
-    
-    public async UniTask<bool> PlayAsync(PlaybackMode playmode, 
-        double startAt, float speed, 
-        string title, string artist, float offset, 
-        string designer, string level, string fumen, 
-        IList<SimaiCommand> commands, int difficulty, string? maidataPath = null)
+
+    public async UniTask<bool> PlayAsync(PlaybackMode playmode,
+        double startAt, float speed,
+        string title, string artist, float offset,
+        string designer, string level, string fumen,
+        IList<SimaiCommand> commands, int difficulty,
+        string? maidataPath = null)
     {
         while (_state is ViewStatus.Busy)
             await UniTask.Yield();
-        
+
         _state = ViewStatus.Busy;
         try
         {
@@ -161,14 +162,16 @@ public class PlayManager : MonoBehaviour
             switch (playmode)
             {
                 case PlaybackMode.Normal:
-                    await loader.Load(_chart, startAt - offset, title, artist, difficulty);
-                    
+                    await loader.Load(_chart,
+                    startAt - offset, title, artist, difficulty, _setting.LegacySlideLayer);
+
                     Majdata<AllPerfectManager>.Instance!.enabled = false;
                     timeProvider.SetStartTime(startAt, offset, speed, playmode);
                     audioManager.PlayTrack();
                     break;
                 case PlaybackMode.IncludeOp:
-                    await loader.Load(_chart, startAt - offset, title, artist, difficulty);
+                    await loader.Load(_chart,
+                    startAt - offset, title, artist, difficulty, _setting.LegacySlideLayer);
 
                     bgManager.PlaySongDetail();
                     AudioManager.noteSfxPlaybackRequests[AudioManager.TRACK_START] = true; //track_start
@@ -184,14 +187,15 @@ public class PlayManager : MonoBehaviour
                         throw new InvalidPathException($"maidata path is required");
                     }
 
-                    await loader.Load(_chart, startAt - offset, title, artist, difficulty);
+                    await loader.Load(_chart,
+                    startAt - offset, title, artist, difficulty, _setting.LegacySlideLayer);
 
                     bgManager.PlaySongDetail();
-                    
+
                     Majdata<AllPerfectManager>.Instance!.enabled = true;
                     _state = ViewStatus.Playing;
-                    screenRecorder.StartRecording(maidataPath, 
-                        _setting.OutputFps, 
+                    screenRecorder.StartRecording(maidataPath,
+                        _setting.OutputFps,
                         _setting.UseAlpha,
                         () =>
                         {
@@ -203,10 +207,10 @@ public class PlayManager : MonoBehaviour
                     }).Forget();
                     return true; //directly return
             }
-            
+
             //save last speed for resume
             _speed = speed;
-            
+
             _state = ViewStatus.Playing;
             return true;
         }
@@ -222,24 +226,24 @@ public class PlayManager : MonoBehaviour
     {
         await ResumeAsync(_speed!.Value);
     }
-    
+
     public async UniTask ResumeAsync(float speed)
     {
         while (_state is ViewStatus.Busy)
             await UniTask.Yield();
-        
+
         _state = ViewStatus.Busy;
         try
         {
             await UniTask.SwitchToMainThread();
-            
+
             timeProvider.Resume(speed);
-            
+
             bgManager.ContinueVideo();
-            
+
             audioManager.PlayTrack();
             audioManager.ResumeTouchHoldSound();
-            
+
             _state = ViewStatus.Playing;
         }
         catch (Exception ex)
@@ -249,24 +253,24 @@ public class PlayManager : MonoBehaviour
             throw;
         }
     }
-    
+
     public async UniTask PauseAsync()
     {
         while (_state is ViewStatus.Busy)
             await UniTask.Yield();
-        
+
         _state = ViewStatus.Busy;
         try
         {
             await UniTask.SwitchToMainThread();
-            
+
             timeProvider.Pause();
-            
+
             bgManager.PauseVideo();
-            
+
             audioManager.PauseTrack();
             audioManager.PauseTouchHoldSound();
-            
+
             _state = ViewStatus.Paused;
         }
         catch (Exception ex)
@@ -276,22 +280,22 @@ public class PlayManager : MonoBehaviour
             throw;
         }
     }
-    
+
     public async UniTask StopAsync()
     {
         while (_state is ViewStatus.Busy)
             await UniTask.Yield();
-        
+
         _state = ViewStatus.Busy;
         try
         {
             await UniTask.SwitchToMainThread();
-            
+
             audioManager.StopTrack();
             screenRecorder.StopRecording();
             //if not so, the last frame will be like after ResetAllManagers
-            await UniTask.Yield(); 
-            
+            await UniTask.Yield();
+
             IsReloading = true;
             ResetAllManagers();
             // IsReloading = false;

@@ -435,8 +435,8 @@ public class WifiDrop : NoteLongBase, ICanShine
         }
         else
         {
-            var process = MathF.Min((fakeLastfor - fakeRemaining) / fakeLastfor, 1);
-            if (fakeLastfor == 0) process = 1;
+            var process = (fakeLastfor - fakesTiming) / fakeLastfor;
+            process = Math.Max(1f - process, 0);
             var pos = (slideBars.Count - 1) * process;
 
             if (process >= 1)
