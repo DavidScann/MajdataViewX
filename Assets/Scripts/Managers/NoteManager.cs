@@ -3,6 +3,7 @@
 #region
 
 using System.Collections.Generic;
+using System.Linq;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 
@@ -29,11 +30,12 @@ public class NoteManager : MonoBehaviour
     }
     public void AddNote(NoteBase note, int index)
     {
-        noteOrder.Add(note.gameObject, index);
+        // 池化场景下：同一 GameObject 可能跨多个 timing 复用，因此用 indexer 覆盖（原 Add 会抛重复键异常）
+        noteOrder[note.gameObject] = index;
     }
     public void AddTouch(NoteBase note, int index)
     {
-        touchOrder.Add(note.gameObject, index);
+        touchOrder[note.gameObject] = index;
     }
 
     public void NextNote(int pos) => noteIndex[pos]++;
@@ -73,13 +75,25 @@ public class NoteManager : MonoBehaviour
 
     public async UniTask ResetState()
     {
+        // 池化路径：先把活跃 note 通过 End() 回收到池，避免 Destroy 浪费实例；
+        // 已池化的 NoteBase override 了 End() 把自己 Release 回 NotePool；
+        // 未池化的 fallback 到 Destroy（NoteBase.End 默认行为）。
+        var snapshot = LoadedNotes.ToArray();
+        foreach (var note in snapshot)
+        {
+            if (note != null)
+            {
+                try { note.End(); }
+                catch (System.Exception e) { Debug.LogWarning($"[NoteManager] End() failed: {e.Message}"); }
+            }
+        }
         LoadedNotes.Clear();
         noteOrder.Clear();
         touchOrder.Clear();
         ResetIndex();
 
-        //clear notes
-        for (var i = 0; i < transform.childCount; i++)
+        //clear notes：兜底——任何未通过 End() 归还的 GameObject 直接销毁
+        for (var i = transform.childCount - 1; i >= 0; i--)
         {
             Destroy(transform.GetChild(i).gameObject);
         }

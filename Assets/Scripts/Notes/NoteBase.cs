@@ -7,6 +7,11 @@ using UnityEngine;
 
 #endregion
 
+/// <summary>
+/// 所有 Note 的共同基类。
+/// <para>池化生命周期：<c>Start (一次性注入依赖) → Init(info) (每次刷新数据/重置状态) → Update/FixedUpdate (运行) → End (归还到池)</c></para>
+/// <para>代码组织规范：<c>Update</c> = running(autoplay) + check(timing 检测)，<c>FixedUpdate</c> = Render（位置/缩放/材质）。</para>
+/// </summary>
 public class NoteBase : MonoBehaviour
 {
     protected TimeProvider timeProvider;
@@ -28,6 +33,20 @@ public class NoteBase : MonoBehaviour
     public bool isMine;
     public bool usingSV;
 
+    /// <summary>池化时回归用的 prefab 引用（由 DataLoader 在 Get 后立即设置）。</summary>
+    [System.NonSerialized]
+    public GameObject? prefabRef;
+
+    /// <summary>
+    /// 池化生命周期的统一结束钩子。子类（如 TapDrop / HoldDrop）override 后负责
+    /// 上报判定 / 解绑事件 / 把自身与子对象归还到 <see cref="NotePool"/>。
+    /// 默认实现走旧的 Destroy 路径（兼容 SlideDrop / WifiDrop 暂未池化的情况）。
+    /// </summary>
+    public virtual void End()
+    {
+        if (gameObject != null)
+            Destroy(gameObject);
+    }
 
     protected NoteStatus State { get; set; } = NoteStatus.Start;
 

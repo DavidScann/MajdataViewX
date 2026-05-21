@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 
 #region
 
@@ -9,50 +9,57 @@ using Random = UnityEngine.Random;
 
 #endregion
 
+/// <summary>
+/// Touch note：单点触摸 note。继承 <see cref="NoteBase"/>。
+/// <para>生命周期：<c>Start (一次性) → Init(info) → Update(running+autoplay) + Check(事件) → FixedUpdate(Render) → End(归还池)</c></para>
+/// </summary>
 public class TouchDrop : NoteBase
 {
+    #region Injected Dependencies (Start 一次性)
     private MultTouchHandler multTouchHandler;
 
-    public char areaPosition;
-    public bool isFirework;
-    public TouchGroup? GroupInfo;
+    [SerializeField] GameObject justEffect;
+    [SerializeField] GameObject multTouchEffect2;
+    [SerializeField] GameObject multTouchEffect3;
 
-    [SerializeField]
-    GameObject justEffect;
-    [SerializeField]
-    GameObject multTouchEffect2;
-    [SerializeField]
-    GameObject multTouchEffect3;
+    [SerializeField] GameObject touchEffect;
+    [SerializeField] GameObject gr_TouchEffect;
+    [SerializeField] GameObject gd_TouchEffect;
+    [SerializeField] GameObject judgeEffect;
 
-    [SerializeField]
-    GameObject touchEffect;
-    [SerializeField]
-    GameObject gr_TouchEffect;
-    [SerializeField]
-    GameObject gd_TouchEffect;
-    [SerializeField]
-    GameObject judgeEffect;
-
-    [SerializeField]
-    GameObject[] fans = new GameObject[7]; //01,02,03,04,point,border_02,border_03
+    [SerializeField] GameObject[] fans = new GameObject[7]; //01,02,03,04,point,border_02,border_03
 
     private SpriteRenderer[] fansRenderers = new SpriteRenderer[7];
     private GameObject firework;
     private Animator fireworkEffect;
 
+    // sortingOrder 基线
+    private int[] _baseFanOrder = new int[7];
+    private bool _baseOrderCached = false;
+    #endregion
+
+    #region Note Data (Init 刷新)
+    public char areaPosition;
+    public bool isFirework;
+    public TouchGroup? GroupInfo;
+
     private float wholeDuration;
     private float moveDuration;
     private float displayDuration;
+    #endregion
+
+    #region Runtime State (Init 重置)
     private bool isStarted;
     private int layer;
     private bool isTriggered = false;
+    private bool inputBound = false;
+    #endregion
 
-    void Start()
+    /// <summary>
+    /// Awake：池化场景下 Init 在 SetActive(true) 之前调用，依赖注入必须在 Awake 完成。
+    /// </summary>
+    void Awake()
     {
-        wholeDuration = 3.209385682f * Mathf.Pow(speed, -0.9549621752f);
-        moveDuration = 0.8f * wholeDuration;
-        displayDuration = 0.2f * wholeDuration;
-
         noteManager = Majdata<NoteManager>.Instance!;
         timeProvider = Majdata<TimeProvider>.Instance!;
         multTouchHandler = Majdata<MultTouchHandler>.Instance!;
@@ -65,12 +72,20 @@ public class TouchDrop : NoteBase
         fireworkEffect = firework.GetComponent<Animator>();
 
         for (var i = 0; i < 7; i++)
-        {
             fansRenderers[i] = fans[i].GetComponent<SpriteRenderer>();
-            fansRenderers[i].sortingOrder += noteSortOrder;
-        }
+    }
 
+    /// <summary>池化复用入口。</summary>
+    public void Init(TouchPoolingInfo info)
+    {
+        ApplyInfo(info);
+        wholeDuration = 3.209385682f * Mathf.Pow(speed, -0.9549621752f);
+        moveDuration = 0.8f * wholeDuration;
+        displayDuration = 0.2f * wholeDuration;
+
+        ResetSortingOrder(info.NoteSortOrder);
         LoadSkin();
+        ResetState();
 
         transform.position = GetAreaPos(startPosition, areaPosition);
         justEffect.SetActive(false);
@@ -78,6 +93,47 @@ public class TouchDrop : NoteBase
 
         sensor = GetSensor();
         inputManager.BindSensor(Check, sensor);
+        inputBound = true;
+        gameObject.SetActive(false);
+    }
+
+    private void ApplyInfo(TouchPoolingInfo info)
+    {
+        time = info.Time;
+        startPosition = info.StartPosition;
+        areaPosition = info.AreaPosition;
+        speed = info.Speed;
+        isEach = info.IsEach;
+        isBreak = info.IsBreak;
+        isMine = info.IsMine;
+        isFirework = info.IsFirework;
+        usingSV = info.UsingSV;
+        GroupInfo = info.GroupInfo;
+    }
+
+    private void ResetSortingOrder(int order)
+    {
+        if (!_baseOrderCached)
+        {
+            for (var i = 0; i < 7; i++)
+                _baseFanOrder[i] = fansRenderers[i].sortingOrder;
+            _baseOrderCached = true;
+        }
+        for (var i = 0; i < 7; i++)
+            fansRenderers[i].sortingOrder = _baseFanOrder[i] + order;
+        noteSortOrder = order;
+    }
+
+    private void ResetState()
+    {
+        isStarted = false;
+        isTriggered = false;
+        isJudged = false;
+        judgeResult = JudgeType.Miss;
+        inputBound = false;
+        layer = 0;
+        multTouchEffect2.SetActive(false);
+        multTouchEffect3.SetActive(false);
     }
 
     private void LoadSkin()
@@ -110,25 +166,56 @@ public class TouchDrop : NoteBase
         justEffect.GetComponent<SpriteRenderer>().sprite = skinManager.TouchJust;
     }
 
+    // ============================== 输入派发 + 判定 ==============================
     void Check(object sender, InputEventArgs arg)
     {
-        if (arg.Type != sensor)
-            return;
-        if (isJudged || !noteManager.CanJudge(gameObject, sensor))
-            return;
-        if (Majdata<InputManager>.Instance!.Mode is AutoPlayMode.Enable or AutoPlayMode.Random)
-            return;
+        if (arg.Type != sensor) return;
+        if (isJudged || !noteManager.CanJudge(gameObject, sensor)) return;
+        if (Majdata<InputManager>.Instance!.Mode is AutoPlayMode.Enable or AutoPlayMode.Random) return;
 
         if (arg.IsClick)
         {
-            if (!inputManager.IsIdle(arg))
-                return;
-
+            if (!inputManager.IsIdle(arg)) return;
             inputManager.SetBusy(arg);
             Judge();
         }
     }
-    private void FixedUpdate()
+
+    void Judge()
+    {
+        const float JUDGE_GOOD_AREA = 316.667f;
+        const int JUDGE_GREAT_AREA = 250;
+        const int JUDGE_PERFECT_AREA = 200;
+        const float JUDGE_SEG_PERFECT = 150f;
+
+        if (isJudged) return;
+
+        var timing = timeProvider.NoteTime - time;
+        var isFast = timing < 0;
+        var diff = MathF.Abs(timing * 1000);
+        JudgeType result;
+        if (diff > JUDGE_SEG_PERFECT && isFast) return;
+        else if (diff < JUDGE_SEG_PERFECT) result = JudgeType.Perfect;
+        else if (diff < JUDGE_PERFECT_AREA) result = JudgeType.LatePerfect2;
+        else if (diff < JUDGE_GREAT_AREA) result = JudgeType.LateGreat;
+        else if (diff < JUDGE_GOOD_AREA) result = JudgeType.LateGood;
+        else result = JudgeType.Miss;
+
+        judgeResult = result;
+        isJudged = true;
+    }
+
+    // ============================== 逻辑：Update（running + autoplay + miss 检测） ==============================
+    /// <summary>
+    /// Update：running(autoplay) + check(timing-based miss / group join)。
+    /// 由原 FixedUpdate 迁移到 Update（refactor.md 要求 logic 在 Update）。
+    /// </summary>
+    private void Update()
+    {
+        UpdateRunning();
+    }
+
+    private void UpdateRunning()
     {
         var timing = timeProvider.NoteTime - time;
         if (isMine && !isJudged && timing >= 0.016667f)
@@ -145,6 +232,7 @@ public class TouchDrop : NoteBase
                     isJudged = true;
                     judgeResult = (JudgeType)GroupInfo.JudgeResult;
                     DestroySelf();
+                    return;
                 }
             }
         }
@@ -153,85 +241,48 @@ public class TouchDrop : NoteBase
             judgeResult = JudgeType.Miss;
             isJudged = true;
             DestroySelf();
+            return;
         }
         else if (isJudged)
         {
             DestroySelf();
+            return;
         }
 
-
-        if (timeProvider.NoteTime - time >= 0)
+        if (timing >= 0)
         {
             switch (Majdata<InputManager>.Instance!.Mode)
             {
                 case AutoPlayMode.Enable:
-                    if (isMine)
-                        judgeResult = JudgeType.Miss;
-                    else
-                        judgeResult = JudgeType.Perfect;
+                    judgeResult = isMine ? JudgeType.Miss : JudgeType.Perfect;
                     isJudged = true;
                     break;
                 case AutoPlayMode.Random:
                     judgeResult = (JudgeType)Random.Range(1, 14);
                     if (isMine)
-                    {
-                        if (judgeResult > JudgeType.Perfect) //Fast
-                        {
-                            judgeResult = JudgeType.Miss;
-                        }
-                        else
-                        {
-                            judgeResult = JudgeType.Perfect;
-                        }
-                    }
+                        judgeResult = judgeResult > JudgeType.Perfect ? JudgeType.Miss : JudgeType.Perfect;
                     isJudged = true;
                     break;
                 case AutoPlayMode.DJAuto:
-                    if (isTriggered)
-                        return;
-                    if (!isMine) //mine buda
-                        inputManager.ClickSensor(sensor);
+                    if (isTriggered) return;
+                    if (!isMine) inputManager.ClickSensor(sensor);
                     isTriggered = true;
-                    break;
-                case AutoPlayMode.Disable:
-                default:
                     break;
             }
         }
     }
-    void Judge()
+
+    // ============================== 渲染：FixedUpdate ==============================
+    /// <summary>
+    /// FixedUpdate：Render（fans 移动/颜色淡入/justEffect）。
+    /// 由原 Update 迁移到 FixedUpdate（refactor.md 要求 Render 在 FixedUpdate）。
+    /// </summary>
+    private void FixedUpdate()
     {
-        const float JUDGE_GOOD_AREA = 316.667f;
-        const int JUDGE_GREAT_AREA = 250;
-        const int JUDGE_PERFECT_AREA = 200;
-
-        const float JUDGE_SEG_PERFECT = 150f;
-
-        if (isJudged)
-            return;
-
-        var timing = timeProvider.NoteTime - time;
-        var isFast = timing < 0;
-        var diff = MathF.Abs(timing * 1000);
-        JudgeType result;
-        if (diff > JUDGE_SEG_PERFECT && isFast)
-            return;
-        else if (diff < JUDGE_SEG_PERFECT)
-            result = JudgeType.Perfect;
-        else if (diff < JUDGE_PERFECT_AREA)
-            result = JudgeType.LatePerfect2;
-        else if (diff < JUDGE_GREAT_AREA)
-            result = JudgeType.LateGreat;
-        else if (diff < JUDGE_GOOD_AREA)
-            result = JudgeType.LateGood;
-        else
-            result = JudgeType.Miss;
-
-        judgeResult = result;
-        isJudged = true;
+        Render();
     }
-    // Update is called once per frame
-    private void Update()
+
+    private void Render()
     {
         var timing = timeProvider.NoteTime - time;
         var pow = -Mathf.Exp(8 * (timing * 0.43f / moveDuration) - 0.85f) + 0.42f;
@@ -253,10 +304,7 @@ public class TouchDrop : NoteBase
             var _pow = -Mathf.Exp(-0.85f) + 0.42f;
             var _distance = Mathf.Clamp(_pow, 0f, 0.4f);
             for (var i = 0; i < 4; i++)
-            {
-                var pos = (0.226f + _distance) * GetAngle(i);
-                fans[i].transform.localPosition = pos;
-            }
+                fans[i].transform.localPosition = (0.226f + _distance) * GetAngle(i);
             return;
         }
 
@@ -269,7 +317,6 @@ public class TouchDrop : NoteBase
                 isStarted = true;
                 multTouchHandler.RegisterTouch(this);
             }
-
             SetFanColor(new Color(1f, 1f, 1f, Mathf.Clamp((wholeDuration + fakeTiming) / displayDuration, 0f, 1f)));
         }
         else if (-fakeTiming < moveDuration)
@@ -279,33 +326,38 @@ public class TouchDrop : NoteBase
 
         if (float.IsNaN(fakeDistance)) fakeDistance = 0f;
         for (var i = 0; i < 4; i++)
-        {
-            var pos = (0.226f + fakeDistance) * GetAngle(i);
-            fans[i].transform.localPosition = pos;
-        }
+            fans[i].transform.localPosition = (0.226f + fakeDistance) * GetAngle(i);
     }
 
+    // ============================== 销毁 / End ==============================
     private void DestroySelf()
     {
         if (judgeResult != JudgeType.Miss)
         {
-            if (isBreak)
-            {
-                audioManager.PlayTapSound(judgeResult, false, isBreak);
-            }
-            else if (isFirework)
-            {
-                audioManager.PlayHanabiSound();
-            }
-            else
-            {
-                audioManager.PlayTouchSound();
-            }
+            if (isBreak) audioManager.PlayTapSound(judgeResult, false, isBreak);
+            else if (isFirework) audioManager.PlayHanabiSound();
+            else audioManager.PlayTouchSound();
         }
         noteManager.RemoveLoadedNote(this);
-        Destroy(gameObject);
+        End();
     }
-    private void OnDestroy()
+
+    /// <summary>池化结束：上报判定 + 解绑 input + 归还到池。</summary>
+    public override void End()
+    {
+        ReportResult();
+        if (inputBound)
+        {
+            inputManager.UnbindSensor(Check, sensor);
+            inputBound = false;
+        }
+        if (prefabRef != null)
+            NotePool.Instance.Release(prefabRef, gameObject);
+        else
+            Destroy(gameObject);
+    }
+
+    private void ReportResult()
     {
         if (PlayManager.IsReloading) return;
         multTouchHandler.CancelTouch(this);
@@ -320,8 +372,18 @@ public class TouchDrop : NoteBase
             fireworkEffect.SetTrigger("Fire");
             firework.transform.position = transform.position;
         }
-        inputManager.UnbindSensor(Check, sensor);
     }
+
+    private void OnDestroy()
+    {
+        if (PlayManager.IsReloading) return;
+        if (inputBound)
+        {
+            inputManager.UnbindSensor(Check, sensor);
+            inputBound = false;
+        }
+    }
+
     void PlayJudgeEffect()
     {
         //show effect
@@ -349,15 +411,13 @@ public class TouchDrop : NoteBase
                     Instantiate(touchEffect, transform.position, transform.rotation);
                     break;
                 case JudgeType.Miss:
-                default:
-                    break;
+                default: break;
             }
         }
 
         //show level
         if (EffectManager.showLevel)
         {
-            //get obj
             var obj = Instantiate(judgeEffect, Vector3.zero, transform.rotation);
             var judgeObj = obj.transform.GetChild(0);
             if (sensor != SensorType.C)
@@ -367,33 +427,27 @@ public class TouchDrop : NoteBase
             judgeObj.GetChild(0).transform.rotation = GetRotation();
             var anim = obj.GetComponent<Animator>();
 
-            //show
             switch (judgeResult)
             {
                 case JudgeType.LateGood:
                 case JudgeType.FastGood:
-                    judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = skinManager.JudgeText[1];
-                    break;
+                    judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = skinManager.JudgeText[1]; break;
                 case JudgeType.LateGreat:
                 case JudgeType.LateGreat1:
                 case JudgeType.LateGreat2:
                 case JudgeType.FastGreat2:
                 case JudgeType.FastGreat1:
                 case JudgeType.FastGreat:
-                    judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = skinManager.JudgeText[2];
-                    break;
+                    judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = skinManager.JudgeText[2]; break;
                 case JudgeType.LatePerfect2:
                 case JudgeType.FastPerfect2:
                 case JudgeType.LatePerfect1:
                 case JudgeType.FastPerfect1:
-                    judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = skinManager.JudgeText[3];
-                    break;
+                    judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = skinManager.JudgeText[3]; break;
                 case JudgeType.Perfect:
-                    judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = skinManager.JudgeText[4];
-                    break;
+                    judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = skinManager.JudgeText[4]; break;
                 case JudgeType.Miss:
-                    judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = skinManager.JudgeText[0];
-                    break;
+                    judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = skinManager.JudgeText[0]; break;
             }
             anim.SetTrigger("touch");
         }
@@ -401,11 +455,7 @@ public class TouchDrop : NoteBase
         //show fast late
         if (EffectManager.showFL)
         {
-            if (judgeResult is JudgeType.Miss or JudgeType.Perfect)
-            {
-                return;
-            }
-            //get obj
+            if (judgeResult is JudgeType.Miss or JudgeType.Perfect) return;
             var customSkin = GameObject.Find("Outline").GetComponent<SkinManager>();
             var obj = Instantiate(judgeEffect, Vector3.zero, transform.rotation);
             var flObj = obj.transform.GetChild(0);
@@ -415,9 +465,8 @@ public class TouchDrop : NoteBase
                 flObj.transform.position = new Vector3(0, -1.08f, 0);
             flObj.GetChild(0).transform.rotation = GetRotation();
             var flAnim = obj.GetComponent<Animator>();
-            //show
             obj.SetActive(true);
-            if (judgeResult > JudgeType.Perfect) //Fast
+            if (judgeResult > JudgeType.Perfect)
                 obj.transform.GetChild(0).GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = customSkin.FastText;
             else
                 obj.transform.GetChild(0).GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = customSkin.LateText;
@@ -437,11 +486,9 @@ public class TouchDrop : NoteBase
     }
     private Quaternion GetRotation()
     {
-        if (sensor == SensorType.C)
-            return Quaternion.Euler(Vector3.zero);
+        if (sensor == SensorType.C) return Quaternion.Euler(Vector3.zero);
         var d = Vector3.zero - transform.position;
         var deg = 180 + Mathf.Atan2(d.x, d.y) * Mathf.Rad2Deg;
-
         return Quaternion.Euler(new Vector3(0, 0, -deg));
     }
     private Vector3 GetAngle(int index)
@@ -454,36 +501,28 @@ public class TouchDrop : NoteBase
 
     private Vector3 GetAreaPos(int index, char area)
     {
-        // AreaDistance: 
-        // C:   0
-        // E:   3.1
-        // B:   2.21
-        // A,D: 4.8
+        // AreaDistance:  C: 0  E: 3.1  B: 2.21  A,D: 4.8
         if (area == 'C') return Vector3.zero;
         if (area == 'B')
         {
             var angle = -index * (Mathf.PI / 4) + Mathf.PI * 5 / 8;
             return new Vector3(Mathf.Cos(angle), Mathf.Sin(angle)) * 2.3f;
         }
-
         if (area == 'A')
         {
             var angle = -index * (Mathf.PI / 4) + Mathf.PI * 5 / 8;
             return new Vector3(Mathf.Cos(angle), Mathf.Sin(angle)) * 4.1f;
         }
-
         if (area == 'E')
         {
             var angle = -index * (Mathf.PI / 4) + Mathf.PI * 6 / 8;
             return new Vector3(Mathf.Cos(angle), Mathf.Sin(angle)) * 3.0f;
         }
-
         if (area == 'D')
         {
             var angle = -index * (Mathf.PI / 4) + Mathf.PI * 6 / 8;
             return new Vector3(Mathf.Cos(angle), Mathf.Sin(angle)) * 4.1f;
         }
-
         return Vector3.zero;
     }
 
@@ -491,7 +530,6 @@ public class TouchDrop : NoteBase
     {
         foreach (var fan in fansRenderers) fan.color = color;
     }
-
     private void SetFanSprite(Sprite sprite)
     {
         for (var i = 0; i < 4; i++) fansRenderers[i].sprite = sprite;
@@ -515,8 +553,5 @@ public class TouchDrop : NoteBase
             multTouchEffect3.SetActive(false);
         }
     }
-    public void LayerDown()
-    {
-        setLayer(layer - 1);
-    }
+    public void LayerDown() => setLayer(layer - 1);
 }

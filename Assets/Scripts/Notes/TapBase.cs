@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 
 #region
 
@@ -9,6 +9,11 @@ using Random = UnityEngine.Random;
 
 #endregion
 
+/// <summary>
+/// Tap 系列(TapDrop / StarDrop)的基类。
+/// <para>统一生命周期：<c>Start(PreLoad 一次性) → Init(每次刷新) → Update(running+check) → FixedUpdate(Render) → End(归还池)</c>。</para>
+/// <para>子类负责：在 Start 中调用 <see cref="PreLoad"/> 并各自处理 LoadSkin；在 Init 时通过 <see cref="ApplyTapInfo"/> + 重置 state 完成复用。</para>
+/// </summary>
 public class TapBase : NoteBase
 {
     public GameObject tapLine;
@@ -17,8 +22,17 @@ public class TapBase : NoteBase
     protected SpriteRenderer exSpriteRender;
     protected SpriteRenderer lineSpriteRenderer;
 
-    protected bool isTriggered = false;
+    /// <summary>原 prefab 引用，子类 Start 时存下用于子对象池化（tapLine）。</summary>
+    [SerializeField] protected GameObject tapLinePrefab;
 
+    protected bool isTriggered = false;
+    /// <summary>已订阅 InputManager 的标记，防止 End 时漏解绑或重复解绑。</summary>
+    protected bool inputBound = false;
+
+    /// <summary>
+    /// Start 阶段一次性获取依赖与子对象。
+    /// 注意：<paramref name="tapLine"/> 的实际 GameObject 取池后由 prefab 缓存，重玩时复用。
+    /// </summary>
     protected void PreLoad()
     {
         var notes = GameObject.Find("Notes").transform;
@@ -29,18 +43,75 @@ public class TapBase : NoteBase
         skinManager = Majdata<SkinManager>.Instance!;
         audioManager = Majdata<AudioManager>.Instance!;
 
-        tapLine = Instantiate(tapLine, notes);
+        // tapLine prefab 优先级：本组件 SerializeField → tapLine 字段（兼容旧 inspector 设置）→ DataLoader 单例
+        if (tapLinePrefab == null)
+            tapLinePrefab = tapLine != null ? tapLine : Majdata<DataLoader>.Instance!.tapLine;
+
+        tapLine = NotePool.Instance.Get(tapLinePrefab, notes);
         tapLine.SetActive(false);
 
         spriteRenderer = GetComponent<SpriteRenderer>();
         lineSpriteRenderer = tapLine.GetComponent<SpriteRenderer>();
         exSpriteRender = transform.GetChild(0).GetComponent<SpriteRenderer>();
-
-        spriteRenderer.sortingOrder += noteSortOrder;
-        exSpriteRender.sortingOrder += noteSortOrder;
     }
 
-    protected void FixedUpdate()
+    /// <summary>
+    /// 把 NoteBase 公共字段 + tap 渲染层级 一并应用。子类的 Init 在调用此方法后应额外重置自己的状态。
+    /// </summary>
+    protected void ApplyTapInfoCommon(int sortOrder)
+    {
+        ResetSortingOrder(sortOrder);
+    }
+
+    /// <summary>
+    /// 重置 sortingOrder：原版只在 PreLoad 中 +=，池化时每次 Init 都要重新设置。
+    /// 使用绝对值（避免反复 += 累积）。子类 StarDrop 也复用。
+    /// </summary>
+    private int _baseSpriteOrder = int.MinValue;
+    private int _baseExOrder = int.MinValue;
+    protected void ResetSortingOrder(int order)
+    {
+        if (_baseSpriteOrder == int.MinValue)
+        {
+            _baseSpriteOrder = spriteRenderer.sortingOrder;
+            _baseExOrder = exSpriteRender.sortingOrder;
+        }
+        spriteRenderer.sortingOrder = _baseSpriteOrder + order;
+        exSpriteRender.sortingOrder = _baseExOrder + order;
+        noteSortOrder = order;
+    }
+
+    /// <summary>每次复用前重置 Tap 共有的运行时状态。</summary>
+    protected void ResetTapState()
+    {
+        State = NoteStatus.Initialized;
+        isJudged = false;
+        judgeResult = JudgeType.Miss;
+        isTriggered = false;
+        inputBound = false;
+
+        // 重置渲染态：关掉显示，等到 fakeDestScale 大于阈值再显示
+        spriteRenderer.forceRenderingOff = true;
+        if (isEx) exSpriteRender.forceRenderingOff = true;
+        spriteRenderer.material.SetFloat("_Brightness", 0.95f);
+
+        transform.localScale = new Vector3(0, 0);
+        tapLine.SetActive(false);
+    }
+
+    // ============================== 逻辑：running + check ==============================
+    /// <summary>
+    /// Update：处理 autoplay running 与 timing-based check（miss 检测）。
+    /// 由原 FixedUpdate 迁移而来——按照 refactor.md，逻辑在 Update、Render 在 FixedUpdate。
+    /// </summary>
+    protected virtual void Update()
+    {
+        UpdateRunning();
+        // Check 是事件驱动（InputManager.BindArea），不在这里直接调用
+    }
+
+    /// <summary>状态机推进 + autoplay + 自动 miss 检测。</summary>
+    protected void UpdateRunning()
     {
         var timing = timeProvider.NoteTime - time;
         if (isMine && !isJudged && timing >= 0.016667f)
@@ -53,10 +124,12 @@ public class TapBase : NoteBase
             judgeResult = JudgeType.Miss;
             isJudged = true;
             DestroySelf();
+            return;
         }
         else if (isJudged)
         {
             DestroySelf();
+            return;
         }
         else if (timing >= -0.01f)
         {
@@ -74,20 +147,14 @@ public class TapBase : NoteBase
                     if (isMine)
                     {
                         if (judgeResult > JudgeType.Perfect) //Fast
-                        {
                             judgeResult = JudgeType.Miss;
-                        }
                         else
-                        {
                             judgeResult = JudgeType.Perfect;
-                        }
                     }
-
                     isJudged = true;
                     break;
                 case AutoPlayMode.DJAuto:
-                    if (isTriggered)
-                        break;
+                    if (isTriggered) break;
                     //mine就不打了
                     if (!isMine)
                         inputManager.ClickSensor(sensor);
@@ -97,8 +164,18 @@ public class TapBase : NoteBase
         }
     }
 
-    // Update is called once per frame
-    protected virtual void Update()
+    // ============================== 渲染：状态机视觉表现 ==============================
+    /// <summary>
+    /// FixedUpdate：渲染（位置/缩放/material 高亮）。
+    /// 之所以放 FixedUpdate，是按照 refactor.md 的统一规范——所有 note 的 Render 步骤进入 FixedUpdate。
+    /// </summary>
+    protected virtual void FixedUpdate()
+    {
+        Render();
+    }
+
+    /// <summary>渲染：状态机驱动的位置/缩放/Line。</summary>
+    protected virtual void Render()
     {
         var timing = timeProvider.NoteTime - time;
         var distance = timing * speed + 4.8f;
@@ -124,7 +201,6 @@ public class TapBase : NoteBase
                     State = NoteStatus.Pending;
                     goto case NoteStatus.Pending;
                 }
-
                 transform.localScale = new Vector3(0, 0);
                 return;
             case NoteStatus.Pending:
@@ -164,6 +240,10 @@ public class TapBase : NoteBase
         }
     }
 
+    // ============================== 输入派发 ==============================
+    /// <summary>
+    /// 由 InputManager 触发：玩家点击对应 sensor 时调用。
+    /// </summary>
     protected void Check(object sender, InputEventArgs arg)
     {
         if (arg.Type != sensor)
@@ -178,11 +258,11 @@ public class TapBase : NoteBase
             if (!inputManager.IsIdle(arg))
                 return;
             inputManager.SetBusy(arg);
-
             Judge();
         }
     }
 
+    /// <summary>判定计算（玩家点击触发）。</summary>
     protected void Judge()
     {
         const int JUDGE_GOOD_AREA = 150;
@@ -235,14 +315,45 @@ public class TapBase : NoteBase
         judgeResult = result;
         isJudged = true;
     }
+
+    // ============================== 销毁 / End ==============================
+    /// <summary>
+    /// 完成判定后销毁/归还。原版直接 Destroy；池化版本走 End()。
+    /// </summary>
     protected virtual void DestroySelf()
     {
         audioManager.PlayTapSound(judgeResult, isEx, isBreak);
         noteManager.RemoveLoadedNote(this);
-        Destroy(tapLine);
-        Destroy(gameObject);
+        End();
     }
-    protected virtual void OnDestroy()
+
+    /// <summary>
+    /// 池化结束：上报判定结果、解绑事件、归还到池。
+    /// </summary>
+    public override void End()
+    {
+        ReportResult();
+        UnbindInput();
+        if (prefabRef != null)
+        {
+            // tapLine 也回池（独立 prefab 的池子）
+            if (tapLinePrefab != null && tapLine != null)
+            {
+                NotePool.Instance.Release(tapLinePrefab, tapLine);
+                tapLine = null!;
+            }
+            NotePool.Instance.Release(prefabRef, gameObject);
+        }
+        else
+        {
+            // 未池化路径：兼容旧的 Destroy 流程
+            if (tapLine != null) Destroy(tapLine);
+            Destroy(gameObject);
+        }
+    }
+
+    /// <summary>上报判定结果给 effect/object counter/note manager。</summary>
+    protected virtual void ReportResult()
     {
         if (PlayManager.IsReloading) return;
         var effectManager = Majdata<EffectManager>.Instance!;
@@ -250,6 +361,21 @@ public class TapBase : NoteBase
         effectManager.PlayFastLate(startPosition, judgeResult);
         noteManager.NextNote(startPosition);
         objectCounter.ReportResult(SimaiNoteType.Tap, judgeResult, isBreak);
+    }
+
+    /// <summary>解绑 inputManager 订阅，确保池化复用时不会泄漏 handler。</summary>
+    protected void UnbindInput()
+    {
+        if (!inputBound) return;
         inputManager.UnbindArea(Check, sensor);
+        inputBound = false;
+    }
+
+    /// <summary>场景销毁兜底（非池化场景）：保持原 Destroy 时的上报与解绑行为。</summary>
+    protected virtual void OnDestroy()
+    {
+        if (PlayManager.IsReloading) return;
+        // 如果走过 End()，inputBound 已为 false，不会重复 Unbind
+        UnbindInput();
     }
 }

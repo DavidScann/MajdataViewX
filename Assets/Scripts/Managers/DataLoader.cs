@@ -346,121 +346,143 @@ public class DataLoader : MonoBehaviour
             if (note.Type == SimaiNoteType.Tap)
             {
                 GameObject GOnote;
-                TapBase NDCompo;
+                NoteBase NDCompo;
 
                 if (note.IsForceStar)
                 {
-                    GOnote = Instantiate(starPrefab, notes.transform);
-                    var _NDCompo = GOnote.GetComponent<StarDrop>();
+                    // force-star → StarDrop（无 slide 关联）
+                    GOnote = NotePool.Instance.Get(starPrefab, notes.transform);
+                    var starCompo = GOnote.GetComponent<StarDrop>();
+                    starCompo.prefabRef = starPrefab;
 
-                    _NDCompo.isFakeStarRotate = note.IsFakeRotate;
-                    _NDCompo.isFakeStar = true;
-                    NDCompo = _NDCompo;
+                    var starInfo = new StarPoolingInfo
+                    {
+                        Time = (float)timing.Timing,
+                        StartPosition = note.StartPosition,
+                        Speed = noteSpeed * timing.HSpeed,
+                        NoteSortOrder = noteSortOrder,
+                        IsEach = timing.Notes.Length > 1,
+                        IsBreak = note.IsBreak,
+                        IsEx = note.IsEx,
+                        IsMine = note.IsMine,
+                        UsingSV = note.UsingSV,
+                        IsFakeStar = true,
+                        IsFakeStarRotate = note.IsFakeRotate,
+                        Slide = null,
+                    };
+                    starCompo.Init(starInfo);
+                    NDCompo = starCompo;
                 }
                 else
                 {
-                    GOnote = Instantiate(tapPrefab, notes.transform);
-                    NDCompo = GOnote.GetComponent<TapDrop>();
+                    GOnote = NotePool.Instance.Get(tapPrefab, notes.transform);
+                    var tapCompo = GOnote.GetComponent<TapDrop>();
+                    tapCompo.prefabRef = tapPrefab;
+
+                    var tapInfo = new TapPoolingInfo
+                    {
+                        Time = (float)timing.Timing,
+                        StartPosition = note.StartPosition,
+                        Speed = noteSpeed * timing.HSpeed,
+                        NoteSortOrder = noteSortOrder,
+                        IsEach = timing.Notes.Length > 1,
+                        IsBreak = note.IsBreak,
+                        IsEx = note.IsEx,
+                        IsMine = note.IsMine,
+                        UsingSV = note.UsingSV,
+                    };
+                    tapCompo.Init(tapInfo);
+                    NDCompo = tapCompo;
                 }
 
-                // note的图层顺序
-                NDCompo.noteSortOrder = noteSortOrder;
                 noteSortOrder -= NOTE_LAYER_COUNT[note.Type];
-
-                if (timing.Notes.Length > 1) NDCompo.isEach = true;
-                NDCompo.isBreak = note.IsBreak;
-                NDCompo.isEx = note.IsEx;
-                NDCompo.isMine = note.IsMine;
-                NDCompo.usingSV = note.UsingSV;
-                NDCompo.tapLine = tapLine;
-                NDCompo.time = (float)timing.Timing;
-                NDCompo.startPosition = note.StartPosition;
-                NDCompo.speed = noteSpeed * timing.HSpeed;
-
                 noteManager.AddLoadedNote(NDCompo);
                 noteManager.AddNote(NDCompo, noteIndex[note.StartPosition]++);
-                GOnote.SetActive(false);
+                // GOnote 已通过 Init 设置 inactive，等 streaming 激活
             }
             else if (note.Type == SimaiNoteType.Hold)
             {
-                var GOnote = Instantiate(holdPrefab, notes.transform);
+                var GOnote = NotePool.Instance.Get(holdPrefab, notes.transform);
                 var NDCompo = GOnote.GetComponent<HoldDrop>();
+                NDCompo.prefabRef = holdPrefab;
 
-                // note的图层顺序
-                NDCompo.noteSortOrder = noteSortOrder;
+                var holdInfo = new HoldPoolingInfo
+                {
+                    Time = (float)timing.Timing,
+                    LastFor = (float)note.HoldTime,
+                    StartPosition = note.StartPosition,
+                    Speed = noteSpeed * timing.HSpeed,
+                    NoteSortOrder = noteSortOrder,
+                    IsEach = timing.Notes.Length > 1,
+                    IsBreak = note.IsBreak,
+                    IsEx = note.IsEx,
+                    IsMine = note.IsMine,
+                    UsingSV = note.UsingSV,
+                };
+                NDCompo.Init(holdInfo);
+
                 noteSortOrder -= NOTE_LAYER_COUNT[note.Type];
-
-                if (timing.Notes.Length > 1) NDCompo.isEach = true;
-                NDCompo.time = (float)timing.Timing;
-                NDCompo.LastFor = (float)note.HoldTime;
-                NDCompo.startPosition = note.StartPosition;
-                NDCompo.speed = noteSpeed * timing.HSpeed;
-                NDCompo.isEx = note.IsEx;
-                NDCompo.isBreak = note.IsBreak;
-                NDCompo.isMine = note.IsMine;
-                NDCompo.usingSV = note.UsingSV;
-                NDCompo.tapLine = tapLine;
-
                 noteManager.AddLoadedNote(NDCompo);
                 noteManager.AddNote(NDCompo, noteIndex[note.StartPosition]++);
-                GOnote.SetActive(false);
             }
             else if (note.Type == SimaiNoteType.TouchHold)
             {
-                var GOnote = Instantiate(touchHoldPrefab, notes.transform);
+                var GOnote = NotePool.Instance.Get(touchHoldPrefab, notes.transform);
                 var NDCompo = GOnote.GetComponent<TouchHoldDrop>();
+                NDCompo.prefabRef = touchHoldPrefab;
 
-                // note的图层顺序
-                NDCompo.noteSortOrder = noteSortOrder;
+                var thInfo = new TouchHoldPoolingInfo
+                {
+                    Time = (float)timing.Timing,
+                    LastFor = (float)note.HoldTime,
+                    StartPosition = note.StartPosition,
+                    AreaPosition = note.TouchArea,
+                    Speed = touchSpeed * timing.HSpeed,
+                    NoteSortOrder = noteSortOrder,
+                    IsEach = timing.Notes.Length > 1,
+                    IsBreak = note.IsBreak,
+                    IsMine = note.IsMine,
+                    IsFirework = note.IsHanabi,
+                    UsingSV = note.UsingSV,
+                };
+                NDCompo.Init(thInfo);
+
                 noteSortOrder -= NOTE_LAYER_COUNT[note.Type];
-
-                if (timing.Notes.Length > 1) NDCompo.isEach = true;
-                NDCompo.time = (float)timing.Timing;
-                NDCompo.LastFor = (float)note.HoldTime;
-                NDCompo.speed = touchSpeed * timing.HSpeed;
-                NDCompo.isFirework = note.IsHanabi;
-                NDCompo.isBreak = note.IsBreak;
-                NDCompo.isMine = note.IsMine;
-                NDCompo.usingSV = note.UsingSV;
-                NDCompo.areaPosition = note.TouchArea;
-                NDCompo.startPosition = note.StartPosition;
-
                 noteManager.AddLoadedNote(NDCompo);
                 noteManager.AddTouch(NDCompo, touchIndex[NDCompo.GetSensor()]++);
-                GOnote.SetActive(false);
             }
             else if (note.Type == SimaiNoteType.Touch)
             {
-                var GOnote = Instantiate(touchPrefab, notes.transform);
+                var GOnote = NotePool.Instance.Get(touchPrefab, notes.transform);
                 var NDCompo = GOnote.GetComponent<TouchDrop>();
+                NDCompo.prefabRef = touchPrefab;
 
-                // note的图层顺序
-                NDCompo.noteSortOrder = noteSortOrder;
-                noteSortOrder -= NOTE_LAYER_COUNT[note.Type];
-                NDCompo.time = (float)timing.Timing;
-                NDCompo.areaPosition = note.TouchArea;
-                NDCompo.startPosition = note.StartPosition;
+                var touchInfo = new TouchPoolingInfo
+                {
+                    Time = (float)timing.Timing,
+                    StartPosition = note.StartPosition,
+                    AreaPosition = note.TouchArea,
+                    Speed = touchSpeed * timing.HSpeed,
+                    NoteSortOrder = noteSortOrder,
+                    IsEach = timing.Notes.Length > 1,
+                    IsBreak = note.IsBreak,
+                    IsMine = note.IsMine,
+                    IsFirework = note.IsHanabi,
+                    UsingSV = note.UsingSV,
+                    GroupInfo = null,
+                };
+                NDCompo.Init(touchInfo);
 
                 if (timing.Notes.Length > 1)
-                {
-                    NDCompo.isEach = true;
                     touchMembers.Add(NDCompo);
-                }
 
-                NDCompo.speed = touchSpeed * timing.HSpeed;
-                NDCompo.isFirework = note.IsHanabi;
-                NDCompo.isBreak = note.IsBreak;
-                NDCompo.isMine = note.IsMine;
-                NDCompo.usingSV = note.UsingSV;
-                NDCompo.GroupInfo = null;
-
+                noteSortOrder -= NOTE_LAYER_COUNT[note.Type];
                 noteManager.AddLoadedNote(NDCompo);
                 noteManager.AddTouch(NDCompo, touchIndex[NDCompo.GetSensor()]++);
-                GOnote.SetActive(false);
             }
 
             else if (note.Type == SimaiNoteType.Slide)
-                InstantiateStarGroup(timing, note); // 星星组
+                InstantiateStarGroup(timing, note); // 星星组：仍走旧路径，slide arrow 池化为 follow-up
         }
 
         //touch group handle
@@ -519,11 +541,9 @@ public class DataLoader : MonoBehaviour
             endPos = endPos - startPos;
             if (endPos == 0) return;
 
-            var line = Instantiate(eachLine, notes.transform);
+            var line = NotePool.Instance.Get(eachLine, notes.transform);
             var lineDrop = line.GetComponent<EachLineDrop>();
-
-            lineDrop.time = (float)timing.Timing;
-            lineDrop.speed = noteSpeed * timing.HSpeed;
+            lineDrop.prefabRef = eachLine;
 
             endPos = endPos < 0 ? endPos + 8 : endPos;
             endPos = endPos > 8 ? endPos - 8 : endPos;
@@ -539,8 +559,14 @@ public class DataLoader : MonoBehaviour
                 endPos++;
             }
 
-            lineDrop.startPosition = startPos;
-            lineDrop.curvLength = endPos - 1;
+            lineDrop.Init(new EachLinePoolingInfo
+            {
+                Time = (float)timing.Timing,
+                Speed = noteSpeed * timing.HSpeed,
+                StartPosition = startPos,
+                CurvLength = endPos - 1,
+                UsingSV = false,
+            });
         }
     }
 
