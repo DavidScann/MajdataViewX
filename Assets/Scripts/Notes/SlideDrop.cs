@@ -68,6 +68,7 @@ public class SlideDrop : NoteLongBase, ICanShine
     bool isDestroyed = false;
     bool _initApplied = false;  // Init(info) 是否被调用过（区分新池化路径 vs 旧直接赋值路径）
     bool _ondestroyReported = false; // 防止 End 与 OnDestroy 重复上报
+    bool _isEnded = false;       // 防止 End() 被重复调用（链式 End 时尤其重要）
     /// <summary>动态 AddComponent 的 BreakShineController 列表，End 时清除避免池复用累积。</summary>
     private readonly List<BreakShineController> _dynamicShineControllers = new();
     /// <summary>缓存的 slideOK 原始父级（slide 自身）；Initialize 会把它移到 slide.parent，End 时需还原。</summary>
@@ -140,6 +141,7 @@ public class SlideDrop : NoteLongBase, ICanShine
         canCheck = false;
         isChecking = false;
         _ondestroyReported = false;
+        _isEnded = false;
 
         boundSensors.Clear();
         triggerSensors.Clear();
@@ -813,23 +815,16 @@ public class SlideDrop : NoteLongBase, ICanShine
 
         if (onlyStar)
         {
+            // conn slide 中段：只释放引导星，slide GameObject 保留，等链尾通过 End() 链式清理
             ReleaseStar();
         }
         else
         {
-            // 释放上一个 conn slide 的整体（其实是 conn 链中我自己上一段的 slide GameObject）
-            if (ConnectInfo.Parent != null)
-            {
-                var parentSlide = ConnectInfo.Parent.GetComponent<SlideDrop>();
-                if (parentSlide != null) parentSlide.End();
-                else Destroy(ConnectInfo.Parent);
-                ConnectInfo.Parent = null;
-            }
-
             foreach (var obj in slideBars)
                 obj.SetActive(false);
 
             ReleaseStar();
+            // End() 内部会负责链式 End 上游 conn slide，避免孤儿
             End();
         }
     }
@@ -929,11 +924,25 @@ public class SlideDrop : NoteLongBase, ICanShine
     }
 
     /// <summary>
-    /// 池化结束：上报、解绑、把 slideOK 还原回 child、释放 star_slide 与自身回池。
+    /// 池化结束：上报、解绑、链式 End 上游 conn slide、把 slideOK 还原回 child、释放 star_slide 与自身回池。
+    /// 通过 <see cref="_isEnded"/> 保证幂等（链式 End 可能被重复触发）。
     /// </summary>
     public override void End()
     {
+        if (_isEnded) return;
+        _isEnded = true;
+
         ReportAndUnbind();
+
+        // 链式 End 上游 conn slide，避免孤儿（原版在 OnDestroy 中通过 Destroy(Parent) 实现）
+        if (ConnectInfo.Parent != null)
+        {
+            var parentRef = ConnectInfo.Parent;
+            var parentSlide = parentRef.GetComponent<SlideDrop>();
+            ConnectInfo.Parent = null; // 先断引用，防止循环
+            if (parentSlide != null) parentSlide.End();
+            else Destroy(parentRef);
+        }
 
         // 把 slideOK 还原回 slide 子对象，这样整体 Release 后下次 Initialize 还能正确找到它
         if (_slideOKDetached && slideOK != null)

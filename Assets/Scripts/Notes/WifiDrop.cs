@@ -66,6 +66,7 @@ public class WifiDrop : NoteLongBase, ICanShine
 
     bool _initApplied = false;
     bool _ondestroyReported = false;
+    bool _isEnded = false;
     private readonly List<BreakShineController> _dynamicShineControllers = new();
     private bool _slideOKDetached = false;
     #endregion
@@ -123,6 +124,7 @@ public class WifiDrop : NoteLongBase, ICanShine
         canCheck = false;
         isChecking = false;
         _ondestroyReported = false;
+        _isEnded = false;
 
         boundSensors.Clear();
         judgeQueues.Clear();
@@ -728,9 +730,13 @@ public class WifiDrop : NoteLongBase, ICanShine
 
     /// <summary>
     /// 池化结束：上报、解绑、把 slideOK 还原回 child、释放 3 个 star_slide 与自身回池。
+    /// 通过 <see cref="_isEnded"/> 保证幂等。
     /// </summary>
     public override void End()
     {
+        if (_isEnded) return;
+        _isEnded = true;
+
         ReportAndUnbind();
 
         // 把 slideOK 还原回 slide 子对象，便于整体回池后下次 Init 时仍可用 transform.GetChild 找到它
