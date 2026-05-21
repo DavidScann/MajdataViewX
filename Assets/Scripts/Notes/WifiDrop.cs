@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 
 #region
 
@@ -12,20 +12,34 @@ using Random = UnityEngine.Random;
 
 #endregion
 
+/// <summary>
+/// Wifi slide：3 条引导星 + 扇形箭头组的特殊 slide。
+/// <para>生命周期：<c>Awake (注入依赖) → Init(info) (刷新数据/重置状态/初始化) →
+/// Update (running+check) → FixedUpdate (Render) → End (归还池)</c>。</para>
+/// <para>3 个 star_slide 由 <see cref="NotePool"/> 池化（共享同一 <c>star_slidePrefab</c>），重玩时复用。</para>
+/// </summary>
 public class WifiDrop : NoteLongBase, ICanShine
 {
     [SerializeField]
     GameObject star_slidePrefab;
 
+    #region Note Data (Init 刷新)
     public bool isJustR;
     public float startTime;
     public int endPosition;
     public int sortIndex;
-
-
     public List<int> areaStep = new();
     public bool smoothSlideAnime = false;
+    #endregion
 
+    #region Pooled Children (Init 时 NotePool.Get)
+    private readonly GameObject[] star_slides = new GameObject[3];
+    private readonly SpriteRenderer[] star_Renderer = new SpriteRenderer[3];
+    private GameObject slideOK;
+    [System.NonSerialized] public GameObject? starSlidePrefabRef;
+    #endregion
+
+    #region Runtime State (Init 重置)
     private float arriveTime = -1;
     private List<SensorType> boundSensors = new();
     private List<List<SlideArea>> judgeQueues = new(3);
@@ -34,13 +48,9 @@ public class WifiDrop : NoteLongBase, ICanShine
     private bool IsFinished => judgeQueues.All(x => x.Count == 0);
 
     private Animator fadeInAnimator;
-    private readonly GameObject[] star_slides = new GameObject[3];
-    private readonly SpriteRenderer[] star_Renderer = new SpriteRenderer[3];
     private readonly List<SpriteRenderer> sbRender = new();
     private readonly List<GameObject> slideBars = new();
     private readonly Vector3[] SlidePositionEnd = new Vector3[3];
-    private GameObject slideOK;
-
     private Vector3 SlidePositionStart;
 
     bool isDestroying = false;
@@ -54,14 +64,94 @@ public class WifiDrop : NoteLongBase, ICanShine
     float forceJudgeTime;
     Dictionary<GameObject, Guid> guids = new();
 
+    bool _initApplied = false;
+    bool _ondestroyReported = false;
+    private readonly List<BreakShineController> _dynamicShineControllers = new();
+    private bool _slideOKDetached = false;
+    #endregion
 
-    private void Start()
+    /// <summary>
+    /// Awake：依赖注入只跑一次。原版的所有创建逻辑被搬到 <see cref="Init"/>，避免每次 Instantiate 都跑。
+    /// </summary>
+    private void Awake()
     {
         objectCounter = Majdata<ObjectCounter>.Instance!;
         timeProvider = Majdata<TimeProvider>.Instance!;
         skinManager = Majdata<SkinManager>.Instance!;
         inputManager = Majdata<InputManager>.Instance!;
         audioManager = Majdata<AudioManager>.Instance!;
+    }
+
+    // ============================== 池化入口 ==============================
+    /// <summary>
+    /// 池化复用入口：刷新数据 + 重置状态 + 重新初始化（创建/复用 star_slides，构建 judgeQueues 等）。
+    /// </summary>
+    public void Init(WifiPoolingInfo info)
+    {
+        _initApplied = true;
+        ApplyInfo(info);
+        ResetRuntimeState();
+        InitializeImpl();
+    }
+
+    private void ApplyInfo(WifiPoolingInfo info)
+    {
+        time = info.Time;
+        startTime = info.StartTime;
+        LastFor = info.LastFor;
+        startPosition = info.StartPosition;
+        endPosition = info.EndPosition;
+        speed = info.Speed;
+        sortIndex = info.SortIndex;
+        isJustR = info.IsJustR;
+        isEach = info.IsEach;
+        isBreak = info.IsBreak;
+        isMine = info.IsMine;
+        usingSV = info.UsingSV;
+        smoothSlideAnime = info.SmoothSlideAnime;
+    }
+
+    private void ResetRuntimeState()
+    {
+        arriveTime = -1;
+        judgeResult = JudgeType.Miss;
+        isJudged = false;
+        isDestroying = false;
+        isDestroyed = false;
+        isSoundPlayed = false;
+        canShine = false;
+        canCheck = false;
+        isChecking = false;
+        _ondestroyReported = false;
+
+        boundSensors.Clear();
+        judgeQueues.Clear();
+        triggerSensors.Clear();
+        guids.Clear();
+        slideBars.Clear();
+        sbRender.Clear();
+
+        for (var i = 0; i < _dynamicShineControllers.Count; i++)
+            if (_dynamicShineControllers[i] != null)
+                Destroy(_dynamicShineControllers[i]);
+        _dynamicShineControllers.Clear();
+
+        // 把上次移到 parent 的 slideOK 还原回 slide
+        if (_slideOKDetached && slideOK != null)
+        {
+            slideOK.transform.SetParent(transform, false);
+            _slideOKDetached = false;
+        }
+
+        transform.localScale = Vector3.one;
+        transform.rotation = Quaternion.identity;
+    }
+
+    /// <summary>
+    /// 把原 Start 中的初始化全部迁移到这里，由 <see cref="Init"/> 调用。
+    /// </summary>
+    private void InitializeImpl()
+    {
         var notes = GameObject.Find("Notes").transform;
 
         // 计算Slide淡入时机
@@ -72,13 +162,21 @@ public class WifiDrop : NoteLongBase, ICanShine
         var fullFadeInTime = Math.Min(fadeInTime + 0.2f, 0);
         var interval = fullFadeInTime - fadeInTime;
         fadeInAnimator = this.GetComponent<Animator>();
+        fadeInAnimator.Rebind();
         fadeInAnimator.speed = 0.2f / interval; //淡入时机与正解帧间隔小于200ms时，加快淡入动画的播放速度; interval永不为0
         fadeInAnimator.SetTrigger("wifi");
 
-        //stars skin
+        // 池化用 prefab key（仅一次性记录）
+        if (starSlidePrefabRef == null) starSlidePrefabRef = star_slidePrefab;
+
+        //stars skin —— 第一次走 NotePool.Get；后续 Init 复用相同 GameObject
         for (var i = 0; i < star_slides.Length; i++)
         {
-            star_slides[i] = Instantiate(star_slidePrefab, notes);
+            if (star_slides[i] == null)
+                star_slides[i] = NotePool.Instance.Get(starSlidePrefabRef!, notes);
+            else
+                star_slides[i].transform.SetParent(notes, false);
+
             star_Renderer[i] = star_slides[i].GetComponent<SpriteRenderer>();
 
             star_Renderer[i].sprite = skinManager.Star;
@@ -87,6 +185,8 @@ public class WifiDrop : NoteLongBase, ICanShine
             if (isMine) star_Renderer[i].sprite = skinManager.Star_Mine;
 
             star_slides[i].transform.rotation = Quaternion.Euler(0, 0, -22.5f * (8 + i + 2 * (startPosition - 1)));
+            star_slides[i].transform.localScale = Vector3.one;
+            star_Renderer[i].color = Color.white;
             star_slides[i].SetActive(false);
         }
 
@@ -95,11 +195,12 @@ public class WifiDrop : NoteLongBase, ICanShine
         SlidePositionEnd[1] = ne.transform.GetChild(0).GetChild(endPosition - 1).position;// Center
         SlidePositionEnd[2] = ne.transform.GetChild(0).GetChild(endPosition >= 8 ? 0 : endPosition).position; // L
 
-
         //bars
         transform.rotation = Quaternion.Euler(0f, 0f, -45f * (startPosition - 1));
         slideBars.Clear();
         for (var i = 0; i < transform.childCount - 1; i++) slideBars.Add(transform.GetChild(i).gameObject);
+        foreach (var bar in slideBars) bar.SetActive(true); // 池化复用：上次被 SetActive(false) 的要恢复
+
         slideOK = transform.GetChild(transform.childCount - 1).gameObject; //slideok is the last one
         if (isJustR)
         {
@@ -121,13 +222,14 @@ public class WifiDrop : NoteLongBase, ICanShine
                 var controller = star.AddComponent<BreakShineController>();
                 controller.enabled = true;
                 controller.parent = this;
+                _dynamicShineControllers.Add(controller);
             }
         }
 
         slideOK.SetActive(false);
         slideOK.transform.SetParent(transform.parent);
+        _slideOKDetached = true;
         SlidePositionStart = getPositionFromDistance(4.8f);
-
 
         //bars skin
         for (var i = 0; i < slideBars.Count; i++)
@@ -147,6 +249,7 @@ public class WifiDrop : NoteLongBase, ICanShine
                 var controller = slideBars[i].AddComponent<BreakShineController>();
                 controller.parent = this;
                 controller.enabled = true;
+                _dynamicShineControllers.Add(controller);
             }
             if (isMine)
             {
@@ -185,11 +288,16 @@ public class WifiDrop : NoteLongBase, ICanShine
             }
         }
     }
-    private void FixedUpdate()
+
+    // ============================== 逻辑：Update（running + check） ==============================
+    /// <summary>
+    /// Update：状态推进 + autoplay (Running) + 玩家判定轮询 (CheckAll)。
+    /// 由原 FixedUpdate 中的状态/Running 与 Update 末尾的 CheckAll 合并而来。
+    /// </summary>
+    private void Update()
     {
-        // time      是Slide启动的时间点
-        // timeStart 是Slide完全显示但未启动
-        // LastFor   是Slide的时值
+        if (isDestroyed) return;
+
         var timing = timeProvider.NoteTime - time;
         var startTiming = timeProvider.NoteTime - startTime;
         var forceJudge = timing - LastFor - forceJudgeTime;
@@ -207,7 +315,10 @@ public class WifiDrop : NoteLongBase, ICanShine
         }
         else if (forceJudge >= 0)
             TooLateJudge();
+
+        CheckAll();
     }
+
     int GetLastIndex()
     {
         if (judgeQueues.All(x => x.Count == 0))
@@ -215,6 +326,7 @@ public class WifiDrop : NoteLongBase, ICanShine
 
         return areaStep[4 - judgeQueues.Max(q => q.Count)];
     }
+
     void TooLateJudge()
     {
         if (isMine)
@@ -233,6 +345,7 @@ public class WifiDrop : NoteLongBase, ICanShine
         SetJust();
         DestroySelf();
     }
+
     public void Check(object sender, InputEventArgs arg) => CheckAll();
     void CheckAll()
     {
@@ -301,6 +414,7 @@ public class WifiDrop : NoteLongBase, ICanShine
         if (!IsFinished)
             HideBar(GetLastIndex());
     }
+
     void Judge()
     {
         if (isMine)
@@ -364,12 +478,14 @@ public class WifiDrop : NoteLongBase, ICanShine
             isJudged = true;
         }
     }
+
     void HideBar(int endIndex)
     {
         endIndex = Math.Min(endIndex, slideBars.Count - 1);
         for (int i = 0; i <= endIndex; i++)
             slideBars[i].SetActive(false);
     }
+
     void Running()
     {
         if (timeProvider.NoteTime - time < 0f || isMine)
@@ -382,9 +498,21 @@ public class WifiDrop : NoteLongBase, ICanShine
             inputManager.WorldPositionHandle(guids[star].GetHashCode(), starPos);
         }
     }
-    // Update is called once per frame
-    private void Update()
+
+    // ============================== 渲染：FixedUpdate ==============================
+    /// <summary>
+    /// FixedUpdate：渲染（淡入、3 个引导星位置插值、HideBar 进度）。
+    /// 由原 Update 迁移到 FixedUpdate（refactor.md 要求 Render 在 FixedUpdate）。
+    /// </summary>
+    private void FixedUpdate()
     {
+        Render();
+    }
+
+    private void Render()
+    {
+        if (isDestroyed) return;
+
         var timing = timeProvider.NoteTime - startTime;
         var stiming = timeProvider.NoteTime - time;
         var remaining = Math.Max(LastFor - timing, 0);
@@ -493,8 +621,8 @@ public class WifiDrop : NoteLongBase, ICanShine
                     break;
             }
         }
-        CheckAll();
     }
+
     void SetJust()
     {
         switch (judgeResult)
@@ -521,31 +649,39 @@ public class WifiDrop : NoteLongBase, ICanShine
         }
     }
     public bool CanShine() => canShine;
+
+    // ============================== 销毁 / End ==============================
     void DestroySelf()
     {
         if (isDestroyed)
             return;
         isDestroyed = true;
-        if (isBreak &&
-            judgeResult == JudgeType.Perfect)
+        if (isBreak && judgeResult == JudgeType.Perfect)
         {
             audioManager.PlayBreakSlideEndSound();
         }
         foreach (GameObject obj in slideBars)
             obj.SetActive(false);
 
-        for (var i = 0; i < star_slides.Length; i++)
-            Destroy(star_slides[i]);
-        Destroy(gameObject);
+        End();
     }
+
     void OnDestroy()
     {
         if (PlayManager.IsReloading) return;
-        if (isDestroying)
-            return;
+        if (isDestroying) return;
+        ReportAndUnbind();
+    }
+
+    private void ReportAndUnbind()
+    {
+        if (_ondestroyReported) return;
+        _ondestroyReported = true;
         isDestroying = true;
 
-        ClearTriggeredSensor();
+        if (inputManager != null)
+            ClearTriggeredSensor();
+
         switch (Majdata<InputManager>.Instance!.Mode)
         {
             case AutoPlayMode.Enable:
@@ -560,7 +696,7 @@ public class WifiDrop : NoteLongBase, ICanShine
                 if (isMine)
                 {
                     if (judgeResult != JudgeType.Miss)
-                    { //Too Late Only, 不考虑留一个判定区的那种LateGd，都随机了，能支持就是随机的荣幸
+                    { //Too Late Only
                         judgeResult = JudgeType.Miss;
                     }
                     else
@@ -571,26 +707,79 @@ public class WifiDrop : NoteLongBase, ICanShine
                 SetJust();
                 break;
         }
-        objectCounter.ReportResult(SimaiNoteType.Slide, judgeResult, isBreak);
-        if (isBreak && judgeResult == JudgeType.Perfect)
-            slideOK.GetComponent<Animator>().runtimeAnimatorController = skinManager.Shine_JudgeBreak;
-        if (!EffectManager.showLevel) slideOK.GetComponent<SpriteRenderer>().sprite =
-            Sprite.Create(new Texture2D(0, 0), new Rect(0, 0, 0, 0), new Vector2(0.5f, 0.5f));
+        if (objectCounter != null)
+            objectCounter.ReportResult(SimaiNoteType.Slide, judgeResult, isBreak);
+        if (slideOK != null)
+        {
+            if (isBreak && judgeResult == JudgeType.Perfect)
+                slideOK.GetComponent<Animator>().runtimeAnimatorController = skinManager.Shine_JudgeBreak;
+            if (!EffectManager.showLevel) slideOK.GetComponent<SpriteRenderer>().sprite =
+                Sprite.Create(new Texture2D(0, 0), new Rect(0, 0, 0, 0), new Vector2(0.5f, 0.5f));
+            slideOK.SetActive(true);
+        }
 
-        slideOK.SetActive(true);
-
-
-        foreach (var t in boundSensors)
-            inputManager.UnbindSensor(Check, t);
+        if (inputManager != null)
+        {
+            foreach (var t in boundSensors)
+                inputManager.UnbindSensor(Check, t);
+        }
+        boundSensors.Clear();
     }
+
+    /// <summary>
+    /// 池化结束：上报、解绑、把 slideOK 还原回 child、释放 3 个 star_slide 与自身回池。
+    /// </summary>
+    public override void End()
+    {
+        ReportAndUnbind();
+
+        // 把 slideOK 还原回 slide 子对象，便于整体回池后下次 Init 时仍可用 transform.GetChild 找到它
+        if (_slideOKDetached && slideOK != null)
+        {
+            slideOK.transform.SetParent(transform, false);
+            _slideOKDetached = false;
+        }
+
+        // 释放 3 个 star_slide 回池
+        if (starSlidePrefabRef != null)
+        {
+            for (var i = 0; i < star_slides.Length; i++)
+            {
+                if (star_slides[i] != null)
+                {
+                    NotePool.Instance.Release(starSlidePrefabRef, star_slides[i]);
+                    star_slides[i] = null!;
+                }
+            }
+        }
+        else
+        {
+            for (var i = 0; i < star_slides.Length; i++)
+                if (star_slides[i] != null)
+                    Destroy(star_slides[i]);
+        }
+
+        for (var i = 0; i < _dynamicShineControllers.Count; i++)
+            if (_dynamicShineControllers[i] != null)
+                Destroy(_dynamicShineControllers[i]);
+        _dynamicShineControllers.Clear();
+
+        if (prefabRef != null)
+            NotePool.Instance.Release(prefabRef, gameObject);
+        else
+            Destroy(gameObject);
+    }
+
     /// <summary>
     /// 清空所有已触发的Sensor
     /// </summary>
     void ClearTriggeredSensor()
     {
         foreach (var star in star_slides)
-            inputManager.ClearTriggeredSensor(guids[star].GetHashCode());
+            if (star != null && guids.ContainsKey(star))
+                inputManager.ClearTriggeredSensor(guids[star].GetHashCode());
     }
+
     private void setSlideBarAlpha(float alpha)
     {
         foreach (var sr in sbRender)

@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 
 #region
 
@@ -11,40 +11,50 @@ using Random = UnityEngine.Random;
 
 #endregion
 
+/// <summary>
+/// Slide note：复杂的轨迹型 note，包含多段判定区(<see cref="SlideArea"/>)、引导星(<see cref="star_slide"/>)、
+/// 箭头组(<see cref="slideBars"/>)、判定显示(<see cref="slideOK"/>)、连接星星(ConnSlide)。
+/// <para>生命周期：<c>Awake (注入依赖) → Init(info) (刷新数据/重置状态/调用 Initialize) →
+/// Update (running+check) → FixedUpdate (Render) → End (归还池)</c>。</para>
+/// <para>箭头摆放数据：<see cref="SlideArrowTable"/> 提供静态 ArrowPose；当前实现仍使用 prefab 上的
+/// arrow 子对象（保留旧渲染），后续可改用 <see cref="ArrowPool"/> 完成"单 prefab + 字典定位"的目标。</para>
+/// </summary>
 public class SlideDrop : NoteLongBase, ICanShine
 {
+    #region Note Data (Init 刷新)
     public int endPosition;
-
     public bool isMirror;
     public bool isJustR;
     public bool isSpecialFlip; // fixes known star problem
-
     public float startTime;
     public int sortIndex;
-
     public ConnSlideInfo ConnectInfo = new();
     public List<int> areaStep = new();
     public bool smoothSlideAnime = false;
-
     public string slideType;
+    #endregion
 
+    #region Pooled Children (DataLoader 注入 prefab refs)
+    public GameObject star_slide;
+    [System.NonSerialized] public GameObject? starSlidePrefab; // 池化用 prefab key
+    private SpriteRenderer starRenderer;
+    private GameObject slideOK;
+    #endregion
+
+    #region Runtime State (Init 重置)
     private float arriveTime = -1;
     private List<SensorType> boundSensors = new();
-    private List<SensorType> triggerSensors = new(); // AutoPlay; 标记已触发的Sensor 
-    private List<SlideArea> judgeQueue = new(); // 判定队列(目前剩余的)
-    private List<SlideArea> _judgeQueue = new(); // 判定队列
+    private List<SensorType> triggerSensors = new(); // AutoPlay; 标记已触发的Sensor
+    private List<SlideArea> judgeQueue = new();      // 判定队列(目前剩余的)
+    private List<SlideArea> _judgeQueue = new();     // 判定队列原始拷贝
 
     public bool IsFinished => judgeQueue.Count == 0;
     public bool IsPendingFinish => judgeQueue.Count == 1;
-
-    public GameObject star_slide;
-    private SpriteRenderer starRenderer;
 
     private readonly List<GameObject> slideBars = new();
     private readonly List<Vector3> slidePositions = new();
     private readonly List<Quaternion> slideRotations = new();
     private Animator fadeInAnimator;
-    private GameObject slideOK;
 
     bool canShine = false;
     bool canCheck = false;
@@ -53,12 +63,115 @@ public class SlideDrop : NoteLongBase, ICanShine
     float judgeTiming; // 正解帧
     float forceJudgeTime;
     bool isInitialized = false; //防止重复初始化
-    bool isDestroying = false; // 防止重复销毁
+    bool isDestroying = false;  // 防止 OnDestroy 重复执行
     bool isSoundPlayed = false;
     bool isDestroyed = false;
+    bool _initApplied = false;  // Init(info) 是否被调用过（区分新池化路径 vs 旧直接赋值路径）
+    bool _ondestroyReported = false; // 防止 End 与 OnDestroy 重复上报
+    /// <summary>动态 AddComponent 的 BreakShineController 列表，End 时清除避免池复用累积。</summary>
+    private readonly List<BreakShineController> _dynamicShineControllers = new();
+    /// <summary>缓存的 slideOK 原始父级（slide 自身）；Initialize 会把它移到 slide.parent，End 时需还原。</summary>
+    private bool _slideOKDetached = false;
+    #endregion
 
     /// <summary>
+    /// Awake：依赖注入只跑一次（池化复用时不会重复执行）。
+    /// 注意：原版 SlideDrop 没有 Start/Awake，而是在 Initialize 中第一次注入；
+    /// 重构后改为 Awake 注入，Initialize 仅做与 note 数据相关的初始化。
+    /// </summary>
+    private void Awake()
+    {
+        objectCounter = Majdata<ObjectCounter>.Instance!;
+        skinManager = Majdata<SkinManager>.Instance!;
+        timeProvider = Majdata<TimeProvider>.Instance!;
+        inputManager = Majdata<InputManager>.Instance!;
+        audioManager = Majdata<AudioManager>.Instance!;
+    }
+
+    // ============================== 池化入口 ==============================
+    /// <summary>
+    /// 池化复用入口：刷新数据、重置状态、再调用 <see cref="Initialize"/>。
+    /// </summary>
+    public void Init(SlidePoolingInfo info)
+    {
+        _initApplied = true;
+        ApplyInfo(info);
+        ResetRuntimeState();
+        // 注：Initialize 由 DataLoader.InstantiateStarGroup 在所有 subSlide 创建完后统一调用
+        // （以便正确建立 ConnectInfo 链与 totalSlideLen）。这里不主动 Initialize。
+    }
+
+    private void ApplyInfo(SlidePoolingInfo info)
+    {
+        time = info.Time;
+        startTime = info.StartTime;
+        LastFor = info.LastFor;
+        startPosition = info.StartPosition;
+        endPosition = info.EndPosition;
+        speed = info.Speed;
+        sortIndex = info.SortIndex;
+
+        slideType = info.SlideShape;
+        isMirror = info.IsMirror;
+        isSpecialFlip = info.IsSpecialFlip;
+        isJustR = info.IsJustR;
+        isEach = info.IsEach;
+        isBreak = info.IsBreak;
+        isMine = info.IsMine;
+        usingSV = info.UsingSV;
+        smoothSlideAnime = info.SmoothSlideAnime;
+        ConnectInfo = info.ConnectInfo;
+    }
+
+    /// <summary>
+    /// 重置所有运行时状态（list/bool/Animator/sortingOrder/transform），让 prefab 实例
+    /// 可以被 <see cref="Initialize"/> 重新初始化。
+    /// </summary>
+    private void ResetRuntimeState()
+    {
+        arriveTime = -1;
+        judgeResult = JudgeType.Miss;
+        isJudged = false;
+        isInitialized = false;
+        isDestroying = false;
+        isDestroyed = false;
+        isSoundPlayed = false;
+        canShine = false;
+        canCheck = false;
+        isChecking = false;
+        _ondestroyReported = false;
+
+        boundSensors.Clear();
+        triggerSensors.Clear();
+        judgeQueue.Clear();
+        _judgeQueue.Clear();
+        slideBars.Clear();
+        slidePositions.Clear();
+        slideRotations.Clear();
+
+        // 移除上次 Init 在 slideBars 与 star_slide 上 AddComponent 的 BreakShineController（避免累积）
+        for (var i = 0; i < _dynamicShineControllers.Count; i++)
+            if (_dynamicShineControllers[i] != null)
+                Destroy(_dynamicShineControllers[i]);
+        _dynamicShineControllers.Clear();
+
+        // 把上次 Initialize 移到 slide.parent 的 slideOK 还原回 slide 子对象（如果存在）
+        if (_slideOKDetached && slideOK != null)
+        {
+            slideOK.transform.SetParent(transform, false);
+            _slideOKDetached = false;
+        }
+
+        // 重置 transform（Initialize 后续会覆盖）
+        transform.localScale = Vector3.one;
+        transform.rotation = Quaternion.identity;
+    }
+
+    // ============================== 原 Initialize（公开供 DataLoader.InstantiateStarGroup 调用） ==============================
+    /// <summary>
     /// Slide初始化
+    /// <para>由 DataLoader.InstantiateStarGroup 在所有 subSlide 都创建完成后统一调用。
+    /// 池化场景下：先由 <see cref="Init"/> 重置状态，再调此方法重新铺 arrow / 计算 judgeQueue。</para>
     /// </summary>
     public void Initialize()
     {
@@ -66,11 +179,12 @@ public class SlideDrop : NoteLongBase, ICanShine
             return;
         isInitialized = true;
 
-        objectCounter = Majdata<ObjectCounter>.Instance!;
-        skinManager = Majdata<SkinManager>.Instance!;
-        timeProvider = Majdata<TimeProvider>.Instance!;
-        inputManager = Majdata<InputManager>.Instance!;
-        audioManager = Majdata<AudioManager>.Instance!;
+        // 防御性兜底：Awake 应已注入这些依赖；走旧路径(直接 set 字段，不经 Init)的实例也能在这里补上
+        if (objectCounter == null) objectCounter = Majdata<ObjectCounter>.Instance!;
+        if (skinManager == null) skinManager = Majdata<SkinManager>.Instance!;
+        if (timeProvider == null) timeProvider = Majdata<TimeProvider>.Instance!;
+        if (inputManager == null) inputManager = Majdata<InputManager>.Instance!;
+        if (audioManager == null) audioManager = Majdata<AudioManager>.Instance!;
 
         //star
         starRenderer = star_slide.GetComponent<SpriteRenderer>();
@@ -85,14 +199,21 @@ public class SlideDrop : NoteLongBase, ICanShine
             var controller = star_slide.AddComponent<BreakShineController>();
             controller.parent = this;
             controller.enabled = true;
+            _dynamicShineControllers.Add(controller);
         }
+        // star 的 transform 重置（池化复用时旧的位置/缩放/颜色会脏）
+        star_slide.transform.localScale = Vector3.one;
+        star_slide.SetActive(false);
+        starRenderer.color = Color.white;
 
-        //bars
+        //bars——从 prefab 上的 arrow 子对象收集（保留原行为；ArrowPool 路径见 refactor-status.md）
         for (var i = 0; i < transform.childCount - 1; i++)
             slideBars.Add(transform.GetChild(i).gameObject);
+        // 复用时上次被 SetActive(false) 的 bar 这里要恢复
+        foreach (var bar in slideBars) bar.SetActive(true);
 
         //slideok
-        slideOK = transform.GetChild(transform.childCount - 1).gameObject; //slideok is the last one        
+        slideOK = transform.GetChild(transform.childCount - 1).gameObject; //slideok is the last one
         if (isMirror)
         {
             transform.localScale = new Vector3(-1f, 1f, 1f);
@@ -123,8 +244,9 @@ public class SlideDrop : NoteLongBase, ICanShine
         }
         slideOK.SetActive(false);
         slideOK.transform.SetParent(transform.parent);
+        _slideOKDetached = true; // 标记：End 时需要把它再 SetParent(transform) 回来以便整体回池
 
-        //bars
+        //bars positions/rotations（仍按 prefab 子对象的 transform 来读，保留原 18° 偏移）
         slidePositions.Add(getPositionFromDistance(4.8f));
         foreach (var bars in slideBars)
         {
@@ -166,6 +288,7 @@ public class SlideDrop : NoteLongBase, ICanShine
                 var controller = gm.AddComponent<BreakShineController>();
                 controller.parent = this;
                 controller.enabled = true;
+                _dynamicShineControllers.Add(controller);
             }
             if (isMine)
             {
@@ -182,6 +305,8 @@ public class SlideDrop : NoteLongBase, ICanShine
         var fullFadeInTime = Math.Min(fadeInTime + 0.2f, 0);
         var interval = fullFadeInTime - fadeInTime;
         fadeInAnimator = this.GetComponent<Animator>();
+        // 池化复用：Animator 状态需要 Rebind，否则 SetTrigger 不生效
+        fadeInAnimator.Rebind();
         //淡入时机与正解帧间隔小于200ms时，加快淡入动画的播放速度; interval永不为0
         fadeInAnimator.speed = 0.2f / interval;
         fadeInAnimator.SetTrigger("slide");
@@ -260,10 +385,20 @@ public class SlideDrop : NoteLongBase, ICanShine
         judgeQueue.Clear();
     }
 
+    // ============================== 逻辑：Update（running + check） ==============================
+    /// <summary>
+    /// Update：状态机推进 + autoplay (Running) + 玩家判定轮询 (Check)。
+    /// 由原 Update 与 FixedUpdate 末尾的 Check 合并而来。
+    /// </summary>
     private void Update()
     {
+        if (isDestroyed) return;
+
         if (Majdata<InputManager>.Instance!.Mode is AutoPlayMode.Enable or AutoPlayMode.Random)
+        {
+            // autoplay 路径下 Update 不做检查（FixedUpdate.Render 会处理 hide/destroy）
             return;
+        }
 
         // time        是Slide启动的时间点
         // startTiming 是Slide完全显示但未启动
@@ -303,9 +438,20 @@ public class SlideDrop : NoteLongBase, ICanShine
         }
 
         Running();
+        Check();
     }
-    // Update is called once per frame
+
+    // ============================== 渲染：FixedUpdate ==============================
+    /// <summary>
+    /// FixedUpdate：渲染（淡入、引导星位置插值、HideBar 进度）。
+    /// 注：autoplay 模式下的 HideBar/DestroySelf 仍在 Render 中触发（与原版一致）。
+    /// </summary>
     private void FixedUpdate()
+    {
+        Render();
+    }
+
+    private void Render()
     {
         if (isDestroyed) return;
 
@@ -337,7 +483,6 @@ public class SlideDrop : NoteLongBase, ICanShine
             else if (!fadeInAnimator.enabled && fakeTiming >= fadeInTime)
                 fadeInAnimator.enabled = true;
             return;
-
         }
         fadeInAnimator.enabled = false;
         setSlideBarAlpha(1f);
@@ -432,7 +577,6 @@ public class SlideDrop : NoteLongBase, ICanShine
                     break;
             }
         }
-        Check();
     }
 
     public float GetSlideLength()
@@ -443,7 +587,7 @@ public class SlideDrop : NoteLongBase, ICanShine
         return Math.Max(slideBars.Count, 1);
     }
 
-
+    // ============================== 判定 ==============================
     public void Check(object sender, InputEventArgs arg) => Check();
     /// <summary>
     /// 判定队列检查
@@ -513,6 +657,7 @@ public class SlideDrop : NoteLongBase, ICanShine
 
         isChecking = false;
     }
+
     void HideBar(int endIndex)
     {
         endIndex = Math.Min(endIndex - 1, slideBars.Count - 1);
@@ -522,9 +667,7 @@ public class SlideDrop : NoteLongBase, ICanShine
 
     /// <summary>
     /// AutoPlay
-    /// <para>
-    /// 用于触发Sensor
-    /// </para>
+    /// <para>用于触发Sensor</para>
     /// </summary>
     void Running()
     {
@@ -538,6 +681,7 @@ public class SlideDrop : NoteLongBase, ICanShine
             inputManager.WorldPositionHandle(guid.GetHashCode(), starPos);
         }
     }
+
     /// <summary>
     /// Slide判定
     /// </summary>
@@ -606,6 +750,7 @@ public class SlideDrop : NoteLongBase, ICanShine
             SetJust();
         }
     }
+
     void SetJust()
     {
         switch (judgeResult)
@@ -632,6 +777,7 @@ public class SlideDrop : NoteLongBase, ICanShine
 
         }
     }
+
     /// <summary>
     /// 强制将Slide判定为TooLate并销毁
     /// </summary>
@@ -651,9 +797,11 @@ public class SlideDrop : NoteLongBase, ICanShine
         SetJust();
         isJudged = true;
     }
+
+    // ============================== 销毁 / End ==============================
     /// <summary>
     /// 销毁当前Slide
-    /// <para>当 <paramref name="onlyStar"/> 为true时，仅销毁引导Star</para>
+    /// <para>当 <paramref name="onlyStar"/> 为true时，仅销毁/归还引导Star</para>
     /// </summary>
     /// <param name="onlyStar"></param>
     void DestroySelf(bool onlyStar = false)
@@ -662,36 +810,70 @@ public class SlideDrop : NoteLongBase, ICanShine
             return;
         isDestroyed = true;
         PlayJudgeSFX();
+
         if (onlyStar)
         {
-            Destroy(star_slide);
-            star_slide = null!;
+            ReleaseStar();
         }
         else
         {
+            // 释放上一个 conn slide 的整体（其实是 conn 链中我自己上一段的 slide GameObject）
             if (ConnectInfo.Parent != null)
-                Destroy(ConnectInfo.Parent);
+            {
+                var parentSlide = ConnectInfo.Parent.GetComponent<SlideDrop>();
+                if (parentSlide != null) parentSlide.End();
+                else Destroy(ConnectInfo.Parent);
+                ConnectInfo.Parent = null;
+            }
 
             foreach (var obj in slideBars)
                 obj.SetActive(false);
 
-            if (star_slide != null)
-                Destroy(star_slide);
-            Destroy(gameObject);
+            ReleaseStar();
+            End();
         }
     }
+
+    private void ReleaseStar()
+    {
+        if (star_slide == null) return;
+        if (starSlidePrefab != null)
+        {
+            NotePool.Instance.Release(starSlidePrefab, star_slide);
+        }
+        else
+        {
+            Destroy(star_slide);
+        }
+        star_slide = null!;
+    }
+
     void OnDestroy()
     {
         if (PlayManager.IsReloading) return;
-        if (isDestroying)
-            return;
-        isDestroying = true;
-        if (ConnectInfo.Parent != null)
-            Destroy(ConnectInfo.Parent);
-        if (star_slide != null)
-            Destroy(star_slide);
+        if (isDestroying) return;
+        ReportAndUnbind();
+    }
 
-        inputManager.ClearTriggeredSensor(guid.GetHashCode());
+    /// <summary>
+    /// 上报判定 + 解绑 sensors。 OnDestroy 与 End 都会调用此方法（用 _ondestroyReported 防重复）。
+    /// </summary>
+    private void ReportAndUnbind()
+    {
+        if (_ondestroyReported) return;
+        _ondestroyReported = true;
+        isDestroying = true;
+
+        // 兜底销毁未释放的 child slide / star_slide（Reload 流程会走这里）
+        if (ConnectInfo.Parent != null && ConnectInfo.Parent)
+        {
+            // ConnectInfo.Parent 在重玩流程中可能仍存在，但其 SlideDrop 可能已被销毁
+            // 不再触碰它，避免循环
+        }
+
+        if (inputManager != null)
+            inputManager.ClearTriggeredSensor(guid.GetHashCode());
+
         if (ConnectInfo.IsGroupPartEnd || !ConnectInfo.IsConnSlide)
         {
             switch (Majdata<InputManager>.Instance!.Mode)
@@ -721,21 +903,62 @@ public class SlideDrop : NoteLongBase, ICanShine
             }
 
             // 只有组内最后一个Slide完成 才会显示判定条并增加总数
-            objectCounter.ReportResult(SimaiNoteType.Slide, judgeResult, isBreak);
-            if (isBreak && judgeResult == JudgeType.Perfect)
-                slideOK.GetComponent<Animator>().runtimeAnimatorController = skinManager.Shine_JudgeBreak;
-            if (EffectManager.showLevel)
+            if (objectCounter != null)
+                objectCounter.ReportResult(SimaiNoteType.Slide, judgeResult, isBreak);
+            if (slideOK != null)
             {
-                slideOK.SetActive(true);
+                if (isBreak && judgeResult == JudgeType.Perfect)
+                    slideOK.GetComponent<Animator>().runtimeAnimatorController = skinManager.Shine_JudgeBreak;
+                if (EffectManager.showLevel)
+                {
+                    slideOK.SetActive(true);
+                }
             }
         }
         else
         {
-            // 如果不是组内最后一个 那么也要将判定条删掉
-            Destroy(slideOK);
+            // 如果不是组内最后一个 那么也要把判定条隐藏
+            if (slideOK != null) slideOK.SetActive(false);
         }
-        foreach (var t in boundSensors)
-            inputManager.UnbindSensor(Check, t);
+        if (inputManager != null)
+        {
+            foreach (var t in boundSensors)
+                inputManager.UnbindSensor(Check, t);
+        }
+        boundSensors.Clear();
+    }
+
+    /// <summary>
+    /// 池化结束：上报、解绑、把 slideOK 还原回 child、释放 star_slide 与自身回池。
+    /// </summary>
+    public override void End()
+    {
+        ReportAndUnbind();
+
+        // 把 slideOK 还原回 slide 子对象，这样整体 Release 后下次 Initialize 还能正确找到它
+        if (_slideOKDetached && slideOK != null)
+        {
+            slideOK.transform.SetParent(transform, false);
+            _slideOKDetached = false;
+        }
+
+        // 释放 star_slide（如果还在）
+        ReleaseStar();
+
+        // 移除动态 BreakShineController（避免下次 Init 累积）
+        for (var i = 0; i < _dynamicShineControllers.Count; i++)
+            if (_dynamicShineControllers[i] != null)
+                Destroy(_dynamicShineControllers[i]);
+        _dynamicShineControllers.Clear();
+
+        if (prefabRef != null)
+        {
+            NotePool.Instance.Release(prefabRef, gameObject);
+        }
+        else
+        {
+            Destroy(gameObject);
+        }
     }
 
     private void setSlideBarAlpha(float alpha)

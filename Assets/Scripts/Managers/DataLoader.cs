@@ -747,23 +747,14 @@ public class DataLoader : MonoBehaviour
 
     private GameObject InstantiateSlide(SimaiTimingPoint timing, SimaiNote note, ConnSlideInfo info)
     {
-        var GOnote = Instantiate(starPrefab, notes.transform);
-        GOnote.SetActive(false);
+        // ---------- head star（slide 头）通过 NotePool 池化 ----------
+        var GOnote = NotePool.Instance.Get(starPrefab, notes.transform);
         var NDCompo = GOnote.GetComponent<StarDrop>();
+        NDCompo.prefabRef = starPrefab;
+
         //无头星星的头只用来叫醒slide
         noteManager.AddLoadedNote(NDCompo);
         if (!note.IsSlideNoHead) noteManager.AddNote(NDCompo, noteIndex[note.StartPosition]++);
-
-        // note的图层顺序
-        NDCompo.noteSortOrder = noteSortOrder;
-        noteSortOrder -= NOTE_LAYER_COUNT[note.Type];
-
-        NDCompo.rotateSpeed = (float)note.SlideTime;
-        NDCompo.isEx = note.IsEx;
-        NDCompo.isBreak = note.IsBreak;
-        NDCompo.isMine = note.IsMine;
-        NDCompo.usingSV = note.UsingSV;
-        NDCompo.tapLine = tapLine;
 
         var slideShape = detectShapeFromText(note.RawContent);
         var isMirror = false;
@@ -774,53 +765,65 @@ public class DataLoader : MonoBehaviour
         }
         var slideIndex = SLIDE_PREFAB_MAP[slideShape];
 
-        var slide = Instantiate(slidePrefab[slideIndex], notes.transform);
-        var slide_star = Instantiate(star_slidePrefab, notes.transform);
+        // ---------- slide body 通过 NotePool 池化 ----------
+        var slide = NotePool.Instance.Get(slidePrefab[slideIndex], notes.transform);
+        var slide_star = NotePool.Instance.Get(star_slidePrefab, notes.transform);
         slide_star.SetActive(false);
         slide.SetActive(false);
-        NDCompo.slide = slide;
-        var SliCompo = slide.AddComponent<SlideDrop>();
 
-        SliCompo.slideType = slideShape;
-        SliCompo.areaStep = new List<int>(SLIDE_AREA_STEP_MAP[slideShape]);
-        SliCompo.smoothSlideAnime = smoothSlideAnime;
+        // SliCompo: 复用时已存在；首次需 AddComponent
+        var SliCompo = slide.GetComponent<SlideDrop>();
+        if (SliCompo == null) SliCompo = slide.AddComponent<SlideDrop>();
+        SliCompo.prefabRef = slidePrefab[slideIndex];
+        SliCompo.starSlidePrefab = star_slidePrefab;
+        SliCompo.star_slide = slide_star;
 
+        // ---------- 计算 isEach / isDouble for head star ----------
+        var headIsEach = false;
+        var headIsDouble = false;
+        var slideIsEach = false;
         if (timing.Notes.Length > 1)
         {
-            var notes = timing.Notes.ToList();
-            NDCompo.isEach = true;
-            if (notes.FindAll(o => o.Type == SimaiNoteType.Slide).Count > 1)
-            {
-                SliCompo.isEach = true;
-            }
+            var notesList = timing.Notes.ToList();
+            headIsEach = true;
+            if (notesList.FindAll(o => o.Type == SimaiNoteType.Slide).Count > 1)
+                slideIsEach = true;
 
-            var count = notes.FindAll(
+            var count = notesList.FindAll(
                 o => o.Type == SimaiNoteType.Slide &&
                      o.StartPosition == note.StartPosition).Count;
             if (count > 1)
             {
-                NDCompo.isDouble = true;
-                if (count == notes.Count)
-                    NDCompo.isEach = false;
-                else
-                    NDCompo.isEach = true;
+                headIsDouble = true;
+                headIsEach = (count != notesList.Count);
             }
         }
 
-        SliCompo.ConnectInfo = info;
-        SliCompo.isBreak = note.IsSlideBreak;
-        SliCompo.isMine = note.IsMineSlide;
-        SliCompo.usingSV = note.UsingSV;
+        // ---------- 通过 PoolingInfo 初始化 head star ----------
+        var starInfo = new StarPoolingInfo
+        {
+            Time = (float)timing.Timing,
+            StartPosition = note.StartPosition,
+            Speed = noteSpeed * timing.HSpeed,
+            NoteSortOrder = noteSortOrder,
+            RotateSpeed = (float)note.SlideTime,
+            IsEach = headIsEach,
+            IsBreak = note.IsBreak,
+            IsEx = note.IsEx,
+            IsMine = note.IsMine,
+            UsingSV = note.UsingSV,
+            IsDouble = headIsDouble,
+            IsNoHead = note.IsSlideNoHead,
+            IsFakeStar = false,
+            IsFakeStarRotate = false,
+            Slide = slide,
+        };
+        NDCompo.Init(starInfo);
 
-        NDCompo.isNoHead = note.IsSlideNoHead;
-        NDCompo.time = (float)timing.Timing;
-        NDCompo.startPosition = note.StartPosition;
-        NDCompo.speed = noteSpeed * timing.HSpeed;
+        noteSortOrder -= NOTE_LAYER_COUNT[note.Type];
 
-
-        SliCompo.isMirror = isMirror;
-        SliCompo.isJustR = detectJustType(note.RawContent, out int endPos);
-        SliCompo.endPosition = endPos;
+        // ---------- 计算 isSpecialFlip ----------
+        bool isSpecialFlip;
         if (slideIndex - 26 > 0 && slideIndex - 26 <= 8)
         {
             // known slide sprite issue
@@ -828,25 +831,52 @@ public class DataLoader : MonoBehaviour
             // p  X X X X X X O O
             // q  X O O X X X X X
             var pqEndPos = slideIndex - 26;
-            SliCompo.isSpecialFlip = isMirror == (pqEndPos == 7 || pqEndPos == 8);
+            isSpecialFlip = isMirror == (pqEndPos == 7 || pqEndPos == 8);
         }
         else
         {
-            SliCompo.isSpecialFlip = isMirror;
+            isSpecialFlip = isMirror;
         }
-        SliCompo.speed = noteSpeed * timing.HSpeed;
-        SliCompo.startTime = (float)timing.Timing;
-        SliCompo.startPosition = note.StartPosition;
-        SliCompo.star_slide = slide_star;
-        SliCompo.time = (float)note.SlideStartTime;
-        SliCompo.LastFor = (float)note.SlideTime;
-        //SliCompo.sortIndex = -7000 + (int)((lastNoteTime - timing.time) * -100) + sort * 5;
-        SliCompo.sortIndex = slideLayer;
+
+        // ---------- 通过 PoolingInfo 初始化 slide body ----------
+        // areaStep 仍然按原方式赋值（与判定相关，不在 PoolingInfo 中）
+        SliCompo.areaStep = new List<int>(SLIDE_AREA_STEP_MAP[slideShape]);
+        var slideInfo = new SlidePoolingInfo
+        {
+            Time = (float)note.SlideStartTime,
+            StartTime = (float)timing.Timing,
+            LastFor = (float)note.SlideTime,
+            StartPosition = note.StartPosition,
+            EndPosition = detectJustTypeAndEndPos(note.RawContent, out var _slideEndPos),
+            Speed = noteSpeed * timing.HSpeed,
+            SortIndex = slideLayer,
+            SlideShape = slideShape,
+            IsMirror = isMirror,
+            IsSpecialFlip = isSpecialFlip,
+            IsJustR = detectJustType(note.RawContent, out var __discard),
+            IsEach = slideIsEach,
+            IsBreak = note.IsSlideBreak,
+            IsMine = note.IsMineSlide,
+            UsingSV = note.UsingSV,
+            SmoothSlideAnime = smoothSlideAnime,
+            ConnectInfo = info,
+        };
+        SliCompo.Init(slideInfo);
+
         if (legacySlideLayer)
             slideLayer -= SLIDE_AREA_STEP_MAP[slideShape].Last();
         else
             slideLayer += 5;
         return slide;
+    }
+
+    /// <summary>
+    /// Helper：调用 detectJustType 并把 endPos 同时作为返回值返回，使 PoolingInfo 字段更整洁。
+    /// </summary>
+    private int detectJustTypeAndEndPos(string content, out int endPos)
+    {
+        detectJustType(content, out endPos);
+        return endPos;
     }
 
     private void InstantiateWifi(SimaiTimingPoint timing, SimaiNote note)
@@ -860,70 +890,84 @@ public class DataLoader : MonoBehaviour
         endPos = endPos > 8 ? endPos - 8 : endPos;
         endPos++;
 
-        var GOnote = Instantiate(starPrefab, notes.transform);
-        GOnote.SetActive(false);
+        // ---------- head star 通过 NotePool 池化 ----------
+        var GOnote = NotePool.Instance.Get(starPrefab, notes.transform);
         var NDCompo = GOnote.GetComponent<StarDrop>();
+        NDCompo.prefabRef = starPrefab;
         //无头星星的头只用来叫醒slide
         noteManager.AddLoadedNote(NDCompo);
         if (!note.IsSlideNoHead) noteManager.AddNote(NDCompo, noteIndex[note.StartPosition]++);
 
-        // note的图层顺序
-        NDCompo.noteSortOrder = noteSortOrder;
-        noteSortOrder -= NOTE_LAYER_COUNT[note.Type];
-
-        NDCompo.rotateSpeed = (float)note.SlideTime;
-        NDCompo.isEx = note.IsEx;
-        NDCompo.isBreak = note.IsBreak;
-        NDCompo.isMine = note.IsMine;
-        NDCompo.usingSV = note.UsingSV;
-        NDCompo.tapLine = tapLine;
-
-        var slideWifi = Instantiate(slidePrefab[SLIDE_PREFAB_MAP["wifi"]], notes.transform);
+        // ---------- wifi slide body 通过 NotePool 池化 ----------
+        var wifiPrefab = slidePrefab[SLIDE_PREFAB_MAP["wifi"]];
+        var slideWifi = NotePool.Instance.Get(wifiPrefab, notes.transform);
         slideWifi.SetActive(false);
-        NDCompo.slide = slideWifi;
         var WifiCompo = slideWifi.GetComponent<WifiDrop>();
+        WifiCompo.prefabRef = wifiPrefab;
 
-        WifiCompo.areaStep = new List<int>(SLIDE_AREA_STEP_MAP["wifi"]);
-        WifiCompo.smoothSlideAnime = smoothSlideAnime;
-
+        // ---------- 计算 isEach / isDouble for head star ----------
+        var headIsEach = false;
+        var headIsDouble = false;
+        var wifiIsEach = false;
         if (timing.Notes.Length > 1)
         {
-            NDCompo.isEach = true;
-            NDCompo.isDouble = false;
-            var notes = timing.Notes.ToList();
-            if (notes.FindAll(
-                    o => o.Type == SimaiNoteType.Slide).Count
-                > 1)
-                WifiCompo.isEach = true;
-            var count = notes.FindAll(
+            headIsEach = true;
+            var notesList = timing.Notes.ToList();
+            if (notesList.FindAll(o => o.Type == SimaiNoteType.Slide).Count > 1)
+                wifiIsEach = true;
+            var count = notesList.FindAll(
                 o => o.Type == SimaiNoteType.Slide &&
                      o.StartPosition == note.StartPosition).Count;
             if (count > 1) //有同起点
             {
-                NDCompo.isDouble = true;
-                if (count == notes.Count)
-                    NDCompo.isEach = false;
-                else
-                    NDCompo.isEach = true;
+                headIsDouble = true;
+                headIsEach = (count != notesList.Count);
             }
         }
 
-        WifiCompo.isBreak = note.IsSlideBreak;
-        WifiCompo.isMine = note.IsMineSlide;
-        WifiCompo.usingSV = note.UsingSV;
-        NDCompo.isNoHead = note.IsSlideNoHead;
-        NDCompo.time = (float)timing.Timing;
-        NDCompo.startPosition = note.StartPosition;
-        NDCompo.speed = noteSpeed * timing.HSpeed;
+        // ---------- head star 初始化 ----------
+        var starInfo = new StarPoolingInfo
+        {
+            Time = (float)timing.Timing,
+            StartPosition = note.StartPosition,
+            Speed = noteSpeed * timing.HSpeed,
+            NoteSortOrder = noteSortOrder,
+            RotateSpeed = (float)note.SlideTime,
+            IsEach = headIsEach,
+            IsBreak = note.IsBreak,
+            IsEx = note.IsEx,
+            IsMine = note.IsMine,
+            UsingSV = note.UsingSV,
+            IsDouble = headIsDouble,
+            IsNoHead = note.IsSlideNoHead,
+            IsFakeStar = false,
+            IsFakeStarRotate = false,
+            Slide = slideWifi,
+        };
+        NDCompo.Init(starInfo);
 
-        WifiCompo.isJustR = detectJustType(note.RawContent, out endPos);
-        WifiCompo.endPosition = endPos;
-        WifiCompo.speed = noteSpeed * timing.HSpeed;
-        WifiCompo.startTime = (float)timing.Timing;
-        WifiCompo.startPosition = note.StartPosition;
-        WifiCompo.time = (float)note.SlideStartTime;
-        WifiCompo.LastFor = (float)note.SlideTime;
-        WifiCompo.sortIndex = slideLayer;
+        noteSortOrder -= NOTE_LAYER_COUNT[note.Type];
+
+        // ---------- wifi body 初始化 ----------
+        WifiCompo.areaStep = new List<int>(SLIDE_AREA_STEP_MAP["wifi"]);
+        var wifiInfo = new WifiPoolingInfo
+        {
+            Time = (float)note.SlideStartTime,
+            StartTime = (float)timing.Timing,
+            LastFor = (float)note.SlideTime,
+            StartPosition = note.StartPosition,
+            EndPosition = detectJustTypeAndEndPos(note.RawContent, out var _),
+            Speed = noteSpeed * timing.HSpeed,
+            SortIndex = slideLayer,
+            IsJustR = detectJustType(note.RawContent, out var __),
+            IsEach = wifiIsEach,
+            IsBreak = note.IsSlideBreak,
+            IsMine = note.IsMineSlide,
+            UsingSV = note.UsingSV,
+            SmoothSlideAnime = smoothSlideAnime,
+        };
+        WifiCompo.Init(wifiInfo);
+
         if (legacySlideLayer)
             slideLayer -= SLIDE_AREA_STEP_MAP["wifi"].Last();
         else
