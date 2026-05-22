@@ -1,4 +1,4 @@
-#nullable enable
+﻿#nullable enable
 
 #region
 
@@ -36,7 +36,7 @@ public class SlideDrop : NoteLongBase, ICanShine
 
     #region Pooled Children (DataLoader 注入 prefab refs)
     public GameObject star_slide;
-    [System.NonSerialized] public GameObject? starSlidePrefab; // 池化用 prefab key
+    [NonSerialized] public GameObject starSlidePrefab;
     private SpriteRenderer starRenderer;
     private GameObject slideOK;
     #endregion
@@ -75,26 +75,19 @@ public class SlideDrop : NoteLongBase, ICanShine
     private bool _slideOKDetached = false;
     #endregion
 
-    /// <summary>
-    /// Awake：依赖注入只跑一次（池化复用时不会重复执行）。
-    /// 注意：原版 SlideDrop 没有 Start/Awake，而是在 Initialize 中第一次注入；
-    /// 重构后改为 Awake 注入，Initialize 仅做与 note 数据相关的初始化。
-    /// </summary>
-    private void Awake()
-    {
-        objectCounter = Majdata<ObjectCounter>.Instance!;
-        skinManager = Majdata<SkinManager>.Instance!;
-        timeProvider = Majdata<TimeProvider>.Instance!;
-        inputManager = Majdata<InputManager>.Instance!;
-        audioManager = Majdata<AudioManager>.Instance!;
-    }
-
     // ============================== 池化入口 ==============================
     /// <summary>
     /// 池化复用入口：刷新数据、重置状态、再调用 <see cref="Initialize"/>。
     /// </summary>
     public void Init(SlidePoolingInfo info)
     {
+        notes = GameObject.Find("Notes");
+        noteManager = Majdata<NoteManager>.Instance!;
+        objectCounter = Majdata<ObjectCounter>.Instance!;
+        skinManager = Majdata<SkinManager>.Instance!;
+        timeProvider = Majdata<TimeProvider>.Instance!;
+        inputManager = Majdata<InputManager>.Instance!;
+        audioManager = Majdata<AudioManager>.Instance!;
         _initApplied = true;
         ApplyInfo(info);
         ResetRuntimeState();
@@ -181,14 +174,10 @@ public class SlideDrop : NoteLongBase, ICanShine
             return;
         isInitialized = true;
 
-        // 防御性兜底：Awake 应已注入这些依赖；走旧路径(直接 set 字段，不经 Init)的实例也能在这里补上
-        if (objectCounter == null) objectCounter = Majdata<ObjectCounter>.Instance!;
-        if (skinManager == null) skinManager = Majdata<SkinManager>.Instance!;
-        if (timeProvider == null) timeProvider = Majdata<TimeProvider>.Instance!;
-        if (inputManager == null) inputManager = Majdata<InputManager>.Instance!;
-        if (audioManager == null) audioManager = Majdata<AudioManager>.Instance!;
-
         //star
+        if (star_slide == null)
+            star_slide = NotePool.Instance.Get(starSlidePrefab, notes.transform);
+
         starRenderer = star_slide.GetComponent<SpriteRenderer>();
         starRenderer.sprite = skinManager.Star;
         if (isEach) starRenderer.sprite = skinManager.Star_Each;
@@ -306,7 +295,7 @@ public class SlideDrop : NoteLongBase, ICanShine
         // 正常情况下应为负值；速度过高将忽略淡入
         var fullFadeInTime = Math.Min(fadeInTime + 0.2f, 0);
         var interval = fullFadeInTime - fadeInTime;
-        fadeInAnimator = this.GetComponent<Animator>();
+        fadeInAnimator = GetComponent<Animator>();
         // 池化复用：Animator 状态需要 Rebind，否则 SetTrigger 不生效
         fadeInAnimator.Rebind();
         //淡入时机与正解帧间隔小于200ms时，加快淡入动画的播放速度; interval永不为0
@@ -482,7 +471,7 @@ public class SlideDrop : NoteLongBase, ICanShine
                 fadeInAnimator.enabled = false;
                 setSlideBarAlpha(1f);
             }
-            else if (!fadeInAnimator.enabled && fakeTiming >= fadeInTime)
+            else if (fadeInAnimator != null && !fadeInAnimator.enabled && fakeTiming >= fadeInTime)
                 fadeInAnimator.enabled = true;
             return;
         }
@@ -832,14 +821,8 @@ public class SlideDrop : NoteLongBase, ICanShine
     private void ReleaseStar()
     {
         if (star_slide == null) return;
-        if (starSlidePrefab != null)
-        {
-            NotePool.Instance.Release(starSlidePrefab, star_slide);
-        }
-        else
-        {
-            Destroy(star_slide);
-        }
+
+        NotePool.Instance.Release(starSlidePrefab, star_slide);
         star_slide = null!;
     }
 
@@ -855,6 +838,7 @@ public class SlideDrop : NoteLongBase, ICanShine
     /// </summary>
     private void ReportAndUnbind()
     {
+        if (PlayManager.IsReloading) return;
         if (_ondestroyReported) return;
         _ondestroyReported = true;
         isDestroying = true;
@@ -932,16 +916,15 @@ public class SlideDrop : NoteLongBase, ICanShine
         if (_isEnded) return;
         _isEnded = true;
 
+        noteManager.RemoveLoadedNote(this);
         ReportAndUnbind();
 
         // 链式 End 上游 conn slide，避免孤儿（原版在 OnDestroy 中通过 Destroy(Parent) 实现）
         if (ConnectInfo.Parent != null)
         {
-            var parentRef = ConnectInfo.Parent;
-            var parentSlide = parentRef.GetComponent<SlideDrop>();
+            var parentSlide = ConnectInfo.Parent.GetComponent<SlideDrop>();
             ConnectInfo.Parent = null; // 先断引用，防止循环
-            if (parentSlide != null) parentSlide.End();
-            else Destroy(parentRef);
+            parentSlide.End();
         }
 
         // 把 slideOK 还原回 slide 子对象，这样整体 Release 后下次 Initialize 还能正确找到它
@@ -960,14 +943,7 @@ public class SlideDrop : NoteLongBase, ICanShine
                 Destroy(_dynamicShineControllers[i]);
         _dynamicShineControllers.Clear();
 
-        if (prefabRef != null)
-        {
-            NotePool.Instance.Release(prefabRef, gameObject);
-        }
-        else
-        {
-            Destroy(gameObject);
-        }
+        NotePool.Instance.Release(prefabRef, gameObject);
     }
 
     private void setSlideBarAlpha(float alpha)

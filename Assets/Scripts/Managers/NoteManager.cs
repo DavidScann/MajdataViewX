@@ -92,13 +92,6 @@ public class NoteManager : MonoBehaviour
         touchOrder.Clear();
         ResetIndex();
 
-        //clear notes：兜底——任何未通过 End() 归还的 GameObject 直接销毁
-        for (var i = transform.childCount - 1; i >= 0; i--)
-        {
-            Destroy(transform.GetChild(i).gameObject);
-        }
-        await UniTask.WaitUntil(() => transform.childCount == 0);
-
         PlayManager.IsReloading = false;
     }
 }

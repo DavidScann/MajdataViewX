@@ -378,20 +378,11 @@ public class TouchHoldDrop : NoteLongBase
             inputManager.UnbindSensor(Check, sensor);
             inputBound = false;
         }
-        if (prefabRef != null)
-        {
-            if (holdEffectPrefab != null && holdEffect != null)
-            {
-                NotePool.Instance.Release(holdEffectPrefab, holdEffect);
-                holdEffect = null!;
-            }
-            NotePool.Instance.Release(prefabRef, gameObject);
-        }
-        else
-        {
-            if (holdEffect != null) Destroy(holdEffect);
-            Destroy(gameObject);
-        }
+
+
+        NotePool.Instance.Release(holdEffectPrefab, holdEffect);
+        holdEffect = null!;
+        NotePool.Instance.Release(prefabRef, gameObject);
     }
 
     private void ReportResult()

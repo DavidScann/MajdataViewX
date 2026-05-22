@@ -24,7 +24,4 @@ public struct StarPoolingInfo
     public bool IsNoHead;
     public bool IsFakeStar;
     public bool IsFakeStarRotate;
-
-    /// <summary>关联的 slide GameObject（无头星头与 slide 配套，会在 Pending→Running 时叫醒 slide）。</summary>
-    public GameObject? Slide;
 }

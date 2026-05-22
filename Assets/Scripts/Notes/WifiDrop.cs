@@ -1,4 +1,4 @@
-#nullable enable
+﻿#nullable enable
 
 #region
 
@@ -20,9 +20,6 @@ using Random = UnityEngine.Random;
 /// </summary>
 public class WifiDrop : NoteLongBase, ICanShine
 {
-    [SerializeField]
-    GameObject star_slidePrefab;
-
     #region Note Data (Init 刷新)
     public bool isJustR;
     public float startTime;
@@ -34,9 +31,10 @@ public class WifiDrop : NoteLongBase, ICanShine
 
     #region Pooled Children (Init 时 NotePool.Get)
     private readonly GameObject[] star_slides = new GameObject[3];
+    [NonSerialized] public GameObject starSlidePrefab;
     private readonly SpriteRenderer[] star_Renderer = new SpriteRenderer[3];
     private GameObject slideOK;
-    [System.NonSerialized] public GameObject? starSlidePrefabRef;
+    [NonSerialized] public GameObject starSlidePrefabRef;
     #endregion
 
     #region Runtime State (Init 重置)
@@ -71,24 +69,19 @@ public class WifiDrop : NoteLongBase, ICanShine
     private bool _slideOKDetached = false;
     #endregion
 
-    /// <summary>
-    /// Awake：依赖注入只跑一次。原版的所有创建逻辑被搬到 <see cref="Init"/>，避免每次 Instantiate 都跑。
-    /// </summary>
-    private void Awake()
-    {
-        objectCounter = Majdata<ObjectCounter>.Instance!;
-        timeProvider = Majdata<TimeProvider>.Instance!;
-        skinManager = Majdata<SkinManager>.Instance!;
-        inputManager = Majdata<InputManager>.Instance!;
-        audioManager = Majdata<AudioManager>.Instance!;
-    }
-
     // ============================== 池化入口 ==============================
     /// <summary>
     /// 池化复用入口：刷新数据 + 重置状态 + 重新初始化（创建/复用 star_slides，构建 judgeQueues 等）。
     /// </summary>
     public void Init(WifiPoolingInfo info)
     {
+        notes = GameObject.Find("Notes");
+        objectCounter = Majdata<ObjectCounter>.Instance!;
+        noteManager = Majdata<NoteManager>.Instance!;
+        timeProvider = Majdata<TimeProvider>.Instance!;
+        skinManager = Majdata<SkinManager>.Instance!;
+        inputManager = Majdata<InputManager>.Instance!;
+        audioManager = Majdata<AudioManager>.Instance!;
         _initApplied = true;
         ApplyInfo(info);
         ResetRuntimeState();
@@ -154,8 +147,6 @@ public class WifiDrop : NoteLongBase, ICanShine
     /// </summary>
     private void InitializeImpl()
     {
-        var notes = GameObject.Find("Notes").transform;
-
         // 计算Slide淡入时机
         // 在8.0速时应当提前300ms显示Slide
         fadeInTime = -3.926913f / speed;
@@ -163,21 +154,20 @@ public class WifiDrop : NoteLongBase, ICanShine
         // 正常情况下应为负值；速度过高将忽略淡入
         var fullFadeInTime = Math.Min(fadeInTime + 0.2f, 0);
         var interval = fullFadeInTime - fadeInTime;
-        fadeInAnimator = this.GetComponent<Animator>();
+        fadeInAnimator = GetComponent<Animator>();
         fadeInAnimator.Rebind();
         fadeInAnimator.speed = 0.2f / interval; //淡入时机与正解帧间隔小于200ms时，加快淡入动画的播放速度; interval永不为0
         fadeInAnimator.SetTrigger("wifi");
 
         // 池化用 prefab key（仅一次性记录）
-        if (starSlidePrefabRef == null) starSlidePrefabRef = star_slidePrefab;
+        if (starSlidePrefabRef == null) starSlidePrefabRef = starSlidePrefab;
 
-        //stars skin —— 第一次走 NotePool.Get；后续 Init 复用相同 GameObject
         for (var i = 0; i < star_slides.Length; i++)
         {
             if (star_slides[i] == null)
-                star_slides[i] = NotePool.Instance.Get(starSlidePrefabRef!, notes);
+                star_slides[i] = NotePool.Instance.Get(starSlidePrefabRef!, notes.transform);
             else
-                star_slides[i].transform.SetParent(notes, false);
+                star_slides[i].transform.SetParent(notes.transform, false);
 
             star_Renderer[i] = star_slides[i].GetComponent<SpriteRenderer>();
 
@@ -677,6 +667,7 @@ public class WifiDrop : NoteLongBase, ICanShine
 
     private void ReportAndUnbind()
     {
+        if (PlayManager.IsReloading) return;
         if (_ondestroyReported) return;
         _ondestroyReported = true;
         isDestroying = true;
@@ -737,6 +728,7 @@ public class WifiDrop : NoteLongBase, ICanShine
         if (_isEnded) return;
         _isEnded = true;
 
+        noteManager.RemoveLoadedNote(this);
         ReportAndUnbind();
 
         // 把 slideOK 还原回 slide 子对象，便于整体回池后下次 Init 时仍可用 transform.GetChild 找到它
@@ -747,22 +739,11 @@ public class WifiDrop : NoteLongBase, ICanShine
         }
 
         // 释放 3 个 star_slide 回池
-        if (starSlidePrefabRef != null)
+
+        for (var i = 0; i < star_slides.Length; i++)
         {
-            for (var i = 0; i < star_slides.Length; i++)
-            {
-                if (star_slides[i] != null)
-                {
-                    NotePool.Instance.Release(starSlidePrefabRef, star_slides[i]);
-                    star_slides[i] = null!;
-                }
-            }
-        }
-        else
-        {
-            for (var i = 0; i < star_slides.Length; i++)
-                if (star_slides[i] != null)
-                    Destroy(star_slides[i]);
+            NotePool.Instance.Release(starSlidePrefabRef, star_slides[i]);
+            star_slides[i] = null!;
         }
 
         for (var i = 0; i < _dynamicShineControllers.Count; i++)
@@ -770,10 +751,7 @@ public class WifiDrop : NoteLongBase, ICanShine
                 Destroy(_dynamicShineControllers[i]);
         _dynamicShineControllers.Clear();
 
-        if (prefabRef != null)
-            NotePool.Instance.Release(prefabRef, gameObject);
-        else
-            Destroy(gameObject);
+        NotePool.Instance.Release(prefabRef, gameObject);
     }
 
     /// <summary>

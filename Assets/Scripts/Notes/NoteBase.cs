@@ -14,6 +14,7 @@ using UnityEngine;
 /// </summary>
 public class NoteBase : MonoBehaviour
 {
+    protected GameObject notes;
     protected TimeProvider timeProvider;
     protected ObjectCounter objectCounter;
     protected NoteManager noteManager;
@@ -35,7 +36,7 @@ public class NoteBase : MonoBehaviour
 
     /// <summary>池化时回归用的 prefab 引用（由 DataLoader 在 Get 后立即设置）。</summary>
     [System.NonSerialized]
-    public GameObject? prefabRef;
+    public GameObject prefabRef;
 
     /// <summary>
     /// 池化生命周期的统一结束钩子。子类（如 TapDrop / HoldDrop）override 后负责

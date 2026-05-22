@@ -19,9 +19,6 @@ public class StarDrop : TapBase
     public bool isNoHead;
     public bool isFakeStar = false;
     public bool isFakeStarRotate = false;
-
-    /// <summary>关联的 slide GameObject（由 DataLoader 填入 PoolingInfo）。</summary>
-    public GameObject? slide;
     #endregion
 
     /// <summary>
@@ -30,7 +27,6 @@ public class StarDrop : TapBase
     private void Awake()
     {
         PreLoad();
-        LoadSkin();
         spriteRenderer.forceRenderingOff = true;
         exSpriteRender.forceRenderingOff = true;
     }
@@ -53,15 +49,17 @@ public class StarDrop : TapBase
         State = NoteStatus.Initialized;
     }
 
-    /// <summary>池化复用入口。</summary>
+    /// <summary>
+    /// 池化复用入口。
+    /// </summary>
     public void Init(StarPoolingInfo info)
     {
         _initApplied = true;
         ApplyStarInfo(info);
+        GetTapLine();
         ResetSortingOrder(info.NoteSortOrder);
         LoadSkin();
         ResetTapState();
-        // 旋转重置（关键：池化复用时旧的旋转状态会脏）
         transform.rotation = Quaternion.identity;
 
         if (!isNoHead)
@@ -88,7 +86,6 @@ public class StarDrop : TapBase
         isNoHead = info.IsNoHead;
         isFakeStar = info.IsFakeStar;
         isFakeStarRotate = info.IsFakeStarRotate;
-        slide = info.Slide;
     }
 
     private void LoadSkin()
@@ -205,15 +202,12 @@ public class StarDrop : TapBase
                     }
                     else
                     {
-                        if (!isFakeStar && slide != null && !slide.activeSelf)
+                        if (isNoHead)
                         {
-                            slide.SetActive(true);
-                            if (isNoHead)
-                            {
-                                DestroySelf();
-                                return;
-                            }
+                            DestroySelf();
+                            return;
                         }
+
                         State = NoteStatus.Running;
                         goto case NoteStatus.Running;
                     }

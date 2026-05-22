@@ -351,10 +351,8 @@ public class TouchDrop : NoteBase
             inputManager.UnbindSensor(Check, sensor);
             inputBound = false;
         }
-        if (prefabRef != null)
-            NotePool.Instance.Release(prefabRef, gameObject);
-        else
-            Destroy(gameObject);
+
+        NotePool.Instance.Release(prefabRef, gameObject);
     }
 
     private void ReportResult()

@@ -19,7 +19,6 @@ public class TapDrop : TapBase
     private void Awake()
     {
         PreLoad();
-        LoadSkin();
         // 池化时即使尚未 Init，先把渲染关掉，等 Init 注入 startPosition 等数据后再启用
         spriteRenderer.forceRenderingOff = true;
         exSpriteRender.forceRenderingOff = true;
@@ -31,13 +30,10 @@ public class TapDrop : TapBase
     public void Init(TapPoolingInfo info)
     {
         ApplyTapInfo(info);
-        // 重新计算 sortingOrder（每次复用都要重新设置）
+        GetTapLine();
         ResetSortingOrder(info.NoteSortOrder);
-        // 皮肤可能因 isEach/isBreak/isMine 改变
         LoadSkin();
-        // 重置 Tap 共有运行时状态
         ResetTapState();
-        // 输入订阅：每次 Init 重新绑定（sensor 可能变）
         sensor = (SensorType)startPosition - 1;
         inputManager.BindArea(Check, sensor);
         inputBound = true;

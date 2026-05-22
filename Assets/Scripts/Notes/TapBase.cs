@@ -1,4 +1,4 @@
-#nullable enable
+﻿#nullable enable
 
 #region
 
@@ -31,11 +31,10 @@ public class TapBase : NoteBase
 
     /// <summary>
     /// Start 阶段一次性获取依赖与子对象。
-    /// 注意：<paramref name="tapLine"/> 的实际 GameObject 取池后由 prefab 缓存，重玩时复用。
     /// </summary>
     protected void PreLoad()
     {
-        var notes = GameObject.Find("Notes").transform;
+        notes = GameObject.Find("Notes");
         noteManager = Majdata<NoteManager>.Instance!;
         timeProvider = Majdata<TimeProvider>.Instance!;
         objectCounter = Majdata<ObjectCounter>.Instance!;
@@ -44,14 +43,9 @@ public class TapBase : NoteBase
         audioManager = Majdata<AudioManager>.Instance!;
 
         // tapLine prefab 优先级：本组件 SerializeField → tapLine 字段（兼容旧 inspector 设置）→ DataLoader 单例
-        if (tapLinePrefab == null)
-            tapLinePrefab = tapLine != null ? tapLine : Majdata<DataLoader>.Instance!.tapLine;
-
-        tapLine = NotePool.Instance.Get(tapLinePrefab, notes);
-        tapLine.SetActive(false);
+        tapLinePrefab = Majdata<DataLoader>.Instance!.tapLine;
 
         spriteRenderer = GetComponent<SpriteRenderer>();
-        lineSpriteRenderer = tapLine.GetComponent<SpriteRenderer>();
         exSpriteRender = transform.GetChild(0).GetComponent<SpriteRenderer>();
     }
 
@@ -62,7 +56,13 @@ public class TapBase : NoteBase
     {
         ResetSortingOrder(sortOrder);
     }
-
+    
+    protected void GetTapLine()
+    {
+        tapLine = NotePool.Instance.Get(tapLinePrefab, notes.transform);
+        tapLine.SetActive(false);
+        lineSpriteRenderer = tapLine.GetComponent<SpriteRenderer>();
+    }
     /// <summary>
     /// 重置 sortingOrder：原版只在 PreLoad 中 +=，池化时每次 Init 都要重新设置。
     /// 使用绝对值（避免反复 += 累积）。子类 StarDrop 也复用。
@@ -334,22 +334,11 @@ public class TapBase : NoteBase
     {
         ReportResult();
         UnbindInput();
-        if (prefabRef != null)
-        {
-            // tapLine 也回池（独立 prefab 的池子）
-            if (tapLinePrefab != null && tapLine != null)
-            {
-                NotePool.Instance.Release(tapLinePrefab, tapLine);
-                tapLine = null!;
-            }
-            NotePool.Instance.Release(prefabRef, gameObject);
-        }
-        else
-        {
-            // 未池化路径：兼容旧的 Destroy 流程
-            if (tapLine != null) Destroy(tapLine);
-            Destroy(gameObject);
-        }
+
+        // tapLine 也回池（独立 prefab 的池子）
+        NotePool.Instance.Release(tapLinePrefab, tapLine);
+        tapLine = null!;
+        NotePool.Instance.Release(prefabRef, gameObject);
     }
 
     /// <summary>上报判定结果给 effect/object counter/note manager。</summary>

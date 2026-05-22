@@ -12,7 +12,6 @@ using Random = UnityEngine.Random;
 /// <summary>
 /// Hold note：长按型 note。继承 <see cref="NoteLongBase"/>。
 /// <para>生命周期：<c>Start (一次性) → Init(info) → Update(running+autoplay) + Check(事件) → FixedUpdate(Render) → End(归还池)</c></para>
-/// <para>子对象：<c>tapLine</c> 与 <c>holdEffect</c>（Particle）均通过 <see cref="NotePool"/> 池化。</para>
 /// </summary>
 public class HoldDrop : NoteLongBase
 {
@@ -45,7 +44,7 @@ public class HoldDrop : NoteLongBase
     /// </summary>
     private void Awake()
     {
-        var notes = GameObject.Find("Notes").transform;
+        notes = GameObject.Find("Notes");
         timeProvider = Majdata<TimeProvider>.Instance!;
         objectCounter = Majdata<ObjectCounter>.Instance!;
         noteManager = Majdata<NoteManager>.Instance!;
@@ -58,8 +57,8 @@ public class HoldDrop : NoteLongBase
         if (tapLinePrefab == null)
             tapLinePrefab = tapLine != null ? tapLine : Majdata<DataLoader>.Instance!.tapLine;
         if (holdEffectPrefab == null) holdEffectPrefab = holdEffect;
-        tapLine = NotePool.Instance.Get(tapLinePrefab, notes);
-        holdEffect = NotePool.Instance.Get(holdEffectPrefab, notes);
+        tapLine = NotePool.Instance.Get(tapLinePrefab, notes.transform);
+        holdEffect = NotePool.Instance.Get(holdEffectPrefab, notes.transform);
         tapLine.SetActive(false);
         holdEffect.SetActive(false);
         material = holdEffect.GetComponent<ParticleSystemRenderer>().material;
@@ -132,7 +131,8 @@ public class HoldDrop : NoteLongBase
         spriteRenderer.forceRenderingOff = true;
         exSpriteRender.forceRenderingOff = true;
         holdEndRender.enabled = false;
-        tapLine.SetActive(false);
+        tapLine.SetActive(false); //BUG: Last error
+        //TODO: WHERE IS MY SLIDEOK
         holdEffect.SetActive(false);
         spriteRenderer.size = new Vector2(1.22f, 1.4f);
     }
@@ -426,26 +426,17 @@ public class HoldDrop : NoteLongBase
             inputBound = false;
         }
 
-        if (prefabRef != null)
+        if (tapLinePrefab != null && tapLine != null)
         {
-            if (tapLinePrefab != null && tapLine != null)
-            {
-                NotePool.Instance.Release(tapLinePrefab, tapLine);
-                tapLine = null!;
-            }
-            if (holdEffectPrefab != null && holdEffect != null)
-            {
-                NotePool.Instance.Release(holdEffectPrefab, holdEffect);
-                holdEffect = null!;
-            }
-            NotePool.Instance.Release(prefabRef, gameObject);
+            NotePool.Instance.Release(tapLinePrefab, tapLine);
+            tapLine = null!;
         }
-        else
+        if (holdEffectPrefab != null && holdEffect != null)
         {
-            if (tapLine != null) Destroy(tapLine);
-            if (holdEffect != null) Destroy(holdEffect);
-            Destroy(gameObject);
+            NotePool.Instance.Release(holdEffectPrefab, holdEffect);
+            holdEffect = null!;
         }
+        NotePool.Instance.Release(prefabRef, gameObject);
     }
 
     /// <summary>

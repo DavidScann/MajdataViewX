@@ -34,7 +34,6 @@ public class DataLoader : MonoBehaviour
     // public GameObject mineLine;
     public GameObject notes;
     public GameObject star_slidePrefab;
-
     public GameObject[] slidePrefab;
 
     Majson loadedData = null;
@@ -368,7 +367,6 @@ public class DataLoader : MonoBehaviour
                         UsingSV = note.UsingSV,
                         IsFakeStar = true,
                         IsFakeStarRotate = note.IsFakeRotate,
-                        Slide = null,
                     };
                     starCompo.Init(starInfo);
                     NDCompo = starCompo;
@@ -752,7 +750,6 @@ public class DataLoader : MonoBehaviour
         var NDCompo = GOnote.GetComponent<StarDrop>();
         NDCompo.prefabRef = starPrefab;
 
-        //无头星星的头只用来叫醒slide
         noteManager.AddLoadedNote(NDCompo);
         if (!note.IsSlideNoHead) noteManager.AddNote(NDCompo, noteIndex[note.StartPosition]++);
 
@@ -767,16 +764,16 @@ public class DataLoader : MonoBehaviour
 
         // ---------- slide body 通过 NotePool 池化 ----------
         var slide = NotePool.Instance.Get(slidePrefab[slideIndex], notes.transform);
-        var slide_star = NotePool.Instance.Get(star_slidePrefab, notes.transform);
-        slide_star.SetActive(false);
         slide.SetActive(false);
 
         // SliCompo: 复用时已存在；首次需 AddComponent
-        var SliCompo = slide.GetComponent<SlideDrop>();
-        if (SliCompo == null) SliCompo = slide.AddComponent<SlideDrop>();
+        if (!slide.TryGetComponent<SlideDrop>(out var SliCompo))
+        {
+            SliCompo = slide.AddComponent<SlideDrop>();
+        }
         SliCompo.prefabRef = slidePrefab[slideIndex];
         SliCompo.starSlidePrefab = star_slidePrefab;
-        SliCompo.star_slide = slide_star;
+        noteManager.AddLoadedNote(SliCompo);
 
         // ---------- 计算 isEach / isDouble for head star ----------
         var headIsEach = false;
@@ -816,7 +813,6 @@ public class DataLoader : MonoBehaviour
             IsNoHead = note.IsSlideNoHead,
             IsFakeStar = false,
             IsFakeStarRotate = false,
-            Slide = slide,
         };
         NDCompo.Init(starInfo);
 
@@ -894,7 +890,6 @@ public class DataLoader : MonoBehaviour
         var GOnote = NotePool.Instance.Get(starPrefab, notes.transform);
         var NDCompo = GOnote.GetComponent<StarDrop>();
         NDCompo.prefabRef = starPrefab;
-        //无头星星的头只用来叫醒slide
         noteManager.AddLoadedNote(NDCompo);
         if (!note.IsSlideNoHead) noteManager.AddNote(NDCompo, noteIndex[note.StartPosition]++);
 
@@ -904,6 +899,8 @@ public class DataLoader : MonoBehaviour
         slideWifi.SetActive(false);
         var WifiCompo = slideWifi.GetComponent<WifiDrop>();
         WifiCompo.prefabRef = wifiPrefab;
+        WifiCompo.starSlidePrefab = star_slidePrefab;
+        noteManager.AddLoadedNote(WifiCompo);
 
         // ---------- 计算 isEach / isDouble for head star ----------
         var headIsEach = false;
@@ -942,7 +939,6 @@ public class DataLoader : MonoBehaviour
             IsNoHead = note.IsSlideNoHead,
             IsFakeStar = false,
             IsFakeStarRotate = false,
-            Slide = slideWifi,
         };
         NDCompo.Init(starInfo);
 
