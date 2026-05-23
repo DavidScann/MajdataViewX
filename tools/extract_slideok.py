@@ -63,6 +63,21 @@ def extract_xyz(value: str) -> Tuple[float, float, float]:
     return tuple(float(m.group(i)) for i in (1, 2, 3))  # type: ignore
 
 
+def extract_xyzw(value: str) -> Tuple[float, float, float, float]:
+    """Extract quaternion {x, y, z, w}."""
+    m = re.match(r"\{x:\s*(-?[\d.eE+-]+),\s*y:\s*(-?[\d.eE+-]+),\s*z:\s*(-?[\d.eE+-]+),\s*w:\s*(-?[\d.eE+-]+)", value)
+    if not m:
+        return (0.0, 0.0, 0.0, 1.0)
+    return tuple(float(m.group(i)) for i in (1, 2, 3, 4))  # type: ignore
+
+
+def quaternion_to_euler_z(qx: float, qy: float, qz: float, qw: float) -> float:
+    """Convert quaternion to euler Z angle in degrees."""
+    import math
+    angle_rad = 2 * math.atan2(qz, qw)
+    return math.degrees(angle_rad)
+
+
 def parse_prefab_slideok(path: Path) -> Optional[Tuple[float, float, float]]:
     """Extract (localX, localY, eulerZ) for the Just_str/Just_curv object."""
     text = path.read_text(encoding="utf-8")
@@ -101,7 +116,7 @@ def parse_prefab_instance_just(text: str) -> Optional[Tuple[float, float, float]
 
     # Extract position and rotation from m_Modifications
     pos_x = pos_y = 0.0
-    euler_z = 0.0
+    rot_z = rot_w = 0.0
 
     # Pattern for m_LocalPosition.x/y
     for axis in ['x', 'y']:
@@ -115,14 +130,25 @@ def parse_prefab_instance_just(text: str) -> Optional[Tuple[float, float, float]
             else:
                 pos_y = float(match.group(1))
 
-    # Pattern for m_LocalEulerAnglesHint.z
-    euler_match = re.search(
-        r'propertyPath:\s*m_LocalEulerAnglesHint\.z\s*\n\s*value:\s*(-?[\d.eE+-]+)',
+    # Pattern for m_LocalRotation.z and m_LocalRotation.w (quaternion)
+    rot_z_match = re.search(
+        r'propertyPath:\s*m_LocalRotation\.z\s*\n\s*value:\s*(-?[\d.eE+-]+)',
         block
     )
-    if euler_match:
-        euler_z = float(euler_match.group(1))
+    rot_w_match = re.search(
+        r'propertyPath:\s*m_LocalRotation\.w\s*\n\s*value:\s*(-?[\d.eE+-]+)',
+        block
+    )
+    if rot_z_match:
+        rot_z = float(rot_z_match.group(1))
+    if rot_w_match:
+        rot_w = float(rot_w_match.group(1))
 
+    # If no rotation found in modifications, default to identity (w=1)
+    if rot_w == 0.0 and rot_z == 0.0:
+        rot_w = 1.0
+
+    euler_z = quaternion_to_euler_z(0.0, 0.0, rot_z, rot_w)
     return (pos_x, pos_y, euler_z)
 
 
@@ -172,8 +198,9 @@ def parse_gameobject_just(text: str) -> Optional[Tuple[float, float, float]]:
 
     t = transforms[just_transform_id]
     pos = extract_xyz(t.get("m_LocalPosition", "{x: 0, y: 0, z: 0}"))
-    euler = extract_xyz(t.get("m_LocalEulerAnglesHint", "{x: 0, y: 0, z: 0}"))
-    return (pos[0], pos[1], euler[2])
+    rot = extract_xyzw(t.get("m_LocalRotation", "{x: 0, y: 0, z: 0, w: 1}"))
+    euler_z = quaternion_to_euler_z(*rot)
+    return (pos[0], pos[1], euler_z)
 
 
 # ---------------------------------------------------------------------------

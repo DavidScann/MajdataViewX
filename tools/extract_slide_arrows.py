@@ -67,6 +67,24 @@ def extract_xyz(value: str) -> Tuple[float, float, float]:
     return tuple(float(m.group(i)) for i in (1, 2, 3))  # type: ignore
 
 
+def extract_xyzw(value: str) -> Tuple[float, float, float, float]:
+    """Extract quaternion {x, y, z, w}."""
+    m = re.match(r"\{x:\s*(-?[\d.eE+-]+),\s*y:\s*(-?[\d.eE+-]+),\s*z:\s*(-?[\d.eE+-]+),\s*w:\s*(-?[\d.eE+-]+)", value)
+    if not m:
+        return (0.0, 0.0, 0.0, 1.0)
+    return tuple(float(m.group(i)) for i in (1, 2, 3, 4))  # type: ignore
+
+
+def quaternion_to_euler_z(qx: float, qy: float, qz: float, qw: float) -> float:
+    """Convert quaternion to euler Z angle in degrees.
+
+    For a pure Z rotation, the formula simplifies to: angle = 2 * atan2(z, w)
+    """
+    import math
+    angle_rad = 2 * math.atan2(qz, qw)
+    return math.degrees(angle_rad)
+
+
 def extract_father_id(value: str) -> Optional[int]:
     m = re.search(r"fileID:\s*(-?\d+)", value)
     if not m:
@@ -126,8 +144,9 @@ def parse_prefab(path: Path) -> List[Tuple[float, float, float]]:
             if go and "Just_str" in go.get("m_Name", ""):
                 continue
         pos = extract_xyz(t.get("m_LocalPosition", "{x: 0, y: 0, z: 0}"))
-        euler = extract_xyz(t.get("m_LocalEulerAnglesHint", "{x: 0, y: 0, z: 0}"))
-        poses.append((pos[0], pos[1], euler[2]))
+        rot = extract_xyzw(t.get("m_LocalRotation", "{x: 0, y: 0, z: 0, w: 1}"))
+        euler_z = quaternion_to_euler_z(*rot)
+        poses.append((pos[0], pos[1], euler_z))
     return poses
 
 
@@ -212,8 +231,9 @@ def parse_prefab_full(path: Path) -> List[Tuple[float, float, float]]:
             if go and "Just_str" in go.get("m_Name", ""):
                 continue
         pos = extract_xyz(t.get("m_LocalPosition", "{x: 0, y: 0, z: 0}"))
-        euler = extract_xyz(t.get("m_LocalEulerAnglesHint", "{x: 0, y: 0, z: 0}"))
-        poses.append((pos[0], pos[1], euler[2]))
+        rot = extract_xyzw(t.get("m_LocalRotation", "{x: 0, y: 0, z: 0, w: 1}"))
+        euler_z = quaternion_to_euler_z(*rot)
+        poses.append((pos[0], pos[1], euler_z))
     return poses
 
 
