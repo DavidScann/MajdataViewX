@@ -42,7 +42,6 @@ public class TapBase : NoteBase
         skinManager = Majdata<SkinManager>.Instance!;
         audioManager = Majdata<AudioManager>.Instance!;
 
-        // tapLine prefab 优先级：本组件 SerializeField → tapLine 字段（兼容旧 inspector 设置）→ DataLoader 单例
         tapLinePrefab = Majdata<DataLoader>.Instance!.tapLine;
 
         spriteRenderer = GetComponent<SpriteRenderer>();
@@ -56,7 +55,7 @@ public class TapBase : NoteBase
     {
         ResetSortingOrder(sortOrder);
     }
-    
+
     protected void GetTapLine()
     {
         tapLine = NotePool.Instance.Get(tapLinePrefab, notes.transform);

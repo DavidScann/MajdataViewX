@@ -2846,6 +2846,10 @@ MonoBehaviour:
   notes: {fileID: 327139454}
   star_slidePrefab: {fileID: 3082733108601366817, guid: 42156a3b3ae4d054da74641cd739534f,
     type: 3}
+  slideShellPrefab: {fileID: 3811942671679594881, guid: 7acabddb7af6b464ca1368caef08c7d2,
+    type: 3}
+  slideArrowPrefab: {fileID: 4083360378008502305, guid: 41f9b264977faeb41a3ecfdfa6e40a6e,
+    type: 3}
   slidePrefab:
   - {fileID: 51001413267503469, guid: cd5abf6f94eca144ca09399678cf2b5b, type: 3}
   - {fileID: 7987079123466364501, guid: b267b00e56991124987b1a4d95fe300f, type: 3}

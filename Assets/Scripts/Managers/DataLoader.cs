@@ -34,6 +34,8 @@ public class DataLoader : MonoBehaviour
     // public GameObject mineLine;
     public GameObject notes;
     public GameObject star_slidePrefab;
+    public GameObject slideShellPrefab;   // 空壳 slide prefab（只含 slideOK）
+    public GameObject slideArrowPrefab;   // 单个 arrow prefab
     public GameObject[] slidePrefab;
 
     Majson loadedData = null;
@@ -200,6 +202,13 @@ public class DataLoader : MonoBehaviour
     private void Awake()
     {
         Majdata<DataLoader>.Instance = this;
+
+        // 注册 ArrowPool 并预热
+        if (slideArrowPrefab != null)
+        {
+            ArrowPool.Instance.RegisterPrefab(slideArrowPrefab);
+            ArrowPool.Instance.Prewarm(200); // 预热 200 个 arrow（最大单 slide 约 65 个）
+        }
     }
 
     private void Start()
@@ -652,7 +661,9 @@ public class DataLoader : MonoBehaviour
                 int slideIndex = SLIDE_PREFAB_MAP[slideShape];
                 if (slideIndex < 0) slideIndex = -slideIndex;
 
-                var barCount = slidePrefab[slideIndex].transform.childCount;
+                // 从 SlideArrowTable 获取 arrow 数量（而非从 prefab 子对象读取）
+                var poses = SlideArrowTable.Get(slideShape);
+                var barCount = poses?.Length ?? 0;
                 subBarCount.Add(barCount);
                 sumBarCount += barCount;
 
@@ -762,8 +773,8 @@ public class DataLoader : MonoBehaviour
         }
         var slideIndex = SLIDE_PREFAB_MAP[slideShape];
 
-        // ---------- slide body 通过 NotePool 池化 ----------
-        var slide = NotePool.Instance.Get(slidePrefab[slideIndex], notes.transform);
+        // ---------- slide body 通过 NotePool 池化（统一使用空壳 slideShellPrefab）----------
+        var slide = NotePool.Instance.Get(slideShellPrefab, notes.transform);
         slide.SetActive(false);
 
         // SliCompo: 复用时已存在；首次需 AddComponent
@@ -771,7 +782,7 @@ public class DataLoader : MonoBehaviour
         {
             SliCompo = slide.AddComponent<SlideDrop>();
         }
-        SliCompo.prefabRef = slidePrefab[slideIndex];
+        SliCompo.prefabRef = slideShellPrefab;
         SliCompo.starSlidePrefab = star_slidePrefab;
         noteManager.AddLoadedNote(SliCompo);
 

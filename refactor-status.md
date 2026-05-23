@@ -37,7 +37,7 @@
 | **TouchDrop** | ✅ | `Awake → Init → Update → FixedUpdate(Render) → End`；fan SortingOrder 缓存基线避免累积 |
 | **TouchHoldDrop** | ✅ | 同上，含 `holdEffect` 池化与 mask 重置 |
 | **EachLineDrop** | ✅ | `Awake → Init → FixedUpdate(Render) → End`；纯渲染无判定 |
-| **SlideDrop** | ✅ | `Awake (依赖注入) → Init(info) → Initialize (重载已支持池复用) → Update(running+check) → FixedUpdate(Render) → End`；BreakShineController 动态记账与清理；slideOK 自动 reparent 回 child；conn slide 链式 End |
+| **SlideDrop** | ✅ | `Awake (依赖注入) → Init(info) → Initialize (ArrowPool 动态获取 arrow) → Update(running+check) → FixedUpdate(Render) → End`；BreakShineController 动态记账与清理；slideOK 自动 reparent 回 child；conn slide 链式 End；**arrow 从 ArrowPool 动态获取/归还** |
 | **WifiDrop** | ✅ | 同 SlideDrop 套路；3 个 `star_slide` 通过 `NotePool` 共享同一 `star_slidePrefab` 池化 |
 
 每个 note 现在都有清晰的 `#region` 分区（依赖 / 池化数据 / 运行时状态），`Update` 处理 `running(autoplay) + check`，`FixedUpdate` 处理 `Render`。
@@ -51,36 +51,27 @@
 
 ---
 
+## ✅ Slide Arrow 动态池化（已完成）
+
+### 统一 slide 池 + ArrowPool 动态取存
+
+所有普通 slide（除 wifi）现在共用 **1 个空壳 slide 池**（`slideShellPrefab`）+ **1 个 arrow 池**（`ArrowPool`），而非 42 个独立的 slide prefab 池。
+
+**改动要点**：
+- `DataLoader.slideShellPrefab`：空壳 slide prefab（只含 slideOK 子对象）
+- `DataLoader.slideArrowPrefab`：单个 arrow prefab，注册到 ArrowPool
+- `SlideDrop.Initialize`：从 `SlideArrowTable.Get(slideType)` 获取 ArrowPose 数组，从 ArrowPool 动态获取 arrow 并按坐标摆放
+- `SlideDrop.End` / `ResetRuntimeState`：归还 arrow 到 ArrowPool
+
+**Unity 编辑器需手动创建**：
+1. `Assets/Prefab/Pool/Slide_Shell.prefab` —— 只含 slideOK 子对象 + Animator
+2. `Assets/Prefab/Pool/Slide_Arrow.prefab` —— 单个 SpriteRenderer
+
+**Wifi 保持独立**：使用独特的 sprite 数组 `skinManager.Wifi[i]`，继续使用 `slidePrefab[SLIDE_PREFAB_MAP["wifi"]]`。
+
+---
+
 ## 🔶 后续可选优化
-
-### Slide arrow 真正使用 ArrowPool（非阻塞）
-
-当前 `SlideDrop` / `WifiDrop` 仍**通过 prefab 上的 arrow 子对象**渲染（`transform.GetChild`），这与原版行为一致。基础设施 `ArrowPool` + `SlideArrowTable` 已就位，但激活它需要 Unity 编辑器一侧的工作（建一个空白 `Slide_Arrow.prefab`，然后修改 SlideDrop.Initialize 改为从 ArrowPool 摆放）。
-
-### 步骤（按需）：
-
-1. **Unity 编辑器**：建 `Assets/Prefab/Pool/Slide_Arrow.prefab` —— 单 SpriteRenderer + GUID `3030b339c8cedc34bbbaf6fd2c4500e6` 的 sprite，size `0.7×0.94`。
-2. **`DataLoader.Awake`**：`ArrowPool.Instance.RegisterPrefab(slideArrowPrefab);`
-3. **`SlideDrop.Initialize`** 中删除：
-   ```csharp
-   for (var i = 0; i < transform.childCount - 1; i++)
-       slideBars.Add(transform.GetChild(i).gameObject);
-   ```
-   改为：
-   ```csharp
-   var poses = SlideArrowTable.Get(slideType);
-   foreach (var p in poses) {
-       var arrow = ArrowPool.Instance.Get(transform);
-       arrow.transform.localPosition = new Vector3(isMirror ? -p.X : p.X, p.Y, 0);
-       arrow.transform.localRotation = Quaternion.Euler(0, 0, isMirror ? -p.RotZ : p.RotZ);
-       arrow.SetActive(true);
-       slideBars.Add(arrow);
-   }
-   ```
-   `slidePositions` / `slideRotations` 直接从 ArrowPose 数组算出，不再读 `transform.position`。
-4. **`SlideDrop.End`** 中加：`ArrowPool.Instance.ReleaseMany(slideBars);`
-5. **WifiDrop**：`SlideArrowTable["wifi"]` 是扁平化的 12 个 arrow（3 × 4），需要在用法上分 3 段处理（参考 `WifiDrop` 内 `slideBars` 的三组使用），或者单独为 wifi 维护"3 数组"版本的表。
-6. **slide prefabs**：在 Unity 编辑器移除每个 `Star_*.prefab` 的 arrow 子对象（仅保留 slideOK），减少首次实例化成本。
 
 ### 其他已知边界
 
@@ -101,6 +92,8 @@
 | GC 改善 | Unity Profiler 加载 + 重玩阶段 `GC.Alloc` 应明显下降 |
 | **Slide / Wifi** | 含 slide / wifi 的谱面正常通关，特别注意 conn slide / 镜像 / break slide |
 | 镜像 slide | 含 `<` `>` `^` `qq` `pp` 的谱面通关 |
+| **ArrowPool 统一池** | Profiler 确认只有 1 个 slide 池 + 1 个 arrow 池（而非 42 个 slide 池） |
+| **Unity Prefab 创建** | 确保已手动创建 `Slide_Shell.prefab` 和 `Slide_Arrow.prefab` 并赋值到 DataLoader Inspector |
 
 ---
 
@@ -115,6 +108,10 @@
   tools/extract_slide_arrows.py
   refactor-status.md                                  (本文档)
 
+新增（Unity 编辑器手动创建）：
+  Assets/Prefab/Pool/Slide_Shell.prefab               (空壳 slide：只含 slideOK + Animator)
+  Assets/Prefab/Pool/Slide_Arrow.prefab               (单个 arrow：SpriteRenderer)
+
 修改：
   Assets/Scripts/Notes/NoteBase.cs                    (加 prefabRef, virtual End)
   Assets/Scripts/Notes/TapBase.cs                     (大改)
@@ -124,9 +121,9 @@
   Assets/Scripts/Notes/TouchDrop.cs                   (大改)
   Assets/Scripts/Notes/TouchHoldDrop.cs               (大改)
   Assets/Scripts/Notes/EachLineDrop.cs                (大改)
-  Assets/Scripts/Notes/SlideDrop.cs                   (重写：池化生命周期 + 状态重置)
+  Assets/Scripts/Notes/SlideDrop.cs                   (重写：ArrowPool 动态取存 + 池化生命周期)
   Assets/Scripts/Notes/WifiDrop.cs                    (重写：池化生命周期 + 3 star pool)
-  Assets/Scripts/Managers/DataLoader.cs               (LoadTiming/InstantiateSlide/InstantiateWifi 全部走池化)
+  Assets/Scripts/Managers/DataLoader.cs               (LoadTiming/InstantiateSlide 走统一池化，新增 slideShellPrefab/slideArrowPrefab)
   Assets/Scripts/Managers/NoteManager.cs              (ResetState 走 End()，AddNote 用 indexer)
 ```
 

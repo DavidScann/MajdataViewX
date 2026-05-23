@@ -58,7 +58,7 @@ public class TouchHoldDrop : NoteLongBase
     /// </summary>
     private void Awake()
     {
-        var notes = GameObject.Find("Notes").transform;
+        notes = GameObject.Find("Notes");
         objectCounter = Majdata<ObjectCounter>.Instance!;
         noteManager = Majdata<NoteManager>.Instance!;
         timeProvider = Majdata<TimeProvider>.Instance!;
@@ -66,10 +66,7 @@ public class TouchHoldDrop : NoteLongBase
         skinManager = Majdata<SkinManager>.Instance!;
         audioManager = Majdata<AudioManager>.Instance!;
 
-        if (holdEffectPrefab == null) holdEffectPrefab = holdEffect;
-        holdEffect = NotePool.Instance.Get(holdEffectPrefab, notes);
-        holdEffect.SetActive(false);
-        material = holdEffect.GetComponent<ParticleSystemRenderer>().material;
+        holdEffectPrefab = holdEffect;
 
         firework = GameObject.Find("FireworkEffect");
         fireworkEffect = firework.GetComponent<Animator>();
@@ -87,6 +84,7 @@ public class TouchHoldDrop : NoteLongBase
         moveDuration = 0.8f * wholeDuration;
         displayDuration = 0.2f * wholeDuration;
 
+        GetHoldEffect();
         ResetSortingOrder(info.NoteSortOrder);
         LoadSkin();
         ResetState();
@@ -116,6 +114,13 @@ public class TouchHoldDrop : NoteLongBase
         isMine = info.IsMine;
         isFirework = info.IsFirework;
         usingSV = info.UsingSV;
+    }
+
+    private void GetHoldEffect()
+    {
+        holdEffect = NotePool.Instance.Get(holdEffectPrefab, notes.transform);
+        holdEffect.SetActive(false);
+        material = holdEffect.GetComponent<ParticleSystemRenderer>().material;
     }
 
     private void ResetSortingOrder(int order)

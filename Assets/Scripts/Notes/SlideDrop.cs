@@ -21,6 +21,7 @@ using Random = UnityEngine.Random;
 /// </summary>
 public class SlideDrop : NoteLongBase, ICanShine
 {
+    public float SlideBarAlpha; //FOR ANIMATOER
     #region Note Data (Init 刷新)
     public int endPosition;
     public bool isMirror;
@@ -52,6 +53,9 @@ public class SlideDrop : NoteLongBase, ICanShine
     public bool IsPendingFinish => judgeQueue.Count == 1;
 
     private readonly List<GameObject> slideBars = new();
+
+    private readonly List<SpriteRenderer> slideBarsRenderer = new();
+
     private readonly List<Vector3> slidePositions = new();
     private readonly List<Quaternion> slideRotations = new();
     private Animator fadeInAnimator;
@@ -71,6 +75,8 @@ public class SlideDrop : NoteLongBase, ICanShine
     bool _isEnded = false;       // 防止 End() 被重复调用（链式 End 时尤其重要）
     /// <summary>动态 AddComponent 的 BreakShineController 列表，End 时清除避免池复用累积。</summary>
     private readonly List<BreakShineController> _dynamicShineControllers = new();
+    /// <summary>从 ArrowPool 动态获取的 arrow，End 时需归还。</summary>
+    private readonly List<GameObject> _pooledArrows = new();
     /// <summary>缓存的 slideOK 原始父级（slide 自身）；Initialize 会把它移到 slide.parent，End 时需还原。</summary>
     private bool _slideOKDetached = false;
     #endregion
@@ -140,9 +146,17 @@ public class SlideDrop : NoteLongBase, ICanShine
         triggerSensors.Clear();
         judgeQueue.Clear();
         _judgeQueue.Clear();
+
+        // 归还上次 Initialize 从 ArrowPool 获取的 arrow（如果有）
+        if (_pooledArrows.Count > 0)
+        {
+            ArrowPool.Instance.ReleaseMany(_pooledArrows);
+            _pooledArrows.Clear();
+        }
         slideBars.Clear();
         slidePositions.Clear();
         slideRotations.Clear();
+        slideBarsRenderer.Clear();
 
         // 移除上次 Init 在 slideBars 与 star_slide 上 AddComponent 的 BreakShineController（避免累积）
         for (var i = 0; i < _dynamicShineControllers.Count; i++)
@@ -197,14 +211,10 @@ public class SlideDrop : NoteLongBase, ICanShine
         star_slide.SetActive(false);
         starRenderer.color = Color.white;
 
-        //bars——从 prefab 上的 arrow 子对象收集（保留原行为；ArrowPool 路径见 refactor-status.md）
-        for (var i = 0; i < transform.childCount - 1; i++)
-            slideBars.Add(transform.GetChild(i).gameObject);
-        // 复用时上次被 SetActive(false) 的 bar 这里要恢复
-        foreach (var bar in slideBars) bar.SetActive(true);
+        //slideok（空壳 prefab 中 slideOK 是第一个也是唯一一个子对象）
+        slideOK = transform.GetChild(0).gameObject;
 
-        //slideok
-        slideOK = transform.GetChild(transform.childCount - 1).gameObject; //slideok is the last one
+        // 先设置 slide 的 rotation/mirror，这样后续动态摆放的 arrow 才能正确变换
         if (isMirror)
         {
             transform.localScale = new Vector3(-1f, 1f, 1f);
@@ -215,6 +225,36 @@ public class SlideDrop : NoteLongBase, ICanShine
         {
             transform.rotation = Quaternion.Euler(0f, 0f, -45f * (startPosition - 1));
         }
+
+        // slideOK 位置：从 SlideOKTable 获取该 slideType 对应的位姿并设置 localPosition/localRotation
+        var okPose = SlideOKTable.Get(slideType);
+        if (okPose.HasValue)
+        {
+            var pose = okPose.Value;
+            slideOK.transform.localPosition = new Vector3(pose.X, pose.Y, 0);
+            slideOK.transform.localRotation = Quaternion.Euler(0, 0, pose.RotZ);
+        }
+
+        //bars——从 ArrowPool 动态获取并按 SlideArrowTable 摆放
+        var poses = SlideArrowTable.Get(slideType);
+        if (poses != null)
+        {
+            ArrowPool.Instance.GetMany(transform, poses.Length, _pooledArrows);
+            for (var i = 0; i < poses.Length; i++)
+            {
+                var arrow = _pooledArrows[i];
+                var pose = poses[i];
+
+                // 设置 localPosition/localRotation（父对象已旋转，镜像由 localScale.x=-1 处理）
+                arrow.transform.localPosition = new Vector3(pose.X, pose.Y, 0);
+                arrow.transform.localRotation = Quaternion.Euler(0, 0, pose.RotZ);
+                arrow.SetActive(true);
+
+                slideBars.Add(arrow);
+            }
+        }
+
+        // slideOK 的 Just 设置
         if (isJustR)
         {
             if (slideOK.GetComponent<LoadJustSprite>().setR() == 1 && isMirror)
@@ -237,7 +277,7 @@ public class SlideDrop : NoteLongBase, ICanShine
         slideOK.transform.SetParent(transform.parent);
         _slideOKDetached = true; // 标记：End 时需要把它再 SetParent(transform) 回来以便整体回池
 
-        //bars positions/rotations（仍按 prefab 子对象的 transform 来读，保留原 18° 偏移）
+        //bars positions/rotations（动态摆放后读取世界坐标，保留原 18° 偏移）
         slidePositions.Add(getPositionFromDistance(4.8f));
         foreach (var bars in slideBars)
         {
@@ -262,7 +302,7 @@ public class SlideDrop : NoteLongBase, ICanShine
         foreach (var gm in slideBars)
         {
             var sr = gm.GetComponent<SpriteRenderer>();
-            sr.color = new Color(1f, 1f, 1f, 0f);
+            slideBarsRenderer.Add(sr);
             sr.sortingOrder = sortIndex--;
             sr.sortingLayerName = "Slide";
 
@@ -286,6 +326,7 @@ public class SlideDrop : NoteLongBase, ICanShine
                 sr.sprite = skinManager.Slide_Mine;
             }
         }
+        SetSlideBarAlpha(0f);
 
         //bars fadein
         // 计算Slide淡入时机
@@ -446,7 +487,7 @@ public class SlideDrop : NoteLongBase, ICanShine
     {
         if (isDestroyed) return;
 
-        var timing = timeProvider.NoteTime - startTime;
+        var timing = timeProvider.NoteTime - startTime; // Slide完全显示但未启动的时间点
         var stiming = timeProvider.NoteTime - time;
         var remaining = Math.Max(LastFor - timing, 0);
 
@@ -469,14 +510,18 @@ public class SlideDrop : NoteLongBase, ICanShine
             if (fakeTiming >= -0.05f)
             {
                 fadeInAnimator.enabled = false;
-                setSlideBarAlpha(1f);
+                SetSlideBarAlpha(1f);
             }
-            else if (fadeInAnimator != null && !fadeInAnimator.enabled && fakeTiming >= fadeInTime)
-                fadeInAnimator.enabled = true;
+            else if (fakeTiming >= fadeInTime)
+            {
+                if (fadeInAnimator != null && !fadeInAnimator.enabled)
+                {
+                    fadeInAnimator.enabled = true;
+                }
+                SetSlideBarAlpha(SlideBarAlpha);
+            }
             return;
         }
-        fadeInAnimator.enabled = false;
-        setSlideBarAlpha(1f);
 
         star_slide.SetActive(true);
         if (fakesTiming <= 0f)
@@ -943,12 +988,26 @@ public class SlideDrop : NoteLongBase, ICanShine
                 Destroy(_dynamicShineControllers[i]);
         _dynamicShineControllers.Clear();
 
+        // 归还 arrow 到 ArrowPool
+        if (_pooledArrows.Count > 0)
+        {
+            ArrowPool.Instance.ReleaseMany(_pooledArrows);
+            _pooledArrows.Clear();
+        }
+        slideBars.Clear();
+        slideBarsRenderer.Clear();
+
         NotePool.Instance.Release(prefabRef, gameObject);
     }
 
-    private void setSlideBarAlpha(float alpha)
+    private void SetSlideBarAlpha(float alpha)
     {
-        foreach (var gm in slideBars) gm.GetComponent<SpriteRenderer>().color = new Color(1f, 1f, 1f, alpha);
+        foreach (var r in slideBarsRenderer)
+        {
+            var c = r.color;
+            c.a = alpha;
+            r.color = c;
+        }
     }
     private void applyStarRotation(Quaternion newRotation)
     {

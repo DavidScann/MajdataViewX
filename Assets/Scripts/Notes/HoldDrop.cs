@@ -53,20 +53,12 @@ public class HoldDrop : NoteLongBase
         effectManager = Majdata<EffectManager>.Instance!;
         audioManager = Majdata<AudioManager>.Instance!;
 
-        // 子对象走池化（prefab 优先级：SerializeField → 实例字段 → DataLoader 单例）
-        if (tapLinePrefab == null)
-            tapLinePrefab = tapLine != null ? tapLine : Majdata<DataLoader>.Instance!.tapLine;
-        if (holdEffectPrefab == null) holdEffectPrefab = holdEffect;
-        tapLine = NotePool.Instance.Get(tapLinePrefab, notes.transform);
-        holdEffect = NotePool.Instance.Get(holdEffectPrefab, notes.transform);
-        tapLine.SetActive(false);
-        holdEffect.SetActive(false);
-        material = holdEffect.GetComponent<ParticleSystemRenderer>().material;
+        tapLinePrefab = Majdata<DataLoader>.Instance!.tapLine;
+        holdEffectPrefab = holdEffect;
 
         animator = GetComponent<Animator>();
         animator.enabled = false;
 
-        lineSpriteRender = tapLine.GetComponent<SpriteRenderer>();
         spriteRenderer = GetComponent<SpriteRenderer>();
         holdEndRender = transform.GetChild(1).GetComponent<SpriteRenderer>();
         exSpriteRender = transform.GetChild(0).GetComponent<SpriteRenderer>();
@@ -80,6 +72,7 @@ public class HoldDrop : NoteLongBase
     public void Init(HoldPoolingInfo info)
     {
         ApplyHoldInfo(info);
+        GetTapLineAndHoldEffect();
         ResetSortingOrder(info.NoteSortOrder);
         LoadSkin();
         ResetState();
@@ -88,6 +81,16 @@ public class HoldDrop : NoteLongBase
         inputManager.BindArea(Check, sensor);
         inputBound = true;
         gameObject.SetActive(false);
+    }
+
+    protected void GetTapLineAndHoldEffect()
+    {
+        tapLine = NotePool.Instance.Get(tapLinePrefab, notes.transform);
+        holdEffect = NotePool.Instance.Get(holdEffectPrefab, notes.transform);
+        tapLine.SetActive(false);
+        holdEffect.SetActive(false);
+        material = holdEffect.GetComponent<ParticleSystemRenderer>().material;
+        lineSpriteRender = tapLine.GetComponent<SpriteRenderer>();
     }
 
     private void ApplyHoldInfo(HoldPoolingInfo info)
@@ -131,8 +134,7 @@ public class HoldDrop : NoteLongBase
         spriteRenderer.forceRenderingOff = true;
         exSpriteRender.forceRenderingOff = true;
         holdEndRender.enabled = false;
-        tapLine.SetActive(false); //BUG: Last error
-        //TODO: WHERE IS MY SLIDEOK
+        tapLine.SetActive(false);
         holdEffect.SetActive(false);
         spriteRenderer.size = new Vector2(1.22f, 1.4f);
     }

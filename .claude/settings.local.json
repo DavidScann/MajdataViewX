@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p ~/.claude/plans)",
+      "Bash(cat)",
+      "mcp__ide__getDiagnostics",
+      "Bash(python tools/extract_slideok.py)",
+      "Bash(xargs -I{} grep -A2 \"slideShellPrefab\" {})",
+      "Bash(python *)"
+    ]
+  }
+}
