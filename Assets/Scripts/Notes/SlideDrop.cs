@@ -730,6 +730,10 @@ public class SlideDrop : NoteLongBase, ICanShine
             {
                 slideOK.SetActive(true);
             }
+            else
+            {
+                Destroy(slideOK);
+            }
         }
         else
         {
