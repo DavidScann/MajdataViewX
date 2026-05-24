@@ -51,8 +51,7 @@ public class DataLoader : MonoBehaviour
     public RawImage cardImage;
     public Color[] diffColors = new Color[7];
 
-    private const double StreamingCreatePreloadTime = 10;
-    private const double StreamingActivePreloadTime = 5;
+    private const double StreamingCreatePreloadTime = 4;
     private const double StreamingFrameBudgetMs = 4;
 
     private int slideLayer = -1;
@@ -229,12 +228,11 @@ public class DataLoader : MonoBehaviour
         objectCounter.CountNoteSumAsync(chart).Forget();
         objectCounter.ReportMeterBpmAsync(chart).Forget();
 
-        Majdata<TimeProvider>.Instance.LoadSV(chart.CommaTimings);
+        Majdata<TimeProvider>.Instance!.LoadSV(chart.CommaTimings);
 
         noteManager.ResetIndex();
         streamingRunning = true;
         var timings = chart.NoteTimings.ToArray();
-        StreamingSetActive(ignoreOffset).Forget();
         await StreamingCreate(timings, ignoreOffset);
     }
 
@@ -293,34 +291,6 @@ public class DataLoader : MonoBehaviour
         return i;
     }
 
-    private async UniTask StreamingSetActive(double fallbackTime)
-    {
-        while (streamingRunning)
-        {
-            var now = GetStreamingTime(fallbackTime);
-            var frameStart = GetTimestamp();
-
-            for (var i = 0; i < noteManager.LoadedNotes.Count; i++)
-            {
-                var note = noteManager.LoadedNotes[i];
-                if (note.time - now > StreamingActivePreloadTime)
-                    break;
-
-                if (!note.gameObject.activeSelf)
-                    note.gameObject.SetActive(true);
-
-                if (!IsFrameBudgetExceeded(frameStart))
-                    continue;
-
-                await UniTask.Yield();
-                frameStart = GetTimestamp();
-                now = GetStreamingTime(fallbackTime);
-            }
-
-            await UniTask.Yield();
-        }
-    }
-
     private static long GetTimestamp()
     {
         return System.Diagnostics.Stopwatch.GetTimestamp();
@@ -377,9 +347,7 @@ public class DataLoader : MonoBehaviour
                 NDCompo.startPosition = note.StartPosition;
                 NDCompo.speed = noteSpeed * timing.HSpeed;
 
-                noteManager.AddLoadedNote(NDCompo);
                 noteManager.AddNote(NDCompo, noteIndex[note.StartPosition]++);
-                GOnote.SetActive(false);
             }
             else if (note.Type == SimaiNoteType.Hold)
             {
@@ -401,9 +369,7 @@ public class DataLoader : MonoBehaviour
                 NDCompo.usingSV = note.UsingSV;
                 NDCompo.tapLine = tapLine;
 
-                noteManager.AddLoadedNote(NDCompo);
                 noteManager.AddNote(NDCompo, noteIndex[note.StartPosition]++);
-                GOnote.SetActive(false);
             }
             else if (note.Type == SimaiNoteType.TouchHold)
             {
@@ -425,9 +391,7 @@ public class DataLoader : MonoBehaviour
                 NDCompo.areaPosition = note.TouchArea;
                 NDCompo.startPosition = note.StartPosition;
 
-                noteManager.AddLoadedNote(NDCompo);
                 noteManager.AddTouch(NDCompo, touchIndex[NDCompo.GetSensor()]++);
-                GOnote.SetActive(false);
             }
             else if (note.Type == SimaiNoteType.Touch)
             {
@@ -454,9 +418,7 @@ public class DataLoader : MonoBehaviour
                 NDCompo.usingSV = note.UsingSV;
                 NDCompo.GroupInfo = null;
 
-                noteManager.AddLoadedNote(NDCompo);
                 noteManager.AddTouch(NDCompo, touchIndex[NDCompo.GetSensor()]++);
-                GOnote.SetActive(false);
             }
 
             else if (note.Type == SimaiNoteType.Slide)
@@ -665,7 +627,7 @@ public class DataLoader : MonoBehaviour
             tempBarCount += subBarCount[i];
         }
 
-        GameObject parent = null;
+        GameObject parent = null!;
         List<SlideDrop> subSlides = new();
         float totalLen = (float)subSlide.Sum(x => x.SlideTime);
         for (var i = 0; i <= subSlide.Count - 1; i++)
@@ -726,6 +688,7 @@ public class DataLoader : MonoBehaviour
             s.sortIndex = slideLayer - slideLen.Take(i).Sum();
             s.ConnectInfo.TotalSlideLen = totalSlideLen;
             s.ConnectInfo.TotalJudgeQueueLen = judgeQueueLen;
+            s.ConnectInfo.Slides = subSlides.ToArray();
             s.Initialize();
         }
         if (!legacySlideLayer)
@@ -738,9 +701,7 @@ public class DataLoader : MonoBehaviour
         if (!note.IsSlideNoHead)
         {
             var GOnote = Instantiate(starPrefab, notes.transform);
-            GOnote.SetActive(false);
             NDCompo = GOnote.GetComponent<StarDrop>();
-            noteManager.AddLoadedNote(NDCompo);
             noteManager.AddNote(NDCompo, noteIndex[note.StartPosition]++);
 
             // note的图层顺序
@@ -770,9 +731,7 @@ public class DataLoader : MonoBehaviour
         var slide = Instantiate(slidePrefab[slideIndex], notes.transform);
         var slide_star = Instantiate(star_slidePrefab, notes.transform);
         slide_star.SetActive(false);
-        slide.SetActive(false);
         var SliCompo = slide.AddComponent<SlideDrop>();
-        noteManager.AddLoadedNote(SliCompo);
         SliCompo.slideType = slideShape;
         SliCompo.areaStep = new List<int>(SLIDE_AREA_STEP_MAP[slideShape]);
         SliCompo.smoothSlideAnime = smoothSlideAnime;
@@ -848,9 +807,7 @@ public class DataLoader : MonoBehaviour
         if (!note.IsSlideNoHead)
         {
             var GOnote = Instantiate(starPrefab, notes.transform);
-            GOnote.SetActive(false);
             NDCompo = GOnote.GetComponent<StarDrop>();
-            noteManager.AddLoadedNote(NDCompo);
             noteManager.AddNote(NDCompo, noteIndex[note.StartPosition]++);
 
             // note的图层顺序
@@ -868,9 +825,7 @@ public class DataLoader : MonoBehaviour
             NDCompo.speed = noteSpeed * timing.HSpeed;
         }
         var slideWifi = Instantiate(slidePrefab[SLIDE_PREFAB_MAP["wifi"]], notes.transform);
-        slideWifi.SetActive(false);
         var WifiCompo = slideWifi.GetComponent<WifiDrop>();
-        noteManager.AddLoadedNote(WifiCompo);
         WifiCompo.areaStep = new List<int>(SLIDE_AREA_STEP_MAP["wifi"]);
         WifiCompo.smoothSlideAnime = smoothSlideAnime;
 

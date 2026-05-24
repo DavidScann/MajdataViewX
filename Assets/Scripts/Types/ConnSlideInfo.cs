@@ -17,7 +17,7 @@ public class ConnSlideInfo
     /// 表示Slide Group的总长度
     /// </summary>
     public float TotalSlideLen { get; set; }
-    
+
     /// <summary>
     /// Indicates the length of the judgment queue of Slide Group
     /// </summary>
@@ -50,6 +50,11 @@ public class ConnSlideInfo
     /// 获取位于该Slide前方的Slide的GameObject对象
     /// </summary>
     public GameObject? Parent { get; set; }
+
+    /// <summary>
+    /// 获取整条fes所有的星星
+    /// </summary>
+    public SlideDrop[]? Slides { get; set; }
 
     /// <summary>
     /// 指示当前Slide是否为Connect Slide

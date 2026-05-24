@@ -302,7 +302,6 @@ public class TouchDrop : NoteBase
                 audioManager.PlayTouchSound();
             }
         }
-        noteManager.RemoveLoadedNote(this);
         Destroy(gameObject);
     }
     private void OnDestroy()

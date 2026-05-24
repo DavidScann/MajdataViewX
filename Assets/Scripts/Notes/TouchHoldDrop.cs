@@ -334,7 +334,6 @@ public class TouchHoldDrop : NoteLongBase
                 audioManager.PlayTouchSound();
             }
         }
-        noteManager.RemoveLoadedNote(this);
         Destroy(holdEffect);
         Destroy(gameObject);
     }

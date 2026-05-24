@@ -546,7 +546,6 @@ public class WifiDrop : NoteLongBase, ICanShine
             return;
         isDestroying = true;
 
-        noteManager.RemoveLoadedNote(this);
         ClearTriggeredSensor();
         switch (Majdata<InputManager>.Instance!.Mode)
         {

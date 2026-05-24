@@ -363,7 +363,6 @@ public class HoldDrop : NoteLongBase
     private void DestroySelf()
     {
         PlayJudgeSFX();
-        noteManager.RemoveLoadedNote(this);
         Destroy(tapLine);
         Destroy(holdEffect);
         Destroy(gameObject);

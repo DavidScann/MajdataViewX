@@ -238,7 +238,6 @@ public class TapBase : NoteBase
     protected virtual void DestroySelf()
     {
         audioManager.PlayTapSound(judgeResult, isEx, isBreak);
-        noteManager.RemoveLoadedNote(this);
         Destroy(tapLine);
         Destroy(gameObject);
     }
