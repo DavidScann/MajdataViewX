@@ -305,7 +305,7 @@ public class TouchHoldDrop : NoteLongBase
         }
 
         if (float.IsNaN(distance)) distance = 0f;
-        if (fakeTiming >= 0f)
+        if (fakeTiming >= -0.05f)
         {
             //holdEffect.SetActive(true);
             holdEffect.transform.position = transform.position;
