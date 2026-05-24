@@ -10,8 +10,6 @@ using UnityEngine;
 
 public class NoteManager : MonoBehaviour
 {
-    public List<NoteBase> LoadedNotes { get; private set; } = new();
-
     private Dictionary<GameObject, int> noteOrder = new();
     private Dictionary<int, int> noteIndex = new();
 
@@ -23,10 +21,6 @@ public class NoteManager : MonoBehaviour
         Majdata<NoteManager>.Instance = this;
     }
 
-    public void AddLoadedNote(NoteBase note)
-    {
-        LoadedNotes.Add(note);
-    }
     public void AddNote(NoteBase note, int index)
     {
         noteOrder.Add(note.gameObject, index);
@@ -38,11 +32,6 @@ public class NoteManager : MonoBehaviour
 
     public void NextNote(int pos) => noteIndex[pos]++;
     public void NextTouch(SensorType pos) => touchIndex[pos]++;
-
-    public void RemoveLoadedNote(NoteBase note)
-    {
-        LoadedNotes.Remove(note);
-    }
 
     public void ResetIndex()
     {
@@ -73,7 +62,6 @@ public class NoteManager : MonoBehaviour
 
     public async UniTask ResetState()
     {
-        LoadedNotes.Clear();
         noteOrder.Clear();
         touchOrder.Clear();
         ResetIndex();

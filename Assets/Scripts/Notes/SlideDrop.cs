@@ -300,7 +300,7 @@ public class SlideDrop : NoteLongBase, ICanShine
         else if (IsFinished)
         {
             HideBar(areaStep.LastOrDefault());
-            DestroySelf(true);
+            //DestroySelf(true); //不用鸟他 ondestroy拯救一切
         }
 
         Running();
@@ -312,12 +312,12 @@ public class SlideDrop : NoteLongBase, ICanShine
 
         var timing = timeProvider.NoteTime - startTime;
         var stiming = timeProvider.NoteTime - time;
-        var remaining = Math.Max(LastFor - timing, 0);
+        var remaining = GetRemainingTime();
 
         var fakeTiming = timeProvider.FakeNoteTime - timeProvider.GetPositionAtTime(startTime);
         var fakesTiming = timeProvider.FakeNoteTime - timeProvider.GetPositionAtTime(time);
         var fakeLastfor = timeProvider.GetPositionAtTime(time + LastFor) - timeProvider.GetPositionAtTime(time);
-        var fakeRemaining = Math.Max(fakeLastfor - fakeTiming, 0);
+        var fakeRemaining = MathF.Max(fakeLastfor - fakesTiming, 0);
 
         if (!usingSV)
         {
@@ -368,7 +368,7 @@ public class SlideDrop : NoteLongBase, ICanShine
             starRenderer.color = Color.white;
             star_slide.transform.localScale = new Vector3(1.5f, 1.5f, 1.5f);
 
-            var process = (fakeLastfor - fakesTiming) / fakeLastfor;
+            var process = fakeRemaining / fakeLastfor;
             process = Math.Max(1f - process, 0);
             var indexProcess = (slidePositions.Count - 1) * process;
             var index = (int)indexProcess;
@@ -665,6 +665,7 @@ public class SlideDrop : NoteLongBase, ICanShine
         PlayJudgeSFX();
         if (onlyStar)
         {
+            print("Destroy Star");
             Destroy(star_slide);
             star_slide = null!;
         }
@@ -683,7 +684,6 @@ public class SlideDrop : NoteLongBase, ICanShine
     }
     void OnDestroy()
     {
-        noteManager.RemoveLoadedNote(this);
         if (PlayManager.IsReloading) return;
         if (isDestroying)
             return;
