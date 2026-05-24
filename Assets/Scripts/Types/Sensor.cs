@@ -20,12 +20,12 @@ public class Sensor : MonoBehaviour
     {
         if (tasks.Contains(id))
             return;
-        
+
         var oStatus = Status;
         var nStatus = SensorStatus.On;
         Status = nStatus;
-        
-        if(!tasks.Contains(id))
+
+        if (!tasks.Contains(id))
             tasks.Add(id);
         if (oStatus != nStatus)
         {
@@ -43,14 +43,14 @@ public class Sensor : MonoBehaviour
             print($"Sensor:{Type} On");
         }
     }
-    public void SetOff(Guid id) 
+    public void SetOff(Guid id)
     {
         if (!tasks.Contains(id))
             return;
         var nStatus = SensorStatus.Off;
 
         tasks.Remove(id);
-        if(tasks.Count == 0)
+        if (tasks.Count == 0)
         {
             var oStatus = Status;
             if (OnStatusChanged != null)
