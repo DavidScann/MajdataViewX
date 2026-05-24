@@ -11,11 +11,9 @@ public class StarDrop : TapBase
     public float rotateSpeed = 1f;
 
     public bool isDouble;
-    public bool isNoHead;
     public bool isFakeStar = false;
     public bool isFakeStarRotate = false;
 
-    public GameObject slide;
 
     private void Start()
     {
@@ -26,11 +24,9 @@ public class StarDrop : TapBase
         spriteRenderer.forceRenderingOff = true;
         exSpriteRender.forceRenderingOff = true;
 
-        if (!isNoHead)
-        {
-            sensor = (SensorType)startPosition - 1;
-            inputManager.BindArea(Check, sensor);
-        }
+        sensor = (SensorType)startPosition - 1;
+        inputManager.BindArea(Check, sensor);
+
         State = NoteStatus.Initialized;
     }
 
@@ -119,9 +115,7 @@ public class StarDrop : TapBase
             case NoteStatus.Initialized:
                 if (fakeDestScale >= 0f)
                 {
-
-                    if (!isNoHead)
-                        tapLine.transform.rotation = Quaternion.Euler(0, 0, -22.5f + -45f * (startPosition - 1));
+                    tapLine.transform.rotation = Quaternion.Euler(0, 0, -22.5f + -45f * (startPosition - 1));
                     State = NoteStatus.Pending;
                     goto case NoteStatus.Pending;
                 }
@@ -130,7 +124,7 @@ public class StarDrop : TapBase
                 return;
             case NoteStatus.Pending:
                 {
-                    if (fakeDestScale > 0.3f && !isNoHead)
+                    if (fakeDestScale > 0.3f)
                         tapLine.SetActive(true);
                     if (fakeDistance < 1.225f)
                     {
@@ -141,15 +135,6 @@ public class StarDrop : TapBase
                     }
                     else
                     {
-                        if (!isFakeStar && !slide.activeSelf)
-                        {
-                            slide.SetActive(true);
-                            if (isNoHead)
-                            {
-                                DestroySelf();
-                                return;
-                            }
-                        }
                         State = NoteStatus.Running;
                         goto case NoteStatus.Running;
                     }
@@ -165,41 +150,12 @@ public class StarDrop : TapBase
                 break;
         }
 
-        if (isNoHead)
-        {
-            spriteRenderer.forceRenderingOff = true;
-            if (isEx) exSpriteRender.forceRenderingOff = true;
-        }
-        else
-        {
-            spriteRenderer.forceRenderingOff = false;
-            if (isEx) exSpriteRender.forceRenderingOff = false;
-        }
+        spriteRenderer.forceRenderingOff = false;
+        if (isEx) exSpriteRender.forceRenderingOff = false;
 
         if (timeProvider.IsStart && !isFakeStar && rotateSpeed != 0)
             transform.Rotate(0f, 0f, -180f * Time.deltaTime * songSpeed / rotateSpeed);
         else if (isFakeStarRotate)
             transform.Rotate(0f, 0f, 400f * Time.deltaTime);
-    }
-
-    protected override void DestroySelf()
-    {
-        if (!isNoHead || isFakeStar)
-        {
-            base.DestroySelf();
-        }
-        else
-        {
-            noteManager.RemoveLoadedNote(this);
-            Destroy(tapLine);
-            Destroy(gameObject);
-        }
-    }
-
-    protected override void OnDestroy()
-    {
-        if (isNoHead) return;
-
-        base.OnDestroy();
     }
 }

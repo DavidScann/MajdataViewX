@@ -1,5 +1,5 @@
 #region
-
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -677,7 +677,12 @@ public class DataLoader : MonoBehaviour
             {
                 if (isConn)
                     throw new InvalidOperationException("不允许Wifi Slide作为Connection Slide的一部分");
+                if (legacySlideLayer)
+                    slideLayer += SLIDE_AREA_STEP_MAP["wifi"].Last();
                 InstantiateWifi(timing, subSlide[i]);
+                if (!legacySlideLayer)
+                    slideLayer -= SLIDE_AREA_STEP_MAP["wifi"].Last();
+                return;
             }
             else
             {
@@ -693,15 +698,16 @@ public class DataLoader : MonoBehaviour
                 subSlides.Add(parent.GetComponent<SlideDrop>());
             }
         }
-        float totalSlideLen = 0;
-        long judgeQueueLen = 0;
+        var slideLen = new int[subSlides.Count];
+        int judgeQueueLen = 0;
         var slideCount = subSlides.Count;
         for (var i = 0; i < slideCount; i++)
         {
             var isEnd = i == slideCount - 1;
             var table = SlideTables.FindTableByName(subSlides[i].slideType);
 
-            totalSlideLen += subSlides[i].GetSlideLength();
+            slideLen[i] = subSlides[i].GetSlideLength();
+
             if (isEnd)
             {
                 judgeQueueLen += table!.JudgeQueue.Length;
@@ -711,33 +717,46 @@ public class DataLoader : MonoBehaviour
                 judgeQueueLen += table!.JudgeQueue.Length - 1;
             }
         }
-        subSlides.ForEach(s =>
+        var totalSlideLen = slideLen.Sum();
+        if (legacySlideLayer)
+            slideLayer += totalSlideLen;
+        for (var i = 0; i < subSlides.Count; i++)
         {
+            var s = subSlides[i];
+            s.sortIndex = slideLayer - slideLen.Take(i).Sum();
             s.ConnectInfo.TotalSlideLen = totalSlideLen;
             s.ConnectInfo.TotalJudgeQueueLen = judgeQueueLen;
             s.Initialize();
-        });
+        }
+        if (!legacySlideLayer)
+            slideLayer -= totalSlideLen;
     }
 
     private GameObject InstantiateSlide(SimaiTimingPoint timing, SimaiNote note, ConnSlideInfo info)
     {
-        var GOnote = Instantiate(starPrefab, notes.transform);
-        GOnote.SetActive(false);
-        var NDCompo = GOnote.GetComponent<StarDrop>();
-        //无头星星的头只用来叫醒slide
-        noteManager.AddLoadedNote(NDCompo);
-        if (!note.IsSlideNoHead) noteManager.AddNote(NDCompo, noteIndex[note.StartPosition]++);
+        StarDrop? NDCompo = null;
+        if (!note.IsSlideNoHead)
+        {
+            var GOnote = Instantiate(starPrefab, notes.transform);
+            GOnote.SetActive(false);
+            NDCompo = GOnote.GetComponent<StarDrop>();
+            noteManager.AddLoadedNote(NDCompo);
+            noteManager.AddNote(NDCompo, noteIndex[note.StartPosition]++);
 
-        // note的图层顺序
-        NDCompo.noteSortOrder = noteSortOrder;
-        noteSortOrder -= NOTE_LAYER_COUNT[note.Type];
+            // note的图层顺序
+            NDCompo.noteSortOrder = noteSortOrder;
+            noteSortOrder -= NOTE_LAYER_COUNT[note.Type];
 
-        NDCompo.rotateSpeed = (float)note.SlideTime;
-        NDCompo.isEx = note.IsEx;
-        NDCompo.isBreak = note.IsBreak;
-        NDCompo.isMine = note.IsMine;
-        NDCompo.usingSV = note.UsingSV;
-        NDCompo.tapLine = tapLine;
+            NDCompo.rotateSpeed = (float)note.SlideTime;
+            NDCompo.isEx = note.IsEx;
+            NDCompo.isBreak = note.IsBreak;
+            NDCompo.isMine = note.IsMine;
+            NDCompo.usingSV = note.UsingSV;
+            NDCompo.tapLine = tapLine;
+            NDCompo.time = (float)timing.Timing;
+            NDCompo.startPosition = note.StartPosition;
+            NDCompo.speed = noteSpeed * timing.HSpeed;
+        }
 
         var slideShape = detectShapeFromText(note.RawContent);
         var isMirror = false;
@@ -752,17 +771,17 @@ public class DataLoader : MonoBehaviour
         var slide_star = Instantiate(star_slidePrefab, notes.transform);
         slide_star.SetActive(false);
         slide.SetActive(false);
-        NDCompo.slide = slide;
         var SliCompo = slide.AddComponent<SlideDrop>();
-
+        noteManager.AddLoadedNote(SliCompo);
         SliCompo.slideType = slideShape;
         SliCompo.areaStep = new List<int>(SLIDE_AREA_STEP_MAP[slideShape]);
         SliCompo.smoothSlideAnime = smoothSlideAnime;
 
         if (timing.Notes.Length > 1)
         {
+            if (NDCompo != null) NDCompo.isEach = true;
+
             var notes = timing.Notes.ToList();
-            NDCompo.isEach = true;
             if (notes.FindAll(o => o.Type == SimaiNoteType.Slide).Count > 1)
             {
                 SliCompo.isEach = true;
@@ -771,7 +790,7 @@ public class DataLoader : MonoBehaviour
             var count = notes.FindAll(
                 o => o.Type == SimaiNoteType.Slide &&
                      o.StartPosition == note.StartPosition).Count;
-            if (count > 1)
+            if (count > 1 && NDCompo != null)
             {
                 NDCompo.isDouble = true;
                 if (count == notes.Count)
@@ -785,12 +804,6 @@ public class DataLoader : MonoBehaviour
         SliCompo.isBreak = note.IsSlideBreak;
         SliCompo.isMine = note.IsMineSlide;
         SliCompo.usingSV = note.UsingSV;
-
-        NDCompo.isNoHead = note.IsSlideNoHead;
-        NDCompo.time = (float)timing.Timing;
-        NDCompo.startPosition = note.StartPosition;
-        NDCompo.speed = noteSpeed * timing.HSpeed;
-
 
         SliCompo.isMirror = isMirror;
         SliCompo.isJustR = detectJustType(note.RawContent, out int endPos);
@@ -815,11 +828,8 @@ public class DataLoader : MonoBehaviour
         SliCompo.time = (float)note.SlideStartTime;
         SliCompo.LastFor = (float)note.SlideTime;
         //SliCompo.sortIndex = -7000 + (int)((lastNoteTime - timing.time) * -100) + sort * 5;
-        SliCompo.sortIndex = slideLayer;
-        if (legacySlideLayer)
-            slideLayer -= SLIDE_AREA_STEP_MAP[slideShape].Last();
-        else
-            slideLayer += 5;
+        //SliCompo.sortIndex = slideLayer; //in loader
+        //slideLayer -= SLIDE_AREA_STEP_MAP[slideShape].Last();
         return slide;
     }
 
@@ -834,36 +844,39 @@ public class DataLoader : MonoBehaviour
         endPos = endPos > 8 ? endPos - 8 : endPos;
         endPos++;
 
-        var GOnote = Instantiate(starPrefab, notes.transform);
-        GOnote.SetActive(false);
-        var NDCompo = GOnote.GetComponent<StarDrop>();
-        //无头星星的头只用来叫醒slide
-        noteManager.AddLoadedNote(NDCompo);
-        if (!note.IsSlideNoHead) noteManager.AddNote(NDCompo, noteIndex[note.StartPosition]++);
+        StarDrop? NDCompo = null;
+        if (!note.IsSlideNoHead)
+        {
+            var GOnote = Instantiate(starPrefab, notes.transform);
+            GOnote.SetActive(false);
+            NDCompo = GOnote.GetComponent<StarDrop>();
+            noteManager.AddLoadedNote(NDCompo);
+            noteManager.AddNote(NDCompo, noteIndex[note.StartPosition]++);
 
-        // note的图层顺序
-        NDCompo.noteSortOrder = noteSortOrder;
-        noteSortOrder -= NOTE_LAYER_COUNT[note.Type];
+            // note的图层顺序
+            NDCompo.noteSortOrder = noteSortOrder;
+            noteSortOrder -= NOTE_LAYER_COUNT[note.Type];
 
-        NDCompo.rotateSpeed = (float)note.SlideTime;
-        NDCompo.isEx = note.IsEx;
-        NDCompo.isBreak = note.IsBreak;
-        NDCompo.isMine = note.IsMine;
-        NDCompo.usingSV = note.UsingSV;
-        NDCompo.tapLine = tapLine;
-
+            NDCompo.rotateSpeed = (float)note.SlideTime;
+            NDCompo.isEx = note.IsEx;
+            NDCompo.isBreak = note.IsBreak;
+            NDCompo.isMine = note.IsMine;
+            NDCompo.usingSV = note.UsingSV;
+            NDCompo.tapLine = tapLine;
+            NDCompo.time = (float)timing.Timing;
+            NDCompo.startPosition = note.StartPosition;
+            NDCompo.speed = noteSpeed * timing.HSpeed;
+        }
         var slideWifi = Instantiate(slidePrefab[SLIDE_PREFAB_MAP["wifi"]], notes.transform);
         slideWifi.SetActive(false);
-        NDCompo.slide = slideWifi;
         var WifiCompo = slideWifi.GetComponent<WifiDrop>();
-
+        noteManager.AddLoadedNote(WifiCompo);
         WifiCompo.areaStep = new List<int>(SLIDE_AREA_STEP_MAP["wifi"]);
         WifiCompo.smoothSlideAnime = smoothSlideAnime;
 
         if (timing.Notes.Length > 1)
         {
-            NDCompo.isEach = true;
-            NDCompo.isDouble = false;
+            if (NDCompo != null) NDCompo.isEach = true;
             var notes = timing.Notes.ToList();
             if (notes.FindAll(
                     o => o.Type == SimaiNoteType.Slide).Count
@@ -874,21 +887,20 @@ public class DataLoader : MonoBehaviour
                      o.StartPosition == note.StartPosition).Count;
             if (count > 1) //有同起点
             {
-                NDCompo.isDouble = true;
-                if (count == notes.Count)
-                    NDCompo.isEach = false;
-                else
-                    NDCompo.isEach = true;
+                if (NDCompo != null)
+                {
+                    NDCompo.isDouble = true;
+                    if (count == notes.Count)
+                        NDCompo.isEach = false;
+                    else
+                        NDCompo.isEach = true;
+                }
             }
         }
 
         WifiCompo.isBreak = note.IsSlideBreak;
         WifiCompo.isMine = note.IsMineSlide;
         WifiCompo.usingSV = note.UsingSV;
-        NDCompo.isNoHead = note.IsSlideNoHead;
-        NDCompo.time = (float)timing.Timing;
-        NDCompo.startPosition = note.StartPosition;
-        NDCompo.speed = noteSpeed * timing.HSpeed;
 
         WifiCompo.isJustR = detectJustType(note.RawContent, out endPos);
         WifiCompo.endPosition = endPos;
@@ -898,15 +910,11 @@ public class DataLoader : MonoBehaviour
         WifiCompo.time = (float)note.SlideStartTime;
         WifiCompo.LastFor = (float)note.SlideTime;
         WifiCompo.sortIndex = slideLayer;
-        if (legacySlideLayer)
-            slideLayer -= SLIDE_AREA_STEP_MAP["wifi"].Last();
-        else
-            slideLayer += 5;
+        //slideLayer -= SLIDE_AREA_STEP_MAP["wifi"].Last();
     }
 
 
     //helper
-
     private bool detectJustType(string content, out int endPos)
     {
         // > < ^ V w
