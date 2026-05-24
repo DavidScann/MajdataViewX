@@ -71,6 +71,7 @@ public class SlideDrop : NoteLongBase, ICanShine
         timeProvider = Majdata<TimeProvider>.Instance!;
         inputManager = Majdata<InputManager>.Instance!;
         audioManager = Majdata<AudioManager>.Instance!;
+        noteManager = Majdata<NoteManager>.Instance!;
 
         //star
         starRenderer = star_slide.GetComponent<SpriteRenderer>();
@@ -435,7 +436,7 @@ public class SlideDrop : NoteLongBase, ICanShine
         Check();
     }
 
-    public float GetSlideLength()
+    public int GetSlideLength()
     {
         if (areaStep.Count > 0)
             return areaStep.Last();
@@ -682,6 +683,7 @@ public class SlideDrop : NoteLongBase, ICanShine
     }
     void OnDestroy()
     {
+        noteManager.RemoveLoadedNote(this);
         if (PlayManager.IsReloading) return;
         if (isDestroying)
             return;

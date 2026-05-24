@@ -62,6 +62,7 @@ public class WifiDrop : NoteLongBase, ICanShine
         skinManager = Majdata<SkinManager>.Instance!;
         inputManager = Majdata<InputManager>.Instance!;
         audioManager = Majdata<AudioManager>.Instance!;
+        noteManager = Majdata<NoteManager>.Instance!;
         var notes = GameObject.Find("Notes").transform;
 
         // 计算Slide淡入时机
@@ -545,6 +546,7 @@ public class WifiDrop : NoteLongBase, ICanShine
             return;
         isDestroying = true;
 
+        noteManager.RemoveLoadedNote(this);
         ClearTriggeredSensor();
         switch (Majdata<InputManager>.Instance!.Mode)
         {
