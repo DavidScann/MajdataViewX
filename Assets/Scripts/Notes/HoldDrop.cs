@@ -126,7 +126,7 @@ public class HoldDrop : NoteLongBase
                     PlaySFX();
                     break;
                 case AutoPlayMode.DJAuto:
-                    if (!isJudged && !isMine) //mine buda
+                    if (!isMine) //mine buda
                         inputManager.SetSensorOn(sensor, guid);
                     break;
                 case AutoPlayMode.Random:

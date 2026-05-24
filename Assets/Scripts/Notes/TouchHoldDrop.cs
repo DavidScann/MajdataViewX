@@ -198,7 +198,7 @@ public class TouchHoldDrop : NoteLongBase
                     audioManager.PlayTouchHoldSound();
                     return;
                 case AutoPlayMode.DJAuto:
-                    if (!isJudged && !isMine)
+                    if (!isMine)
                         inputManager.SetSensorOn(sensor, guid);
                     break;
                 case AutoPlayMode.Random:
