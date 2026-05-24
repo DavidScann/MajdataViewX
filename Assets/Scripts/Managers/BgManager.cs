@@ -13,9 +13,9 @@ public class BgManager : MonoBehaviour
 {
     private TimeProvider timeProvider;
 
-    [SerializeField] 
+    [SerializeField]
     private Sprite defaultBg;
-    
+
     private RawImage jacketImage;
     private GameObject songDetail;
     private Animator detailAnim;
@@ -24,7 +24,7 @@ public class BgManager : MonoBehaviour
 
     private float smoothRDelta;
     private float originalScaleX;
-    
+
     private Sprite? Bg { get; set; }
     private string? VideoUrl { get; set; }
 
@@ -32,7 +32,7 @@ public class BgManager : MonoBehaviour
     public static bool hasVideo;
     public bool IsBgLoaded => !hasBg || Bg != null;
     public bool IsVideoLoaded => !hasVideo || !string.IsNullOrWhiteSpace(VideoUrl);
-    
+
 
     private void Awake()
     {
@@ -42,11 +42,11 @@ public class BgManager : MonoBehaviour
     private void Start()
     {
         timeProvider = Majdata<TimeProvider>.Instance!;
-        
+
         jacketImage = GameObject.Find("Jacket").GetComponent<RawImage>();
         songDetail = GameObject.Find("CanvasSongDetail");
         songDetail.SetActive(false);
-        
+
         originalScaleX = gameObject.transform.localScale.x;
         spriteRender = GetComponent<SpriteRenderer>();
         videoPlayer = GetComponent<VideoPlayer>();
@@ -80,16 +80,6 @@ public class BgManager : MonoBehaviour
         detailAnim.SetTrigger("show");
     }
 
-    public void PauseVideo()
-    {
-        videoPlayer.Pause();
-    }
-
-    public void ContinueVideo()
-    {
-        videoPlayer.Play();
-    }
-    
     public void LoadBG(string path)
     {
         Bg = SpriteLoader.Load(path);
@@ -98,7 +88,7 @@ public class BgManager : MonoBehaviour
     public void ShowBG()
     {
         if (Bg == null || !hasBg) return;
-        
+
         jacketImage.texture = Bg.texture;
         spriteRender.sprite = Bg;
         var scale = 1140f / Bg.texture.width;
@@ -113,13 +103,13 @@ public class BgManager : MonoBehaviour
     public void ShowVideo()
     {
         if (!hasVideo) return;
-        
+
         videoPlayer.url = VideoUrl;
         StartCoroutine(WaitFumenStart());
         IEnumerator WaitFumenStart()
         {
             videoPlayer.Prepare();
-            
+
             //secret hack: if not so, the bg won't be set to defaultBg but full white
             spriteRender.sprite =
                 Sprite.Create(new Texture2D(1080, 1080), new Rect(0, 0, 1080, 1080), new Vector2(0.5f, 0.5f));
@@ -134,13 +124,25 @@ public class BgManager : MonoBehaviour
         }
     }
 
+    public void PauseVideo()
+    {
+        if (!hasVideo) return;
+        videoPlayer.Pause();
+    }
+
+    public void ContinueVideo()
+    {
+        if (!hasVideo) return;
+        videoPlayer.Play();
+    }
+
     public void ResetState()
     {
         videoPlayer.Stop();
         gameObject.transform.localScale = new Vector3(1.1f, 1.1f, 1.1f);
         spriteRender.sprite = defaultBg;
         smoothRDelta = 0f;
-        
+
         if (songDetail != null)
             songDetail.SetActive(false);
     }
