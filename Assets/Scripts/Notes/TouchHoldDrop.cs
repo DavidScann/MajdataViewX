@@ -39,7 +39,6 @@ public class TouchHoldDrop : NoteLongBase
 
     private bool _isTouched = false; //for mine judge
     private Sprite _borderSprite;
-    private bool isSfxPlaying;
 
     // Start is called before the first frame update
     private void Start()
@@ -195,7 +194,7 @@ public class TouchHoldDrop : NoteLongBase
                     isJudged = true;
                     _isTouched = true;
                     PlayHoldEffect();
-                    audioManager.PlayTouchHoldSound();
+                    audioManager.PlayTouchHoldSound(guid);
                     return;
                 case AutoPlayMode.DJAuto:
                     if (!isMine)
@@ -221,7 +220,7 @@ public class TouchHoldDrop : NoteLongBase
                         isJudged = true;
                     }
                     PlayHoldEffect();
-                    audioManager.PlayTouchHoldSound();
+                    audioManager.PlayTouchHoldSound(guid);
                     return;
                 case AutoPlayMode.Disable:
                 default:
@@ -239,11 +238,11 @@ public class TouchHoldDrop : NoteLongBase
             if (on)
             {
                 _isTouched = true;
-                audioManager.PlayTouchHoldSound();
+                audioManager.PlayTouchHoldSound(guid);
             }
             else
             {
-                audioManager.StopTouchHoldSound();
+                audioManager.StopTouchHoldSound(guid);
             }
 
             if (timing <= 0.25f) // 忽略头部15帧
@@ -340,7 +339,7 @@ public class TouchHoldDrop : NoteLongBase
     private void OnDestroy()
     {
         if (PlayManager.IsReloading) return;
-        audioManager.StopTouchHoldSound();
+        audioManager.StopTouchHoldSound(guid);
         var realityHT = LastFor - 0.45f - (judgeDiff / 1000f);
         var percent = Math.Clamp((realityHT - playerIdleTime) / realityHT, 0, 1);
         JudgeType result = judgeResult;
