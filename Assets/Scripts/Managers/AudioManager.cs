@@ -59,7 +59,8 @@ public class AudioManager : MonoBehaviour
     public const int TRACK_START = 14;
     public const int ALL_PERFECT = 15;
 
-    private bool isTouchHoldRiserPlaying = false;
+    private List<Guid> touchholdRiserPlayingTask = new();
+    private bool isTouchholdRiserPlaying;
     private void Awake()
     {
         Majdata<AudioManager>.Instance = this;
@@ -216,16 +217,16 @@ public class AudioManager : MonoBehaviour
                 case TOUCHHOLD:
                     if (isRequested)
                     {
-                        if (isTouchHoldRiserPlaying)
-                            break;
-                        isTouchHoldRiserPlaying = true;
+                        if (isTouchholdRiserPlaying) break;
+
+                        isTouchholdRiserPlaying = true;
                         NoteSfxs[TOUCHHOLD].PlayOneShot();
                     }
                     else
                     {
-                        if (!isTouchHoldRiserPlaying)
-                            break;
-                        isTouchHoldRiserPlaying = false;
+                        if (!isTouchholdRiserPlaying) break;
+
+                        isTouchholdRiserPlaying = false;
                         NoteSfxs[TOUCHHOLD].Stop();
                     }
                     break;
@@ -305,7 +306,9 @@ public class AudioManager : MonoBehaviour
     public void ResetState()
     {
         StopTrack();
-        StopTouchHoldSound();
+        //StopTouchHoldSound();
+        noteSfxPlaybackRequests[TOUCHHOLD] = false;
+        touchholdRiserPlayingTask.Clear();
 
         answerTimingPoints.Clear();
         for (var i = 0; i < noteSfxPlaybackRequests.Length; i++)
@@ -446,24 +449,30 @@ public class AudioManager : MonoBehaviour
     {
         noteSfxPlaybackRequests[FIREWORK] = true;
     }
-    public void PlayTouchHoldSound()
+    public void PlayTouchHoldSound(Guid guid)
     {
         noteSfxPlaybackRequests[TOUCHHOLD] = true;
+        if (!touchholdRiserPlayingTask.Contains(guid))
+            touchholdRiserPlayingTask.Add(guid);
     }
 
     public void PauseTouchHoldSound()
     {
-        if (isTouchHoldRiserPlaying)
+        if (isTouchholdRiserPlaying)
             NoteSfxs[TOUCHHOLD].Pause(); //seen as still playing
     }
     public void ResumeTouchHoldSound()
     {
-        if (isTouchHoldRiserPlaying)
+        if (isTouchholdRiserPlaying)
             NoteSfxs[TOUCHHOLD].Play();
     }
-    public void StopTouchHoldSound()
+    public void StopTouchHoldSound(Guid guid)
     {
-        noteSfxPlaybackRequests[TOUCHHOLD] = false;
+        if (touchholdRiserPlayingTask.Contains(guid))
+            touchholdRiserPlayingTask.Remove(guid);
+
+        if (touchholdRiserPlayingTask.Count == 0)
+            noteSfxPlaybackRequests[TOUCHHOLD] = false;
     }
     public void PlaySlideSound(bool isBreak)
     {
