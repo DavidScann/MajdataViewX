@@ -216,6 +216,14 @@ public class TouchDrop : NoteBase
         JudgeType result;
         if (diff > JUDGE_SEG_PERFECT && isFast)
             return;
+
+        if (isMine)
+        {
+            judgeResult = JudgeType.Miss;
+            isJudged = true;
+            return;
+        }
+
         else if (diff < JUDGE_SEG_PERFECT)
             result = JudgeType.Perfect;
         else if (diff < JUDGE_PERFECT_AREA)

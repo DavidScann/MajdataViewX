@@ -4,6 +4,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using JetBrains.Annotations;
 using MajSimai;
 using ManagedBass;
@@ -344,7 +345,14 @@ public class AudioManager : MonoBehaviour
         foreach (var timingPoint in chart.NoteTimings)
         {
             var startTiming = (float)timingPoint.Timing;
-            rawTimings.Add(startTiming);
+
+            if (!timingPoint.Notes.All              //无头别叫
+                            (o => o.Type is SimaiNoteType.Slide
+                            && o.IsSlideNoHead == true))
+            {
+                rawTimings.Add(startTiming);
+            }
+
 
             var holds = Array.FindAll(timingPoint.Notes,
                 o => o.Type is SimaiNoteType.Hold or SimaiNoteType.TouchHold);

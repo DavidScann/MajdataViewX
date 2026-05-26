@@ -368,8 +368,20 @@ public class SlideDrop : NoteLongBase, ICanShine
             starRenderer.color = Color.white;
             star_slide.transform.localScale = new Vector3(1.5f, 1.5f, 1.5f);
 
-            var process = fakeRemaining / fakeLastfor;
-            process = Math.Max(1f - process, 0);
+            float process;
+            if (fakeLastfor > 0)
+            {
+                process = fakeRemaining / fakeLastfor;
+                process = Math.Max(1f - process, 0);
+            }
+            else if (fakeLastfor == 0)
+            {
+                process = 1f;
+            }
+            else
+            {
+                process = 0;
+            }
             var indexProcess = (slidePositions.Count - 1) * process;
             var index = (int)indexProcess;
             var pos = indexProcess - index;
