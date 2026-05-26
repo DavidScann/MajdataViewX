@@ -37,12 +37,10 @@ public class DataLoader : MonoBehaviour
 
     public GameObject[] slidePrefab;
 
-    Majson loadedData = null;
     Dictionary<int, int> noteIndex = new();
     Dictionary<SensorType, int> touchIndex = new();
     private bool streamingRunning;
     List<TouchDrop> touchMembers = new();
-
     public Text diffText;
     public Text levelText;
     public Text titleText;
@@ -54,6 +52,7 @@ public class DataLoader : MonoBehaviour
     private const double StreamingCreatePreloadTime = 4;
     private const double StreamingFrameBudgetMs = 4;
 
+    private Text errText;
     private int slideLayer = -1;
     private int noteSortOrder = 0;
 
@@ -207,6 +206,7 @@ public class DataLoader : MonoBehaviour
         objectCounter = Majdata<ObjectCounter>.Instance!;
         skinManager = Majdata<SkinManager>.Instance!;
         noteManager = Majdata<NoteManager>.Instance!;
+        errText = GameObject.Find("ErrText").GetComponent<Text>();
         for (var i = 1; i < 9; i++)
             noteIndex.Add(i, 0);
         for (var i = 0; i < 33; i++)
@@ -531,9 +531,11 @@ public class DataLoader : MonoBehaviour
                 // 读取到字符
                 var slideTypeChar = noteContent[ptr++].ToString();
 
-                var slidePart = new SimaiNote();
-                slidePart.Type = SimaiNoteType.Slide;
-                slidePart.StartPosition = latestStartIndex;
+                var slidePart = new SimaiNote
+                {
+                    Type = SimaiNoteType.Slide,
+                    StartPosition = latestStartIndex
+                };
                 if (slideTypeChar == "V")
                 {
                     // 转折星星
@@ -564,8 +566,11 @@ public class DataLoader : MonoBehaviour
                         // 之前读取到的都是未指定时长的段落 那么将flag设为3 如果之后又读取到时长 则报错
                         specTimeFlag = 3;
                     else if (specTimeFlag == 3)
-                        // 之前读取到了指定时长 并期待那个时长就是最终时长 但是又读取到一个新的时长 则报错
-                        throw new Exception("组合星星有错误\nSLIDE CHAIN ERROR");
+                    // 之前读取到了指定时长 并期待那个时长就是最终时长 但是又读取到一个新的时长 则报错
+                    {
+                        errText.text = "组合星星有错误\nSLIDE CHAIN ERROR";
+                        return;
+                    }
 
                     while (ptr < noteContent.Length && noteContent[ptr] != ']')
                         slidePart.RawContent += noteContent[ptr++];
@@ -578,16 +583,22 @@ public class DataLoader : MonoBehaviour
                         // 之前未读取过
                         specTimeFlag = 1;
                     else if (specTimeFlag == 2 || specTimeFlag == 3)
-                        // 之前读取到指定时长的段落了 说明这一条组合星星有的指定时长 有的没指定 则需要报错
-                        throw new Exception("组合星星有错误\nSLIDE CHAIN ERROR");
+                    // 之前读取到指定时长的段落了 说明这一条组合星星有的指定时长 有的没指定 则需要报错
+                    {
+                        errText.text = "组合星星有错误\nSLIDE CHAIN ERROR";
+                        return;
+                    }
                 }
 
                 string slideShape = detectShapeFromText(slidePart.RawContent);
-                if (slideShape.StartsWith("-"))
+                if (slideShape.StartsWith("-")) slideShape = slideShape.Substring(1);
+
+                if (string.IsNullOrEmpty(slideShape) || !SLIDE_PREFAB_MAP.ContainsKey(slideShape))
                 {
-                    slideShape = slideShape.Substring(1);
+                    errText.text = "星星形状有错误\nSLIDE ERROR";
+                    return;
                 }
-                int slideIndex = SLIDE_PREFAB_MAP[slideShape];
+                var slideIndex = SLIDE_PREFAB_MAP[slideShape];
                 if (slideIndex < 0) slideIndex = -slideIndex;
 
                 var barCount = slidePrefab[slideIndex].transform.childCount;
@@ -599,7 +610,8 @@ public class DataLoader : MonoBehaviour
             else
             {
                 // 理论上来说 不应该读取到数字 因此如果读取到了 说明有语法错误
-                throw new Exception("组合星星有错误\nwSLIDE CHAIN ERROR");
+                errText.text = "组合星星有错误\nSLIDE CHAIN ERROR";
+                return;
             }
 
         subSlide.ForEach(o =>
@@ -614,9 +626,12 @@ public class DataLoader : MonoBehaviour
         });
         subSlide[0].IsSlideNoHead = note.IsSlideNoHead;
 
+        // 如果到结束还是1 那说明没有一个指定了时长 报错
         if (specTimeFlag == 1 || specTimeFlag == 0)
-            // 如果到结束还是1 那说明没有一个指定了时长 报错
-            throw new Exception("组合星星有错误\nwSLIDE CHAIN ERROR");
+        {
+            errText.text = "组合星星有错误\nSLIDE CHAIN ERROR";
+            return;
+        }
         // 此时 flag为2表示每条指定语法 为3表示整体指定语法
 
         var tempBarCount = 0;
@@ -638,7 +653,10 @@ public class DataLoader : MonoBehaviour
             if (note.RawContent.Contains('w')) //wifi
             {
                 if (isConn)
-                    throw new InvalidOperationException("不允许Wifi Slide作为Connection Slide的一部分");
+                {
+                    errText.text = "组合星星有错误\nSLIDE CHAIN ERROR";
+                    return;
+                }
                 if (legacySlideLayer)
                     slideLayer += SLIDE_AREA_STEP_MAP["wifi"].Last();
                 InstantiateWifi(timing, subSlide[i]);
@@ -967,7 +985,11 @@ public class DataLoader : MonoBehaviour
             var startPos = int.Parse(digits[0]);
             var endPos = int.Parse(digits[1]);
             endPos = getRelativeEndPos(startPos, endPos);
-            if (endPos < 3 || endPos > 7) throw new Exception("-星星至少隔开一键\n-スライドエラー");
+            if (endPos < 3 || endPos > 7)
+            {
+                errText.text = "-星星至少隔开一键\n-スライドエラー";
+                return "";
+            }
             return "line" + endPos;
         }
 
@@ -1015,7 +1037,8 @@ public class DataLoader : MonoBehaviour
 
             if (endPos == 1 || endPos == 5)
             {
-                throw new Exception("^星星不合法\n^スライドエラー");
+                errText.text = "^星星不合法\n^スライドエラー";
+                return "";
             }
 
             if (endPos < 5)
@@ -1036,7 +1059,11 @@ public class DataLoader : MonoBehaviour
             var startPos = int.Parse(digits[0]);
             var endPos = int.Parse(digits[1]);
             endPos = getRelativeEndPos(startPos, endPos);
-            if (endPos == 5) throw new Exception("v星星不合法\nvスライドエラー");
+            if (endPos == 5)
+            {
+                errText.text = "v星星不合法\nvスライドエラー";
+                return "";
+            }
             return "v" + endPos;
         }
 
@@ -1094,7 +1121,11 @@ public class DataLoader : MonoBehaviour
             var startPos = int.Parse(digits[0]);
             var endPos = int.Parse(digits[1]);
             endPos = getRelativeEndPos(startPos, endPos);
-            if (endPos != 5) throw new Exception("s星星尾部错误\nsスライドエラー");
+            if (endPos != 5)
+            {
+                errText.text = "s星星尾部错误\nsスライドエラー";
+                return "";
+            }
             return "s";
         }
 
@@ -1106,7 +1137,11 @@ public class DataLoader : MonoBehaviour
             var startPos = int.Parse(digits[0]);
             var endPos = int.Parse(digits[1]);
             endPos = getRelativeEndPos(startPos, endPos);
-            if (endPos != 5) throw new Exception("z星星尾部错误\nzスライドエラー");
+            if (endPos != 5)
+            {
+                errText.text = "z星星尾部错误\nzスライドエラー";
+                return "";
+            }
             return "-s";
         }
 
@@ -1123,17 +1158,26 @@ public class DataLoader : MonoBehaviour
             endPos = getRelativeEndPos(startPos, endPos);
             if (turnPos == 7)
             {
-                if (endPos < 2 || endPos > 5) throw new Exception("V星星终点不合法\nVスライドエラー");
+                if (endPos < 2 || endPos > 5)
+                {
+                    errText.text = "V星星终点不合法\nVスライドエラー";
+                    return "";
+                }
                 return "L" + endPos;
             }
 
             if (turnPos == 3)
             {
-                if (endPos < 5) throw new Exception("V星星终点不合法\nVスライドエラー");
+                if (endPos < 5)
+                {
+                    errText.text = "V星星终点不合法\nVスライドエラー";
+                    return "";
+                }
                 return "-L" + MirrorKeys(endPos);
             }
 
-            throw new Exception("V星星拐点只能隔开一键\nVスライドエラー");
+            errText.text = "V星星拐点只能隔开一键\nVスライドエラー";
+            return "";
         }
 
         if (content.Contains('w'))
@@ -1144,7 +1188,11 @@ public class DataLoader : MonoBehaviour
             var startPos = int.Parse(digits[0]);
             var endPos = int.Parse(digits[1]);
             endPos = getRelativeEndPos(startPos, endPos);
-            if (endPos != 5) throw new Exception("w星星尾部错误\nwスライドエラー");
+            if (endPos != 5)
+            {
+                errText.text = "w星星尾部错误\nwスライドエラー";
+                return "";
+            }
             return "wifi";
         }
 
@@ -1182,7 +1230,8 @@ public class DataLoader : MonoBehaviour
         if (key == 6) return 4;
         if (key == 7) return 3;
         if (key == 8) return 2;
-        throw new Exception("Keys out of range: " + key);
+        errText.text = "Keys out of range: " + key;
+        return 1;
     }
 
     public static string GetDifficultyText(int index)
@@ -1199,7 +1248,6 @@ public class DataLoader : MonoBehaviour
 
     public void ResetState()
     {
-        loadedData = null;
         streamingRunning = false;
         for (var i = 1; i < 9; i++)
             noteIndex[i] = 0;

@@ -197,6 +197,13 @@ public class TapBase : NoteBase
         if (isJudged)
             return;
 
+        var timing = timeProvider.NoteTime - time;
+        var isFast = timing < 0;
+        var diff = MathF.Abs(timing * 1000);
+        JudgeType result;
+        if (diff > JUDGE_GOOD_AREA && isFast)
+            return;
+
         if (isMine)
         {
             judgeResult = JudgeType.Miss;
@@ -204,12 +211,6 @@ public class TapBase : NoteBase
             return;
         }
 
-        var timing = timeProvider.NoteTime - time;
-        var isFast = timing < 0;
-        var diff = MathF.Abs(timing * 1000);
-        JudgeType result;
-        if (diff > JUDGE_GOOD_AREA && isFast)
-            return;
         else if (diff < JUDGE_SEG_PERFECT1)
             result = JudgeType.Perfect;
         else if (diff < JUDGE_SEG_PERFECT2)
