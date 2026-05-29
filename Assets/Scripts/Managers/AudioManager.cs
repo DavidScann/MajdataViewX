@@ -38,6 +38,7 @@ public class AudioManager : MonoBehaviour
 
     public double GlobalAudioOffset { get; private set; }
 
+    public bool IsShowingSongDetail => timeProvider.AudioTime <= recordingInitialAudioTime + TimeProvider.SONG_DETAIL_OFFSET;
     const int SAMPLERATE = 44100;
     const int CHANNELS = 2;
 
@@ -580,15 +581,17 @@ public class AudioManager : MonoBehaviour
         }
 
 
-        var trackOffset = TRACK_ANSWER_PLAYBACK_OFFSET_SEC + (float)GlobalAudioOffset + 5;
+        var trackOffset = TRACK_ANSWER_PLAYBACK_OFFSET_SEC +
+                            (float)GlobalAudioOffset;
         var initialTrackSec = recordingInitialAudioTime - trackOffset;
+        var trackStartFrameCount = (int)((initialTrackSec + TimeProvider.SONG_DETAIL_OFFSET) * SAMPLERATE * recordingSpeed);
         var trackFrameCount = TrackSampleData.Length / CHANNELS;
         var recordingFrameCount = recordingBuffer.Length / CHANNELS;
 
         for (var dstFrame = 0; dstFrame < recordingFrameCount; dstFrame++)
         {
             var srcFrame = (initialTrackSec * SAMPLERATE) + dstFrame * recordingSpeed;
-            if (srcFrame < 0) continue;
+            if (srcFrame < 0 || srcFrame <= trackStartFrameCount) continue;
             if (srcFrame >= trackFrameCount - 1) break;
 
             var srcFrameFloor = (int)srcFrame;

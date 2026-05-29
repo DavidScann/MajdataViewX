@@ -92,7 +92,7 @@ public class ScreenRecorder : MonoBehaviour
         // 预分配 Texture2D，避免循环内 new 产生 GC
         var cpuTex = new Texture2D(Screen.width, Screen.height, TextureFormat.RGBA32, false);
 
-        audioManager.PrepareRecordingBuffer(timeProvider.AudioTime, timeProvider.CurrentSpeed);
+        //audioManager.PrepareRecordingBuffer(timeProvider.AudioTime, timeProvider.CurrentSpeed);
         IsRecording = true;
 
         var isTouchHoldRising = false;
@@ -122,45 +122,50 @@ public class ScreenRecorder : MonoBehaviour
                 using (var bw = new BinaryWriter(pipeServer))
                 {
                     onStart?.Invoke();
+                    //这时再传入时间点，onstart启动了timeprovider
+                    audioManager.PrepareRecordingBuffer(timeProvider.AudioTime, timeProvider.CurrentSpeed);
                     while (IsRecording && !ProcessUtils.HasExited(ffmpegProcessHandle, out _))
                     {
                         await UniTask.WaitForEndOfFrame(this);
 
                         // Audio
-                        audioManager.UpdateAnswerSfx();
-                        for (var i = 0; i < AudioManager.noteSfxPlaybackRequests.Length; i++)
+                        if (!audioManager.IsShowingSongDetail)
                         {
-                            if (i == AudioManager.TRACK_START) continue;
+                            audioManager.UpdateAnswerSfx();
+                            for (var i = 0; i < AudioManager.noteSfxPlaybackRequests.Length; i++)
+                            {
+                                if (i == AudioManager.TRACK_START) continue;
 
-                            if (i == AudioManager.TOUCHHOLD)
-                            {
-                                var isRequested = AudioManager.noteSfxPlaybackRequests[i];
-                                if (isRequested)
+                                if (i == AudioManager.TOUCHHOLD)
                                 {
-                                    if (!isTouchHoldRising)
+                                    var isRequested = AudioManager.noteSfxPlaybackRequests[i];
+                                    if (isRequested)
                                     {
-                                        isTouchHoldRising = true;
-                                        audioManager.TriggerSfxRecording(AudioManager.TOUCHHOLD);
+                                        if (!isTouchHoldRising)
+                                        {
+                                            isTouchHoldRising = true;
+                                            audioManager.TriggerSfxRecording(AudioManager.TOUCHHOLD);
+                                        }
+                                        // TouchHold 不重置指针，让它继续播
                                     }
-                                    // TouchHold 不重置指针，让它继续播
+                                    else
+                                    {
+                                        if (isTouchHoldRising)
+                                        {
+                                            isTouchHoldRising = false;
+                                            audioManager.StopSfxRecording(AudioManager.TOUCHHOLD); // 停止播放
+                                        }
+                                    }
                                 }
-                                else
+                                else if (AudioManager.noteSfxPlaybackRequests[i])
                                 {
-                                    if (isTouchHoldRising)
-                                    {
-                                        isTouchHoldRising = false;
-                                        audioManager.StopSfxRecording(AudioManager.TOUCHHOLD); // 停止播放
-                                    }
+                                    // 重置指针
+                                    audioManager.TriggerSfxRecording(i);
+                                    AudioManager.noteSfxPlaybackRequests[i] = false;
                                 }
                             }
-                            else if (AudioManager.noteSfxPlaybackRequests[i])
-                            {
-                                // 重置指针
-                                audioManager.TriggerSfxRecording(i);
-                                AudioManager.noteSfxPlaybackRequests[i] = false;
-                            }
+                            audioManager.UpdateSfxRecording(deltaTime, recordingElapsedTime);
                         }
-                        audioManager.UpdateSfxRecording(deltaTime, recordingElapsedTime);
 
                         // Video
                         RenderTexture.active = null;
