@@ -202,7 +202,7 @@ public class PlayManager : MonoBehaviour
                     _state = ViewStatus.Playing;
                     screenRecorder.StartRecording(maidataPath,
                         _setting.OutputFps,
-                        _setting.UseAlpha,
+                        _setting.ResizeBg,
                         () =>
                         {
                             timeProvider.SetStartTime(startAt, offset, speed, playmode, _setting.OutputFps);
