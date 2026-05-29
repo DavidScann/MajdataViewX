@@ -11,6 +11,7 @@ using UnityEngine.Video;
 
 public class BgManager : MonoBehaviour
 {
+    private static readonly int ShowHash = Animator.StringToHash("show");
     private TimeProvider timeProvider;
 
     [SerializeField]
@@ -32,7 +33,6 @@ public class BgManager : MonoBehaviour
     public static bool hasVideo;
     public bool IsBgLoaded => !hasBg || Bg != null;
     public bool IsVideoLoaded => !hasVideo || !string.IsNullOrWhiteSpace(VideoUrl);
-
 
     private void Awake()
     {
@@ -77,7 +77,7 @@ public class BgManager : MonoBehaviour
     public void PlaySongDetail()
     {
         songDetail.SetActive(true);
-        detailAnim.SetTrigger("show");
+        detailAnim.SetTrigger(ShowHash);
     }
 
     public void LoadBG(string path)
