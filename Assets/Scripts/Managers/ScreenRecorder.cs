@@ -34,9 +34,9 @@ public class ScreenRecorder : MonoBehaviour
     }
 
     public async UniTask StartRecording(string maidataPath,
-        int fps, bool useAlpha, [CanBeNull] Action onStart = null)
+        int fps, bool resizeBg, [CanBeNull] Action onStart = null)
     {
-        await CaptureScreen(maidataPath, fps, useAlpha, onStart);
+        await CaptureScreen(maidataPath, fps, resizeBg, onStart);
     }
 
     public void StopRecording()
@@ -51,7 +51,7 @@ public class ScreenRecorder : MonoBehaviour
     }
 
     private async UniTask CaptureScreen(string maidataPath,
-        int fps, bool useAlpha, [CanBeNull] Action onStart = null)
+        int fps, bool resizeBg, [CanBeNull] Action onStart = null)
     {
         //成功的情况下不需要调用errText.text，一路走下去根本看不见错误提示
         // 1. check
@@ -65,28 +65,25 @@ public class ScreenRecorder : MonoBehaviour
         var ffmpegPath = Path.Combine(Application.streamingAssetsPath, "ffmpeg.exe");
         var pipeName = $"majdataRec_{ProcessUtils.CurrentProcessId}_{System.Guid.NewGuid():N}";
         var wavName = "temp.wav";
-        var videoName = useAlpha ? "temp.webm" : "temp.mp4";
-        var finalName = useAlpha ? "out.webm" : "out.mp4";
+        var videoName = "temp.mp4";
+        var finalName = "out.mp4";
 
-        // 透明：VP9 (deadline realtime 提高速度, yuva420p 保留 Alpha)
-        // 不透明：x264 (ultrafast 提高速度, yuv420p 体积最小)
-        var videoCodecArgs = useAlpha
-            ? "-c:v libvpx-vp9 -deadline realtime -cpu-used 8 -crf 22 -b:v 0 -pix_fmt yuva420p "
-            : "-c:v libx264 -preset ultrafast -crf 20 -pix_fmt yuv420p ";
+        var videoCodecArgs = "-c:v libx264 -preset veryfast -crf 18 -pix_fmt yuv420p -movflags +faststart ";
+
+        var vfArgs = "-vf vflip ";
+
         var outArgs =
-            "-hide_banner -y " +
+            "-hide_banner -y -report " +
             $"-f rawvideo -pix_fmt rgba -s {Screen.width}x{Screen.height} -r {fps} " +
             $@"-i \\.\pipe\{pipeName} " +
-            "-vf vflip " +
+            vfArgs +
             videoCodecArgs +
             $"\"{videoName}\"";
 
-        //WebM => libopus，MP4 => aac
-        var audioCodec = useAlpha ? "libopus" : "aac";
         var muxArgs =
             "-hide_banner -y " +
             $"-i \"{videoName}\" -i \"{wavName}\" " +
-            $"-c:v copy -c:a {audioCodec} -b:a 320k -shortest " +
+            "-c:v copy -c:a aac -b:a 320k -shortest " +
             $"\"{finalName}\"";
 
         // 3. objects
@@ -94,11 +91,6 @@ public class ScreenRecorder : MonoBehaviour
         rt.Create();
         // 预分配 Texture2D，避免循环内 new 产生 GC
         var cpuTex = new Texture2D(Screen.width, Screen.height, TextureFormat.RGBA32, false);
-
-        var camera = Camera.main;
-        var oldRT = camera != null ? camera.targetTexture : null;
-        if (useAlpha && camera != null)
-            camera.targetTexture = rt;
 
         audioManager.PrepareRecordingBuffer(timeProvider.AudioTime, timeProvider.CurrentSpeed);
         IsRecording = true;
@@ -171,14 +163,7 @@ public class ScreenRecorder : MonoBehaviour
                         audioManager.UpdateSfxRecording(deltaTime, recordingElapsedTime);
 
                         // Video
-                        if (useAlpha)
-                        {
-                            RenderTexture.active = rt;
-                        }
-                        else
-                        {
-                            RenderTexture.active = null;
-                        }
+                        RenderTexture.active = null;
                         cpuTex.ReadPixels(new Rect(0, 0, Screen.width, Screen.height), 0, 0);
                         bw.Write(cpuTex.GetRawTextureData());
                         recordingElapsedTime += deltaTime;
@@ -197,7 +182,6 @@ public class ScreenRecorder : MonoBehaviour
         finally
         {
             ProcessUtils.CloseProcessHandle(ffmpegProcessHandle);
-            camera.targetTexture = oldRT;
             RenderTexture.active = null;
             rt.Release();
             Destroy(rt);
