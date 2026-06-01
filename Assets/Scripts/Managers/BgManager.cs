@@ -15,6 +15,8 @@ public class BgManager : MonoBehaviour
     private TimeProvider timeProvider;
 
     [SerializeField]
+    private Sprite bgDummy;
+    [SerializeField]
     private Sprite defaultBg;
 
     private RawImage jacketImage;
@@ -87,7 +89,12 @@ public class BgManager : MonoBehaviour
 
     public void ShowBG()
     {
-        if (Bg == null || !hasBg) return;
+        if (Bg == null || !hasBg)
+        {
+            jacketImage.texture = bgDummy.texture;
+            spriteRender.sprite = defaultBg;
+            return;
+        }
 
         jacketImage.texture = Bg.texture;
         spriteRender.sprite = Bg;

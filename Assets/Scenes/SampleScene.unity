@@ -5357,6 +5357,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3ca526cac7312c54498bf8bf99e86413, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  bgDummy: {fileID: 21300000, guid: 30663c3fa610ab742aa9f7e584136105, type: 3}
   defaultBg: {fileID: 21300000, guid: e76da1c30dfa99d4f88a60d737457499, type: 3}
 --- !u!212 &655536541
 SpriteRenderer:
