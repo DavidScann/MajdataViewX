@@ -90,7 +90,7 @@ public class TapBase : NoteBase
                         break;
                     //mine就不打了
                     if (!isMine)
-                        inputManager.ClickSensor(sensor);
+                        inputManager.ClickArea(sensor);
                     isTriggered = true;
                     break;
             }

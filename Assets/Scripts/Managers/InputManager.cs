@@ -12,6 +12,7 @@ using UnityEngine;
 public class InputManager : MonoBehaviour
 {
     public AutoPlayMode Mode { get; set; }
+    public bool ButtonFirst { get; set; }
 
     private Guid guid = Guid.NewGuid();
 
@@ -138,14 +139,35 @@ public class InputManager : MonoBehaviour
     public bool CheckArea(SensorType type) =>
         GetSensor(type).Status == SensorStatus.On ||
         GetButton(type).Status == SensorStatus.On;
-
     public bool CheckSensor(SensorType type) =>
         GetSensor(type).Status == SensorStatus.On;
+
+    public void SetAreaOn(SensorType type, Guid guid)
+    {
+        if (ButtonFirst)
+            GetButton(type).SetOn(guid);
+        else
+            GetSensor(type).SetOn(guid);
+    }
+    public void SetAreaOff(SensorType type, Guid guid)
+    {
+        if (ButtonFirst)
+            GetButton(type).SetOff(guid);
+        else
+            GetSensor(type).SetOff(guid);
+    }
 
     public void SetSensorOn(SensorType type, Guid guid) =>
         GetSensor(type).SetOn(guid);
     public void SetSensorOff(SensorType type, Guid guid) =>
         GetSensor(type).SetOff(guid);
+    public void ClickArea(SensorType type)
+    {
+        if (ButtonFirst)
+            GetButton(type).Click();
+        else
+            GetSensor(type).Click();
+    }
     public void ClickSensor(SensorType type) =>
         GetSensor(type).Click();
 

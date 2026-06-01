@@ -156,6 +156,7 @@ public class PlayManager : MonoBehaviour
             effectManager.SetDisplayMode(_setting.JudgeDisplayMode);
             //simulate
             Majdata<InputManager>.Instance!.Mode = _setting.AutoMode;
+            Majdata<InputManager>.Instance!.ButtonFirst = _setting.ButtonFirst;
             //bg
             bgCover.color = new Color(0f, 0f, 0f, _setting.BackgroundDim);
             bgManager.ShowBG();

@@ -127,7 +127,7 @@ public class HoldDrop : NoteLongBase
                     break;
                 case AutoPlayMode.DJAuto:
                     if (!isMine) //mine buda
-                        inputManager.SetSensorOn(sensor, guid);
+                        inputManager.SetAreaOn(sensor, guid);
                     break;
                 case AutoPlayMode.Random:
                     if (!isJudged)
@@ -440,7 +440,7 @@ public class HoldDrop : NoteLongBase
         if (!isJudged)
             noteManager.NextNote(startPosition);
 
-        inputManager.SetSensorOff(sensor, guid);
+        inputManager.SetAreaOff(sensor, guid);
         inputManager.UnbindArea(Check, sensor);
     }
     protected override void PlayHoldEffect()
