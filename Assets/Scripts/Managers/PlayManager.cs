@@ -298,7 +298,6 @@ public class PlayManager : MonoBehaviour
         {
             await UniTask.SwitchToMainThread();
 
-            audioManager.StopTrack();
             screenRecorder.StopRecording();
             //if not so, the last frame will be like after ResetAllManagers
             await UniTask.Yield();
