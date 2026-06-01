@@ -199,7 +199,7 @@ public class InputManager : MonoBehaviour
         if (!triggerSensors.ContainsKey(id))
             triggerSensors.Add(id, new());
 
-        const float HAND_RADIUS = 0.038f;
+        const float HAND_RADIUS = 0.39f;
         var oldList = new List<Sensor>(triggerSensors[id]);
         triggerSensors[id].Clear();
 
