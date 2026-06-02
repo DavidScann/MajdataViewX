@@ -334,12 +334,10 @@ public class AudioManager : MonoBehaviour
 
     public void GenerateAnswerSFX(SimaiChart chart, double ignoreOffset, int clockCount = 0)
     {
+        if (chart.NoteTimings.IsEmpty) return;
+
         //Generate ClockSounds
-        var firstBpm = 0f;
-        if (!chart.NoteTimings.IsEmpty)
-        {
-            firstBpm = chart.NoteTimings[0].Bpm;
-        }
+        var firstBpm = chart.NoteTimings[0].Bpm;
 
         answerTimingPoints.Clear();
         if (firstBpm > 0f)

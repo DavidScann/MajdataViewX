@@ -163,8 +163,11 @@ public class PlayManager : MonoBehaviour
             bgManager.ShowVideo();
             //sfx
             var clockCount = 0;
-            var clockCommand = commands.FirstOrDefault(c => c.Prefix == "clock_count");
-            if (clockCommand != default) int.TryParse(clockCommand.Value, out clockCount);
+            if (playmode != PlaybackMode.Normal)
+            {
+                var clockCommand = commands.FirstOrDefault(c => c.Prefix == "clock_count");
+                if (clockCommand != default) int.TryParse(clockCommand.Value, out clockCount);
+            }
             audioManager.GenerateAnswerSFX(_chart, ignoreOffset, clockCount);
 
             switch (playmode)
