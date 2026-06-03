@@ -102,10 +102,20 @@ public class TouchDrop : NoteBase
         }
         if (isMine)
         {
-            SetFanSprite(skinManager.Touch_Mine);
-            fansRenderers[4].sprite = skinManager.TouchPoint_Mine;
-            fansRenderers[5].sprite = skinManager.TouchBorder_Mine[0];
-            fansRenderers[6].sprite = skinManager.TouchBorder_Mine[1];
+            if (isBreak)
+            {
+                SetFanSprite(skinManager.Touch_Break_Mine);
+                fansRenderers[4].sprite = skinManager.TouchPoint_Break_Mine;
+                fansRenderers[5].sprite = skinManager.TouchBorder_Break_Mine[0];
+                fansRenderers[6].sprite = skinManager.TouchBorder_Break_Mine[1];
+            }
+            else
+            {
+                SetFanSprite(skinManager.Touch_Mine);
+                fansRenderers[4].sprite = skinManager.TouchPoint_Mine;
+                fansRenderers[5].sprite = skinManager.TouchBorder_Mine[0];
+                fansRenderers[6].sprite = skinManager.TouchBorder_Mine[1];
+            }
         }
         justEffect.GetComponent<SpriteRenderer>().sprite = skinManager.TouchJust;
     }

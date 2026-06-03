@@ -45,7 +45,10 @@ public class TapDrop : TapBase
         }
         if (isMine)
         {
-            spriteRenderer.sprite = skinManager.Tap_Mine;
+            if (isBreak)
+                spriteRenderer.sprite = skinManager.Tap_Break_Mine;
+            else
+                spriteRenderer.sprite = skinManager.Tap_Mine;
             lineSpriteRenderer.sprite = skinManager.Line_Mine;
         }
     }

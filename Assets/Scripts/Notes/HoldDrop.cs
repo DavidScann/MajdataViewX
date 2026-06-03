@@ -92,8 +92,11 @@ public class HoldDrop : NoteLongBase
         }
         if (isMine)
         {
+            if (isBreak)
+                spriteRenderer.sprite = skinManager.Hold_Break_Mine;
+            else
+                spriteRenderer.sprite = skinManager.Hold_Mine;
             lineSpriteRender.sprite = skinManager.Line_Mine;
-            spriteRenderer.sprite = skinManager.Hold_Mine;
         }
     }
 
@@ -461,6 +464,14 @@ public class HoldDrop : NoteLongBase
             else if (isEach)
             {
                 spriteRenderer.sprite = skinManager.Hold_Each_On;
+                animator.runtimeAnimatorController = skinManager.Shine;
+            }
+            else if (isMine)
+            {
+                if (isBreak)
+                    spriteRenderer.sprite = skinManager.Hold_Break_Mine_On;
+                else
+                    spriteRenderer.sprite = skinManager.Hold_Mine_On;
                 animator.runtimeAnimatorController = skinManager.Shine;
             }
             else

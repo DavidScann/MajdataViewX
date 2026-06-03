@@ -106,7 +106,10 @@ public class TouchHoldDrop : NoteLongBase
             for (var i = 0; i < 4; i++)
                 fansRenderers[i].sprite = skinManager.TouchHold_Mine[i];
             fansRenderers[4].sprite = skinManager.TouchPoint_Mine;
-            border.sprite = _borderSprite = skinManager.TouchHold_Border_Mine;
+            if (isBreak)
+                border.sprite = _borderSprite = skinManager.TouchHold_Border_Break_Mine;
+            else
+                border.sprite = _borderSprite = skinManager.TouchHold_Border_Mine;
         }
     }
 

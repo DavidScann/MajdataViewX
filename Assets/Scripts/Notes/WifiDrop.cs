@@ -85,7 +85,13 @@ public class WifiDrop : NoteLongBase, ICanShine
             star_Renderer[i].sprite = skinManager.Star;
             if (isBreak) star_Renderer[i].sprite = skinManager.Star_Break;
             if (isEach) star_Renderer[i].sprite = skinManager.Star_Each;
-            if (isMine) star_Renderer[i].sprite = skinManager.Star_Mine;
+            if (isMine)
+            {
+                if (isBreak)
+                    star_Renderer[i].sprite = skinManager.Star_Break_Mine;
+                else
+                    star_Renderer[i].sprite = skinManager.Star_Mine;
+            }
 
             star_slides[i].transform.rotation = Quaternion.Euler(0, 0, -22.5f * (8 + i + 2 * (startPosition - 1)));
             star_slides[i].SetActive(false);

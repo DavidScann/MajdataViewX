@@ -77,7 +77,6 @@ public class SlideDrop : NoteLongBase, ICanShine
         starRenderer = star_slide.GetComponent<SpriteRenderer>();
         starRenderer.sprite = skinManager.Star;
         if (isEach) starRenderer.sprite = skinManager.Star_Each;
-        if (isMine) starRenderer.sprite = skinManager.Star_Mine;
         if (isBreak)
         {
             starRenderer.sprite = skinManager.Star_Break;
@@ -86,6 +85,13 @@ public class SlideDrop : NoteLongBase, ICanShine
             var controller = star_slide.AddComponent<BreakShineController>();
             controller.parent = this;
             controller.enabled = true;
+        }
+        if (isMine)
+        {
+            if (isBreak)
+                starRenderer.sprite = skinManager.Star_Break_Mine;
+            else
+                starRenderer.sprite = skinManager.Star_Mine;
         }
 
         //bars
@@ -170,7 +176,10 @@ public class SlideDrop : NoteLongBase, ICanShine
             }
             if (isMine)
             {
-                sr.sprite = skinManager.Slide_Mine;
+                if (isBreak)
+                    sr.sprite = skinManager.Slide_Break_Mine;
+                else
+                    sr.sprite = skinManager.Slide_Mine;
             }
         }
 

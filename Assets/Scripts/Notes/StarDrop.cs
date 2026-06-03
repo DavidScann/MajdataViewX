@@ -84,7 +84,16 @@ public class StarDrop : TapBase
             }
             if (isMine)
             {
-                spriteRenderer.sprite = skinManager.Star_Mine;
+                if (isBreak)
+                    if (isDouble)
+                        spriteRenderer.sprite = skinManager.Star_Break_Double_Mine;
+                    else
+                        spriteRenderer.sprite = skinManager.Star_Break_Mine;
+                else
+                    if (isDouble)
+                        spriteRenderer.sprite = skinManager.Star_Mine_Double;
+                    else
+                        spriteRenderer.sprite = skinManager.Star_Mine;
                 lineSpriteRenderer.sprite = skinManager.Line_Mine;
             }
         }
