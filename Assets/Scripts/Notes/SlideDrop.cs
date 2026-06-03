@@ -402,6 +402,10 @@ public class SlideDrop : NoteLongBase, ICanShine
                         DestroySelf();
                         judgeQueue.Clear();
                         return;
+                    case AutoPlayMode.DJAuto:
+                    case AutoPlayMode.Disable:
+                        TooLateJudge();
+                        break;
                 }
                 star_slide.transform.position = slidePositions.LastOrDefault();
                 applyStarRotation(slideRotations.LastOrDefault());
@@ -439,9 +443,17 @@ public class SlideDrop : NoteLongBase, ICanShine
                     break;
                 case AutoPlayMode.Random:
                     judgeQueue = judgeQueue.Skip((int)(process * (judgeQueue.Count - 1))).ToList();
-                    var barIndex = areaStep[(int)(process * (areaStep.Count - 1))];
-                    HideBar(barIndex);
+                    HideBar(areaStep[(int)(process * (areaStep.Count - 1))]);
                     PlaySFX();
+                    break;
+                case AutoPlayMode.DJAuto:
+                case AutoPlayMode.Disable:
+                    if (isMine)
+                    {
+                        judgeQueue = judgeQueue.Skip((int)(process * (judgeQueue.Count - 1))).ToList();
+                        HideBar(areaStep[(int)(process * (areaStep.Count - 1))]);
+                        PlaySFX();
+                    }
                     break;
             }
         }
@@ -645,6 +657,7 @@ public class SlideDrop : NoteLongBase, ICanShine
 
         }
     }
+
     /// <summary>
     /// 强制将Slide判定为TooLate并销毁
     /// </summary>
