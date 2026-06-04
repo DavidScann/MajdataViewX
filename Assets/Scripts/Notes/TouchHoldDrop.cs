@@ -168,7 +168,8 @@ public class TouchHoldDrop : NoteLongBase
         judgeResult = result;
         isJudged = true;
         PlayHoldEffect();
-        audioManager.PlayTouchSound();
+        if (!isMine)
+            audioManager.PlayTouchSound();
     }
     private void FixedUpdate()
     {
@@ -242,10 +243,12 @@ public class TouchHoldDrop : NoteLongBase
             {
                 _isTouched = true;
                 audioManager.PlayTouchHoldSound(guid);
+                PlayHoldEffect();
             }
             else
             {
                 audioManager.StopTouchHoldSound(guid);
+                StopHoldEffect();
             }
 
             if (timing <= 0.25f) // 忽略头部15帧
@@ -255,12 +258,10 @@ public class TouchHoldDrop : NoteLongBase
 
             if (on)
             {
-                PlayHoldEffect();
             }
             else
             {
                 playerIdleTime += Time.fixedDeltaTime;
-                StopHoldEffect();
             }
         }
         else if (timing > 0.316667f)
@@ -321,7 +322,7 @@ public class TouchHoldDrop : NoteLongBase
 
     private void DestroySelf()
     {
-        if (judgeResult != JudgeType.Miss)
+        if (judgeResult != JudgeType.Miss && !isMine)
         {
             if (isBreak)
             {
@@ -426,7 +427,8 @@ public class TouchHoldDrop : NoteLongBase
     protected override void StopHoldEffect()
     {
         base.StopHoldEffect();
-        border.sprite = skinManager.TouchHold_Border_Miss;
+        if (!isMine)
+            border.sprite = skinManager.TouchHold_Border_Miss;
     }
 
     private void PlayJudgeEffect(JudgeType judgeResult)

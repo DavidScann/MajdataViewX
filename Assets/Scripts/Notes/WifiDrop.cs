@@ -232,7 +232,7 @@ public class WifiDrop : NoteLongBase, ICanShine
             DestroySelf();
             return;
         }
-        if (judgeQueues.Count == 1)
+        if (judgeQueues.All(x => x.Count <= 1))
             slideOK.GetComponent<LoadJustSprite>().setLateGd();
         else
             slideOK.GetComponent<LoadJustSprite>().setMiss();
@@ -470,6 +470,10 @@ public class WifiDrop : NoteLongBase, ICanShine
                         DestroySelf();
                         judgeQueues.Clear();
                         return;
+                    case AutoPlayMode.DJAuto:
+                    case AutoPlayMode.Disable:
+                        TooLateJudge();
+                        break;
                 }
                 if (IsFinished && isJudged)
                     DestroySelf();
@@ -480,23 +484,30 @@ public class WifiDrop : NoteLongBase, ICanShine
                 {
                     star_Renderer[i].color = Color.white;
                     star_slides[i].transform.position =
-                        (SlidePositionEnd[i] - SlidePositionStart) * process + SlidePositionStart; //TODO add some runhua
+                        (SlidePositionEnd[i] - SlidePositionStart) * process + SlidePositionStart;
                     star_slides[i].transform.localScale = new Vector3(1.5f, 1.5f, 1.5f);
                 }
             }
             switch (Majdata<InputManager>.Instance!.Mode)
             {
                 case AutoPlayMode.Enable:
-                    judgeQueues = judgeQueues.Skip((int)(process * (judgeQueues.Count - 1))).ToList();
+                    judgeQueues.ForEach(queue => queue.Skip((int)(process * (queue.Count - 1))).ToList());
                     if (smoothSlideAnime) HideBar((int)pos + 1);
                     else HideBar(areaStep[(int)(process * (areaStep.Count - 1))]);
                     PlaySFX();
                     break;
                 case AutoPlayMode.Random:
-                    judgeQueues = judgeQueues.Skip((int)(process * (judgeQueues.Count - 1))).ToList();
-                    var barIndex = areaStep[(int)(process * (areaStep.Count - 1))];
-                    HideBar(barIndex);
+                    judgeQueues.ForEach(queue => queue.Skip((int)(process * (queue.Count - 1))).ToList());
+                    HideBar(areaStep[(int)(process * (areaStep.Count - 1))]);
                     PlaySFX();
+                    break;
+                case AutoPlayMode.DJAuto:
+                case AutoPlayMode.Disable:
+                    if (isMine)
+                    {
+                        judgeQueues.ForEach(queue => queue.Skip((int)(process * (queue.Count - 1))).ToList());
+                        HideBar(areaStep[(int)(process * (areaStep.Count - 1))]);
+                    }
                     break;
             }
         }
@@ -609,7 +620,7 @@ public class WifiDrop : NoteLongBase, ICanShine
     }
     private void PlaySFX()
     {
-        if (isSoundPlayed) return;
+        if (isSoundPlayed || isMine) return;
 
         isSoundPlayed = true;
         audioManager.PlaySlideSound(isBreak);

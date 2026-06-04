@@ -238,7 +238,10 @@ public class TapBase : NoteBase
     }
     protected virtual void DestroySelf()
     {
-        audioManager.PlayTapSound(judgeResult, isEx, isBreak);
+        if (!isMine)
+        {
+            audioManager.PlayTapSound(judgeResult, isEx, isBreak);
+        }
         Destroy(tapLine);
         Destroy(gameObject);
     }

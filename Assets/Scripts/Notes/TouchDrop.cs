@@ -305,7 +305,7 @@ public class TouchDrop : NoteBase
 
     private void DestroySelf()
     {
-        if (judgeResult != JudgeType.Miss)
+        if (judgeResult != JudgeType.Miss && !isMine)
         {
             if (isBreak)
             {

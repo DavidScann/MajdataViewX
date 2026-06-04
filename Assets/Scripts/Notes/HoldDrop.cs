@@ -487,18 +487,20 @@ public class HoldDrop : NoteLongBase
         base.StopHoldEffect();
         holdAnimStart = false;
         animator.enabled = false;
-        spriteRenderer.sprite = skinManager.Hold_Off;
+        if (!isMine)
+            spriteRenderer.sprite = skinManager.Hold_Off;
     }
 
 
     private void PlayJudgeSFX()
     {
+        if (isMine) return;
         audioManager.PlayTapSound(judgeResult, false, false);
     }
 
     private void PlaySFX()
     {
-        if (isPlayedSFX) return;
+        if (isPlayedSFX || isMine) return;
         audioManager.PlayTapSound(judgeResult, isEx, isBreak);
         isPlayedSFX = true;
     }

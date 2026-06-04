@@ -461,7 +461,6 @@ public class SlideDrop : NoteLongBase, ICanShine
                     {
                         judgeQueue = judgeQueue.Skip((int)(process * (judgeQueue.Count - 1))).ToList();
                         HideBar(areaStep[(int)(process * (areaStep.Count - 1))]);
-                        PlaySFX();
                     }
                     break;
             }
@@ -795,7 +794,7 @@ public class SlideDrop : NoteLongBase, ICanShine
     private void PlayJudgeSFX()
     {
         if ((ConnectInfo.IsGroupPartHead || !ConnectInfo.IsConnSlide) &&
-            isBreak &&
+            isBreak && !isMine &&
             judgeResult == JudgeType.Perfect)
         {
             audioManager.PlayBreakSlideEndSound();
@@ -803,7 +802,7 @@ public class SlideDrop : NoteLongBase, ICanShine
     }
     private void PlaySFX()
     {
-        if (isSoundPlayed) return;
+        if (isSoundPlayed || isMine) return;
 
         if (ConnectInfo.IsGroupPartHead || !ConnectInfo.IsConnSlide)
         {
