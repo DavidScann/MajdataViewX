@@ -148,6 +148,12 @@ internal class WsServer : MonoBehaviour
         }
     }
 
+    // for self stopping without request
+    public void SendStopResponse()
+    {
+        Response(MajWsResponseType.PlayStopped, PlayManager.Summary);
+    }
+
     private void Response(MajWsResponseType type, object? data = null)
     {
         var rsp = new MajWsResponseBase

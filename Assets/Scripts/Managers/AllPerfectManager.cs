@@ -13,7 +13,7 @@ public class AllPerfectManager : MonoBehaviour
     Animator AllPerfect;
 
     private bool isPlayed;
-    
+
     private void Awake()
     {
         Majdata<AllPerfectManager>.Instance = this;
@@ -35,7 +35,10 @@ public class AllPerfectManager : MonoBehaviour
             if (isPlayed)
             {
                 if (!AllPerfect.gameObject.activeSelf)
+                {
                     Majdata<PlayManager>.Instance!.StopAsync().Forget();
+                    Majdata<WsServer>.Instance!.SendStopResponse();
+                }
             }
             else
             {
@@ -48,7 +51,7 @@ public class AllPerfectManager : MonoBehaviour
     }
 
     public void ResetState()
-    { 
+    {
         AllPerfect.gameObject.SetActive(false);
         isPlayed = false;
     }
