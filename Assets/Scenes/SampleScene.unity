@@ -7483,7 +7483,6 @@ GameObject:
   m_Component:
   - component: {fileID: 1024226212}
   - component: {fileID: 1024226215}
-  - component: {fileID: 1024226214}
   - component: {fileID: 1024226213}
   m_Layer: 5
   m_Name: objTime
@@ -7601,18 +7600,6 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
---- !u!114 &1024226214
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1024226211}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 6c6ad208514d9944682be6c3d5c5b1b8, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!222 &1024226215
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -13529,7 +13516,6 @@ GameObject:
   - component: {fileID: 1904206639}
   - component: {fileID: 1904206642}
   - component: {fileID: 1904206641}
-  - component: {fileID: 1904206640}
   m_Layer: 5
   m_Name: TimeText
   m_TagString: Untagged
@@ -13556,18 +13542,6 @@ RectTransform:
   m_AnchoredPosition: {x: -39.63964, y: 31.469986}
   m_SizeDelta: {x: 16.637001, y: 4.625}
   m_Pivot: {x: 0.5, y: 0.5}
---- !u!114 &1904206640
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1904206638}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 6c6ad208514d9944682be6c3d5c5b1b8, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!114 &1904206641
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -37,7 +37,7 @@ public class TouchHoldDrop : NoteLongBase
     private float moveDuration;
     private float displayDuration;
 
-    private bool _isTouched = false; //for mine judge
+    private bool isTouched = false; //for mine judge
     private Sprite _borderSprite;
 
     // Start is called before the first frame update
@@ -176,7 +176,13 @@ public class TouchHoldDrop : NoteLongBase
         var remainingTime = GetRemainingTime();
         var timing = timeProvider.NoteTime - time;
 
-        if (remainingTime == 0 && isJudged)
+        if (isMine && !isJudged && timing >= 0.016667f)
+        {
+            judgeResult = JudgeType.Perfect;
+            isJudged = true;
+            noteManager.NextTouch(GetSensor());
+        }
+        else if (remainingTime == 0 && isJudged)
         {
             inputManager.SetSensorOff(sensor, guid);
             DestroySelf();
@@ -196,7 +202,7 @@ public class TouchHoldDrop : NoteLongBase
                         judgeResult = JudgeType.Perfect;
 
                     isJudged = true;
-                    _isTouched = true;
+                    isTouched = true;
                     PlayHoldEffect();
                     audioManager.PlayTouchHoldSound(guid);
                     return;
@@ -219,7 +225,7 @@ public class TouchHoldDrop : NoteLongBase
                                 judgeResult = JudgeType.Perfect;
                             }
 
-                            if (judgeResult != JudgeType.Miss) _isTouched = true; //必有摸
+                            if (judgeResult != JudgeType.Miss) isTouched = true; //必有摸
                         }
                         isJudged = true;
                     }
@@ -241,7 +247,7 @@ public class TouchHoldDrop : NoteLongBase
 
             if (on)
             {
-                _isTouched = true;
+                isTouched = true;
                 audioManager.PlayTouchHoldSound(guid);
                 PlayHoldEffect();
             }
@@ -256,10 +262,7 @@ public class TouchHoldDrop : NoteLongBase
             if (remainingTime <= 0.2f) // 忽略尾部12帧
                 return;
 
-            if (on)
-            {
-            }
-            else
+            if (!on)
             {
                 playerIdleTime += Time.fixedDeltaTime;
             }
@@ -400,7 +403,7 @@ public class TouchHoldDrop : NoteLongBase
 
         if (isMine) //覆盖掉前面的判定
         {
-            if (_isTouched)
+            if (isTouched)
                 result = JudgeType.Miss;
             else
                 result = JudgeType.Perfect;

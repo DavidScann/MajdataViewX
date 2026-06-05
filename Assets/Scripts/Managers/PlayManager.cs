@@ -142,11 +142,7 @@ public class PlayManager : MonoBehaviour
 
             //chart
             _chart = await SimaiParser.ParseChartAsync(level, designer, fumen);
-            if (_chart.NoteTimings.Length == 0)
-            {
-                _state = lastState;
-                return false;
-            }
+
             loader.noteSpeed = (float)(107.25 / (71.4184491 * Mathf.Pow(_setting.TapSpeed + 0.9975f, -0.985558604f)));
             loader.touchSpeed = _setting.TouchSpeed;
             loader.smoothSlideAnime = _setting.SmoothSlideAnime;

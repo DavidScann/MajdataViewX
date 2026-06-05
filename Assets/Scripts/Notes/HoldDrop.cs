@@ -105,7 +105,13 @@ public class HoldDrop : NoteLongBase
         var timing = timeProvider.NoteTime - time;
         var remainingTime = GetRemainingTime();
 
-        if (remainingTime == 0 && isJudged) // Hold完成后Destroy
+        if (isMine && !isJudged && timing >= 0.016667f)
+        {
+            judgeResult = JudgeType.Perfect;
+            isJudged = true;
+            noteManager.NextNote(startPosition);
+        }
+        else if (remainingTime == 0 && isJudged) // Hold完成后Destroy
         {
             DestroySelf();
         }
@@ -160,23 +166,29 @@ public class HoldDrop : NoteLongBase
 
         if (isJudged) // 头部判定完成后开始累计按压时长
         {
-            if (inputManager.CheckArea(sensor)) isTouched = true;
-
-            if (timing <= 0.1f) // 忽略头部6帧
-                return;
-            if (remainingTime <= 0.2f) // 忽略尾部12帧
-                return;
-            if (!timeProvider.IsStart || Majdata<InputManager>.Instance!.Mode is AutoPlayMode.Enable or AutoPlayMode.Random) // 忽略暂停
+            if (!timeProvider.IsStart) // 忽略暂停
                 return;
 
-            if (inputManager.CheckArea(sensor))
+            var on = inputManager.CheckArea(sensor);
+
+            if (on)
             {
+                isTouched = true;
                 PlayHoldEffect();
             }
             else
             {
-                playerIdleTime += Time.fixedDeltaTime;
                 StopHoldEffect();
+            }
+
+            if (timing <= 0.25f) // 忽略头部15帧
+                return;
+            if (remainingTime <= 0.2f) // 忽略尾部12帧
+                return;
+
+            if (!on)
+            {
+                playerIdleTime += Time.fixedDeltaTime;
             }
         }
         else if (timing > 0.15f && !isJudged) // 头部Miss
