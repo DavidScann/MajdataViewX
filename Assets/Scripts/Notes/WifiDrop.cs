@@ -157,7 +157,10 @@ public class WifiDrop : NoteLongBase, ICanShine
             }
             if (isMine)
             {
-                sr.sprite = skinManager.Wifi_Mine[i];
+                if (isBreak)
+                    sr.sprite = skinManager.Wifi_Break_Mine[i];
+                else
+                    sr.sprite = skinManager.Wifi_Mine[i];
             }
 
             sbRender.Add(sr);
