@@ -19,9 +19,6 @@ public class EachLineDrop : MonoBehaviour
 
     public int curvLength;
 
-    [SerializeField]
-    Sprite[] curvSprites;
-
     //own
     private SpriteRenderer spriteRenderer;
 
@@ -31,7 +28,7 @@ public class EachLineDrop : MonoBehaviour
         timeProvider = Majdata<TimeProvider>.Instance!;
 
         spriteRenderer = GetComponent<SpriteRenderer>();
-        spriteRenderer.sprite = curvSprites[curvLength - 1];
+        spriteRenderer.sprite = Majdata<SkinManager>.Instance!.EachLine[curvLength - 1];
         spriteRenderer.forceRenderingOff = true;
     }
 

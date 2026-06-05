@@ -359,10 +359,12 @@ MonoBehaviour:
   Tap_Break: {fileID: 0}
   Tap_Ex: {fileID: 0}
   Tap_Mine: {fileID: 0}
+  Tap_Break_Mine: {fileID: 0}
   Slide: {fileID: 0}
   Slide_Each: {fileID: 0}
   Slide_Break: {fileID: 0}
   Slide_Mine: {fileID: 0}
+  Slide_Break_Mine: {fileID: 0}
   Wifi:
   - {fileID: 0}
   - {fileID: 0}
@@ -411,6 +413,18 @@ MonoBehaviour:
   - {fileID: 0}
   - {fileID: 0}
   - {fileID: 0}
+  Wifi_Break_Mine:
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
   Star: {fileID: 0}
   Star_Double: {fileID: 0}
   Star_Each: {fileID: 0}
@@ -421,6 +435,8 @@ MonoBehaviour:
   Star_Mine_Double: {fileID: 0}
   Star_Ex: {fileID: 0}
   Star_Ex_Double: {fileID: 0}
+  Star_Break_Mine: {fileID: 0}
+  Star_Break_Double_Mine: {fileID: 0}
   Hold: {fileID: 0}
   Hold_On: {fileID: 0}
   Hold_Off: {fileID: 0}
@@ -429,6 +445,9 @@ MonoBehaviour:
   Hold_Break: {fileID: 0}
   Hold_Break_On: {fileID: 0}
   Hold_Mine: {fileID: 0}
+  Hold_Mine_On: {fileID: 0}
+  Hold_Break_Mine: {fileID: 0}
+  Hold_Break_Mine_On: {fileID: 0}
   Hold_Ex: {fileID: 0}
   Just:
   - {fileID: 0}
@@ -480,10 +499,12 @@ MonoBehaviour:
   Touch_Each: {fileID: 0}
   Touch_Break: {fileID: 0}
   Touch_Mine: {fileID: 0}
+  Touch_Break_Mine: {fileID: 0}
   TouchPoint: {fileID: 0}
   TouchPoint_Each: {fileID: 0}
   TouchPoint_Break: {fileID: 0}
   TouchPoint_Mine: {fileID: 0}
+  TouchPoint_Break_Mine: {fileID: 0}
   TouchJust: {fileID: 0}
   TouchBorder:
   - {fileID: 0}
@@ -495,6 +516,9 @@ MonoBehaviour:
   - {fileID: 0}
   - {fileID: 0}
   TouchBorder_Mine:
+  - {fileID: 0}
+  - {fileID: 0}
+  TouchBorder_Break_Mine:
   - {fileID: 0}
   - {fileID: 0}
   TouchHold:
@@ -515,19 +539,25 @@ MonoBehaviour:
   TouchHold_Border: {fileID: 0}
   TouchHold_Border_Break: {fileID: 0}
   TouchHold_Border_Mine: {fileID: 0}
+  TouchHold_Border_Break_Mine: {fileID: 0}
   TouchHold_Border_Miss: {fileID: 0}
   Ex: {r: 0, g: 0, b: 0, a: 0}
   Ex_Star: {r: 0, g: 0, b: 0, a: 0}
   Ex_Each: {r: 0, g: 0, b: 0, a: 0}
   Ex_Break: {r: 0, g: 0, b: 0, a: 0}
-  Line: {fileID: 21300000, guid: 3003041b178b9f246b4b465afb8079d3, type: 3}
-  Line_Each: {fileID: 21300000, guid: 1a40750ad0e4fb747aeeb83536f52d09, type: 3}
-  Line_Mine: {fileID: 21300000, guid: d0bb6c8b19c521346b5c8a1070063c54, type: 3}
-  Line_Break: {fileID: 21300000, guid: c190fb744a4bc94429a7cbce66f9fa9b, type: 3}
-  Line_Star: {fileID: 21300000, guid: 8576ec838da5f784e866901901ed374f, type: 3}
-  HoldEnd: {fileID: 21300000, guid: f63d7905457bfe74c8bb67ec5b4efe9a, type: 3}
-  HoldEnd_Each: {fileID: 21300000, guid: 525ed29f5ee445942973894c8193d8fb, type: 3}
-  HoldEnd_Break: {fileID: 21300000, guid: 8da47e3bcdd19304da9c55e701f26363, type: 3}
+  Line: {fileID: 0}
+  Line_Each: {fileID: 0}
+  Line_Mine: {fileID: 0}
+  Line_Break: {fileID: 0}
+  Line_Star: {fileID: 0}
+  EachLine:
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  HoldEnd: {fileID: 0}
+  HoldEnd_Each: {fileID: 0}
+  HoldEnd_Break: {fileID: 0}
   Shine: {fileID: 9100000, guid: 3fcb4587ef8c7f141969450782191592, type: 2}
   Shine_Break: {fileID: 9100000, guid: c28f56116f6dc34408d6f0f544f1e2cc, type: 2}
   Shine_JudgeBreak: {fileID: 9100000, guid: 68e114e3215572c4380cbd3b06c36ad0, type: 2}
