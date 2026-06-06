@@ -27,7 +27,7 @@ public static class MajEnv
 #elif UNITY_STANDALONE_OSX
             return Path.Combine(
                 Application.dataPath,
-                "../MacOS/ffmpeg");
+                "MacOS/ffmpeg");
 #elif UNITY_STANDALONE_LINUX
         return Path.Combine(
             Path.GetDirectoryName(Application.dataPath)!,

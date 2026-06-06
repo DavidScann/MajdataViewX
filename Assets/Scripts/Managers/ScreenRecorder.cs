@@ -53,15 +53,12 @@ public class ScreenRecorder : MonoBehaviour
     private async UniTask CaptureScreen(string maidataPath,
         int fps, bool resizeBg, [CanBeNull] Action onStart = null)
     {
-        //成功的情况下不需要调用errText.text，一路走下去根本看不见错误提示
-        // 1. check
         if (Screen.width % 2 != 0 || Screen.height % 2 != 0)
         {
             errText.text = $"无法渲染：分辨率 {Screen.width}x{Screen.height} 不是偶数。";
             return;
         }
 
-        // 2. args
         var ffmpegPath = MajEnv.FFmpegPath;
         var wavName = "temp.wav";
         var videoName = "temp.mp4";
@@ -85,24 +82,21 @@ public class ScreenRecorder : MonoBehaviour
             "-c:v copy -c:a aac -b:a 320k -shortest " +
             $"\"{finalName}\"";
 
-        // 3. objects
         var rt = new RenderTexture(Screen.width, Screen.height, 24, RenderTextureFormat.ARGB32);
         rt.Create();
-        // 预分配 Texture2D，避免循环内 new 产生 GC
         var cpuTex = new Texture2D(Screen.width, Screen.height, TextureFormat.RGBA32, false);
 
-        //audioManager.PrepareRecordingBuffer(timeProvider.AudioTime, timeProvider.CurrentSpeed);
         IsRecording = true;
 
         var isTouchHoldRising = false;
 
-        var deltaTime = 1.0f / fps; // duration per frame
+        var deltaTime = 1.0f / fps;
         var recordingElapsedTime = 0f;
         var videoEncodeSucceeded = false;
 
-        // 4. recording
         try
         {
+#if UNITY_EDITOR
             var ffmpegPsi = new ProcessStartInfo(ffmpegPath, outArgs)
             {
                 WorkingDirectory = maidataPath,
@@ -120,66 +114,52 @@ public class ScreenRecorder : MonoBehaviour
             using (var bw = new BinaryWriter(ffmpegProcess.StandardInput.BaseStream))
             {
                 onStart?.Invoke();
-                //这时再传入时间点，onstart启动了timeprovider
                 audioManager.PrepareRecordingBuffer(timeProvider.AudioTime, timeProvider.CurrentSpeed);
                 while (IsRecording && !ffmpegProcess.HasExited)
                 {
                     await UniTask.WaitForEndOfFrame(this);
-
-                    // Audio
-                    if (!audioManager.IsShowingSongDetail)
-                    {
-                        audioManager.UpdateAnswerSfx();
-                        for (var i = 0; i < AudioManager.noteSfxPlaybackRequests.Length; i++)
-                        {
-                            if (i == AudioManager.TRACK_START) continue;
-
-                            if (i == AudioManager.TOUCHHOLD)
-                            {
-                                var isRequested = AudioManager.noteSfxPlaybackRequests[i];
-                                if (isRequested)
-                                {
-                                    if (!isTouchHoldRising)
-                                    {
-                                        isTouchHoldRising = true;
-                                        audioManager.TriggerSfxRecording(AudioManager.TOUCHHOLD);
-                                    }
-                                    // TouchHold 不重置指针，让它继续播
-                                }
-                                else
-                                {
-                                    if (isTouchHoldRising)
-                                    {
-                                        isTouchHoldRising = false;
-                                        audioManager.StopSfxRecording(AudioManager.TOUCHHOLD); // 停止播放
-                                    }
-                                }
-                            }
-                            else if (AudioManager.noteSfxPlaybackRequests[i])
-                            {
-                                // 重置指针
-                                audioManager.TriggerSfxRecording(i);
-                                AudioManager.noteSfxPlaybackRequests[i] = false;
-                            }
-                        }
-                        audioManager.UpdateSfxRecording(deltaTime, recordingElapsedTime);
-                    }
-
-                    // Video
+                    ProcessSfx(deltaTime, recordingElapsedTime, ref isTouchHoldRising);
                     RenderTexture.active = null;
                     cpuTex.ReadPixels(new Rect(0, 0, Screen.width, Screen.height), 0, 0);
                     bw.Write(cpuTex.GetRawTextureData());
                     recordingElapsedTime += deltaTime;
                 }
-
                 bw.Flush();
             }
 
-            // 等待 FFmpeg 完成
             ffmpegProcess.WaitForExit();
             videoEncodeSucceeded = ffmpegProcess.ExitCode == 0;
             if (!videoEncodeSucceeded)
                 errText.text = $"视频编码失败，FFmpeg 退出码：{ffmpegProcess.ExitCode}";
+#else
+            var cmd = $"cd \"{maidataPath}\" && \"{ffmpegPath}\" {outArgs}";
+            var proc = FFmpegPipe.Spawn(cmd);
+            if (proc.Handle == IntPtr.Zero)
+            {
+                errText.text = "无法启动 FFmpeg";
+                return;
+            }
+
+            onStart?.Invoke();
+            audioManager.PrepareRecordingBuffer(timeProvider.AudioTime, timeProvider.CurrentSpeed);
+            while (IsRecording)
+            {
+                await UniTask.WaitForEndOfFrame(this);
+                ProcessSfx(deltaTime, recordingElapsedTime, ref isTouchHoldRising);
+                RenderTexture.active = null;
+                cpuTex.ReadPixels(new Rect(0, 0, Screen.width, Screen.height), 0, 0);
+                var raw = cpuTex.GetRawTextureData();
+                if (FFmpegPipe.Write(proc.StdinFd, raw, raw.Length) < 0)
+                    break;
+                recordingElapsedTime += deltaTime;
+            }
+
+            FFmpegPipe.ClosePipe(proc.StdinFd);
+            var exitCode = FFmpegPipe.Wait(proc.Handle);
+            videoEncodeSucceeded = exitCode == 0;
+            if (!videoEncodeSucceeded)
+                errText.text = $"视频编码失败，FFmpeg 退出码：{exitCode}";
+#endif
         }
         finally
         {
@@ -195,11 +175,9 @@ public class ScreenRecorder : MonoBehaviour
             return;
         }
 
-        // 5. audio export and mux
-        //errText.text = "正在处理音频导出...";
         audioManager.ExportFinalWav(Path.Combine(maidataPath, wavName));
 
-        //errText.text = "正在执行最终合并 (Muxing)...";
+#if UNITY_EDITOR
         var muxPsi = new ProcessStartInfo(ffmpegPath, muxArgs)
         {
             WorkingDirectory = maidataPath,
@@ -209,16 +187,24 @@ public class ScreenRecorder : MonoBehaviour
         using var muxProcess = Process.Start(muxPsi);
         if (muxProcess == null)
         {
-            errText.text = $"无法启动 Muxing 进程";
+            errText.text = "无法启动 Muxing 进程";
             return;
         }
         muxProcess.WaitForExit();
+#else
+        var muxCmd = $"cd \"{maidataPath}\" && \"{ffmpegPath}\" {muxArgs}";
+        var muxHandle = FFmpegPipe.SpawnSimple(muxCmd);
+        if (muxHandle == IntPtr.Zero)
+        {
+            errText.text = "无法启动 Muxing 进程";
+            return;
+        }
+        FFmpegPipe.Wait(muxHandle);
+#endif
 
-        // 6. clean up
         var outPath = Path.Combine(maidataPath, finalName);
         if (File.Exists(outPath))
         {
-            //errText.text = "渲染成功：" + finalName;
             OpenFileLocation(outPath);
         }
 
@@ -226,28 +212,59 @@ public class ScreenRecorder : MonoBehaviour
         bgManager.PauseVideo();
     }
 
+    private void ProcessSfx(float deltaTime, float recordingElapsedTime, ref bool isTouchHoldRising)
+    {
+        if (audioManager.IsShowingSongDetail)
+            return;
+
+        audioManager.UpdateAnswerSfx();
+        for (var i = 0; i < AudioManager.noteSfxPlaybackRequests.Length; i++)
+        {
+            if (i == AudioManager.TRACK_START) continue;
+
+            if (i == AudioManager.TOUCHHOLD)
+            {
+                var isRequested = AudioManager.noteSfxPlaybackRequests[i];
+                if (isRequested)
+                {
+                    if (!isTouchHoldRising)
+                    {
+                        isTouchHoldRising = true;
+                        audioManager.TriggerSfxRecording(AudioManager.TOUCHHOLD);
+                    }
+                }
+                else
+                {
+                    if (isTouchHoldRising)
+                    {
+                        isTouchHoldRising = false;
+                        audioManager.StopSfxRecording(AudioManager.TOUCHHOLD);
+                    }
+                }
+            }
+            else if (AudioManager.noteSfxPlaybackRequests[i])
+            {
+                audioManager.TriggerSfxRecording(i);
+                AudioManager.noteSfxPlaybackRequests[i] = false;
+            }
+        }
+        audioManager.UpdateSfxRecording(deltaTime, recordingElapsedTime);
+    }
+
     private static void OpenFileLocation(string filePath)
     {
+#if UNITY_EDITOR
         try
         {
-            if (Application.platform == RuntimePlatform.WindowsEditor ||
-                Application.platform == RuntimePlatform.WindowsPlayer)
-            {
-                Process.Start("explorer.exe", $"/select,\"{filePath}\"");
-            }
-            else if (Application.platform == RuntimePlatform.OSXEditor ||
-                     Application.platform == RuntimePlatform.OSXPlayer)
-            {
-                Process.Start("open", $"-R \"{filePath}\"");
-            }
-            else
-            {
-                Process.Start("open", $"\"{Path.GetDirectoryName(filePath)}\"");
-            }
+            Process.Start("explorer.exe", $"/select,\"{filePath}\"");
         }
-        catch
-        {
-            // best-effort, ignore failures
-        }
+        catch { }
+#elif UNITY_STANDALONE_WIN
+        FFmpegPipe.SpawnSimple($"explorer /select,\"{filePath}\"");
+#elif UNITY_STANDALONE_OSX
+        FFmpegPipe.SpawnSimple($"open -R \"{filePath}\"");
+#elif UNITY_STANDALONE_LINUX
+        FFmpegPipe.SpawnSimple($"xdg-open \"{Path.GetDirectoryName(filePath)}\"");
+#endif
     }
 }

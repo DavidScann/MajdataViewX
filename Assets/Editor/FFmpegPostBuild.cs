@@ -35,10 +35,30 @@ public class FFmpegPostBuild : IPostprocessBuildWithReport
                 break;
         }
 
-        if (source != null)
+        if (source == null) return;
+
+        File.Copy(source, destination, true);
+        UnityEngine.Debug.Log($"Copied FFmpeg: {destination}");
+
+        if (report.summary.platform == BuildTarget.StandaloneOSX)
         {
-            File.Copy(source, destination, true);
-            UnityEngine.Debug.Log($"Copied FFmpeg: {destination}");
+            Run("chmod", $"+x \"{destination}\"");
+            Run("codesign", $"--remove-signature \"{destination}\"");
         }
+        else if (report.summary.platform == BuildTarget.StandaloneLinux64)
+        {
+            Run("chmod", $"+x \"{destination}\"");
+        }
+    }
+
+    private static void Run(string file, string args)
+    {
+        var psi = new ProcessStartInfo(file, args)
+        {
+            CreateNoWindow = true,
+            UseShellExecute = false
+        };
+        using var proc = Process.Start(psi);
+        proc?.WaitForExit();
     }
 }
