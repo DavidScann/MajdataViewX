@@ -1,8 +1,8 @@
 #region
 
 using System;
+using System.Diagnostics;
 using System.IO;
-using System.IO.Pipes;
 using Cysharp.Threading.Tasks;
 using JetBrains.Annotations;
 using UnityEngine;
@@ -62,8 +62,7 @@ public class ScreenRecorder : MonoBehaviour
         }
 
         // 2. args
-        var ffmpegPath = Path.Combine(Application.streamingAssetsPath, "ffmpeg.exe");
-        var pipeName = $"majdataRec_{ProcessUtils.CurrentProcessId}_{System.Guid.NewGuid():N}";
+        var ffmpegPath = MajEnv.FFmpegPath;
         var wavName = "temp.wav";
         var videoName = "temp.mp4";
         var finalName = "out.mp4";
@@ -75,7 +74,7 @@ public class ScreenRecorder : MonoBehaviour
         var outArgs =
             "-hide_banner -y -report " +
             $"-f rawvideo -pix_fmt rgba -s {Screen.width}x{Screen.height} -r {fps} " +
-            $@"-i \\.\pipe\{pipeName} " +
+            "-i - " +
             vfArgs +
             videoCodecArgs +
             $"\"{videoName}\"";
@@ -102,91 +101,88 @@ public class ScreenRecorder : MonoBehaviour
         var videoEncodeSucceeded = false;
 
         // 4. recording
-        IntPtr ffmpegProcessHandle = IntPtr.Zero;
         try
         {
-            using (var pipeServer = new NamedPipeServerStream(pipeName, PipeDirection.Out, 1,
-                       PipeTransmissionMode.Byte, PipeOptions.None, 1024 * 1024 * 16, 1024 * 1024 * 16))
+            var ffmpegPsi = new ProcessStartInfo(ffmpegPath, outArgs)
             {
-                var (started, handle) = ProcessUtils.Start(ffmpegPath, outArgs, maidataPath);
-                if (!started)
-                {
-                    errText.text = "无法启动 FFmpeg";
-                    return;
-                }
-                ffmpegProcessHandle = handle;
+                WorkingDirectory = maidataPath,
+                CreateNoWindow = true,
+                UseShellExecute = false,
+                RedirectStandardInput = true
+            };
+            using var ffmpegProcess = Process.Start(ffmpegPsi);
+            if (ffmpegProcess == null)
+            {
+                errText.text = "无法启动 FFmpeg";
+                return;
+            }
 
-                // 等待 FFmpeg 连接
-                pipeServer.WaitForConnection();
-
-                using (var bw = new BinaryWriter(pipeServer))
+            using (var bw = new BinaryWriter(ffmpegProcess.StandardInput.BaseStream))
+            {
+                onStart?.Invoke();
+                //这时再传入时间点，onstart启动了timeprovider
+                audioManager.PrepareRecordingBuffer(timeProvider.AudioTime, timeProvider.CurrentSpeed);
+                while (IsRecording && !ffmpegProcess.HasExited)
                 {
-                    onStart?.Invoke();
-                    //这时再传入时间点，onstart启动了timeprovider
-                    audioManager.PrepareRecordingBuffer(timeProvider.AudioTime, timeProvider.CurrentSpeed);
-                    while (IsRecording && !ProcessUtils.HasExited(ffmpegProcessHandle, out _))
+                    await UniTask.WaitForEndOfFrame(this);
+
+                    // Audio
+                    if (!audioManager.IsShowingSongDetail)
                     {
-                        await UniTask.WaitForEndOfFrame(this);
-
-                        // Audio
-                        if (!audioManager.IsShowingSongDetail)
+                        audioManager.UpdateAnswerSfx();
+                        for (var i = 0; i < AudioManager.noteSfxPlaybackRequests.Length; i++)
                         {
-                            audioManager.UpdateAnswerSfx();
-                            for (var i = 0; i < AudioManager.noteSfxPlaybackRequests.Length; i++)
-                            {
-                                if (i == AudioManager.TRACK_START) continue;
+                            if (i == AudioManager.TRACK_START) continue;
 
-                                if (i == AudioManager.TOUCHHOLD)
+                            if (i == AudioManager.TOUCHHOLD)
+                            {
+                                var isRequested = AudioManager.noteSfxPlaybackRequests[i];
+                                if (isRequested)
                                 {
-                                    var isRequested = AudioManager.noteSfxPlaybackRequests[i];
-                                    if (isRequested)
+                                    if (!isTouchHoldRising)
                                     {
-                                        if (!isTouchHoldRising)
-                                        {
-                                            isTouchHoldRising = true;
-                                            audioManager.TriggerSfxRecording(AudioManager.TOUCHHOLD);
-                                        }
-                                        // TouchHold 不重置指针，让它继续播
+                                        isTouchHoldRising = true;
+                                        audioManager.TriggerSfxRecording(AudioManager.TOUCHHOLD);
                                     }
-                                    else
-                                    {
-                                        if (isTouchHoldRising)
-                                        {
-                                            isTouchHoldRising = false;
-                                            audioManager.StopSfxRecording(AudioManager.TOUCHHOLD); // 停止播放
-                                        }
-                                    }
+                                    // TouchHold 不重置指针，让它继续播
                                 }
-                                else if (AudioManager.noteSfxPlaybackRequests[i])
+                                else
                                 {
-                                    // 重置指针
-                                    audioManager.TriggerSfxRecording(i);
-                                    AudioManager.noteSfxPlaybackRequests[i] = false;
+                                    if (isTouchHoldRising)
+                                    {
+                                        isTouchHoldRising = false;
+                                        audioManager.StopSfxRecording(AudioManager.TOUCHHOLD); // 停止播放
+                                    }
                                 }
                             }
-                            audioManager.UpdateSfxRecording(deltaTime, recordingElapsedTime);
+                            else if (AudioManager.noteSfxPlaybackRequests[i])
+                            {
+                                // 重置指针
+                                audioManager.TriggerSfxRecording(i);
+                                AudioManager.noteSfxPlaybackRequests[i] = false;
+                            }
                         }
-
-                        // Video
-                        RenderTexture.active = null;
-                        cpuTex.ReadPixels(new Rect(0, 0, Screen.width, Screen.height), 0, 0);
-                        bw.Write(cpuTex.GetRawTextureData());
-                        recordingElapsedTime += deltaTime;
+                        audioManager.UpdateSfxRecording(deltaTime, recordingElapsedTime);
                     }
 
-                    bw.Flush();
+                    // Video
+                    RenderTexture.active = null;
+                    cpuTex.ReadPixels(new Rect(0, 0, Screen.width, Screen.height), 0, 0);
+                    bw.Write(cpuTex.GetRawTextureData());
+                    recordingElapsedTime += deltaTime;
                 }
 
-                // 等待 FFmpeg 完成
-                var exitCode = ProcessUtils.WaitForExit(ffmpegProcessHandle);
-                videoEncodeSucceeded = exitCode == 0;
-                if (!videoEncodeSucceeded)
-                    errText.text = $"视频编码失败，FFmpeg 退出码：{exitCode}";
+                bw.Flush();
             }
+
+            // 等待 FFmpeg 完成
+            ffmpegProcess.WaitForExit();
+            videoEncodeSucceeded = ffmpegProcess.ExitCode == 0;
+            if (!videoEncodeSucceeded)
+                errText.text = $"视频编码失败，FFmpeg 退出码：{ffmpegProcess.ExitCode}";
         }
         finally
         {
-            ProcessUtils.CloseProcessHandle(ffmpegProcessHandle);
             RenderTexture.active = null;
             rt.Release();
             Destroy(rt);
@@ -204,22 +200,54 @@ public class ScreenRecorder : MonoBehaviour
         audioManager.ExportFinalWav(Path.Combine(maidataPath, wavName));
 
         //errText.text = "正在执行最终合并 (Muxing)...";
-        var (muxStarted, muxExitCode) = ProcessUtils.StartAndWait(ffmpegPath, muxArgs, maidataPath);
-        if (!muxStarted)
+        var muxPsi = new ProcessStartInfo(ffmpegPath, muxArgs)
         {
-            errText.text = $"无法启动 Muxing 进程，错误码：{muxExitCode}";
+            WorkingDirectory = maidataPath,
+            CreateNoWindow = true,
+            UseShellExecute = false
+        };
+        using var muxProcess = Process.Start(muxPsi);
+        if (muxProcess == null)
+        {
+            errText.text = $"无法启动 Muxing 进程";
             return;
         }
+        muxProcess.WaitForExit();
 
         // 6. clean up
         var outPath = Path.Combine(maidataPath, finalName);
         if (File.Exists(outPath))
         {
             //errText.text = "渲染成功：" + finalName;
-            ProcessUtils.ShowInExplorer(outPath);
+            OpenFileLocation(outPath);
         }
 
         timeProvider.Pause();
         bgManager.PauseVideo();
+    }
+
+    private static void OpenFileLocation(string filePath)
+    {
+        try
+        {
+            if (Application.platform == RuntimePlatform.WindowsEditor ||
+                Application.platform == RuntimePlatform.WindowsPlayer)
+            {
+                Process.Start("explorer.exe", $"/select,\"{filePath}\"");
+            }
+            else if (Application.platform == RuntimePlatform.OSXEditor ||
+                     Application.platform == RuntimePlatform.OSXPlayer)
+            {
+                Process.Start("open", $"-R \"{filePath}\"");
+            }
+            else
+            {
+                Process.Start("open", $"\"{Path.GetDirectoryName(filePath)}\"");
+            }
+        }
+        catch
+        {
+            // best-effort, ignore failures
+        }
     }
 }

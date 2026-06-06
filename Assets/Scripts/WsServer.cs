@@ -36,17 +36,6 @@ internal class WsServer : MonoBehaviour
         webSocket.AddWebSocketService<MajdataWsService>("/majdata");
         webSocket.Start();
         ProcessQueue().Forget();
-
-        //pull up MajdataEdit-Neo
-        var neoPath = Path.Combine(
-            new DirectoryInfo(Application.dataPath).Parent!.FullName,
-            "MajdataEdit-Neo.exe");
-
-        if (File.Exists(neoPath) &&
-            Process.GetProcessesByName("MajdataEdit-Neo").Length <= 0)
-        {
-            ProcessUtils.Start(neoPath, null, neoPath);
-        }
     }
 
     private async UniTaskVoid ProcessQueue()

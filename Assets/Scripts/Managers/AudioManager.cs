@@ -72,7 +72,7 @@ public class AudioManager : MonoBehaviour
         Bass.Init(-1, 44100);
 
         //Note SFX
-        var sfxPath = Path.Combine(new DirectoryInfo(Application.dataPath).Parent!.FullName, "SFX");
+        var sfxPath = MajEnv.GetPath("SFX");
         foreach (var filename in new[]
                 {
                     "tap_perfect.wav",

@@ -116,7 +116,7 @@ public class SkinManager : MonoBehaviour
     {
         Majdata<SkinManager>.Instance = this;
 
-        var path = Path.Combine(new DirectoryInfo(Application.dataPath).Parent!.FullName, "Skin");
+        var path = MajEnv.GetPath("Skin");
         var tapPath = Path.Combine(path, "TapSkins");
         var slidePath = Path.Combine(path, "SlideSkins");
         var wifiPath = Path.Combine(path, "WifiSkins");

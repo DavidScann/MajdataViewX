@@ -133,7 +133,7 @@ public class HoldDrop : NoteLongBase
                     isTouched = true; //算是点到了
                     PlayHoldEffect();
                     PlaySFX();
-                    break;
+                    return;
                 case AutoPlayMode.DJAuto:
                     if (!isMine) //mine buda
                         inputManager.SetAreaOn(sensor, guid);
