@@ -1,7 +1,6 @@
 #region
 
 using System;
-using System.Diagnostics;
 using System.IO;
 using Cysharp.Threading.Tasks;
 using JetBrains.Annotations;
@@ -58,15 +57,14 @@ public class ScreenRecorder : MonoBehaviour
             errText.text = $"无法渲染：分辨率 {Screen.width}x{Screen.height} 不是偶数。";
             return;
         }
+        
+        // 1. args
+        const string wavName = "temp.wav";
+        const string videoName = "temp.mp4";
+        const string finalName = "out.mp4";
 
-        var ffmpegPath = MajEnv.FFmpegPath;
-        var wavName = "temp.wav";
-        var videoName = "temp.mp4";
-        var finalName = "out.mp4";
-
-        var videoCodecArgs = "-c:v libx264 -preset veryfast -crf 18 -pix_fmt yuv420p -movflags +faststart ";
-
-        var vfArgs = "-vf vflip ";
+        const string videoCodecArgs = "-c:v libx264 -preset veryfast -crf 18 -pix_fmt yuv420p -movflags +faststart ";
+        const string vfArgs = "-vf vflip ";
 
         var outArgs =
             "-hide_banner -y -report " +
@@ -82,6 +80,7 @@ public class ScreenRecorder : MonoBehaviour
             "-c:v copy -c:a aac -b:a 320k -shortest " +
             $"\"{finalName}\"";
 
+        // 2. vars
         var rt = new RenderTexture(Screen.width, Screen.height, 24, RenderTextureFormat.ARGB32);
         rt.Create();
         var cpuTex = new Texture2D(Screen.width, Screen.height, TextureFormat.RGBA32, false);
@@ -96,70 +95,36 @@ public class ScreenRecorder : MonoBehaviour
 
         try
         {
-#if UNITY_EDITOR
-            var ffmpegPsi = new ProcessStartInfo(ffmpegPath, outArgs)
-            {
-                WorkingDirectory = maidataPath,
-                CreateNoWindow = true,
-                UseShellExecute = false,
-                RedirectStandardInput = true
-            };
-            using var ffmpegProcess = Process.Start(ffmpegPsi);
-            if (ffmpegProcess == null)
-            {
-                errText.text = "无法启动 FFmpeg";
-                return;
-            }
-
-            using (var bw = new BinaryWriter(ffmpegProcess.StandardInput.BaseStream))
-            {
-                onStart?.Invoke();
-                audioManager.PrepareRecordingBuffer(timeProvider.AudioTime, timeProvider.CurrentSpeed);
-                while (IsRecording && !ffmpegProcess.HasExited)
-                {
-                    await UniTask.WaitForEndOfFrame(this);
-                    ProcessSfx(deltaTime, recordingElapsedTime, ref isTouchHoldRising);
-                    RenderTexture.active = null;
-                    cpuTex.ReadPixels(new Rect(0, 0, Screen.width, Screen.height), 0, 0);
-                    bw.Write(cpuTex.GetRawTextureData());
-                    recordingElapsedTime += deltaTime;
-                }
-                bw.Flush();
-            }
-
-            ffmpegProcess.WaitForExit();
-            videoEncodeSucceeded = ffmpegProcess.ExitCode == 0;
-            if (!videoEncodeSucceeded)
-                errText.text = $"视频编码失败，FFmpeg 退出码：{ffmpegProcess.ExitCode}";
-#else
-            var cmd = $"cd \"{maidataPath}\" && \"{ffmpegPath}\" {outArgs}";
+            // 3. launch ffmpeg pipe
+            var cmd = $"cd \"{maidataPath}\" && ffmpeg {outArgs}";
             var proc = FFmpegPipe.Spawn(cmd);
-            if (proc.Handle == IntPtr.Zero)
+            if (!proc.IsValid)
             {
                 errText.text = "无法启动 FFmpeg";
                 return;
             }
 
+            // 4. prepare
             onStart?.Invoke();
             audioManager.PrepareRecordingBuffer(timeProvider.AudioTime, timeProvider.CurrentSpeed);
+            
             while (IsRecording)
             {
+                // 5. recording
                 await UniTask.WaitForEndOfFrame(this);
                 ProcessSfx(deltaTime, recordingElapsedTime, ref isTouchHoldRising);
                 RenderTexture.active = null;
                 cpuTex.ReadPixels(new Rect(0, 0, Screen.width, Screen.height), 0, 0);
                 var raw = cpuTex.GetRawTextureData();
-                if (FFmpegPipe.Write(proc.StdinFd, raw, raw.Length) < 0)
+                if (FFmpegPipe.Write(proc, raw, raw.Length) < 0)
                     break;
                 recordingElapsedTime += deltaTime;
             }
 
-            FFmpegPipe.ClosePipe(proc.StdinFd);
-            var exitCode = FFmpegPipe.Wait(proc.Handle);
+            // 6. clean up
+            FFmpegPipe.ClosePipe(proc);
+            var exitCode = FFmpegPipe.Wait(proc);
             videoEncodeSucceeded = exitCode == 0;
-            if (!videoEncodeSucceeded)
-                errText.text = $"视频编码失败，FFmpeg 退出码：{exitCode}";
-#endif
         }
         finally
         {
@@ -175,32 +140,18 @@ public class ScreenRecorder : MonoBehaviour
             return;
         }
 
+        // 7. wav
         audioManager.ExportFinalWav(Path.Combine(maidataPath, wavName));
 
-#if UNITY_EDITOR
-        var muxPsi = new ProcessStartInfo(ffmpegPath, muxArgs)
-        {
-            WorkingDirectory = maidataPath,
-            CreateNoWindow = true,
-            UseShellExecute = false
-        };
-        using var muxProcess = Process.Start(muxPsi);
-        if (muxProcess == null)
+        // 8. mux
+        var muxCmd = $"cd \"{maidataPath}\" && ffmpeg {muxArgs}";
+        var muxProc = FFmpegPipe.SpawnSimple(muxCmd);
+        if (!muxProc.IsValid)
         {
             errText.text = "无法启动 Muxing 进程";
             return;
         }
-        muxProcess.WaitForExit();
-#else
-        var muxCmd = $"cd \"{maidataPath}\" && \"{ffmpegPath}\" {muxArgs}";
-        var muxHandle = FFmpegPipe.SpawnSimple(muxCmd);
-        if (muxHandle == IntPtr.Zero)
-        {
-            errText.text = "无法启动 Muxing 进程";
-            return;
-        }
-        FFmpegPipe.Wait(muxHandle);
-#endif
+        FFmpegPipe.Wait(muxProc);
 
         var outPath = Path.Combine(maidataPath, finalName);
         if (File.Exists(outPath))
@@ -253,12 +204,10 @@ public class ScreenRecorder : MonoBehaviour
 
     private static void OpenFileLocation(string filePath)
     {
-#if UNITY_EDITOR
-        try
-        {
-            Process.Start("explorer.exe", $"/select,\"{filePath}\"");
-        }
-        catch { }
+#if UNITY_EDITOR_WIN
+        System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{filePath}\"");
+#elif UNITY_EDITOR_OSX
+        System.Diagnostics.Process.Start("open", $"-R \"{filePath}\"");
 #elif UNITY_STANDALONE_WIN
         FFmpegPipe.SpawnSimple($"explorer /select,\"{filePath}\"");
 #elif UNITY_STANDALONE_OSX

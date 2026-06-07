@@ -53,6 +53,7 @@ public class PlayManager : MonoBehaviour
         Majdata<PlayManager>.Instance = this;
     }
 
+    // 这里是游戏内部的东西的启动初始化
     private void Start()
     {
         IsReloading = false;

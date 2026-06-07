@@ -28,6 +28,7 @@ internal class WsServer : MonoBehaviour
         Majdata<WsServer>.Instance = this;
     }
 
+    // 这里是游戏及游戏外部的初始化
     void Start()
     {
         SceneManager.LoadScene(1);
@@ -36,6 +37,13 @@ internal class WsServer : MonoBehaviour
         webSocket.AddWebSocketService<MajdataWsService>("/majdata");
         webSocket.Start();
         ProcessQueue().Forget();
+
+#if UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX
+        // 补全 Mac 常见的环境变量路径（Homebrew 在 Intel 和 Apple Silicon 的路径不同）
+        var currentPath = Environment.GetEnvironmentVariable("PATH");
+        var extraPath = "/usr/local/bin:/opt/homebrew/bin:/opt/homebrew/sbin";
+        Environment.SetEnvironmentVariable("PATH", $"{currentPath}:{extraPath}");
+#endif
     }
 
     private async UniTaskVoid ProcessQueue()

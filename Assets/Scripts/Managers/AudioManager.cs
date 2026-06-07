@@ -320,7 +320,8 @@ public class AudioManager
         noteSfxPlaybackRequests[TOUCHHOLD] = false;
         touchholdRiserPlayingTask.Clear();
 
-        answerTimingPoints.Clear();
+        lock (answerSfxLock)
+            answerTimingPoints.Clear();
         for (var i = 0; i < noteSfxPlaybackRequests.Length; i++)
             noteSfxPlaybackRequests[i] = false;
     }
