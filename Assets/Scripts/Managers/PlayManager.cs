@@ -340,4 +340,9 @@ public class PlayManager : MonoBehaviour
         _state = CheckIsLoaded() ? ViewStatus.Loaded : ViewStatus.Idle;
         bgCover.color = new Color(0f, 0f, 0f, 0f);
     }
+
+    private void OnDestroy()
+    {
+        audioManager.OnDestroy();
+    }
 }

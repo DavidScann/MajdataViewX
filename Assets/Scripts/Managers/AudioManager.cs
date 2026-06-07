@@ -26,6 +26,7 @@ public class AudioManager
 
     //answer SFX
     List<AnswerTimingPoint> answerTimingPoints = new();
+    private readonly object answerSfxLock = new();
     //note SFX
     public static bool[] noteSfxPlaybackRequests = new bool[16];
     List<AudioSample> NoteSfxs = new(16);
@@ -153,21 +154,24 @@ public class AudioManager
 
     public void UpdateAnswerSfx()
     {
-        for (var i = 0; i < answerTimingPoints.Count; i++)
+        lock (answerSfxLock)
         {
-            var timing = answerTimingPoints[i];
-
-            if (timing is null || timing.IsPlayed) continue;
-
-            var thisFrameSec = Majdata<TimeProvider>.Instance!.NoteTime;
-
-            var delta = thisFrameSec - (timing.Timing + TRACK_ANSWER_PLAYBACK_OFFSET_SEC);
-            if (delta > 0)
+            for (var i = 0; i < answerTimingPoints.Count; i++)
             {
-                if (timing.IsClock) noteSfxPlaybackRequests[ANSWER_CLOCK] = true;
-                else noteSfxPlaybackRequests[ANSWER] = true;
+                var timing = answerTimingPoints[i];
 
-                timing.IsPlayed = true;
+                if (timing.IsPlayed) continue;
+
+                var thisFrameSec = Majdata<TimeProvider>.Instance!.NoteTime;
+
+                var delta = thisFrameSec - (timing.Timing + TRACK_ANSWER_PLAYBACK_OFFSET_SEC);
+                if (delta > 0)
+                {
+                    if (timing.IsClock) noteSfxPlaybackRequests[ANSWER_CLOCK] = true;
+                    else noteSfxPlaybackRequests[ANSWER] = true;
+
+                    timing.IsPlayed = true;
+                }
             }
         }
     }
@@ -258,7 +262,7 @@ public class AudioManager
         }
     }
 
-    private void OnDestroy()
+    public void OnDestroy()
     {
         Bass.Stop();
         Bass.Free();
@@ -331,14 +335,17 @@ public class AudioManager
         //Generate ClockSounds
         var firstBpm = chart.NoteTimings[0].Bpm;
 
-        answerTimingPoints.Clear();
-        if (firstBpm > 0f)
+        lock (answerSfxLock)
         {
-            var interval = 60 / firstBpm;
-            for (var i = 0; i < clockCount; i++)
+            answerTimingPoints.Clear();
+            if (firstBpm > 0f)
             {
-                var timing = i * interval;
-                answerTimingPoints.Add(new AnswerTimingPoint(timing, true));
+                var interval = 60 / firstBpm;
+                for (var i = 0; i < clockCount; i++)
+                {
+                    var timing = i * interval;
+                    answerTimingPoints.Add(new AnswerTimingPoint(timing, true));
+                }
             }
         }
 
@@ -373,13 +380,15 @@ public class AudioManager
         var lastAddedTime = -1f;
         var epsilon = 0.001f; // 1ms 阈值
 
-        foreach (var t in rawTimings)
+        lock (answerSfxLock)
         {
-            // 如果是第一个元素，或者当前时间与上一个添加的时间点差距超过阈值
-            if (lastAddedTime < 0 || t - lastAddedTime > epsilon)
+            foreach (var t in rawTimings)
             {
-                answerTimingPoints.Add(new AnswerTimingPoint(t, false));
-                lastAddedTime = t;
+                if (lastAddedTime < 0 || t - lastAddedTime > epsilon)
+                {
+                    answerTimingPoints.Add(new AnswerTimingPoint(t, false));
+                    lastAddedTime = t;
+                }
             }
         }
     }
