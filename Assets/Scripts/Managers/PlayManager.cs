@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using Cysharp.Threading.Tasks;
 using MajSimai;
 using Unity.Properties;
@@ -55,6 +56,7 @@ public class PlayManager : MonoBehaviour
     private void Start()
     {
         IsReloading = false;
+        _ = new AudioManager();
 
         loader = Majdata<DataLoader>.Instance!;
         timeProvider = Majdata<TimeProvider>.Instance!;
@@ -66,6 +68,11 @@ public class PlayManager : MonoBehaviour
         bgCover = GameObject.Find("BackgroundCover").GetComponent<SpriteRenderer>();
         canvasButtons = GameObject.Find("CanvasButtons");
 
+        new Thread(() =>
+        {
+            while (true) audioManager.OnUpdate();
+        }).Start();
+        
         _state = CheckIsLoaded() ? ViewStatus.Loaded : ViewStatus.Idle;
     }
 

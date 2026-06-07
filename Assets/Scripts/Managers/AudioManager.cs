@@ -5,6 +5,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Cysharp.Threading.Tasks;
 using JetBrains.Annotations;
 using MajSimai;
 using ManagedBass;
@@ -14,7 +15,7 @@ using UnityEngine;
 
 #endregion
 
-public class AudioManager : MonoBehaviour
+public class AudioManager
 {
     private TimeProvider timeProvider;
 
@@ -64,9 +65,13 @@ public class AudioManager : MonoBehaviour
     private List<Guid> touchholdRiserPlayingTask = new();
     private bool isTouchholdRiserPlaying;
     private bool waitingForTrackAudioStart;
-    private void Awake()
+
+    private bool isInited;
+    
+    public AudioManager()
     {
         Majdata<AudioManager>.Instance = this;
+        timeProvider = Majdata<TimeProvider>.Instance!;
         Bass.Configure(Configuration.UpdatePeriod, 20);
         Bass.Configure(Configuration.PlaybackBufferLength, 40);
         Bass.Init(-1, 44100);
@@ -111,6 +116,8 @@ public class AudioManager : MonoBehaviour
             //data
             noteSfxSamplesData.Add(GetSampleDataFromFile(path));
         }
+
+        isInited = true;
     }
 
     public void Setting(double globalAudioOffset, MajVolumeSetting v)
@@ -144,18 +151,13 @@ public class AudioManager : MonoBehaviour
         TrackSampleVolume = v.Track;
     }
 
-    private void Start()
-    {
-        timeProvider = Majdata<TimeProvider>.Instance!;
-    }
-
     public void UpdateAnswerSfx()
     {
         for (var i = 0; i < answerTimingPoints.Count; i++)
         {
             var timing = answerTimingPoints[i];
 
-            if (timing.IsPlayed) continue;
+            if (timing is null || timing.IsPlayed) continue;
 
             var thisFrameSec = Majdata<TimeProvider>.Instance!.NoteTime;
 
@@ -170,9 +172,9 @@ public class AudioManager : MonoBehaviour
         }
     }
 
-    private void FixedUpdate()
+    public void OnUpdate()
     {
-        if (timeProvider.IsRecord) return;
+        if (!isInited || timeProvider.IsRecord) return;
 
         UpdateAnswerSfx();
 
@@ -282,15 +284,15 @@ public class AudioManager : MonoBehaviour
         TrackSample.Volume = TrackSampleVolume;
 
         waitingForTrackAudioStart = true;
-        StartCoroutine(WaitForTrackAudioStart());
+        WaitForTrackAudioStart().Forget();
 
-        IEnumerator WaitForTrackAudioStart()
+        async UniTask WaitForTrackAudioStart()
         {
             var offset = TRACK_ANSWER_PLAYBACK_OFFSET_SEC + GlobalAudioOffset;
             while (Majdata<TimeProvider>.Instance!.AudioTime - offset < 0)
             {
-                if (waitingForTrackAudioStart == false) yield break; //canceled
-                yield return null;
+                if (waitingForTrackAudioStart == false) return; //canceled
+                await UniTask.Yield();
             }
 
             TrackSample!.Play();

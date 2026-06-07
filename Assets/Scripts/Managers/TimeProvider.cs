@@ -42,6 +42,10 @@ public class TimeProvider : MonoBehaviour
     private void Awake()
     {
         Majdata<TimeProvider>.Instance = this;
+        
+        try { if (File.Exists(mmfAudioTimePath)) File.Delete(mmfAudioTimePath); }
+        catch (IOException) { }
+        
         mmfAudioTime = MemoryMappedFile.CreateFromFile(mmfAudioTimePath, 
             FileMode.Create, null, sizeof(float));
         mmvAudioTime = mmfAudioTime.CreateViewAccessor();
@@ -235,7 +239,7 @@ public class TimeProvider : MonoBehaviour
 
     private void OnDestroy()
     {
-        mmfAudioTime?.Dispose();
         mmvAudioTime?.Dispose();
+        mmfAudioTime?.Dispose();
     }
 }
