@@ -2,6 +2,8 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.IO.MemoryMappedFiles;
 using MajSimai;
 using UnityEngine;
 
@@ -31,11 +33,18 @@ public class TimeProvider : MonoBehaviour
 
     public float CurrentSpeed => IsRecord ? Time.timeScale : speed;
 
+    private string mmfAudioTimePath => Path.Combine(MajEnv.MajBase, "majdata_time.dat");
+    private MemoryMappedFile mmfAudioTime;
+    private MemoryMappedViewAccessor mmvAudioTime;
+
     public const float SONG_DETAIL_OFFSET = 5f;
 
     private void Awake()
     {
         Majdata<TimeProvider>.Instance = this;
+        mmfAudioTime = MemoryMappedFile.CreateFromFile(mmfAudioTimePath, 
+            FileMode.Create, null, sizeof(float));
+        mmvAudioTime = mmfAudioTime.CreateViewAccessor();
     }
 
     private void Update()
@@ -52,6 +61,8 @@ public class TimeProvider : MonoBehaviour
             AudioTime = startAt + accumulated + (Time.realtimeSinceStartup - startRealtime) * speed;
             NoteTime = AudioTime - offset;
         }
+        
+        mmvAudioTime.Write(0, AudioTime);
     }
 
     public float GetFrame()
@@ -70,7 +81,7 @@ public class TimeProvider : MonoBehaviour
                 SVList.Add(((float)timing.Timing, timing.SVeloc));
             }
         }
-        CalcSVPos();
+        if (SVList.Count > 0) CalcSVPos();
     }
 
     public void SetStartTime(double _startAt, double _offset, float _speed, PlaybackMode mode, int fps = 60)
@@ -129,16 +140,6 @@ public class TimeProvider : MonoBehaviour
             : (now - startRealtime) * speed;
 
         IsStart = false;
-    }
-
-    public void SyncAudioTime(float syncedAudioTime)
-    {
-        if (!IsStart || IsRecord) return;
-
-        AudioTime = syncedAudioTime;
-        NoteTime = AudioTime - offset;
-        accumulated = AudioTime - startAt;
-        startRealtime = Time.realtimeSinceStartup;
     }
 
     public void Resume(float? _speed)
@@ -230,5 +231,11 @@ public class TimeProvider : MonoBehaviour
                 return PositionFunctions[i](AudioT);
         }
         return PositionFunctions[SVList.Count](AudioT); //理论上不会到这里
+    }
+
+    private void OnDestroy()
+    {
+        mmfAudioTime?.Dispose();
+        mmvAudioTime?.Dispose();
     }
 }

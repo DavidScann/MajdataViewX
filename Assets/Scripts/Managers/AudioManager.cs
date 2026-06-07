@@ -174,8 +174,6 @@ public class AudioManager : MonoBehaviour
     {
         if (timeProvider.IsRecord) return;
 
-        SyncTimeProviderToTrack();
-
         UpdateAnswerSfx();
 
         for (var i = 0; i < noteSfxPlaybackRequests.Length; i++)
@@ -258,14 +256,6 @@ public class AudioManager : MonoBehaviour
         }
     }
 
-    private void SyncTimeProviderToTrack()
-    {
-        if (TrackSample == null || !TrackSample.IsPlaying) return;
-
-        var offset = TRACK_ANSWER_PLAYBACK_OFFSET_SEC + GlobalAudioOffset;
-        timeProvider.SyncAudioTime((float)(TrackSample.CurrentSec + offset));
-    }
-
     private void OnDestroy()
     {
         Bass.Stop();
@@ -297,14 +287,14 @@ public class AudioManager : MonoBehaviour
         IEnumerator WaitForTrackAudioStart()
         {
             var offset = TRACK_ANSWER_PLAYBACK_OFFSET_SEC + GlobalAudioOffset;
-            while (Majdata<TimeProvider>.Instance!.AudioTime < offset)
+            while (Majdata<TimeProvider>.Instance!.AudioTime - offset < 0)
             {
                 if (waitingForTrackAudioStart == false) yield break; //canceled
                 yield return null;
             }
 
+            TrackSample!.Play();
             TrackSample!.CurrentSec = Majdata<TimeProvider>.Instance!.AudioTime - offset;
-            TrackSample.Play();
             waitingForTrackAudioStart = false;
         }
     }

@@ -24,8 +24,8 @@ public class FFmpegPostBuild : IPostprocessBuildWithReport
             case BuildTarget.StandaloneOSX:
                 source = "Assets/ExternalTools/FFmpeg/osx/ffmpeg";
                 destination = Path.Combine(
-                    report.summary.outputPath,
-                    "Contents/MacOS/ffmpeg");
+                    Path.GetDirectoryName(report.summary.outputPath)!,
+                    "ffmpeg");
                 break;
             case BuildTarget.StandaloneLinux64:
                 source = "Assets/ExternalTools/FFmpeg/linux-x64/ffmpeg";
