@@ -4,6 +4,8 @@
 
 using UnityEngine;
 
+using static MajCtx;
+
 #endregion
 
 public class EffectManager : MonoBehaviour
@@ -27,7 +29,7 @@ public class EffectManager : MonoBehaviour
 
     private void Awake()
     {
-        Majdata<EffectManager>.Instance = this;
+        _effectManager = this;
     }
 
 
@@ -60,7 +62,7 @@ public class EffectManager : MonoBehaviour
         }
 
         //Load Skin
-        skinManager = Majdata<SkinManager>.Instance!;
+        skinManager = _skinManager!;
         judgeText = skinManager.JudgeText;
 
         foreach (var judgeEffect in judgeEffects)

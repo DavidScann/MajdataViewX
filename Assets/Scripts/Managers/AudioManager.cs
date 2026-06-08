@@ -13,6 +13,8 @@ using Unity.Collections;
 using Unity.Jobs;
 using UnityEngine;
 
+using static MajCtx;
+
 #endregion
 
 public class AudioManager
@@ -68,11 +70,11 @@ public class AudioManager
     private bool waitingForTrackAudioStart;
 
     private bool isInited;
-    
+
     public AudioManager()
     {
-        Majdata<AudioManager>.Instance = this;
-        timeProvider = Majdata<TimeProvider>.Instance!;
+        _audioManager = this;
+        timeProvider = _timeProvider!;
         Bass.Configure(Configuration.UpdatePeriod, 20);
         Bass.Configure(Configuration.PlaybackBufferLength, 40);
         Bass.Init(-1, 44100);
@@ -162,7 +164,7 @@ public class AudioManager
 
                 if (timing.IsPlayed) continue;
 
-                var thisFrameSec = Majdata<TimeProvider>.Instance!.NoteTime;
+                var thisFrameSec = _timeProvider!.NoteTime;
 
                 var delta = thisFrameSec - (timing.Timing + TRACK_ANSWER_PLAYBACK_OFFSET_SEC);
                 if (delta > 0)
@@ -293,14 +295,14 @@ public class AudioManager
         async UniTask WaitForTrackAudioStart()
         {
             var offset = TRACK_ANSWER_PLAYBACK_OFFSET_SEC + GlobalAudioOffset;
-            while (Majdata<TimeProvider>.Instance!.AudioTime - offset < 0)
+            while (_timeProvider!.AudioTime - offset < 0)
             {
                 if (waitingForTrackAudioStart == false) return; //canceled
                 await UniTask.Yield();
             }
 
             TrackSample!.Play();
-            TrackSample!.CurrentSec = Majdata<TimeProvider>.Instance!.AudioTime - offset;
+            TrackSample!.CurrentSec = _timeProvider!.AudioTime - offset;
             waitingForTrackAudioStart = false;
         }
     }

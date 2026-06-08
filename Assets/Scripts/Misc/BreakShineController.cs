@@ -5,6 +5,8 @@
 using System;
 using UnityEngine;
 
+using static MajCtx;
+
 #endregion
 
 public class BreakShineController : MonoBehaviour
@@ -23,7 +25,7 @@ public class BreakShineController : MonoBehaviour
     
     private void Start()
     {
-        timeProvider = Majdata<TimeProvider>.Instance!;
+        timeProvider = _timeProvider!;
         
         spriteRenderer = GetComponent<SpriteRenderer>();
     }

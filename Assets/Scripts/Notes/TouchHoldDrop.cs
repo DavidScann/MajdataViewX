@@ -7,6 +7,8 @@ using MajSimai;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
+using static MajCtx;
+
 #endregion
 
 public class TouchHoldDrop : NoteLongBase
@@ -48,12 +50,12 @@ public class TouchHoldDrop : NoteLongBase
         displayDuration = 0.2f * wholeDuration;
 
         var notes = GameObject.Find("Notes").transform;
-        objectCounter = Majdata<ObjectCounter>.Instance!;
-        noteManager = Majdata<NoteManager>.Instance!;
-        timeProvider = Majdata<TimeProvider>.Instance!;
-        inputManager = Majdata<InputManager>.Instance!;
-        skinManager = Majdata<SkinManager>.Instance!;
-        audioManager = Majdata<AudioManager>.Instance!;
+        objectCounter = _objectCounter!;
+        noteManager = _noteManager!;
+        timeProvider = _timeProvider!;
+        inputManager = _inputManager!;
+        skinManager = _skinManager!;
+        audioManager = _audioManager!;
 
         holdEffect = Instantiate(holdEffect, notes);
         holdEffect.SetActive(false);
@@ -117,7 +119,7 @@ public class TouchHoldDrop : NoteLongBase
     {
         if (isJudged || !noteManager.CanJudge(gameObject, sensor))
             return;
-        if (Majdata<InputManager>.Instance!.Mode is AutoPlayMode.Enable or AutoPlayMode.Random)
+        if (_inputManager!.Mode is AutoPlayMode.Enable or AutoPlayMode.Random)
             return;
         if (arg.IsClick)
         {
@@ -190,7 +192,7 @@ public class TouchHoldDrop : NoteLongBase
         else if (timing >= -0.01f)
         {
             // AutoPlay相关
-            switch (Majdata<InputManager>.Instance!.Mode)
+            switch (_inputManager!.Mode)
             {
                 case AutoPlayMode.Enable:
                     if (!isJudged)
@@ -388,7 +390,7 @@ public class TouchHoldDrop : NoteLongBase
             }
         }
 
-        switch (Majdata<InputManager>.Instance!.Mode)
+        switch (_inputManager!.Mode)
         {
             case AutoPlayMode.Enable:
                 result = JudgeType.Perfect;

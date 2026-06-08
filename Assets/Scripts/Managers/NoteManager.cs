@@ -6,6 +6,8 @@ using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 
+using static MajCtx;
+
 #endregion
 
 public class NoteManager : MonoBehaviour
@@ -18,7 +20,7 @@ public class NoteManager : MonoBehaviour
 
     private void Awake()
     {
-        Majdata<NoteManager>.Instance = this;
+        _noteManager = this;
     }
 
     public void AddNote(NoteBase note, int index)

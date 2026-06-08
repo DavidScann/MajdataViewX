@@ -7,6 +7,8 @@ using JetBrains.Annotations;
 using UnityEngine;
 using UnityEngine.UI;
 
+using static MajCtx;
+
 #endregion
 
 public class ScreenRecorder : MonoBehaviour
@@ -21,14 +23,14 @@ public class ScreenRecorder : MonoBehaviour
 
     private void Awake()
     {
-        Majdata<ScreenRecorder>.Instance = this;
+        _screenRecorder = this;
     }
 
     private void Start()
     {
-        timeProvider = Majdata<TimeProvider>.Instance!;
-        bgManager = Majdata<BgManager>.Instance!;
-        audioManager = Majdata<AudioManager>.Instance!;
+        timeProvider = _timeProvider!;
+        bgManager = _bgManager!;
+        audioManager = _audioManager!;
         errText = GameObject.Find("ErrText").GetComponent<Text>();
     }
 

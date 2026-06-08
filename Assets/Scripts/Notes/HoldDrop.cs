@@ -7,6 +7,8 @@ using MajSimai;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
+using static MajCtx;
+
 #endregion
 
 public class HoldDrop : NoteLongBase
@@ -29,13 +31,13 @@ public class HoldDrop : NoteLongBase
     private void Start()
     {
         var notes = GameObject.Find("Notes").transform;
-        timeProvider = Majdata<TimeProvider>.Instance!;
-        objectCounter = Majdata<ObjectCounter>.Instance!;
-        noteManager = Majdata<NoteManager>.Instance!;
-        skinManager = Majdata<SkinManager>.Instance!;
-        inputManager = Majdata<InputManager>.Instance!;
-        effectManager = Majdata<EffectManager>.Instance!;
-        audioManager = Majdata<AudioManager>.Instance!;
+        timeProvider = _timeProvider!;
+        objectCounter = _objectCounter!;
+        noteManager = _noteManager!;
+        skinManager = _skinManager!;
+        inputManager = _inputManager!;
+        effectManager = _effectManager!;
+        audioManager = _audioManager!;
 
         holdEffect = Instantiate(holdEffect, notes);
         holdEffect.SetActive(false);
@@ -118,7 +120,7 @@ public class HoldDrop : NoteLongBase
         else if (timing >= -0.01f)
         {
             // AutoPlay相关
-            switch (Majdata<InputManager>.Instance!.Mode)
+            switch (_inputManager!.Mode)
             {
                 case AutoPlayMode.Enable:
                     if (!isJudged)
@@ -205,7 +207,7 @@ public class HoldDrop : NoteLongBase
             return;
         if (isJudged || !noteManager.CanJudge(gameObject, startPosition))
             return;
-        if (Majdata<InputManager>.Instance!.Mode is AutoPlayMode.Enable or AutoPlayMode.Random)
+        if (_inputManager!.Mode is AutoPlayMode.Enable or AutoPlayMode.Random)
             return;
 
         if (arg.IsClick)
@@ -426,7 +428,7 @@ public class HoldDrop : NoteLongBase
             }
         }
 
-        switch (Majdata<InputManager>.Instance!.Mode)
+        switch (_inputManager!.Mode)
         {
             case AutoPlayMode.Enable:
                 result = JudgeType.Perfect;
@@ -461,7 +463,7 @@ public class HoldDrop : NoteLongBase
     protected override void PlayHoldEffect()
     {
         base.PlayHoldEffect();
-        Majdata<EffectManager>.Instance!.ResetEffect(startPosition - 1);
+        _effectManager!.ResetEffect(startPosition - 1);
         if (LastFor <= 0.3)
             return;
         if (!holdAnimStart && timeProvider.NoteTime - time >= 0.1f && !isMine)//忽略开头6帧与结尾12帧和mine

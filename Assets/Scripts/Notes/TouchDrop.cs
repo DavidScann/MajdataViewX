@@ -7,6 +7,8 @@ using MajSimai;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
+using static MajCtx;
+
 #endregion
 
 public class TouchDrop : NoteBase
@@ -53,13 +55,13 @@ public class TouchDrop : NoteBase
         moveDuration = 0.8f * wholeDuration;
         displayDuration = 0.2f * wholeDuration;
 
-        noteManager = Majdata<NoteManager>.Instance!;
-        timeProvider = Majdata<TimeProvider>.Instance!;
-        multTouchHandler = Majdata<MultTouchHandler>.Instance!;
-        objectCounter = Majdata<ObjectCounter>.Instance!;
-        inputManager = Majdata<InputManager>.Instance!;
-        skinManager = Majdata<SkinManager>.Instance!;
-        audioManager = Majdata<AudioManager>.Instance!;
+        noteManager = _noteManager!;
+        timeProvider = _timeProvider!;
+        multTouchHandler = _multTouchHandler!;
+        objectCounter = _objectCounter!;
+        inputManager = _inputManager!;
+        skinManager = _skinManager!;
+        audioManager = _audioManager!;
 
         firework = GameObject.Find("FireworkEffect");
         fireworkEffect = firework.GetComponent<Animator>();
@@ -126,7 +128,7 @@ public class TouchDrop : NoteBase
             return;
         if (isJudged || !noteManager.CanJudge(gameObject, sensor))
             return;
-        if (Majdata<InputManager>.Instance!.Mode is AutoPlayMode.Enable or AutoPlayMode.Random)
+        if (_inputManager!.Mode is AutoPlayMode.Enable or AutoPlayMode.Random)
             return;
 
         if (arg.IsClick)
@@ -172,7 +174,7 @@ public class TouchDrop : NoteBase
 
         if (timeProvider.NoteTime - time >= 0)
         {
-            switch (Majdata<InputManager>.Instance!.Mode)
+            switch (_inputManager!.Mode)
             {
                 case AutoPlayMode.Enable:
                     if (isMine)

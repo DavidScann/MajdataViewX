@@ -4,6 +4,8 @@
 
 using UnityEngine;
 
+using static MajCtx;
+
 #endregion
 
 public class EachLineDrop : MonoBehaviour
@@ -25,10 +27,10 @@ public class EachLineDrop : MonoBehaviour
     // Start is called before the first frame update
     private void Start()
     {
-        timeProvider = Majdata<TimeProvider>.Instance!;
+        timeProvider = _timeProvider!;
 
         spriteRenderer = GetComponent<SpriteRenderer>();
-        spriteRenderer.sprite = Majdata<SkinManager>.Instance!.EachLine[curvLength - 1];
+        spriteRenderer.sprite = _skinManager!.EachLine[curvLength - 1];
         spriteRenderer.forceRenderingOff = true;
     }
 

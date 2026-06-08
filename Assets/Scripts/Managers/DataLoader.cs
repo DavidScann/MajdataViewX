@@ -8,6 +8,8 @@ using MajSimai;
 using UnityEngine;
 using UnityEngine.UI;
 
+using static MajCtx;
+
 #endregion
 
 public class DataLoader : MonoBehaviour
@@ -198,14 +200,14 @@ public class DataLoader : MonoBehaviour
 
     private void Awake()
     {
-        Majdata<DataLoader>.Instance = this;
+        _dataLoader = this;
     }
 
     private void Start()
     {
-        objectCounter = Majdata<ObjectCounter>.Instance!;
-        skinManager = Majdata<SkinManager>.Instance!;
-        noteManager = Majdata<NoteManager>.Instance!;
+        objectCounter = _objectCounter!;
+        skinManager = _skinManager!;
+        noteManager = _noteManager!;
         errText = GameObject.Find("ErrText").GetComponent<Text>();
         for (var i = 1; i < 9; i++)
             noteIndex.Add(i, 0);
@@ -228,7 +230,7 @@ public class DataLoader : MonoBehaviour
         objectCounter.CountNoteSumAsync(chart).Forget();
         objectCounter.ReportMeterBpmAsync(chart).Forget();
 
-        Majdata<TimeProvider>.Instance!.LoadSV(chart.CommaTimings);
+        _timeProvider!.LoadSV(chart.CommaTimings);
 
         noteManager.ResetIndex();
         streamingRunning = true;
@@ -304,7 +306,7 @@ public class DataLoader : MonoBehaviour
 
     private double GetStreamingTime(double fallbackTime)
     {
-        var timeProvider = Majdata<TimeProvider>.Instance!;
+        var timeProvider = _timeProvider!;
         return timeProvider.IsStart ? timeProvider.NoteTime : fallbackTime;
     }
 

@@ -2,6 +2,8 @@
 
 using UnityEngine;
 
+using static MajCtx;
+
 #endregion
 
 public class LoadJustSprite : MonoBehaviour
@@ -59,7 +61,7 @@ public class LoadJustSprite : MonoBehaviour
     }
     private void refreshSprite()
     {
-        spriteRenderer.sprite = Majdata<SkinManager>.Instance!
+        spriteRenderer.sprite = _skinManager!
             .Just[_0curv1str2wifi + indexOffset + judgeOffset];
     }
 }

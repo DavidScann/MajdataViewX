@@ -3,6 +3,8 @@
 using System.IO;
 using UnityEngine;
 
+using static MajCtx;
+
 #endregion
 
 public class SkinManager : MonoBehaviour
@@ -114,7 +116,7 @@ public class SkinManager : MonoBehaviour
 
     private void Awake()
     {
-        Majdata<SkinManager>.Instance = this;
+        _skinManager = this;
 
         var path = MajEnv.GetPath("Skin");
         var tapPath = Path.Combine(path, "TapSkins");

@@ -7,6 +7,8 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.Video;
 
+using static MajCtx;
+
 #endregion
 
 public class BgManager : MonoBehaviour
@@ -38,12 +40,12 @@ public class BgManager : MonoBehaviour
 
     private void Awake()
     {
-        Majdata<BgManager>.Instance = this;
+        _bgManager = this;
     }
 
     private void Start()
     {
-        timeProvider = Majdata<TimeProvider>.Instance!;
+        timeProvider = _timeProvider!;
 
         jacketImage = GameObject.Find("Jacket").GetComponent<RawImage>();
         songDetail = GameObject.Find("CanvasSongDetail");

@@ -9,6 +9,8 @@ using MajSimai;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
+using static MajCtx;
+
 #endregion
 
 public class SlideDrop : NoteLongBase, ICanShine
@@ -66,12 +68,12 @@ public class SlideDrop : NoteLongBase, ICanShine
             return;
         isInitialized = true;
 
-        objectCounter = Majdata<ObjectCounter>.Instance!;
-        skinManager = Majdata<SkinManager>.Instance!;
-        timeProvider = Majdata<TimeProvider>.Instance!;
-        inputManager = Majdata<InputManager>.Instance!;
-        audioManager = Majdata<AudioManager>.Instance!;
-        noteManager = Majdata<NoteManager>.Instance!;
+        objectCounter = _objectCounter!;
+        skinManager = _skinManager!;
+        timeProvider = _timeProvider!;
+        inputManager = _inputManager!;
+        audioManager = _audioManager!;
+        noteManager = _noteManager!;
 
         //star
         starRenderer = star_slide.GetComponent<SpriteRenderer>();
@@ -272,7 +274,7 @@ public class SlideDrop : NoteLongBase, ICanShine
 
     private void Update()
     {
-        if (Majdata<InputManager>.Instance!.Mode is AutoPlayMode.Enable or AutoPlayMode.Random)
+        if (_inputManager!.Mode is AutoPlayMode.Enable or AutoPlayMode.Random)
             return;
 
         // time        是Slide启动的时间点
@@ -397,7 +399,7 @@ public class SlideDrop : NoteLongBase, ICanShine
 
             if (process >= 1f)
             {
-                switch (Majdata<InputManager>.Instance!.Mode)
+                switch (_inputManager!.Mode)
                 {
                     case AutoPlayMode.Enable:
                         if (smoothSlideAnime) HideBar(index + 1);
@@ -442,7 +444,7 @@ public class SlideDrop : NoteLongBase, ICanShine
                     applyStarRotation(newRotation);
                 }
             }
-            switch (Majdata<InputManager>.Instance!.Mode)
+            switch (_inputManager!.Mode)
             {
                 case AutoPlayMode.Enable:
                     judgeQueue = judgeQueue.Skip((int)(process * (judgeQueue.Count - 1))).ToList();
@@ -485,7 +487,7 @@ public class SlideDrop : NoteLongBase, ICanShine
     {
         if (!canCheck || isChecking || IsFinished)
             return;
-        if (Majdata<InputManager>.Instance!.Mode is AutoPlayMode.Enable or AutoPlayMode.Random)
+        if (_inputManager!.Mode is AutoPlayMode.Enable or AutoPlayMode.Random)
             return;
 
         isChecking = true;
@@ -563,7 +565,7 @@ public class SlideDrop : NoteLongBase, ICanShine
     {
         if (timeProvider.NoteTime - time < 0f || isMine)
             return;
-        if (Majdata<InputManager>.Instance!.Mode is AutoPlayMode.Enable or AutoPlayMode.Random or AutoPlayMode.Disable)
+        if (_inputManager!.Mode is AutoPlayMode.Enable or AutoPlayMode.Random or AutoPlayMode.Disable)
             return;
         if (star_slide)
         {
@@ -729,7 +731,7 @@ public class SlideDrop : NoteLongBase, ICanShine
         inputManager.ClearTriggeredSensor(guid.GetHashCode());
         if (ConnectInfo.IsGroupPartEnd || !ConnectInfo.IsConnSlide)
         {
-            switch (Majdata<InputManager>.Instance!.Mode)
+            switch (_inputManager!.Mode)
             {
                 case AutoPlayMode.Enable:
                     if (isMine)

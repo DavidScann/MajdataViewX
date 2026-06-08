@@ -7,6 +7,8 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
+using static MajCtx;
+
 #endregion
 
 public class InputManager : MonoBehaviour
@@ -23,7 +25,7 @@ public class InputManager : MonoBehaviour
 
     private void Awake()
     {
-        Majdata<InputManager>.Instance = this;
+        _inputManager = this;
     }
 
     private void Start()

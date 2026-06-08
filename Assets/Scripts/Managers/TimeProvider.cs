@@ -7,6 +7,8 @@ using System.IO.MemoryMappedFiles;
 using MajSimai;
 using UnityEngine;
 
+using static MajCtx;
+
 #endregion
 
 public class TimeProvider : MonoBehaviour
@@ -41,7 +43,7 @@ public class TimeProvider : MonoBehaviour
 
     private void Awake()
     {
-        Majdata<TimeProvider>.Instance = this;
+        _timeProvider = this;
         
         try { if (File.Exists(mmfAudioTimePath)) File.Delete(mmfAudioTimePath); }
         catch (IOException) { }

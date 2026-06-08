@@ -9,6 +9,8 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
+using static MajCtx;
+
 #endregion
 
 public class ObjectCounter : MonoBehaviour
@@ -193,7 +195,7 @@ public class ObjectCounter : MonoBehaviour
 
     private void Awake()
     {
-        Majdata<ObjectCounter>.Instance = this;
+        _objectCounter = this;
     }
 
     private void Start()
@@ -348,7 +350,7 @@ public class ObjectCounter : MonoBehaviour
         }
         if (type is UIType.TrgUI)
         {
-            switch (Majdata<InputManager>.Instance!.Mode)
+            switch (_inputManager!.Mode)
             {
                 case AutoPlayMode.Enable:
                     objAutoMode.text = "ENABLED\nNONE";
@@ -760,7 +762,7 @@ public class ObjectCounter : MonoBehaviour
                 TapFinishedCount, HoldFinishedCount, SlideFinishedCount, TouchFinishedCount, BreakFinishedCount,
                 TapSum, HoldSum, SlideSum, TouchSum, BreakSum,
                 NoteFinishedCount, NoteSum,
-                Majdata<InputManager>.Instance!.Mode
+                _inputManager!.Mode
             );
 
             objectRate.text = string.Format(
@@ -799,7 +801,7 @@ public class ObjectCounter : MonoBehaviour
 
             objCombo.text = combo.ToString();
 
-            var time = Majdata<TimeProvider>.Instance!.NoteTime;
+            var time = _timeProvider!.NoteTime;
             for (var i = meterList.Count - 1; i >= 0; i--)
             {
                 var meter = meterList.ElementAt(i);
@@ -822,7 +824,7 @@ public class ObjectCounter : MonoBehaviour
     private void OutputTime()
     {
         // Lock AudioTime variable for real
-        var ctime = Majdata<TimeProvider>.Instance!.AudioTime;
+        var ctime = _timeProvider!.AudioTime;
         var timeNowInt = (int)ctime;
         var minute = timeNowInt / 60;
         var second = timeNowInt - 60 * minute;

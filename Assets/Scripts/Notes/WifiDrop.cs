@@ -10,6 +10,8 @@ using UnityEngine;
 using UnityEngine.Serialization;
 using Random = UnityEngine.Random;
 
+using static MajCtx;
+
 #endregion
 
 public class WifiDrop : NoteLongBase, ICanShine
@@ -57,12 +59,12 @@ public class WifiDrop : NoteLongBase, ICanShine
 
     private void Start()
     {
-        objectCounter = Majdata<ObjectCounter>.Instance!;
-        timeProvider = Majdata<TimeProvider>.Instance!;
-        skinManager = Majdata<SkinManager>.Instance!;
-        inputManager = Majdata<InputManager>.Instance!;
-        audioManager = Majdata<AudioManager>.Instance!;
-        noteManager = Majdata<NoteManager>.Instance!;
+        objectCounter = _objectCounter!;
+        timeProvider = _timeProvider!;
+        skinManager = _skinManager!;
+        inputManager = _inputManager!;
+        audioManager = _audioManager!;
+        noteManager = _noteManager!;
         var notes = GameObject.Find("Notes").transform;
 
         // 计算Slide淡入时机
@@ -248,7 +250,7 @@ public class WifiDrop : NoteLongBase, ICanShine
     {
         if (IsFinished || isChecking || !canCheck)
             return;
-        if (Majdata<InputManager>.Instance!.Mode is AutoPlayMode.Enable or AutoPlayMode.Random)
+        if (_inputManager!.Mode is AutoPlayMode.Enable or AutoPlayMode.Random)
             return;
         isChecking = true;
         for (int i = 0; i < 3; i++)
@@ -384,7 +386,7 @@ public class WifiDrop : NoteLongBase, ICanShine
     {
         if (timeProvider.NoteTime - time < 0f || isMine)
             return;
-        if (Majdata<InputManager>.Instance!.Mode is AutoPlayMode.Enable or AutoPlayMode.Random or AutoPlayMode.Disable)
+        if (_inputManager!.Mode is AutoPlayMode.Enable or AutoPlayMode.Random or AutoPlayMode.Disable)
             return;
         foreach (var star in star_slides)
         {
@@ -459,7 +461,7 @@ public class WifiDrop : NoteLongBase, ICanShine
                     star_slides[i].transform.position = SlidePositionEnd[i];
                     star_slides[i].transform.localScale = new Vector3(1.5f, 1.5f, 1.5f);
                 }
-                switch (Majdata<InputManager>.Instance!.Mode)
+                switch (_inputManager!.Mode)
                 {
                     case AutoPlayMode.Enable:
                         if (smoothSlideAnime) HideBar((int)pos + 1);
@@ -491,7 +493,7 @@ public class WifiDrop : NoteLongBase, ICanShine
                     star_slides[i].transform.localScale = new Vector3(1.5f, 1.5f, 1.5f);
                 }
             }
-            switch (Majdata<InputManager>.Instance!.Mode)
+            switch (_inputManager!.Mode)
             {
                 case AutoPlayMode.Enable:
                     judgeQueues.ForEach(queue => queue.Skip((int)(process * (queue.Count - 1))).ToList());
@@ -567,7 +569,7 @@ public class WifiDrop : NoteLongBase, ICanShine
         isDestroying = true;
 
         ClearTriggeredSensor();
-        switch (Majdata<InputManager>.Instance!.Mode)
+        switch (_inputManager!.Mode)
         {
             case AutoPlayMode.Enable:
                 if (isMine)

@@ -5,6 +5,8 @@
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 
+using static MajCtx;
+
 #endregion
 
 public class AllPerfectManager : MonoBehaviour
@@ -16,7 +18,7 @@ public class AllPerfectManager : MonoBehaviour
 
     private void Awake()
     {
-        Majdata<AllPerfectManager>.Instance = this;
+        _allPerfectManager = this;
         AllPerfect.gameObject.SetActive(false);
     }
 
@@ -30,14 +32,14 @@ public class AllPerfectManager : MonoBehaviour
         if (PlayManager.Summary.State is not ViewStatus.Playing)
             return;
 
-        if (Majdata<ObjectCounter>.Instance!.AllFinished)
+        if (_objectCounter.AllFinished)
         {
             if (isPlayed)
             {
                 if (!AllPerfect.gameObject.activeSelf)
                 {
-                    Majdata<PlayManager>.Instance!.StopAsync().Forget();
-                    Majdata<WsServer>.Instance!.SendStopResponse();
+                    _playManager.StopAsync().Forget();
+                    _wsServer.SendStopResponse();
                 }
             }
             else

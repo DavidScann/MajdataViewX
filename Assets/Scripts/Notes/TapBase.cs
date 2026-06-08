@@ -7,6 +7,8 @@ using MajSimai;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
+using static MajCtx;
+
 #endregion
 
 public class TapBase : NoteBase
@@ -22,12 +24,12 @@ public class TapBase : NoteBase
     protected void PreLoad()
     {
         var notes = GameObject.Find("Notes").transform;
-        noteManager = Majdata<NoteManager>.Instance!;
-        timeProvider = Majdata<TimeProvider>.Instance!;
-        objectCounter = Majdata<ObjectCounter>.Instance!;
-        inputManager = Majdata<InputManager>.Instance!;
-        skinManager = Majdata<SkinManager>.Instance!;
-        audioManager = Majdata<AudioManager>.Instance!;
+        noteManager = _noteManager!;
+        timeProvider = _timeProvider!;
+        objectCounter = _objectCounter!;
+        inputManager = _inputManager!;
+        skinManager = _skinManager!;
+        audioManager = _audioManager!;
 
         tapLine = Instantiate(tapLine, notes);
         tapLine.SetActive(false);
@@ -60,7 +62,7 @@ public class TapBase : NoteBase
         }
         else if (timing >= -0.01f)
         {
-            switch (Majdata<InputManager>.Instance!.Mode)
+            switch (_inputManager!.Mode)
             {
                 case AutoPlayMode.Enable:
                     if (isMine)
@@ -170,7 +172,7 @@ public class TapBase : NoteBase
             return;
         if (isJudged || !noteManager.CanJudge(gameObject, startPosition))
             return;
-        if (Majdata<InputManager>.Instance!.Mode is AutoPlayMode.Enable or AutoPlayMode.Random)
+        if (_inputManager!.Mode is AutoPlayMode.Enable or AutoPlayMode.Random)
             return;
 
         if (arg.IsClick)
@@ -248,7 +250,7 @@ public class TapBase : NoteBase
     protected virtual void OnDestroy()
     {
         if (PlayManager.IsReloading) return;
-        var effectManager = Majdata<EffectManager>.Instance!;
+        var effectManager = _effectManager!;
         effectManager.PlayEffect(startPosition, isBreak, judgeResult);
         effectManager.PlayFastLate(startPosition, judgeResult);
         noteManager.NextNote(startPosition);

@@ -12,6 +12,8 @@ using MajSimai;
 using Unity.Properties;
 using UnityEngine;
 
+using static MajCtx;
+
 #endregion
 
 public class PlayManager : MonoBehaviour
@@ -50,7 +52,7 @@ public class PlayManager : MonoBehaviour
 
     private void Awake()
     {
-        Majdata<PlayManager>.Instance = this;
+        _playManager = this;
     }
 
     // 这里是游戏内部的东西的启动初始化
@@ -59,13 +61,13 @@ public class PlayManager : MonoBehaviour
         IsReloading = false;
         _ = new AudioManager();
 
-        loader = Majdata<DataLoader>.Instance!;
-        timeProvider = Majdata<TimeProvider>.Instance!;
-        bgManager = Majdata<BgManager>.Instance!;
-        screenRecorder = Majdata<ScreenRecorder>.Instance!;
-        objectCounter = Majdata<ObjectCounter>.Instance!;
-        effectManager = Majdata<EffectManager>.Instance!;
-        audioManager = Majdata<AudioManager>.Instance!;
+        loader = _dataLoader!;
+        timeProvider = _timeProvider!;
+        bgManager = _bgManager!;
+        screenRecorder = _screenRecorder!;
+        objectCounter = _objectCounter!;
+        effectManager = _effectManager!;
+        audioManager = _audioManager!;
         bgCover = GameObject.Find("BackgroundCover").GetComponent<SpriteRenderer>();
         canvasButtons = GameObject.Find("CanvasButtons");
 
@@ -159,8 +161,8 @@ public class PlayManager : MonoBehaviour
             objectCounter.StartOutput(_setting.ComboStatusType, _setting.UIType);
             effectManager.SetDisplayMode(_setting.JudgeDisplayMode);
             //simulate
-            Majdata<InputManager>.Instance!.Mode = _setting.AutoMode;
-            Majdata<InputManager>.Instance!.ButtonFirst = _setting.ButtonFirst;
+            _inputManager!.Mode = _setting.AutoMode;
+            _inputManager!.ButtonFirst = _setting.ButtonFirst;
             //bg
             bgCover.color = new Color(0f, 0f, 0f, _setting.BackgroundDim);
             bgManager.ShowBG();
@@ -180,7 +182,7 @@ public class PlayManager : MonoBehaviour
                     await loader.Load(_chart,
                     ignoreOffset, title, artist, difficulty, _setting.LegacySlideLayer);
 
-                    Majdata<AllPerfectManager>.Instance!.enabled = false;
+                    _allPerfectManager!.enabled = false;
                     timeProvider.SetStartTime(startAt, offset, speed, playmode);
                     audioManager.PlayTrack();
                     break;
@@ -191,7 +193,7 @@ public class PlayManager : MonoBehaviour
                     bgManager.PlaySongDetail();
                     AudioManager.noteSfxPlaybackRequests[AudioManager.TRACK_START] = true; //track_start
 
-                    Majdata<AllPerfectManager>.Instance!.enabled = true;
+                    _allPerfectManager!.enabled = true;
                     timeProvider.SetStartTime(startAt, offset, speed, playmode);
                     audioManager.PlayTrack();
                     break;
@@ -207,7 +209,7 @@ public class PlayManager : MonoBehaviour
 
                     bgManager.PlaySongDetail();
 
-                    Majdata<AllPerfectManager>.Instance!.enabled = true;
+                    _allPerfectManager!.enabled = true;
                     _state = ViewStatus.Playing;
                     screenRecorder.StartRecording(maidataPath,
                         _setting.OutputFps,
@@ -325,18 +327,18 @@ public class PlayManager : MonoBehaviour
 
     private void ResetAllManagers()
     {
-        Majdata<ScreenRecorder>.Instance!.ResetState();
-        Majdata<ObjectCounter>.Instance!.ResetState();
-        UniTask.WhenAll(Majdata<NoteManager>.Instance!.ResetState());
-        Majdata<MultTouchHandler>.Instance!.ResetState();
-        Majdata<TimeProvider>.Instance!.ResetState();
-        Majdata<AudioManager>.Instance!.ResetState();
-        Majdata<ScreenRecorder>.Instance!.ResetState();
-        Majdata<BgManager>.Instance!.ResetState();
-        Majdata<EffectManager>.Instance!.ResetState();
-        Majdata<InputManager>.Instance!.ResetState();
-        Majdata<AllPerfectManager>.Instance!.ResetState();
-        Majdata<DataLoader>.Instance!.ResetState();
+        _screenRecorder!.ResetState();
+        _objectCounter!.ResetState();
+        UniTask.WhenAll(_noteManager!.ResetState());
+        _multTouchHandler!.ResetState();
+        _timeProvider!.ResetState();
+        _audioManager!.ResetState();
+        _screenRecorder!.ResetState();
+        _bgManager!.ResetState();
+        _effectManager!.ResetState();
+        _inputManager!.ResetState();
+        _allPerfectManager!.ResetState();
+        _dataLoader!.ResetState();
 
         _state = CheckIsLoaded() ? ViewStatus.Loaded : ViewStatus.Idle;
         bgCover.color = new Color(0f, 0f, 0f, 0f);

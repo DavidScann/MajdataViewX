@@ -5,6 +5,8 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+using static MajCtx;
+
 #endregion
 
 public class MultTouchHandler : MonoBehaviour
@@ -13,7 +15,7 @@ public class MultTouchHandler : MonoBehaviour
 
     private void Awake()
     {
-        Majdata<MultTouchHandler>.Instance = this;
+        _multTouchHandler = this;
     }
 
     private void Start()
