@@ -186,53 +186,22 @@ public class TimeProvider : MonoBehaviour
 
     public void CalcSVPos()
     {
-        // 初始化变量
-        float lastPosition = 0f;
+        PositionFunctions.Clear();
+
+        float pos = 0f;
         float lastTime = 0f;
         float lastSpeed = 1f;
 
-        PositionFunctions.Clear();
-        //第一个预留为SV*1
-        PositionFunctions.Add((t) => t);
-        if (SVList.Count == 1)
+        foreach (var (time, sVeloc) in SVList)
         {
-            if (SVList[0].time > 0)
-            {
-                PositionFunctions.Add((t) => t);
-                lastPosition = SVList[0].time;
-                lastTime = SVList[0].time;
-            }
-            PositionFunctions.Add((t) => lastPosition + SVList[0].sVeloc * (t - lastTime));
-            Debug.Log($"Single Segment Case: Start = {lastPosition}, Speed = {SVList[0].sVeloc}");
-            return;
-        }
-        for (int i = 0; i < SVList.Count - 1; i++)
-        {
-            float segmentDuration = SVList[i].time - lastTime; // 上一个区间的持续时间
-            lastPosition += lastSpeed * segmentDuration; // 计算上一个区间结束时的累积位置
-            float speed = SVList[i].sVeloc; // 当前区间的速度
-            lastSpeed = speed; // 更新速度
-            lastTime = SVList[i].time; // 更新上一个时间点
-                                       // 创建分段函数：Position(t) = Position_i + Speed_i * (t - SVTime[i])
-            Debug.Log($"Segment Case {i}: startTime = {lastTime}, Start = {lastPosition}, Speed = {lastSpeed}");
-            float lP = lastPosition;
-            float lS = lastSpeed;
-            float lT = lastTime;
-            float segmentFunction(float t)
-            {
-                return lP + lS * (t - lT);
-            }
-            PositionFunctions.Add(segmentFunction);
+            pos += lastSpeed * (time - lastTime);
+            pos += lastSpeed * (time - lastTime);
 
+            PositionFunctions.Add((t) => pos + lastSpeed * (t - lastTime));
+
+            lastTime = time;
+            lastSpeed = sVeloc;
         }
-        lastPosition += lastSpeed * (SVList[^1].time - lastTime);
-        lastTime = SVList[^1].time;
-        lastSpeed = SVList[^1].sVeloc;
-        float llP = lastPosition;
-        float llS = lastSpeed;
-        float llT = lastTime;
-        PositionFunctions.Add((t) => llP + llS * (t - llT));
-        Debug.Log($"Segment Case Last: StartTime = {lastTime}, Start = {lastPosition}, Speed = {lastSpeed}");
     }
     public float GetPositionAtTime(float AudioT)
     {
