@@ -59,12 +59,6 @@ public class WifiDrop : NoteLongBase, ICanShine
 
     private void Start()
     {
-        objectCounter = _objectCounter!;
-        timeProvider = _timeProvider!;
-        skinManager = _skinManager!;
-        inputManager = _inputManager!;
-        audioManager = _audioManager!;
-        noteManager = _noteManager!;
         var notes = GameObject.Find("Notes").transform;
 
         // 计算Slide淡入时机
@@ -84,15 +78,15 @@ public class WifiDrop : NoteLongBase, ICanShine
             star_slides[i] = Instantiate(star_slidePrefab, notes);
             star_Renderer[i] = star_slides[i].GetComponent<SpriteRenderer>();
 
-            star_Renderer[i].sprite = skinManager.Star;
-            if (isBreak) star_Renderer[i].sprite = skinManager.Star_Break;
-            if (isEach) star_Renderer[i].sprite = skinManager.Star_Each;
+            star_Renderer[i].sprite = _skinManager.Star;
+            if (isBreak) star_Renderer[i].sprite = _skinManager.Star_Break;
+            if (isEach) star_Renderer[i].sprite = _skinManager.Star_Each;
             if (isMine)
             {
                 if (isBreak)
-                    star_Renderer[i].sprite = skinManager.Star_Break_Mine;
+                    star_Renderer[i].sprite = _skinManager.Star_Break_Mine;
                 else
-                    star_Renderer[i].sprite = skinManager.Star_Mine;
+                    star_Renderer[i].sprite = _skinManager.Star_Mine;
             }
 
             star_slides[i].transform.rotation = Quaternion.Euler(0, 0, -22.5f * (8 + i + 2 * (startPosition - 1)));
@@ -125,7 +119,7 @@ public class WifiDrop : NoteLongBase, ICanShine
             foreach (var star in star_slides)
             {
                 var renderer = star.GetComponent<SpriteRenderer>();
-                renderer.material = skinManager.BreakMaterial;
+                renderer.material = _skinManager.BreakMaterial;
                 renderer.material.SetFloat("_Brightness", 0.95f);
                 var controller = star.AddComponent<BreakShineController>();
                 controller.enabled = true;
@@ -143,15 +137,15 @@ public class WifiDrop : NoteLongBase, ICanShine
         {
             var sr = slideBars[i].GetComponent<SpriteRenderer>();
 
-            sr.sprite = skinManager.Wifi[i]; //注意赋值顺序
+            sr.sprite = _skinManager.Wifi[i]; //注意赋值顺序
             if (isEach)
             {
-                sr.sprite = skinManager.Wifi_Each[i];
+                sr.sprite = _skinManager.Wifi_Each[i];
             }
             if (isBreak)
             {
-                sr.sprite = skinManager.Wifi_Break[i];
-                sr.material = skinManager.BreakMaterial;
+                sr.sprite = _skinManager.Wifi_Break[i];
+                sr.material = _skinManager.BreakMaterial;
                 sr.material.SetFloat("_Brightness", 0.95f);
                 var controller = slideBars[i].AddComponent<BreakShineController>();
                 controller.parent = this;
@@ -160,9 +154,9 @@ public class WifiDrop : NoteLongBase, ICanShine
             if (isMine)
             {
                 if (isBreak)
-                    sr.sprite = skinManager.Wifi_Break_Mine[i];
+                    sr.sprite = _skinManager.Wifi_Break_Mine[i];
                 else
-                    sr.sprite = skinManager.Wifi_Mine[i];
+                    sr.sprite = _skinManager.Wifi_Mine[i];
             }
 
             sbRender.Add(sr);
@@ -193,7 +187,7 @@ public class WifiDrop : NoteLongBase, ICanShine
             foreach (var area in judgeQueue.SelectMany(x => x.Areas))
             {
                 boundSensors.Add(area);
-                inputManager.BindSensor(Check, area);
+                _inputManager.BindSensor(Check, area);
             }
         }
     }
@@ -202,8 +196,8 @@ public class WifiDrop : NoteLongBase, ICanShine
         // time      是Slide启动的时间点
         // timeStart 是Slide完全显示但未启动
         // LastFor   是Slide的时值
-        var timing = timeProvider.NoteTime - time;
-        var startTiming = timeProvider.NoteTime - startTime;
+        var timing = _timeProvider.NoteTime - time;
+        var startTiming = _timeProvider.NoteTime - startTime;
         var forceJudge = timing - LastFor - forceJudgeTime;
 
         if (startTiming >= -0.05f)
@@ -250,7 +244,7 @@ public class WifiDrop : NoteLongBase, ICanShine
     {
         if (IsFinished || isChecking || !canCheck)
             return;
-        if (_inputManager!.Mode is AutoPlayMode.Enable or AutoPlayMode.Random)
+        if (_inputManager.Mode is AutoPlayMode.Enable or AutoPlayMode.Random)
             return;
         isChecking = true;
         for (int i = 0; i < 3; i++)
@@ -274,7 +268,7 @@ public class WifiDrop : NoteLongBase, ICanShine
         var fType = first.Areas;
         foreach (var t in fType)
         {
-            first.Judge(inputManager.CheckSensor(t));
+            first.Judge(_inputManager.CheckSensor(t));
         }
 
         if (first.On)
@@ -287,7 +281,7 @@ public class WifiDrop : NoteLongBase, ICanShine
             var sType = second.Areas;
             foreach (var t in sType)
             {
-                second.Judge(inputManager.CheckSensor(t));
+                second.Judge(_inputManager.CheckSensor(t));
             }
 
             if (second.IsFinished)
@@ -322,15 +316,15 @@ public class WifiDrop : NoteLongBase, ICanShine
             isJudged = true;
             return;
         }
-        var timing = timeProvider.NoteTime - time;
+        var timing = _timeProvider.NoteTime - time;
         var starTiming = startTime + (time - startTime) * 0.667;
         var pTime = LastFor / areaStep.Last();
         var judgeTime = time + pTime * (areaStep.LastOrDefault() - 2.1f);// 正解帧
         var stayTime = (time + LastFor) - judgeTime; // 停留时间
         if (!isJudged)
         {
-            arriveTime = timeProvider.NoteTime;
-            var triggerTime = timeProvider.NoteTime;
+            arriveTime = _timeProvider.NoteTime;
+            var triggerTime = _timeProvider.NoteTime;
 
             const float totalInterval = 1.2f; // 秒
             const float nPInterval = 0.4666667f; // Perfect基础区间
@@ -384,26 +378,26 @@ public class WifiDrop : NoteLongBase, ICanShine
     }
     void Running()
     {
-        if (timeProvider.NoteTime - time < 0f || isMine)
+        if (_timeProvider.NoteTime - time < 0f || isMine)
             return;
-        if (_inputManager!.Mode is AutoPlayMode.Enable or AutoPlayMode.Random or AutoPlayMode.Disable)
+        if (_inputManager.Mode is AutoPlayMode.Enable or AutoPlayMode.Random or AutoPlayMode.Disable)
             return;
         foreach (var star in star_slides)
         {
             var starPos = star.transform.position;
-            inputManager.WorldPositionHandle(guids[star].GetHashCode(), starPos);
+            _inputManager.WorldPositionHandle(guids[star].GetHashCode(), starPos);
         }
     }
     // Update is called once per frame
     private void Update()
     {
-        var timing = timeProvider.NoteTime - startTime;
-        var stiming = timeProvider.NoteTime - time;
+        var timing = _timeProvider.NoteTime - startTime;
+        var stiming = _timeProvider.NoteTime - time;
         var remaining = Math.Max(LastFor - timing, 0);
 
-        var fakeTiming = timeProvider.FakeNoteTime - timeProvider.GetPositionAtTime(startTime);
-        var fakesTiming = timeProvider.FakeNoteTime - timeProvider.GetPositionAtTime(time);
-        var fakeLastfor = timeProvider.GetPositionAtTime(time + LastFor) - timeProvider.GetPositionAtTime(time);
+        var fakeTiming = _timeProvider.FakeNoteTime - _timeProvider.GetPositionAtTime(startTime);
+        var fakesTiming = _timeProvider.FakeNoteTime - _timeProvider.GetPositionAtTime(time);
+        var fakeLastfor = _timeProvider.GetPositionAtTime(time + LastFor) - _timeProvider.GetPositionAtTime(time);
         var fakeRemaining = Math.Max(fakeLastfor - fakeTiming, 0);
 
         if (!usingSV)
@@ -461,7 +455,7 @@ public class WifiDrop : NoteLongBase, ICanShine
                     star_slides[i].transform.position = SlidePositionEnd[i];
                     star_slides[i].transform.localScale = new Vector3(1.5f, 1.5f, 1.5f);
                 }
-                switch (_inputManager!.Mode)
+                switch (_inputManager.Mode)
                 {
                     case AutoPlayMode.Enable:
                         if (smoothSlideAnime) HideBar((int)pos + 1);
@@ -493,7 +487,7 @@ public class WifiDrop : NoteLongBase, ICanShine
                     star_slides[i].transform.localScale = new Vector3(1.5f, 1.5f, 1.5f);
                 }
             }
-            switch (_inputManager!.Mode)
+            switch (_inputManager.Mode)
             {
                 case AutoPlayMode.Enable:
                     judgeQueues.ForEach(queue => queue.Skip((int)(process * (queue.Count - 1))).ToList());
@@ -552,7 +546,7 @@ public class WifiDrop : NoteLongBase, ICanShine
         if (isBreak &&
             judgeResult == JudgeType.Perfect)
         {
-            audioManager.PlayBreakSlideEndSound();
+            _audioManager.PlayBreakSlideEndSound();
         }
         foreach (GameObject obj in slideBars)
             obj.SetActive(false);
@@ -569,7 +563,7 @@ public class WifiDrop : NoteLongBase, ICanShine
         isDestroying = true;
 
         ClearTriggeredSensor();
-        switch (_inputManager!.Mode)
+        switch (_inputManager.Mode)
         {
             case AutoPlayMode.Enable:
                 if (isMine)
@@ -594,9 +588,9 @@ public class WifiDrop : NoteLongBase, ICanShine
                 SetJust();
                 break;
         }
-        objectCounter.ReportResult(SimaiNoteType.Slide, judgeResult, isBreak);
+        _objectCounter.ReportResult(SimaiNoteType.Slide, judgeResult, isBreak);
         if (isBreak && judgeResult == JudgeType.Perfect)
-            slideOK.GetComponent<Animator>().runtimeAnimatorController = skinManager.Shine_JudgeBreak;
+            slideOK.GetComponent<Animator>().runtimeAnimatorController = _skinManager.Shine_JudgeBreak;
         if (!EffectManager.showLevel) slideOK.GetComponent<SpriteRenderer>().sprite =
             Sprite.Create(new Texture2D(0, 0), new Rect(0, 0, 0, 0), new Vector2(0.5f, 0.5f));
 
@@ -604,7 +598,7 @@ public class WifiDrop : NoteLongBase, ICanShine
 
 
         foreach (var t in boundSensors)
-            inputManager.UnbindSensor(Check, t);
+            _inputManager.UnbindSensor(Check, t);
     }
     /// <summary>
     /// 清空所有已触发的Sensor
@@ -612,7 +606,7 @@ public class WifiDrop : NoteLongBase, ICanShine
     void ClearTriggeredSensor()
     {
         foreach (var star in star_slides)
-            inputManager.ClearTriggeredSensor(guids[star].GetHashCode());
+            _inputManager.ClearTriggeredSensor(guids[star].GetHashCode());
     }
     private void setSlideBarAlpha(float alpha)
     {
@@ -628,6 +622,6 @@ public class WifiDrop : NoteLongBase, ICanShine
         if (isSoundPlayed || isMine) return;
 
         isSoundPlayed = true;
-        audioManager.PlaySlideSound(isBreak);
+        _audioManager.PlaySlideSound(isBreak);
     }
 }

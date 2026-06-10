@@ -13,7 +13,6 @@ using static MajCtx;
 
 public class TouchDrop : NoteBase
 {
-    private MultTouchHandler multTouchHandler;
 
     public char areaPosition;
     public bool isFirework;
@@ -55,14 +54,6 @@ public class TouchDrop : NoteBase
         moveDuration = 0.8f * wholeDuration;
         displayDuration = 0.2f * wholeDuration;
 
-        noteManager = _noteManager!;
-        timeProvider = _timeProvider!;
-        multTouchHandler = _multTouchHandler!;
-        objectCounter = _objectCounter!;
-        inputManager = _inputManager!;
-        skinManager = _skinManager!;
-        audioManager = _audioManager!;
-
         firework = GameObject.Find("FireworkEffect");
         fireworkEffect = firework.GetComponent<Animator>();
 
@@ -79,70 +70,70 @@ public class TouchDrop : NoteBase
         SetFanColor(new Color(1f, 1f, 1f, 0f));
 
         sensor = GetSensor();
-        inputManager.BindSensor(Check, sensor);
+        _inputManager.BindSensor(Check, sensor);
     }
 
     private void LoadSkin()
     {
-        SetFanSprite(skinManager.Touch);
-        fansRenderers[4].sprite = skinManager.TouchPoint;
-        fansRenderers[5].sprite = skinManager.TouchBorder[0];
-        fansRenderers[6].sprite = skinManager.TouchBorder[1];
+        SetFanSprite(_skinManager.Touch);
+        fansRenderers[4].sprite = _skinManager.TouchPoint;
+        fansRenderers[5].sprite = _skinManager.TouchBorder[0];
+        fansRenderers[6].sprite = _skinManager.TouchBorder[1];
         if (isEach)
         {
-            SetFanSprite(skinManager.Touch_Each);
-            fansRenderers[4].sprite = skinManager.TouchPoint_Each;
-            fansRenderers[5].sprite = skinManager.TouchBorder_Each[0];
-            fansRenderers[6].sprite = skinManager.TouchBorder_Each[1];
+            SetFanSprite(_skinManager.Touch_Each);
+            fansRenderers[4].sprite = _skinManager.TouchPoint_Each;
+            fansRenderers[5].sprite = _skinManager.TouchBorder_Each[0];
+            fansRenderers[6].sprite = _skinManager.TouchBorder_Each[1];
         }
         if (isBreak)
         {
-            SetFanSprite(skinManager.Touch_Break);
-            fansRenderers[4].sprite = skinManager.TouchPoint_Break;
-            fansRenderers[5].sprite = skinManager.TouchBorder_Break[0];
-            fansRenderers[6].sprite = skinManager.TouchBorder_Break[1];
+            SetFanSprite(_skinManager.Touch_Break);
+            fansRenderers[4].sprite = _skinManager.TouchPoint_Break;
+            fansRenderers[5].sprite = _skinManager.TouchBorder_Break[0];
+            fansRenderers[6].sprite = _skinManager.TouchBorder_Break[1];
         }
         if (isMine)
         {
             if (isBreak)
             {
-                SetFanSprite(skinManager.Touch_Break_Mine);
-                fansRenderers[4].sprite = skinManager.TouchPoint_Break_Mine;
-                fansRenderers[5].sprite = skinManager.TouchBorder_Break_Mine[0];
-                fansRenderers[6].sprite = skinManager.TouchBorder_Break_Mine[1];
+                SetFanSprite(_skinManager.Touch_Break_Mine);
+                fansRenderers[4].sprite = _skinManager.TouchPoint_Break_Mine;
+                fansRenderers[5].sprite = _skinManager.TouchBorder_Break_Mine[0];
+                fansRenderers[6].sprite = _skinManager.TouchBorder_Break_Mine[1];
             }
             else
             {
-                SetFanSprite(skinManager.Touch_Mine);
-                fansRenderers[4].sprite = skinManager.TouchPoint_Mine;
-                fansRenderers[5].sprite = skinManager.TouchBorder_Mine[0];
-                fansRenderers[6].sprite = skinManager.TouchBorder_Mine[1];
+                SetFanSprite(_skinManager.Touch_Mine);
+                fansRenderers[4].sprite = _skinManager.TouchPoint_Mine;
+                fansRenderers[5].sprite = _skinManager.TouchBorder_Mine[0];
+                fansRenderers[6].sprite = _skinManager.TouchBorder_Mine[1];
             }
         }
-        justEffect.GetComponent<SpriteRenderer>().sprite = skinManager.TouchJust;
+        justEffect.GetComponent<SpriteRenderer>().sprite = _skinManager.TouchJust;
     }
 
     void Check(object sender, InputEventArgs arg)
     {
         if (arg.Type != sensor)
             return;
-        if (isJudged || !noteManager.CanJudge(gameObject, sensor))
+        if (isJudged || !_noteManager.CanJudge(gameObject, sensor))
             return;
-        if (_inputManager!.Mode is AutoPlayMode.Enable or AutoPlayMode.Random)
+        if (_inputManager.Mode is AutoPlayMode.Enable or AutoPlayMode.Random)
             return;
 
         if (arg.IsClick)
         {
-            if (!inputManager.IsIdle(arg))
+            if (!_inputManager.IsIdle(arg))
                 return;
 
-            inputManager.SetBusy(arg);
+            _inputManager.SetBusy(arg);
             Judge();
         }
     }
     private void FixedUpdate()
     {
-        var timing = timeProvider.NoteTime - time;
+        var timing = _timeProvider.NoteTime - time;
         if (isMine && !isJudged && timing >= 0.016667f)
         {
             judgeResult = JudgeType.Perfect;
@@ -172,9 +163,9 @@ public class TouchDrop : NoteBase
         }
 
 
-        if (timeProvider.NoteTime - time >= 0)
+        if (_timeProvider.NoteTime - time >= 0)
         {
-            switch (_inputManager!.Mode)
+            switch (_inputManager.Mode)
             {
                 case AutoPlayMode.Enable:
                     if (isMine)
@@ -202,7 +193,7 @@ public class TouchDrop : NoteBase
                     if (isTriggered)
                         return;
                     if (!isMine) //mine buda
-                        inputManager.ClickSensor(sensor);
+                        _inputManager.ClickSensor(sensor);
                     isTriggered = true;
                     break;
                 case AutoPlayMode.Disable:
@@ -222,7 +213,7 @@ public class TouchDrop : NoteBase
         if (isJudged)
             return;
 
-        var timing = timeProvider.NoteTime - time;
+        var timing = _timeProvider.NoteTime - time;
         var isFast = timing < 0;
         var diff = MathF.Abs(timing * 1000);
         JudgeType result;
@@ -253,11 +244,11 @@ public class TouchDrop : NoteBase
     // Update is called once per frame
     private void Update()
     {
-        var timing = timeProvider.NoteTime - time;
+        var timing = _timeProvider.NoteTime - time;
         var pow = -Mathf.Exp(8 * (timing * 0.43f / moveDuration) - 0.85f) + 0.42f;
         var distance = Mathf.Clamp(pow, 0f, 0.4f);
 
-        var fakeTiming = timeProvider.FakeNoteTime - timeProvider.GetPositionAtTime(time);
+        var fakeTiming = _timeProvider.FakeNoteTime - _timeProvider.GetPositionAtTime(time);
         var fakePow = -Mathf.Exp(8 * (fakeTiming * 0.43f / moveDuration) - 0.85f) + 0.42f;
         var fakeDistance = Mathf.Clamp(fakePow, 0f, 0.4f);
 
@@ -287,7 +278,7 @@ public class TouchDrop : NoteBase
             if (!isStarted)
             {
                 isStarted = true;
-                multTouchHandler.RegisterTouch(this);
+                _multTouchHandler.RegisterTouch(this);
             }
 
             SetFanColor(new Color(1f, 1f, 1f, Mathf.Clamp((wholeDuration + fakeTiming) / displayDuration, 0f, 1f)));
@@ -311,15 +302,15 @@ public class TouchDrop : NoteBase
         {
             if (isBreak)
             {
-                audioManager.PlayTapSound(judgeResult, false, isBreak);
+                _audioManager.PlayTapSound(judgeResult, false, isBreak);
             }
             else if (isFirework)
             {
-                audioManager.PlayHanabiSound();
+                _audioManager.PlayHanabiSound();
             }
             else
             {
-                audioManager.PlayTouchSound();
+                _audioManager.PlayTouchSound();
             }
         }
         Destroy(gameObject);
@@ -327,19 +318,19 @@ public class TouchDrop : NoteBase
     private void OnDestroy()
     {
         if (PlayManager.IsReloading) return;
-        multTouchHandler.CancelTouch(this);
-        noteManager.NextTouch(sensor);
+        _multTouchHandler.CancelTouch(this);
+        _noteManager.NextTouch(sensor);
         PlayJudgeEffect();
         if (GroupInfo is not null && judgeResult != JudgeType.Miss)
             GroupInfo.JudgeResult = judgeResult;
-        objectCounter.ReportResult(SimaiNoteType.Touch, judgeResult, isBreak);
+        _objectCounter.ReportResult(SimaiNoteType.Touch, judgeResult, isBreak);
 
         if (isFirework && judgeResult != JudgeType.Miss)
         {
             fireworkEffect.SetTrigger("Fire");
             firework.transform.position = transform.position;
         }
-        inputManager.UnbindSensor(Check, sensor);
+        _inputManager.UnbindSensor(Check, sensor);
     }
     void PlayJudgeEffect()
     {
@@ -391,7 +382,7 @@ public class TouchDrop : NoteBase
             {
                 case JudgeType.LateGood:
                 case JudgeType.FastGood:
-                    judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = skinManager.JudgeText[1];
+                    judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = _skinManager.JudgeText[1];
                     break;
                 case JudgeType.LateGreat:
                 case JudgeType.LateGreat1:
@@ -399,19 +390,19 @@ public class TouchDrop : NoteBase
                 case JudgeType.FastGreat2:
                 case JudgeType.FastGreat1:
                 case JudgeType.FastGreat:
-                    judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = skinManager.JudgeText[2];
+                    judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = _skinManager.JudgeText[2];
                     break;
                 case JudgeType.LatePerfect2:
                 case JudgeType.FastPerfect2:
                 case JudgeType.LatePerfect1:
                 case JudgeType.FastPerfect1:
-                    judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = skinManager.JudgeText[3];
+                    judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = _skinManager.JudgeText[3];
                     break;
                 case JudgeType.Perfect:
-                    judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = skinManager.JudgeText[4];
+                    judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = _skinManager.JudgeText[4];
                     break;
                 case JudgeType.Miss:
-                    judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = skinManager.JudgeText[0];
+                    judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = _skinManager.JudgeText[0];
                     break;
             }
             anim.SetTrigger("touch");

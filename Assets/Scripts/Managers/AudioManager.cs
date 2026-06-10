@@ -9,8 +9,11 @@ using Cysharp.Threading.Tasks;
 using JetBrains.Annotations;
 using MajSimai;
 using ManagedBass;
+using Unity.Burst;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
+using Unity.Mathematics;
 using UnityEngine;
 
 using static MajCtx;
@@ -19,8 +22,6 @@ using static MajCtx;
 
 public class AudioManager
 {
-    private TimeProvider timeProvider;
-
     [CanBeNull] private AudioSample TrackSample;
     [CanBeNull] private float[] TrackSampleData;
     private float TrackSampleVolume;
@@ -30,7 +31,7 @@ public class AudioManager
     List<AnswerTimingPoint> answerTimingPoints = new();
     private readonly object answerSfxLock = new();
     //note SFX
-    public static bool[] noteSfxPlaybackRequests = new bool[16];
+    public bool[] noteSfxPlaybackRequests = new bool[16];
     List<AudioSample> NoteSfxs = new(16);
 
     //SFX for recording
@@ -42,7 +43,7 @@ public class AudioManager
 
     public double GlobalAudioOffset { get; private set; }
 
-    public bool IsShowingSongDetail => timeProvider.AudioTime <= recordingInitialAudioTime + TimeProvider.SONG_DETAIL_OFFSET;
+    public bool IsShowingSongDetail => _timeProvider.AudioTime <= recordingInitialAudioTime + TimeProvider.SONG_DETAIL_OFFSET;
     const int SAMPLERATE = 44100;
     const int CHANNELS = 2;
 
@@ -74,7 +75,6 @@ public class AudioManager
     public AudioManager()
     {
         _audioManager = this;
-        timeProvider = _timeProvider!;
         Bass.Configure(Configuration.UpdatePeriod, 20);
         Bass.Configure(Configuration.PlaybackBufferLength, 40);
         Bass.Init(-1, 44100);
@@ -164,7 +164,7 @@ public class AudioManager
 
                 if (timing.IsPlayed) continue;
 
-                var thisFrameSec = _timeProvider!.NoteTime;
+                var thisFrameSec = _timeProvider.NoteTime;
 
                 var delta = thisFrameSec - (timing.Timing + TRACK_ANSWER_PLAYBACK_OFFSET_SEC);
                 if (delta > 0)
@@ -180,7 +180,7 @@ public class AudioManager
 
     public void OnUpdate()
     {
-        if (!isInited || timeProvider.IsRecord) return;
+        if (!isInited || _timeProvider.IsRecord) return;
 
         UpdateAnswerSfx();
 
@@ -286,7 +286,7 @@ public class AudioManager
     public void PlayTrack()
     {
         if (TrackSample == null) return;
-        TrackSample.Speed = timeProvider.CurrentSpeed;
+        TrackSample.Speed = _timeProvider.CurrentSpeed;
         TrackSample.Volume = TrackSampleVolume;
 
         waitingForTrackAudioStart = true;
@@ -295,14 +295,14 @@ public class AudioManager
         async UniTask WaitForTrackAudioStart()
         {
             var offset = TRACK_ANSWER_PLAYBACK_OFFSET_SEC + GlobalAudioOffset;
-            while (_timeProvider!.AudioTime - offset < 0)
+            while (_timeProvider.AudioTime - offset < 0)
             {
                 if (waitingForTrackAudioStart == false) return; //canceled
                 await UniTask.Yield();
             }
 
             TrackSample!.Play();
-            TrackSample!.CurrentSec = _timeProvider!.AudioTime - offset;
+            TrackSample!.CurrentSec = _timeProvider.AudioTime - offset;
             waitingForTrackAudioStart = false;
         }
     }
@@ -639,30 +639,30 @@ public class AudioManager
         Bass.ChannelGetData(stream, rawData, (int)lenBytes);
         Bass.StreamFree(stream);
 
-        var ratio = (float)info.Frequency / SAMPLERATE;
-        var sourceFrames = rawData.Length / 2;
-        var targetFrames = (int)(sourceFrames / ratio);
-        var sourceNative = new NativeArray<float>(rawData, Allocator.TempJob);
-        var outputNative = new NativeArray<float>(targetFrames * 2, Allocator.TempJob);
-
-        // re-poem：本来不想接触job burst这些很搞，vibe也基本上只能学表面的东西的，
-        //          但是好像效果不错，先抄了再说，留个记号以后争取深入深入。
-        new AudioResampleJob
+        unsafe
         {
-            Source = sourceNative,
-            Output = outputNative,
-            Ratio = ratio,
-            TargetFrames = targetFrames,
-            SrcFrameLimit = (rawData.Length / 2) - 1
-        }.Run();
+            fixed (float* dataPtr = rawData)
+            {
+                using var sourceArray = rawData.AsUnsafeNativeArrayScope();
 
-        var result = new float[outputNative.Length];
-        outputNative.CopyTo(result);
+                var ratio = (float)info.Frequency / SAMPLERATE;
+                var sourceFrames = rawData.Length / 2;
+                var targetFrames = (int)(sourceFrames / ratio);
+                var outputArray = new NativeArray<float>(targetFrames * 2, Allocator.TempJob);
 
-        sourceNative.Dispose();
-        outputNative.Dispose();
+                new AudioResampleJob
+                {
+                    Source = sourceArray.Array,
+                    Output = outputArray,
+                    Ratio = ratio,
+                    SrcFrameLimit = (rawData.Length / 2) - 1
+                }.Schedule(targetFrames, 64, default).Complete();
 
-        return result;
+                var result = outputArray.ToArray();
+                outputArray.Dispose();
+                return result;
+            }
+        }
     }
 
     private class AnswerTimingPoint
@@ -676,6 +676,30 @@ public class AudioManager
             Timing = timing;
             IsClock = isClock;
             IsPlayed = false;
+        }
+    }
+
+    [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Fast)]
+    public struct AudioResampleJob : IJobParallelFor
+    {
+        [ReadOnly] public NativeArray<float> Source;
+        [NativeDisableParallelForRestriction][WriteOnly] public NativeArray<float> Output;
+        [ReadOnly] public float Ratio;
+        [ReadOnly] public int SrcFrameLimit;
+
+        public void Execute(int index)
+        {
+            float sourceIdx = index * Ratio;
+            int i1 = (int)math.floor(sourceIdx);
+            int i2 = (i1 < SrcFrameLimit) ? i1 + 1 : i1;
+
+            float frac = sourceIdx - i1;
+            int s1 = i1 << 1;
+            int s2 = i2 << 1;
+            int d = index << 1;
+
+            Output[d] = math.lerp(Source[s1], Source[s2], frac);         // 左声道
+            Output[d + 1] = math.lerp(Source[s1 + 1], Source[s2 + 1], frac); // 右声道
         }
     }
 }

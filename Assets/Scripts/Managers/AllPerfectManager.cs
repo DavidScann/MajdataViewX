@@ -11,15 +11,15 @@ using static MajCtx;
 
 public class AllPerfectManager : MonoBehaviour
 {
+    private static readonly int PlayAllPerfectHash = Animator.StringToHash("playAllPerfect");
     [SerializeField]
-    Animator AllPerfect;
+    private Animator AllPerfect;
 
     private bool isPlayed;
 
     private void Awake()
     {
         _allPerfectManager = this;
-        AllPerfect.gameObject.SetActive(false);
     }
 
     private void Start()
@@ -45,8 +45,8 @@ public class AllPerfectManager : MonoBehaviour
             else
             {
                 AllPerfect.gameObject.SetActive(true);
-                AllPerfect.SetTrigger("playAllPerfect");
-                AudioManager.noteSfxPlaybackRequests[AudioManager.ALL_PERFECT] = true;
+                AllPerfect.SetTrigger(PlayAllPerfectHash);
+                _audioManager.noteSfxPlaybackRequests[AudioManager.ALL_PERFECT] = true;
                 isPlayed = true;
             }
         }

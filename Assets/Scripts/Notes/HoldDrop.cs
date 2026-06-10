@@ -13,7 +13,6 @@ using static MajCtx;
 
 public class HoldDrop : NoteLongBase
 {
-    private EffectManager effectManager;
 
     public GameObject tapLine;
 
@@ -31,14 +30,6 @@ public class HoldDrop : NoteLongBase
     private void Start()
     {
         var notes = GameObject.Find("Notes").transform;
-        timeProvider = _timeProvider!;
-        objectCounter = _objectCounter!;
-        noteManager = _noteManager!;
-        skinManager = _skinManager!;
-        inputManager = _inputManager!;
-        effectManager = _effectManager!;
-        audioManager = _audioManager!;
-
         holdEffect = Instantiate(holdEffect, notes);
         holdEffect.SetActive(false);
         material = holdEffect.GetComponent<ParticleSystemRenderer>().material;
@@ -64,54 +55,54 @@ public class HoldDrop : NoteLongBase
         holdEndRender.enabled = false;
 
         sensor = (SensorType)startPosition - 1;
-        inputManager.BindArea(Check, sensor);
+        _inputManager.BindArea(Check, sensor);
     }
 
     private void LoadSkin()
     {
-        lineSpriteRender.sprite = skinManager.Line;
-        spriteRenderer.sprite = skinManager.Hold;
-        exSpriteRender.sprite = skinManager.Hold_Ex;
-        holdEndRender.sprite = skinManager.HoldEnd;
+        lineSpriteRender.sprite = _skinManager.Line;
+        spriteRenderer.sprite = _skinManager.Hold;
+        exSpriteRender.sprite = _skinManager.Hold_Ex;
+        holdEndRender.sprite = _skinManager.HoldEnd;
         if (isEx)
         {
-            exSpriteRender.color = skinManager.Ex;
+            exSpriteRender.color = _skinManager.Ex;
         }
         if (isEach)
         {
-            spriteRenderer.sprite = skinManager.Hold_Each;
-            lineSpriteRender.sprite = skinManager.Line_Each;
-            holdEndRender.sprite = skinManager.HoldEnd_Each;
-            if (isEx) exSpriteRender.color = skinManager.Ex_Each;
+            spriteRenderer.sprite = _skinManager.Hold_Each;
+            lineSpriteRender.sprite = _skinManager.Line_Each;
+            holdEndRender.sprite = _skinManager.HoldEnd_Each;
+            if (isEx) exSpriteRender.color = _skinManager.Ex_Each;
         }
         if (isBreak)
         {
-            spriteRenderer.sprite = skinManager.Hold_Break;
-            lineSpriteRender.sprite = skinManager.Line_Break;
-            holdEndRender.sprite = skinManager.HoldEnd_Break;
-            if (isEx) exSpriteRender.color = skinManager.Ex_Break;
-            spriteRenderer.material = skinManager.BreakMaterial;
+            spriteRenderer.sprite = _skinManager.Hold_Break;
+            lineSpriteRender.sprite = _skinManager.Line_Break;
+            holdEndRender.sprite = _skinManager.HoldEnd_Break;
+            if (isEx) exSpriteRender.color = _skinManager.Ex_Break;
+            spriteRenderer.material = _skinManager.BreakMaterial;
         }
         if (isMine)
         {
             if (isBreak)
-                spriteRenderer.sprite = skinManager.Hold_Break_Mine;
+                spriteRenderer.sprite = _skinManager.Hold_Break_Mine;
             else
-                spriteRenderer.sprite = skinManager.Hold_Mine;
-            lineSpriteRender.sprite = skinManager.Line_Mine;
+                spriteRenderer.sprite = _skinManager.Hold_Mine;
+            lineSpriteRender.sprite = _skinManager.Line_Mine;
         }
     }
 
     private void FixedUpdate()
     {
-        var timing = timeProvider.NoteTime - time;
+        var timing = _timeProvider.NoteTime - time;
         var remainingTime = GetRemainingTime();
 
         if (isMine && !isJudged && timing >= 0.016667f)
         {
             judgeResult = JudgeType.Perfect;
             isJudged = true;
-            noteManager.NextNote(startPosition);
+            _noteManager.NextNote(startPosition);
         }
         else if (remainingTime == 0 && isJudged) // Hold完成后Destroy
         {
@@ -120,11 +111,11 @@ public class HoldDrop : NoteLongBase
         else if (timing >= -0.01f)
         {
             // AutoPlay相关
-            switch (_inputManager!.Mode)
+            switch (_inputManager.Mode)
             {
                 case AutoPlayMode.Enable:
                     if (!isJudged)
-                        noteManager.NextNote(startPosition);
+                        _noteManager.NextNote(startPosition);
 
                     if (isMine)
                         judgeResult = JudgeType.Miss;
@@ -138,12 +129,12 @@ public class HoldDrop : NoteLongBase
                     return;
                 case AutoPlayMode.DJAuto:
                     if (!isMine) //mine buda
-                        inputManager.SetAreaOn(sensor, guid);
+                        _inputManager.SetAreaOn(sensor, guid);
                     break;
                 case AutoPlayMode.Random:
                     if (!isJudged)
                     {
-                        noteManager.NextNote(startPosition);
+                        _noteManager.NextNote(startPosition);
                         judgeResult = (JudgeType)Random.Range(1, 14);
                         if (isMine)
                         {
@@ -168,10 +159,10 @@ public class HoldDrop : NoteLongBase
 
         if (isJudged) // 头部判定完成后开始累计按压时长
         {
-            if (!timeProvider.IsStart) // 忽略暂停
+            if (!_timeProvider.IsStart) // 忽略暂停
                 return;
 
-            var on = inputManager.CheckArea(sensor);
+            var on = _inputManager.CheckArea(sensor);
 
             if (on)
             {
@@ -198,29 +189,29 @@ public class HoldDrop : NoteLongBase
             judgeDiff = 150;
             judgeResult = JudgeType.Miss;
             isJudged = true;
-            noteManager.NextNote(startPosition);
+            _noteManager.NextNote(startPosition);
         }
     }
     void Check(object sender, InputEventArgs arg)
     {
         if (arg.Type != sensor)
             return;
-        if (isJudged || !noteManager.CanJudge(gameObject, startPosition))
+        if (isJudged || !_noteManager.CanJudge(gameObject, startPosition))
             return;
-        if (_inputManager!.Mode is AutoPlayMode.Enable or AutoPlayMode.Random)
+        if (_inputManager.Mode is AutoPlayMode.Enable or AutoPlayMode.Random)
             return;
 
         if (arg.IsClick)
         {
-            if (!inputManager.IsIdle(arg))
+            if (!_inputManager.IsIdle(arg))
                 return;
 
-            inputManager.SetBusy(arg);
+            _inputManager.SetBusy(arg);
             Judge();
             if (isJudged)
             {
-                inputManager.UnbindArea(Check, sensor);
-                noteManager.NextNote(startPosition);
+                _inputManager.UnbindArea(Check, sensor);
+                _noteManager.NextNote(startPosition);
             }
         }
     }
@@ -238,7 +229,7 @@ public class HoldDrop : NoteLongBase
         if (isJudged)
             return;
 
-        var timing = timeProvider.NoteTime - time;
+        var timing = _timeProvider.NoteTime - time;
         var isFast = timing < 0;
         var diff = MathF.Abs(timing * 1000);
         JudgeType result;
@@ -278,16 +269,16 @@ public class HoldDrop : NoteLongBase
 
     private void Update()
     {
-        var timing = timeProvider.NoteTime - time;
+        var timing = _timeProvider.NoteTime - time;
         var distance = timing * speed + 4.8f;
         var destScale = distance * 0.4f + 0.51f;
         var holdTime = timing - LastFor;
         var holdDistance = holdTime * speed + 4.8f;
 
-        var fakeTiming = timeProvider.FakeNoteTime - timeProvider.GetPositionAtTime(time);
+        var fakeTiming = _timeProvider.FakeNoteTime - _timeProvider.GetPositionAtTime(time);
         var fakeDistance = fakeTiming * speed + 4.8f;
         var fakeDestScale = fakeDistance * 0.4f + 0.51f;
-        var fakeLastfor = timeProvider.GetPositionAtTime(time + LastFor) - timeProvider.GetPositionAtTime(time);
+        var fakeLastfor = _timeProvider.GetPositionAtTime(time + LastFor) - _timeProvider.GetPositionAtTime(time);
         var fakeHoldTime = fakeTiming - fakeLastfor;
         var fakeHoldDistance = fakeHoldTime * speed + 4.8f;
 
@@ -326,7 +317,7 @@ public class HoldDrop : NoteLongBase
             !holdAnimStart &&
             !isJudged)
         {
-            var extra = Math.Max(Mathf.Sin(timeProvider.GetFrame() * 0.17f) * 0.5f, 0);
+            var extra = Math.Max(Mathf.Sin(_timeProvider.GetFrame() * 0.17f) * 0.5f, 0);
             spriteRenderer.material.SetFloat("_Brightness", 0.95f + extra);
         }
 
@@ -428,7 +419,7 @@ public class HoldDrop : NoteLongBase
             }
         }
 
-        switch (_inputManager!.Mode)
+        switch (_inputManager.Mode)
         {
             case AutoPlayMode.Enable:
                 result = JudgeType.Perfect;
@@ -449,49 +440,49 @@ public class HoldDrop : NoteLongBase
                 result = JudgeType.Perfect;
         }
 
-        effectManager.PlayEffect(startPosition, isBreak, result);
-        effectManager.PlayFastLate(startPosition, result);
+        _effectManager.PlayEffect(startPosition, isBreak, result);
+        _effectManager.PlayFastLate(startPosition, result);
         print($"Hold: {MathF.Round(percent * 100, 2)}%\nTotal Len : {MathF.Round(realityHT * 1000, 2)}ms");
 
-        objectCounter.ReportResult(SimaiNoteType.Hold, result, isBreak);
+        _objectCounter.ReportResult(SimaiNoteType.Hold, result, isBreak);
         if (!isJudged)
-            noteManager.NextNote(startPosition);
+            _noteManager.NextNote(startPosition);
 
-        inputManager.SetAreaOff(sensor, guid);
-        inputManager.UnbindArea(Check, sensor);
+        _inputManager.SetAreaOff(sensor, guid);
+        _inputManager.UnbindArea(Check, sensor);
     }
     protected override void PlayHoldEffect()
     {
         base.PlayHoldEffect();
-        _effectManager!.ResetEffect(startPosition - 1);
+        _effectManager.ResetEffect(startPosition - 1);
         if (LastFor <= 0.3)
             return;
-        if (!holdAnimStart && timeProvider.NoteTime - time >= 0.1f && !isMine)//忽略开头6帧与结尾12帧和mine
+        if (!holdAnimStart && _timeProvider.NoteTime - time >= 0.1f && !isMine)//忽略开头6帧与结尾12帧和mine
         {
             holdAnimStart = true;
 
             if (isBreak)
             {
-                spriteRenderer.sprite = skinManager.Hold_Break_On;
-                animator.runtimeAnimatorController = skinManager.Shine_Break;
+                spriteRenderer.sprite = _skinManager.Hold_Break_On;
+                animator.runtimeAnimatorController = _skinManager.Shine_Break;
             }
             else if (isEach)
             {
-                spriteRenderer.sprite = skinManager.Hold_Each_On;
-                animator.runtimeAnimatorController = skinManager.Shine;
+                spriteRenderer.sprite = _skinManager.Hold_Each_On;
+                animator.runtimeAnimatorController = _skinManager.Shine;
             }
             else if (isMine)
             {
                 if (isBreak)
-                    spriteRenderer.sprite = skinManager.Hold_Break_Mine_On;
+                    spriteRenderer.sprite = _skinManager.Hold_Break_Mine_On;
                 else
-                    spriteRenderer.sprite = skinManager.Hold_Mine_On;
-                animator.runtimeAnimatorController = skinManager.Shine;
+                    spriteRenderer.sprite = _skinManager.Hold_Mine_On;
+                animator.runtimeAnimatorController = _skinManager.Shine;
             }
             else
             {
-                spriteRenderer.sprite = skinManager.Hold_On;
-                animator.runtimeAnimatorController = skinManager.Shine;
+                spriteRenderer.sprite = _skinManager.Hold_On;
+                animator.runtimeAnimatorController = _skinManager.Shine;
             }
             animator.enabled = true;
         }
@@ -502,20 +493,20 @@ public class HoldDrop : NoteLongBase
         holdAnimStart = false;
         animator.enabled = false;
         if (!isMine)
-            spriteRenderer.sprite = skinManager.Hold_Off;
+            spriteRenderer.sprite = _skinManager.Hold_Off;
     }
 
 
     private void PlayJudgeSFX()
     {
         if (isMine) return;
-        audioManager.PlayTapSound(judgeResult, false, false);
+        _audioManager.PlayTapSound(judgeResult, false, false);
     }
 
     private void PlaySFX()
     {
         if (isPlayedSFX || isMine) return;
-        audioManager.PlayTapSound(judgeResult, isEx, isBreak);
+        _audioManager.PlayTapSound(judgeResult, isEx, isBreak);
         isPlayedSFX = true;
     }
 }

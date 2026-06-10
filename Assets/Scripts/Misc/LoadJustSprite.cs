@@ -61,7 +61,7 @@ public class LoadJustSprite : MonoBehaviour
     }
     private void refreshSprite()
     {
-        spriteRenderer.sprite = _skinManager!
+        spriteRenderer.sprite = _skinManager
             .Just[_0curv1str2wifi + indexOffset + judgeOffset];
     }
 }

@@ -2,6 +2,11 @@
 
 using System;
 using System.IO;
+using Unity.Burst;
+using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
+using Unity.Jobs;
+using Unity.Mathematics;
 
 #endregion
 
@@ -26,13 +31,36 @@ public static class WavFileWriter
         bw.Write("data".ToCharArray());
         bw.Write(dataSource.Length * 2);
 
-        var buffer = new byte[dataSource.Length * 2];
-        for (int i = 0; i < dataSource.Length; i++)
+        unsafe
         {
-            short s = (short)(Math.Clamp(dataSource[i], -1f, 1f) * 32767);
-            buffer[i * 2] = (byte)s;
-            buffer[i * 2 + 1] = (byte)(s >> 8);
+            fixed (float* dataPtr = dataSource)
+            {
+                using var sourceArray = dataSource.AsUnsafeNativeArrayScope();
+                var outputArray = new NativeArray<byte>(dataSource.Length * 2, Allocator.TempJob);
+
+                new WriteBufferJob
+                {
+                    Source = sourceArray.Array,
+                    Output = outputArray,
+                }.Schedule(dataSource.Length, default).Complete();
+
+                var buffer = outputArray.AsReadOnlySpan();
+                bw.Write(buffer);
+            }
         }
-        bw.Write(buffer);
+    }
+
+    [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Fast)]
+    private struct WriteBufferJob : IJobFor
+    {
+        [ReadOnly] public NativeArray<float> Source;
+        [NativeDisableParallelForRestriction][WriteOnly] public NativeArray<byte> Output;
+
+        public void Execute(int index)
+        {
+            short s = (short)(math.clamp(Source[index], -1f, 1f) * 32767f);
+            Output[index * 2] = (byte)s;
+            Output[index * 2 + 1] = (byte)(s >> 8);
+        }
     }
 }

@@ -69,7 +69,6 @@ public class WsServer : MonoBehaviour
 
     private async UniTask HandleMessageAsync(string json)
     {
-        var playManager = _playManager!;
         try
         {
             var req = JsonConvert.DeserializeObject<MajWsRequestBase>(json);
@@ -79,7 +78,7 @@ public class WsServer : MonoBehaviour
                 case MajWsRequestType.Setting:
                     {
                         var payload = JsonConvert.DeserializeObject<MajWsRequestSetting>(payloadJson);
-                        playManager.Setting(payload.ViewSetting, payload.VolumeSetting);
+                        _playManager.Setting(payload.ViewSetting, payload.VolumeSetting);
                         Response(MajWsResponseType.Ok, PlayManager.Summary);
                         Debug.Log("dequeued: Setting");
                     }
@@ -87,7 +86,7 @@ public class WsServer : MonoBehaviour
                 case MajWsRequestType.Load:
                     {
                         var payload = JsonConvert.DeserializeObject<MajWsRequestLoad>(payloadJson);
-                        await playManager.LoadAsync(payload.TrackPath, payload.ImagePath, payload.VideoPath);
+                        await _playManager.LoadAsync(payload.TrackPath, payload.ImagePath, payload.VideoPath);
                         Response(MajWsResponseType.LoadOk, PlayManager.Summary);
                         Debug.Log("dequeued: Load");
                     }
@@ -95,7 +94,7 @@ public class WsServer : MonoBehaviour
                 case MajWsRequestType.Play:
                     {
                         var payload = JsonConvert.DeserializeObject<MajWsRequestPlay>(payloadJson);
-                        await playManager.PlayAsync(payload.Mode,
+                        await _playManager.PlayAsync(payload.Mode,
                             payload.StartAt, payload.Speed,
                             payload.Title, payload.Artist, payload.Offset,
                             payload.Designer, payload.Level, payload.Fumen,
@@ -107,23 +106,23 @@ public class WsServer : MonoBehaviour
                     break;
                 case MajWsRequestType.Resume:
                     {
-                        if (_screenRecorder!.IsRecording) return;
-                        await playManager.ResumeAsync();
+                        if (_screenRecorder.IsRecording) return;
+                        await _playManager.ResumeAsync();
                         Response(MajWsResponseType.PlayResumed, PlayManager.Summary);
                         Debug.Log("dequeued: Resume");
                     }
                     break;
                 case MajWsRequestType.Pause:
                     {
-                        if (_screenRecorder!.IsRecording) return;
-                        await playManager.PauseAsync();
+                        if (_screenRecorder.IsRecording) return;
+                        await _playManager.PauseAsync();
                         Response(MajWsResponseType.PlayPaused, PlayManager.Summary);
                         Debug.Log("dequeued: Pause");
                     }
                     break;
                 case MajWsRequestType.Stop:
                     {
-                        await playManager.StopAsync();
+                        await _playManager.StopAsync();
                         Response(MajWsResponseType.PlayStopped, PlayManager.Summary);
                         Debug.Log("dequeued: Stop");
                     }

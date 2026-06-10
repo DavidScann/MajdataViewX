@@ -50,13 +50,6 @@ public class TouchHoldDrop : NoteLongBase
         displayDuration = 0.2f * wholeDuration;
 
         var notes = GameObject.Find("Notes").transform;
-        objectCounter = _objectCounter!;
-        noteManager = _noteManager!;
-        timeProvider = _timeProvider!;
-        inputManager = _inputManager!;
-        skinManager = _skinManager!;
-        audioManager = _audioManager!;
-
         holdEffect = Instantiate(holdEffect, notes);
         holdEffect.SetActive(false);
         material = holdEffect.GetComponent<ParticleSystemRenderer>().material;
@@ -83,55 +76,55 @@ public class TouchHoldDrop : NoteLongBase
         mask.enabled = false;
 
         sensor = InputManager.GetSensor(areaPosition, startPosition);
-        inputManager.BindSensor(Check, sensor);
+        _inputManager.BindSensor(Check, sensor);
     }
 
     private void LoadSkin()
     {
         for (var i = 0; i < 4; i++)
-            fansRenderers[i].sprite = skinManager.TouchHold[i];
-        fansRenderers[4].sprite = skinManager.TouchPoint; //point
-        border.sprite = _borderSprite = skinManager.TouchHold_Border;
+            fansRenderers[i].sprite = _skinManager.TouchHold[i];
+        fansRenderers[4].sprite = _skinManager.TouchPoint; //point
+        border.sprite = _borderSprite = _skinManager.TouchHold_Border;
         if (isEach)
         {
-            fansRenderers[4].sprite = skinManager.TouchPoint_Each;
+            fansRenderers[4].sprite = _skinManager.TouchPoint_Each;
         }
         if (isBreak)
         {
             for (var i = 0; i < 4; i++)
-                fansRenderers[i].sprite = skinManager.TouchHold_Break[i];
-            fansRenderers[4].sprite = skinManager.TouchPoint_Break;
-            border.sprite = _borderSprite = skinManager.TouchHold_Border_Break;
+                fansRenderers[i].sprite = _skinManager.TouchHold_Break[i];
+            fansRenderers[4].sprite = _skinManager.TouchPoint_Break;
+            border.sprite = _borderSprite = _skinManager.TouchHold_Border_Break;
         }
         if (isMine)
         {
             for (var i = 0; i < 4; i++)
-                fansRenderers[i].sprite = skinManager.TouchHold_Mine[i];
-            fansRenderers[4].sprite = skinManager.TouchPoint_Mine;
+                fansRenderers[i].sprite = _skinManager.TouchHold_Mine[i];
+            fansRenderers[4].sprite = _skinManager.TouchPoint_Mine;
             if (isBreak)
-                border.sprite = _borderSprite = skinManager.TouchHold_Border_Break_Mine;
+                border.sprite = _borderSprite = _skinManager.TouchHold_Border_Break_Mine;
             else
-                border.sprite = _borderSprite = skinManager.TouchHold_Border_Mine;
+                border.sprite = _borderSprite = _skinManager.TouchHold_Border_Mine;
         }
     }
 
     void Check(object sender, InputEventArgs arg)
     {
-        if (isJudged || !noteManager.CanJudge(gameObject, sensor))
+        if (isJudged || !_noteManager.CanJudge(gameObject, sensor))
             return;
-        if (_inputManager!.Mode is AutoPlayMode.Enable or AutoPlayMode.Random)
+        if (_inputManager.Mode is AutoPlayMode.Enable or AutoPlayMode.Random)
             return;
         if (arg.IsClick)
         {
-            if (!inputManager.IsIdle(arg))
+            if (!_inputManager.IsIdle(arg))
                 return;
 
-            inputManager.SetBusy(arg);
+            _inputManager.SetBusy(arg);
             Judge();
             if (isJudged)
             {
-                inputManager.UnbindArea(Check, sensor);
-                noteManager.NextTouch(sensor);
+                _inputManager.UnbindArea(Check, sensor);
+                _noteManager.NextTouch(sensor);
             }
         }
     }
@@ -146,7 +139,7 @@ public class TouchHoldDrop : NoteLongBase
         if (isJudged)
             return;
 
-        var timing = timeProvider.NoteTime - time;
+        var timing = _timeProvider.NoteTime - time;
         var isFast = timing < 0;
         var diff = MathF.Abs(timing * 1000);
         JudgeType result;
@@ -171,32 +164,32 @@ public class TouchHoldDrop : NoteLongBase
         isJudged = true;
         PlayHoldEffect();
         if (!isMine)
-            audioManager.PlayTouchSound();
+            _audioManager.PlayTouchSound();
     }
     private void FixedUpdate()
     {
         var remainingTime = GetRemainingTime();
-        var timing = timeProvider.NoteTime - time;
+        var timing = _timeProvider.NoteTime - time;
 
         if (isMine && !isJudged && timing >= 0.016667f)
         {
             judgeResult = JudgeType.Perfect;
             isJudged = true;
-            noteManager.NextTouch(GetSensor());
+            _noteManager.NextTouch(GetSensor());
         }
         else if (remainingTime == 0 && isJudged)
         {
-            inputManager.SetSensorOff(sensor, guid);
+            _inputManager.SetSensorOff(sensor, guid);
             DestroySelf();
         }
         else if (timing >= -0.01f)
         {
             // AutoPlay相关
-            switch (_inputManager!.Mode)
+            switch (_inputManager.Mode)
             {
                 case AutoPlayMode.Enable:
                     if (!isJudged)
-                        noteManager.NextTouch(GetSensor());
+                        _noteManager.NextTouch(GetSensor());
 
                     if (isMine)
                         judgeResult = JudgeType.Miss;
@@ -206,16 +199,16 @@ public class TouchHoldDrop : NoteLongBase
                     isJudged = true;
                     isTouched = true;
                     PlayHoldEffect();
-                    audioManager.PlayTouchHoldSound(guid);
+                    _audioManager.PlayTouchHoldSound(guid);
                     return;
                 case AutoPlayMode.DJAuto:
                     if (!isMine)
-                        inputManager.SetSensorOn(sensor, guid);
+                        _inputManager.SetSensorOn(sensor, guid);
                     break;
                 case AutoPlayMode.Random:
                     if (!isJudged)
                     {
-                        noteManager.NextTouch(GetSensor());
+                        _noteManager.NextTouch(GetSensor());
                         if (isMine)
                         {
                             if (judgeResult > JudgeType.Perfect) //Fast
@@ -232,7 +225,7 @@ public class TouchHoldDrop : NoteLongBase
                         isJudged = true;
                     }
                     PlayHoldEffect();
-                    audioManager.PlayTouchHoldSound(guid);
+                    _audioManager.PlayTouchHoldSound(guid);
                     return;
                 case AutoPlayMode.Disable:
                 default:
@@ -242,20 +235,20 @@ public class TouchHoldDrop : NoteLongBase
 
         if (isJudged)
         {
-            if (!timeProvider.IsStart) // 忽略暂停
+            if (!_timeProvider.IsStart) // 忽略暂停
                 return;
 
-            var on = inputManager.CheckSensor(sensor);
+            var on = _inputManager.CheckSensor(sensor);
 
             if (on)
             {
                 isTouched = true;
-                audioManager.PlayTouchHoldSound(guid);
+                _audioManager.PlayTouchHoldSound(guid);
                 PlayHoldEffect();
             }
             else
             {
-                audioManager.StopTouchHoldSound(guid);
+                _audioManager.StopTouchHoldSound(guid);
                 StopHoldEffect();
             }
 
@@ -273,22 +266,22 @@ public class TouchHoldDrop : NoteLongBase
         {
             judgeDiff = 316.667f;
             judgeResult = JudgeType.Miss;
-            inputManager.UnbindSensor(Check, sensor);
+            _inputManager.UnbindSensor(Check, sensor);
             isJudged = true;
-            noteManager.NextTouch(GetSensor());
+            _noteManager.NextTouch(GetSensor());
         }
     }
     // Update is called once per frame
     private void Update()
     {
-        var timing = timeProvider.NoteTime - time;
+        var timing = _timeProvider.NoteTime - time;
         var pow = -Mathf.Exp(8 * (timing * 0.43f / moveDuration) - 0.85f) + 0.42f;
         var distance = Mathf.Clamp(pow, 0f, 0.4f);
 
-        var fakeTiming = timeProvider.FakeNoteTime - timeProvider.GetPositionAtTime(time);
+        var fakeTiming = _timeProvider.FakeNoteTime - _timeProvider.GetPositionAtTime(time);
         var fakePow = -Mathf.Exp(8 * (fakeTiming * 0.43f / moveDuration) - 0.85f) + 0.42f;
         var fakeDistance = Mathf.Clamp(fakePow, 0f, 0.4f);
-        var fakeLastFor = timeProvider.GetPositionAtTime(time + LastFor) - timeProvider.GetPositionAtTime(time);
+        var fakeLastFor = _timeProvider.GetPositionAtTime(time + LastFor) - _timeProvider.GetPositionAtTime(time);
 
         if (!usingSV)
         {
@@ -331,15 +324,15 @@ public class TouchHoldDrop : NoteLongBase
         {
             if (isBreak)
             {
-                audioManager.PlayTapSound(judgeResult, false, isBreak);
+                _audioManager.PlayTapSound(judgeResult, false, isBreak);
             }
             else if (isFirework)
             {
-                audioManager.PlayHanabiSound();
+                _audioManager.PlayHanabiSound();
             }
             else
             {
-                audioManager.PlayTouchSound();
+                _audioManager.PlayTouchSound();
             }
         }
         Destroy(holdEffect);
@@ -348,7 +341,7 @@ public class TouchHoldDrop : NoteLongBase
     private void OnDestroy()
     {
         if (PlayManager.IsReloading) return;
-        audioManager.StopTouchHoldSound(guid);
+        _audioManager.StopTouchHoldSound(guid);
         var realityHT = LastFor - 0.45f - (judgeDiff / 1000f);
         var percent = Math.Clamp((realityHT - playerIdleTime) / realityHT, 0, 1);
         JudgeType result = judgeResult;
@@ -390,7 +383,7 @@ public class TouchHoldDrop : NoteLongBase
             }
         }
 
-        switch (_inputManager!.Mode)
+        switch (_inputManager.Mode)
         {
             case AutoPlayMode.Enable:
                 result = JudgeType.Perfect;
@@ -412,15 +405,15 @@ public class TouchHoldDrop : NoteLongBase
         }
 
         print($"TouchHold: {MathF.Round(percent * 100, 2)}%\nTotal Len : {MathF.Round(realityHT * 1000, 2)}ms");
-        objectCounter.ReportResult(SimaiNoteType.TouchHold, result, isBreak);
+        _objectCounter.ReportResult(SimaiNoteType.TouchHold, result, isBreak);
         if (isFirework && result != JudgeType.Miss)
         {
             fireworkEffect.SetTrigger("Fire");
             firework.transform.position = transform.position;
         }
         if (!isJudged)
-            noteManager.NextTouch(GetSensor());
-        inputManager.UnbindSensor(Check, sensor);
+            _noteManager.NextTouch(GetSensor());
+        _inputManager.UnbindSensor(Check, sensor);
         PlayJudgeEffect(result);
     }
 
@@ -433,7 +426,7 @@ public class TouchHoldDrop : NoteLongBase
     {
         base.StopHoldEffect();
         if (!isMine)
-            border.sprite = skinManager.TouchHold_Border_Miss;
+            border.sprite = _skinManager.TouchHold_Border_Miss;
     }
 
     private void PlayJudgeEffect(JudgeType judgeResult)
@@ -485,7 +478,7 @@ public class TouchHoldDrop : NoteLongBase
             {
                 case JudgeType.LateGood:
                 case JudgeType.FastGood:
-                    judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = skinManager.JudgeText[1];
+                    judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = _skinManager.JudgeText[1];
                     break;
                 case JudgeType.LateGreat:
                 case JudgeType.LateGreat1:
@@ -493,19 +486,19 @@ public class TouchHoldDrop : NoteLongBase
                 case JudgeType.FastGreat2:
                 case JudgeType.FastGreat1:
                 case JudgeType.FastGreat:
-                    judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = skinManager.JudgeText[2];
+                    judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = _skinManager.JudgeText[2];
                     break;
                 case JudgeType.LatePerfect2:
                 case JudgeType.FastPerfect2:
                 case JudgeType.LatePerfect1:
                 case JudgeType.FastPerfect1:
-                    judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = skinManager.JudgeText[3];
+                    judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = _skinManager.JudgeText[3];
                     break;
                 case JudgeType.Perfect:
-                    judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = skinManager.JudgeText[4];
+                    judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = _skinManager.JudgeText[4];
                     break;
                 case JudgeType.Miss:
-                    judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = skinManager.JudgeText[0];
+                    judgeObj.GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = _skinManager.JudgeText[0];
                     break;
                 default:
                     break;

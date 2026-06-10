@@ -39,14 +39,6 @@ public class PlayManager : MonoBehaviour
 
     private static MajViewSetting _setting = new();
 
-    private DataLoader loader;
-    private TimeProvider timeProvider;
-    private BgManager bgManager;
-    private ScreenRecorder screenRecorder;
-    private ObjectCounter objectCounter;
-    private EffectManager effectManager;
-    private AudioManager audioManager;
-
     private SpriteRenderer bgCover;
     private GameObject canvasButtons;
 
@@ -61,32 +53,25 @@ public class PlayManager : MonoBehaviour
         IsReloading = false;
         _ = new AudioManager();
 
-        loader = _dataLoader!;
-        timeProvider = _timeProvider!;
-        bgManager = _bgManager!;
-        screenRecorder = _screenRecorder!;
-        objectCounter = _objectCounter!;
-        effectManager = _effectManager!;
-        audioManager = _audioManager!;
         bgCover = GameObject.Find("BackgroundCover").GetComponent<SpriteRenderer>();
         canvasButtons = GameObject.Find("CanvasButtons");
 
         new Thread(() =>
         {
-            while (true) audioManager.OnUpdate();
+            while (true) _audioManager.OnUpdate();
         }).Start();
-        
+
         _state = CheckIsLoaded() ? ViewStatus.Loaded : ViewStatus.Idle;
     }
 
-    private bool CheckIsLoaded() => audioManager.IsTrackLoaded &&
-                                    bgManager.IsBgLoaded &&
-                                    bgManager.IsVideoLoaded;
+    private bool CheckIsLoaded() => _audioManager.IsTrackLoaded &&
+                                    _bgManager.IsBgLoaded &&
+                                    _bgManager.IsVideoLoaded;
 
     public void Setting(MajViewSetting setting, MajVolumeSetting volumeSetting)
     {
         _setting = setting;
-        audioManager.Setting(setting.GlobalAudioOffset, volumeSetting);
+        _audioManager.Setting(setting.GlobalAudioOffset, volumeSetting);
     }
 
     public async UniTask LoadAsync(string audioPath, string bgPath, string? pvPath)
@@ -100,13 +85,13 @@ public class PlayManager : MonoBehaviour
             await UniTask.SwitchToMainThread();
 
             //audio
-            audioManager.LoadTrack(audioPath);
+            _audioManager.LoadTrack(audioPath);
 
             //bg
             if (File.Exists(bgPath))
             {
                 BgManager.hasBg = true;
-                bgManager.LoadBG(bgPath);
+                _bgManager.LoadBG(bgPath);
             }
             else
             {
@@ -117,7 +102,7 @@ public class PlayManager : MonoBehaviour
             if (pvPath is not null && File.Exists(pvPath))
             {
                 BgManager.hasVideo = true;
-                bgManager.LoadVideo(pvPath);
+                _bgManager.LoadVideo(pvPath);
             }
             else
             {
@@ -153,20 +138,20 @@ public class PlayManager : MonoBehaviour
             //chart
             _chart = await SimaiParser.ParseChartAsync(level, designer, fumen);
 
-            loader.noteSpeed = (float)(107.25 / (71.4184491 * Mathf.Pow(_setting.TapSpeed + 0.9975f, -0.985558604f)));
-            loader.touchSpeed = _setting.TouchSpeed;
-            loader.smoothSlideAnime = _setting.SmoothSlideAnime;
+            _dataLoader.noteSpeed = (float)(107.25 / (71.4184491 * Mathf.Pow(_setting.TapSpeed + 0.9975f, -0.985558604f)));
+            _dataLoader.touchSpeed = _setting.TouchSpeed;
+            _dataLoader.smoothSlideAnime = _setting.SmoothSlideAnime;
             var ignoreOffset = startAt - offset;
             //UI
-            objectCounter.StartOutput(_setting.ComboStatusType, _setting.UIType);
-            effectManager.SetDisplayMode(_setting.JudgeDisplayMode);
+            _objectCounter.StartOutput(_setting.ComboStatusType, _setting.UIType);
+            _effectManager.SetDisplayMode(_setting.JudgeDisplayMode);
             //simulate
-            _inputManager!.Mode = _setting.AutoMode;
-            _inputManager!.ButtonFirst = _setting.ButtonFirst;
+            _inputManager.Mode = _setting.AutoMode;
+            _inputManager.ButtonFirst = _setting.ButtonFirst;
             //bg
             bgCover.color = new Color(0f, 0f, 0f, _setting.BackgroundDim);
-            bgManager.ShowBG();
-            bgManager.ShowVideo();
+            _bgManager.ShowBG();
+            _bgManager.ShowVideo();
             //sfx
             var clockCount = 0;
             if (playmode != PlaybackMode.Normal)
@@ -174,28 +159,28 @@ public class PlayManager : MonoBehaviour
                 var clockCommand = commands.FirstOrDefault(c => c.Prefix == "clock_count");
                 if (clockCommand != default) int.TryParse(clockCommand.Value, out clockCount);
             }
-            audioManager.GenerateAnswerSFX(_chart, ignoreOffset, clockCount);
+            _audioManager.GenerateAnswerSFX(_chart, ignoreOffset, clockCount);
 
             switch (playmode)
             {
                 case PlaybackMode.Normal:
-                    await loader.Load(_chart,
+                    await _dataLoader.Load(_chart,
                     ignoreOffset, title, artist, difficulty, _setting.LegacySlideLayer);
 
-                    _allPerfectManager!.enabled = false;
-                    timeProvider.SetStartTime(startAt, offset, speed, playmode);
-                    audioManager.PlayTrack();
+                    _allPerfectManager.enabled = false;
+                    _timeProvider.SetStartTime(startAt, offset, speed, playmode);
+                    _audioManager.PlayTrack();
                     break;
                 case PlaybackMode.IncludeOp:
-                    await loader.Load(_chart,
+                    await _dataLoader.Load(_chart,
                     ignoreOffset, title, artist, difficulty, _setting.LegacySlideLayer);
 
-                    bgManager.PlaySongDetail();
-                    AudioManager.noteSfxPlaybackRequests[AudioManager.TRACK_START] = true; //track_start
+                    _bgManager.PlaySongDetail();
+                    _audioManager.noteSfxPlaybackRequests[AudioManager.TRACK_START] = true; //track_start
 
-                    _allPerfectManager!.enabled = true;
-                    timeProvider.SetStartTime(startAt, offset, speed, playmode);
-                    audioManager.PlayTrack();
+                    _allPerfectManager.enabled = true;
+                    _timeProvider.SetStartTime(startAt, offset, speed, playmode);
+                    _audioManager.PlayTrack();
                     break;
                 case PlaybackMode.Record:
                     canvasButtons.SetActive(false);
@@ -204,19 +189,19 @@ public class PlayManager : MonoBehaviour
                         throw new InvalidPathException($"maidata path is required");
                     }
 
-                    await loader.Load(_chart,
+                    await _dataLoader.Load(_chart,
                     ignoreOffset, title, artist, difficulty, _setting.LegacySlideLayer);
 
-                    bgManager.PlaySongDetail();
+                    _bgManager.PlaySongDetail();
 
-                    _allPerfectManager!.enabled = true;
+                    _allPerfectManager.enabled = true;
                     _state = ViewStatus.Playing;
-                    screenRecorder.StartRecording(maidataPath,
+                    _screenRecorder.StartRecording(maidataPath,
                         _setting.OutputFps,
                         _setting.ResizeBg,
                         () =>
                         {
-                            timeProvider.SetStartTime(startAt, offset, speed, playmode, _setting.OutputFps);
+                            _timeProvider.SetStartTime(startAt, offset, speed, playmode, _setting.OutputFps);
                         }).ContinueWith(() =>
                     {
                         canvasButtons.SetActive(true);
@@ -254,12 +239,12 @@ public class PlayManager : MonoBehaviour
         {
             await UniTask.SwitchToMainThread();
 
-            timeProvider.Resume(speed);
+            _timeProvider.Resume(speed);
 
-            bgManager.ContinueVideo();
+            _bgManager.ContinueVideo();
 
-            audioManager.PlayTrack();
-            audioManager.ResumeTouchHoldSound();
+            _audioManager.PlayTrack();
+            _audioManager.ResumeTouchHoldSound();
 
             _state = ViewStatus.Playing;
         }
@@ -281,12 +266,12 @@ public class PlayManager : MonoBehaviour
         {
             await UniTask.SwitchToMainThread();
 
-            timeProvider.Pause();
+            _timeProvider.Pause();
 
-            bgManager.PauseVideo();
+            _bgManager.PauseVideo();
 
-            audioManager.PauseTrack();
-            audioManager.PauseTouchHoldSound();
+            _audioManager.PauseTrack();
+            _audioManager.PauseTouchHoldSound();
 
             _state = ViewStatus.Paused;
         }
@@ -308,7 +293,7 @@ public class PlayManager : MonoBehaviour
         {
             await UniTask.SwitchToMainThread();
 
-            screenRecorder.StopRecording();
+            _screenRecorder.StopRecording();
             //if not so, the last frame will be like after ResetAllManagers
             await UniTask.Yield();
 
@@ -327,18 +312,18 @@ public class PlayManager : MonoBehaviour
 
     private void ResetAllManagers()
     {
-        _screenRecorder!.ResetState();
-        _objectCounter!.ResetState();
-        UniTask.WhenAll(_noteManager!.ResetState());
-        _multTouchHandler!.ResetState();
-        _timeProvider!.ResetState();
-        _audioManager!.ResetState();
-        _screenRecorder!.ResetState();
-        _bgManager!.ResetState();
-        _effectManager!.ResetState();
-        _inputManager!.ResetState();
-        _allPerfectManager!.ResetState();
-        _dataLoader!.ResetState();
+        _screenRecorder.ResetState();
+        _objectCounter.ResetState();
+        UniTask.WhenAll(_noteManager.ResetState());
+        _multTouchHandler.ResetState();
+        _timeProvider.ResetState();
+        _audioManager.ResetState();
+        _screenRecorder.ResetState();
+        _bgManager.ResetState();
+        _effectManager.ResetState();
+        _inputManager.ResetState();
+        _allPerfectManager.ResetState();
+        _dataLoader.ResetState();
 
         _state = CheckIsLoaded() ? ViewStatus.Loaded : ViewStatus.Idle;
         bgCover.color = new Color(0f, 0f, 0f, 0f);
@@ -346,6 +331,6 @@ public class PlayManager : MonoBehaviour
 
     private void OnDestroy()
     {
-        audioManager.OnDestroy();
+        _audioManager.OnDestroy();
     }
 }

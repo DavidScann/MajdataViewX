@@ -9,13 +9,6 @@ using UnityEngine;
 
 public class NoteBase : MonoBehaviour
 {
-    protected TimeProvider timeProvider;
-    protected ObjectCounter objectCounter;
-    protected NoteManager noteManager;
-    protected InputManager inputManager;
-    protected SkinManager skinManager;
-    protected AudioManager audioManager;
-
     public float time;
     public int startPosition;
     public SensorType sensor;
@@ -34,7 +27,6 @@ public class NoteBase : MonoBehaviour
     protected Guid guid = Guid.NewGuid();
     protected JudgeType judgeResult;
     protected bool isJudged = false;
-    private JudgeType _judgeResult;
 
     protected Vector3 getPositionFromDistance(float distance) => getPositionFromDistance(distance, startPosition);
     protected Vector3 getPositionFromDistance(float distance, int position)
@@ -56,7 +48,7 @@ public class NoteLongBase : NoteBase
     public GameObject holdEffect;
     protected Material material;
 
-    protected float GetRemainingTime() => MathF.Max(LastFor - (timeProvider.NoteTime - time), 0);
+    protected float GetRemainingTime() => MathF.Max(LastFor - (MajCtx._timeProvider.NoteTime - time), 0);
 
     protected virtual void PlayHoldEffect()
     {

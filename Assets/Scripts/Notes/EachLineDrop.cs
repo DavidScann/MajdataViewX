@@ -10,9 +10,6 @@ using static MajCtx;
 
 public class EachLineDrop : MonoBehaviour
 {
-    //managers
-    private TimeProvider timeProvider;
-
     //init args
     public float time;
     public int startPosition;
@@ -27,22 +24,20 @@ public class EachLineDrop : MonoBehaviour
     // Start is called before the first frame update
     private void Start()
     {
-        timeProvider = _timeProvider!;
-
         spriteRenderer = GetComponent<SpriteRenderer>();
-        spriteRenderer.sprite = _skinManager!.EachLine[curvLength - 1];
+        spriteRenderer.sprite = _skinManager.EachLine[curvLength - 1];
         spriteRenderer.forceRenderingOff = true;
     }
 
     // Update is called once per frame
     private void FixedUpdate()
     {
-        var timing = timeProvider.NoteTime - time;
+        var timing = _timeProvider.NoteTime - time;
         if (timing > 0) Destroy(gameObject);
         var distance = timing * speed + 4.8f;
         var destScale = distance * 0.4f + 0.51f;
 
-        var fakeTiming = timeProvider.FakeNoteTime - timeProvider.GetPositionAtTime(time);
+        var fakeTiming = _timeProvider.FakeNoteTime - _timeProvider.GetPositionAtTime(time);
         var fakeDistance = fakeTiming * speed + 4.8f;
         var fakeDestScale = fakeDistance * 0.4f + 0.51f;
 

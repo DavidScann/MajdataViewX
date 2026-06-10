@@ -12,7 +12,7 @@ public class EffectManager : MonoBehaviour
 {
     public static bool showFL;
     public static bool showLevel;
-    
+
     private readonly Animator[] judgeAnimators = new Animator[8];
     private readonly GameObject[] judgeEffects = new GameObject[8];
     private readonly Animator[] tapAnimators = new Animator[8];
@@ -24,8 +24,6 @@ public class EffectManager : MonoBehaviour
     private readonly Animator[] fastLateAnims = new Animator[8];
     private readonly GameObject[] fastLateEffects = new GameObject[8];
     Sprite[] judgeText;
-
-    private SkinManager skinManager;
 
     private void Awake()
     {
@@ -52,9 +50,9 @@ public class EffectManager : MonoBehaviour
             goodEffects[i] = goodEffectParent.transform.GetChild(i).gameObject;
             greatEffects[i] = greatEffectParent.transform.GetChild(i).gameObject;
             tapEffects[i] = tapEffectParent.transform.GetChild(i).gameObject;
-            
+
             tapAnimators[i] = tapEffects[i].GetComponent<Animator>();
-            
+
 
             goodEffects[i].SetActive(false);
             greatEffects[i].SetActive(false);
@@ -62,15 +60,14 @@ public class EffectManager : MonoBehaviour
         }
 
         //Load Skin
-        skinManager = _skinManager!;
-        judgeText = skinManager.JudgeText;
+        judgeText = _skinManager.JudgeText;
 
         foreach (var judgeEffect in judgeEffects)
         {
             judgeEffect.transform.GetChild(0).GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite =
-                skinManager.JudgeText[0];
+                _skinManager.JudgeText[0];
             judgeEffect.transform.GetChild(0).GetChild(1).gameObject.GetComponent<SpriteRenderer>().sprite =
-                skinManager.JudgeText_Break;
+                _skinManager.JudgeText_Break;
         }
     }
 
@@ -198,10 +195,10 @@ public class EffectManager : MonoBehaviour
 
         fastLateEffects[pos].SetActive(true);
         var isFast = (int)judge > 7;
-        if(isFast)
-             fastLateEffects[pos].transform.GetChild(0).GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = skinManager.FastText;
+        if (isFast)
+            fastLateEffects[pos].transform.GetChild(0).GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = _skinManager.FastText;
         else
-            fastLateEffects[pos].transform.GetChild(0).GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = skinManager.LateText;
+            fastLateEffects[pos].transform.GetChild(0).GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = _skinManager.LateText;
         fastLateAnims[pos].SetTrigger("perfect");
     }
 
