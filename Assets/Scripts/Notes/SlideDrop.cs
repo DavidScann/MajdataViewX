@@ -751,7 +751,7 @@ public class SlideDrop : NoteLongBase, ICanShine
             }
 
             // 只有组内最后一个Slide完成 才会显示判定条并增加总数
-            _objectCounter.ReportResult(SimaiNoteType.Slide, judgeResult, isBreak);
+            _objectCounter.ReportResult(SimaiNoteType.Slide, (JudgeGrade)judgeResult, isBreak);
             if (isBreak && judgeResult == JudgeType.Perfect)
                 slideOK.GetComponent<Animator>().runtimeAnimatorController = _skinManager.Shine_JudgeBreak;
             if (EffectManager.showLevel)

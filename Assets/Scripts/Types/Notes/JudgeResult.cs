@@ -1,0 +1,13 @@
+public readonly ref struct JudgeResult
+{
+    public JudgeGrade Grade { get; init; }
+    public bool IsBreak { get; init; }
+    public bool IsEX { get; init; }
+    public bool IsMine { get; init; }
+    public bool IsFast => Diff < 0;
+    public bool IsMissOrTooFast => Grade is JudgeGrade.Miss or JudgeGrade.TooFast;
+    /// <summary>
+    /// in milliseconds , less than zero is "Fast"
+    /// </summary>
+    public float Diff { get; init; }
+}

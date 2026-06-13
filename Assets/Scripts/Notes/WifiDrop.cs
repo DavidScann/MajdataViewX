@@ -588,7 +588,7 @@ public class WifiDrop : NoteLongBase, ICanShine
                 SetJust();
                 break;
         }
-        _objectCounter.ReportResult(SimaiNoteType.Slide, judgeResult, isBreak);
+        _objectCounter.ReportResult(SimaiNoteType.Slide, (JudgeGrade)judgeResult, isBreak);
         if (isBreak && judgeResult == JudgeType.Perfect)
             slideOK.GetComponent<Animator>().runtimeAnimatorController = _skinManager.Shine_JudgeBreak;
         if (!EffectManager.showLevel) slideOK.GetComponent<SpriteRenderer>().sprite =

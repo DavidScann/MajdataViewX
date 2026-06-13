@@ -117,7 +117,7 @@ public class TouchDrop : NoteBase
     {
         if (arg.Type != sensor)
             return;
-        if (isJudged || !_noteManager.CanJudge(gameObject, sensor))
+        if (isJudged || !_noteJudgeManager.CanJudge(gameObject, sensor))
             return;
         if (_inputManager.Mode is AutoPlayMode.Enable or AutoPlayMode.Random)
             return;
@@ -319,11 +319,11 @@ public class TouchDrop : NoteBase
     {
         if (PlayManager.IsReloading) return;
         _multTouchHandler.CancelTouch(this);
-        _noteManager.NextTouch(sensor);
+        _noteJudgeManager.NextTouch(sensor);
         PlayJudgeEffect();
         if (GroupInfo is not null && judgeResult != JudgeType.Miss)
             GroupInfo.JudgeResult = judgeResult;
-        _objectCounter.ReportResult(SimaiNoteType.Touch, judgeResult, isBreak);
+        _objectCounter.ReportResult(SimaiNoteType.Touch, (JudgeGrade)judgeResult, isBreak);
 
         if (isFirework && judgeResult != JudgeType.Miss)
         {

@@ -22,6 +22,8 @@ using static MajCtx;
 
 public class AudioManager
 {
+    public const int SFX_COUNT = 16;
+
     [CanBeNull] private AudioSample TrackSample;
     [CanBeNull] private float[] TrackSampleData;
     private float TrackSampleVolume;
@@ -31,15 +33,16 @@ public class AudioManager
     List<AnswerTimingPoint> answerTimingPoints = new();
     private readonly object answerSfxLock = new();
     //note SFX
-    public bool[] noteSfxPlaybackRequests = new bool[16];
-    List<AudioSample> NoteSfxs = new(16);
+    public NativeArray<bool> noteSfxPlaybackRequests = new(SFX_COUNT, Allocator.Persistent);
+    public unsafe bool* SfxRequestsPtr => (bool*)noteSfxPlaybackRequests.GetUnsafePtr();
+    List<AudioSample> NoteSfxs = new(SFX_COUNT);
 
     //SFX for recording
-    private List<float[]> noteSfxSamplesData = new(16);
+    private List<float[]> noteSfxSamplesData = new(SFX_COUNT);
     private float[] recordingBuffer;
     private float recordingInitialAudioTime;
     private float recordingSpeed = 1f;
-    private int[] sfxPlayPointers = new int[16]; //-1 is not playing
+    private int[] sfxPlayPointers = new int[SFX_COUNT]; //-1 is not playing
 
     public double GlobalAudioOffset { get; private set; }
 
@@ -266,6 +269,7 @@ public class AudioManager
 
     public void OnDestroy()
     {
+        noteSfxPlaybackRequests.Dispose();
         Bass.Stop();
         Bass.Free();
     }

@@ -314,13 +314,14 @@ public class PlayManager : MonoBehaviour
     {
         _screenRecorder.ResetState();
         _objectCounter.ResetState();
-        UniTask.WhenAll(_noteManager.ResetState());
+        UniTask.WhenAll(_noteJudgeManager.ResetState());
+        _noteManager.ResetState();
         _multTouchHandler.ResetState();
         _timeProvider.ResetState();
         _audioManager.ResetState();
         _screenRecorder.ResetState();
         _bgManager.ResetState();
-        _effectManager.ResetState();
+        //_effectManager.ResetState();
         _inputManager.ResetState();
         _allPerfectManager.ResetState();
         _dataLoader.ResetState();

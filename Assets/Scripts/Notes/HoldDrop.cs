@@ -102,7 +102,7 @@ public class HoldDrop : NoteLongBase
         {
             judgeResult = JudgeType.Perfect;
             isJudged = true;
-            _noteManager.NextNote(startPosition);
+            _noteJudgeManager.NextNote(startPosition);
         }
         else if (remainingTime == 0 && isJudged) // Hold完成后Destroy
         {
@@ -115,7 +115,7 @@ public class HoldDrop : NoteLongBase
             {
                 case AutoPlayMode.Enable:
                     if (!isJudged)
-                        _noteManager.NextNote(startPosition);
+                        _noteJudgeManager.NextNote(startPosition);
 
                     if (isMine)
                         judgeResult = JudgeType.Miss;
@@ -134,7 +134,7 @@ public class HoldDrop : NoteLongBase
                 case AutoPlayMode.Random:
                     if (!isJudged)
                     {
-                        _noteManager.NextNote(startPosition);
+                        _noteJudgeManager.NextNote(startPosition);
                         judgeResult = (JudgeType)Random.Range(1, 14);
                         if (isMine)
                         {
@@ -189,14 +189,14 @@ public class HoldDrop : NoteLongBase
             judgeDiff = 150;
             judgeResult = JudgeType.Miss;
             isJudged = true;
-            _noteManager.NextNote(startPosition);
+            _noteJudgeManager.NextNote(startPosition);
         }
     }
     void Check(object sender, InputEventArgs arg)
     {
         if (arg.Type != sensor)
             return;
-        if (isJudged || !_noteManager.CanJudge(gameObject, startPosition))
+        if (isJudged || !_noteJudgeManager.CanJudge(gameObject, startPosition))
             return;
         if (_inputManager.Mode is AutoPlayMode.Enable or AutoPlayMode.Random)
             return;
@@ -211,7 +211,7 @@ public class HoldDrop : NoteLongBase
             if (isJudged)
             {
                 _inputManager.UnbindArea(Check, sensor);
-                _noteManager.NextNote(startPosition);
+                _noteJudgeManager.NextNote(startPosition);
             }
         }
     }
@@ -440,13 +440,13 @@ public class HoldDrop : NoteLongBase
                 result = JudgeType.Perfect;
         }
 
-        _effectManager.PlayEffect(startPosition, isBreak, result);
-        _effectManager.PlayFastLate(startPosition, result);
+        _effectManager.PlayEffect(startPosition, isBreak, (JudgeGrade)result);
+        _effectManager.PlayFastLate(startPosition, (JudgeGrade)result);
         print($"Hold: {MathF.Round(percent * 100, 2)}%\nTotal Len : {MathF.Round(realityHT * 1000, 2)}ms");
 
-        _objectCounter.ReportResult(SimaiNoteType.Hold, result, isBreak);
+        _objectCounter.ReportResult(SimaiNoteType.Hold, (JudgeGrade)result, isBreak);
         if (!isJudged)
-            _noteManager.NextNote(startPosition);
+            _noteJudgeManager.NextNote(startPosition);
 
         _inputManager.SetAreaOff(sensor, guid);
         _inputManager.UnbindArea(Check, sensor);

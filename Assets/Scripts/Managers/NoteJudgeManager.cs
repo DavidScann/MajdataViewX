@@ -10,7 +10,7 @@ using static MajCtx;
 
 #endregion
 
-public class NoteManager : MonoBehaviour
+public class NoteJudgeManager : MonoBehaviour
 {
     private Dictionary<GameObject, int> noteOrder = new();
     private Dictionary<int, int> noteIndex = new();
@@ -20,7 +20,7 @@ public class NoteManager : MonoBehaviour
 
     private void Awake()
     {
-        _noteManager = this;
+        _noteJudgeManager = this;
     }
 
     public void AddNote(NoteBase note, int index)

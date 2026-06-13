@@ -110,7 +110,7 @@ public class TouchHoldDrop : NoteLongBase
 
     void Check(object sender, InputEventArgs arg)
     {
-        if (isJudged || !_noteManager.CanJudge(gameObject, sensor))
+        if (isJudged || !_noteJudgeManager.CanJudge(gameObject, sensor))
             return;
         if (_inputManager.Mode is AutoPlayMode.Enable or AutoPlayMode.Random)
             return;
@@ -124,7 +124,7 @@ public class TouchHoldDrop : NoteLongBase
             if (isJudged)
             {
                 _inputManager.UnbindArea(Check, sensor);
-                _noteManager.NextTouch(sensor);
+                _noteJudgeManager.NextTouch(sensor);
             }
         }
     }
@@ -175,7 +175,7 @@ public class TouchHoldDrop : NoteLongBase
         {
             judgeResult = JudgeType.Perfect;
             isJudged = true;
-            _noteManager.NextTouch(GetSensor());
+            _noteJudgeManager.NextTouch(GetSensor());
         }
         else if (remainingTime == 0 && isJudged)
         {
@@ -189,7 +189,7 @@ public class TouchHoldDrop : NoteLongBase
             {
                 case AutoPlayMode.Enable:
                     if (!isJudged)
-                        _noteManager.NextTouch(GetSensor());
+                        _noteJudgeManager.NextTouch(GetSensor());
 
                     if (isMine)
                         judgeResult = JudgeType.Miss;
@@ -208,7 +208,7 @@ public class TouchHoldDrop : NoteLongBase
                 case AutoPlayMode.Random:
                     if (!isJudged)
                     {
-                        _noteManager.NextTouch(GetSensor());
+                        _noteJudgeManager.NextTouch(GetSensor());
                         if (isMine)
                         {
                             if (judgeResult > JudgeType.Perfect) //Fast
@@ -268,7 +268,7 @@ public class TouchHoldDrop : NoteLongBase
             judgeResult = JudgeType.Miss;
             _inputManager.UnbindSensor(Check, sensor);
             isJudged = true;
-            _noteManager.NextTouch(GetSensor());
+            _noteJudgeManager.NextTouch(GetSensor());
         }
     }
     // Update is called once per frame
@@ -405,14 +405,14 @@ public class TouchHoldDrop : NoteLongBase
         }
 
         print($"TouchHold: {MathF.Round(percent * 100, 2)}%\nTotal Len : {MathF.Round(realityHT * 1000, 2)}ms");
-        _objectCounter.ReportResult(SimaiNoteType.TouchHold, result, isBreak);
+        _objectCounter.ReportResult(SimaiNoteType.TouchHold, (JudgeGrade)result, isBreak);
         if (isFirework && result != JudgeType.Miss)
         {
             fireworkEffect.SetTrigger("Fire");
             firework.transform.position = transform.position;
         }
         if (!isJudged)
-            _noteManager.NextTouch(GetSensor());
+            _noteJudgeManager.NextTouch(GetSensor());
         _inputManager.UnbindSensor(Check, sensor);
         PlayJudgeEffect(result);
     }

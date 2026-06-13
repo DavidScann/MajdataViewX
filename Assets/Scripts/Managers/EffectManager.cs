@@ -2,6 +2,8 @@
 
 #region
 
+using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
 
 using static MajCtx;
@@ -10,17 +12,27 @@ using static MajCtx;
 
 public class EffectManager : MonoBehaviour
 {
+    public const int EFFECT_COUNT = 8;
+
+    private static readonly int PerfectHash = Animator.StringToHash("perfect");
+    private static readonly int GreatHash = Animator.StringToHash("great");
+    private static readonly int BreakHash = Animator.StringToHash("break");
+    private static readonly int BGreatHash = Animator.StringToHash("bGreat");
+    private static readonly int BGoodHash = Animator.StringToHash("bGood");
     public static bool showFL;
     public static bool showLevel;
+
+    public NativeArray<JudgeEffectData> judgeEffectRequests = new(EFFECT_COUNT, Allocator.Persistent);
+    public NativeArray<FastLateData> fastLateRequests = new(EFFECT_COUNT, Allocator.Persistent);
+    public unsafe JudgeEffectData* JudgeEffectRequestsPtr => (JudgeEffectData*)judgeEffectRequests.GetUnsafePtr();
+    public unsafe FastLateData* FastLateRequestsPtr => (FastLateData*)fastLateRequests.GetUnsafePtr();
 
     private readonly Animator[] judgeAnimators = new Animator[8];
     private readonly GameObject[] judgeEffects = new GameObject[8];
     private readonly Animator[] tapAnimators = new Animator[8];
-
     private readonly GameObject[] tapEffects = new GameObject[8];
     private readonly GameObject[] greatEffects = new GameObject[8];
     private readonly GameObject[] goodEffects = new GameObject[8];
-
     private readonly Animator[] fastLateAnims = new Animator[8];
     private readonly GameObject[] fastLateEffects = new GameObject[8];
     Sprite[] judgeText;
@@ -29,7 +41,6 @@ public class EffectManager : MonoBehaviour
     {
         _effectManager = this;
     }
-
 
     private void Start()
     {
@@ -50,16 +61,13 @@ public class EffectManager : MonoBehaviour
             goodEffects[i] = goodEffectParent.transform.GetChild(i).gameObject;
             greatEffects[i] = greatEffectParent.transform.GetChild(i).gameObject;
             tapEffects[i] = tapEffectParent.transform.GetChild(i).gameObject;
-
             tapAnimators[i] = tapEffects[i].GetComponent<Animator>();
-
 
             goodEffects[i].SetActive(false);
             greatEffects[i].SetActive(false);
             tapEffects[i].SetActive(false);
         }
 
-        //Load Skin
         judgeText = _skinManager.JudgeText;
 
         foreach (var judgeEffect in judgeEffects)
@@ -69,6 +77,17 @@ public class EffectManager : MonoBehaviour
             judgeEffect.transform.GetChild(0).GetChild(1).gameObject.GetComponent<SpriteRenderer>().sprite =
                 _skinManager.JudgeText_Break;
         }
+    }
+
+    private void Update()
+    {
+        ProcessEffectRequests();
+    }
+
+    private void OnDestroy()
+    {
+        if (judgeEffectRequests.IsCreated) judgeEffectRequests.Dispose();
+        if (fastLateRequests.IsCreated) fastLateRequests.Dispose();
     }
 
     public void SetDisplayMode(JudgeDisplayMode mode)
@@ -92,114 +111,30 @@ public class EffectManager : MonoBehaviour
                 break;
         }
     }
-    public void PlayEffect(int position, bool isBreak, JudgeType judge = JudgeType.Perfect)
+
+    public void ProcessEffectRequests()
     {
-        var pos = position - 1;
-
-        ResetEffect(pos);
-
-        switch (judge)
+        for (var i = 0; i < judgeEffectRequests.Length; i++)
         {
-            case JudgeType.LateGood:
-            case JudgeType.FastGood:
-                SetJudgeEffect(pos, judgeText[1]);
-
-                if (isBreak)
-                {
-                    tapEffects[pos].SetActive(true);
-                    tapAnimators[pos].speed = 0.9f;
-                    tapAnimators[pos].SetTrigger("bGood");
-                }
-                else
-                {
-                    goodEffects[pos].SetActive(true);
-                }
-                break;
-            case JudgeType.LateGreat:
-            case JudgeType.LateGreat1:
-            case JudgeType.LateGreat2:
-            case JudgeType.FastGreat2:
-            case JudgeType.FastGreat1:
-            case JudgeType.FastGreat:
-                SetJudgeEffect(pos, judgeText[2]);
-
-                if (isBreak)
-                {
-                    tapEffects[pos].SetActive(true);
-                    tapAnimators[pos].speed = 0.9f;
-                    tapAnimators[pos].SetTrigger("bGreat");
-                }
-                else
-                {
-                    greatEffects[pos].SetActive(true);
-                    greatEffects[pos].gameObject.GetComponent<Animator>().SetTrigger("great");
-                }
-                break;
-            case JudgeType.LatePerfect2:
-            case JudgeType.FastPerfect2:
-            case JudgeType.LatePerfect1:
-            case JudgeType.FastPerfect1:
-                SetJudgeEffect(pos, judgeText[3]);
-
-                tapEffects[pos].SetActive(true);
-                if (isBreak)
-                {
-                    tapAnimators[pos].speed = 0.9f;
-                    tapAnimators[pos].SetTrigger("break");
-                }
-                break;
-            case JudgeType.Perfect:
-                SetJudgeEffect(pos, judgeText[4]);
-
-                tapEffects[pos].SetActive(true);
-                if (isBreak)
-                {
-                    tapAnimators[pos].speed = 0.9f;
-                    tapAnimators[pos].SetTrigger("break");
-                }
-                break;
-            default:
-                SetJudgeEffect(pos, judgeText[0]);
-                break;
+            var req = judgeEffectRequests[i];
+            if (req.HasEffect)
+            {
+                ResetEffect(i);
+                PlayJudgeEffect(i, req.JudgeGrade, req.IsBreak);
+            }
         }
 
-        //play judge text anim
-        if (showLevel)
+        for (var i = 0; i < fastLateRequests.Length; i++)
         {
-            if (isBreak && judge == JudgeType.Perfect)
-                judgeAnimators[pos].SetTrigger("break");
-            else
-                judgeAnimators[pos].SetTrigger("perfect");
-        }
-    }
-
-    private void SetJudgeEffect(int pos, Sprite sprite)
-    {
-        if (!showLevel) return;
-
-        judgeEffects[pos].transform.GetChild(0).GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = sprite;
-    }
-
-    public void PlayFastLate(int position, JudgeType judge)
-    {
-        if (!showFL) return;
-
-        var pos = position - 1;
-
-        if (judge is JudgeType.Miss or JudgeType.Perfect)
-        {
-            fastLateEffects[pos].SetActive(false);
-            return;
+            var req = fastLateRequests[i];
+            if (req.HasEffect)
+                PlayFastLateEffect(i, req.JudgeGrade);
         }
 
-
-        fastLateEffects[pos].SetActive(true);
-        var isFast = (int)judge > 7;
-        if (isFast)
-            fastLateEffects[pos].transform.GetChild(0).GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = _skinManager.FastText;
-        else
-            fastLateEffects[pos].transform.GetChild(0).GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = _skinManager.LateText;
-        fastLateAnims[pos].SetTrigger("perfect");
+        for (var i = 0; i < judgeEffectRequests.Length; i++)
+            judgeEffectRequests[i] = default;
+        for (var i = 0; i < fastLateRequests.Length; i++)
+            fastLateRequests[i] = default;
     }
 
     public void ResetEffect(int pos)
@@ -209,7 +144,140 @@ public class EffectManager : MonoBehaviour
         goodEffects[pos].SetActive(false);
     }
 
+    private void PlayJudgeEffect(int pos, JudgeGrade judge, bool isBreak)
+    {
+        switch (judge)
+        {
+            case JudgeGrade.LateGood:
+            case JudgeGrade.FastGood:
+                SetJudgeEffect(pos, judgeText[1]);
+                if (isBreak)
+                {
+                    tapEffects[pos].SetActive(true);
+                    tapAnimators[pos].speed = 0.9f;
+                    tapAnimators[pos].SetTrigger(BGoodHash);
+                }
+                else
+                {
+                    goodEffects[pos].SetActive(true);
+                }
+                break;
+            case JudgeGrade.LateGreat3rd:
+            case JudgeGrade.LateGreat2nd:
+            case JudgeGrade.LateGreat:
+            case JudgeGrade.FastGreat3rd:
+            case JudgeGrade.FastGreat2nd:
+            case JudgeGrade.FastGreat:
+                SetJudgeEffect(pos, judgeText[2]);
+                if (isBreak)
+                {
+                    tapEffects[pos].SetActive(true);
+                    tapAnimators[pos].speed = 0.9f;
+                    tapAnimators[pos].SetTrigger(BGreatHash);
+                }
+                else
+                {
+                    greatEffects[pos].SetActive(true);
+                    greatEffects[pos].gameObject.GetComponent<Animator>().SetTrigger(GreatHash);
+                }
+                break;
+            case JudgeGrade.LatePerfect3rd:
+            case JudgeGrade.LatePerfect2nd:
+            case JudgeGrade.FastPerfect3rd:
+            case JudgeGrade.FastPerfect2nd:
+                SetJudgeEffect(pos, judgeText[3]);
+                tapEffects[pos].SetActive(true);
+                if (isBreak)
+                {
+                    tapAnimators[pos].speed = 0.9f;
+                    tapAnimators[pos].SetTrigger(BreakHash);
+                }
+                break;
+            case JudgeGrade.Perfect:
+                SetJudgeEffect(pos, judgeText[4]);
+                tapEffects[pos].SetActive(true);
+                if (isBreak)
+                {
+                    tapAnimators[pos].speed = 0.9f;
+                    tapAnimators[pos].SetTrigger(BreakHash);
+                }
+                break;
+            default:
+                SetJudgeEffect(pos, judgeText[0]);
+                break;
+        }
+
+        if (showLevel)
+        {
+            if (isBreak && judge == JudgeGrade.Perfect)
+                judgeAnimators[pos].SetTrigger(BreakHash);
+            else
+                judgeAnimators[pos].SetTrigger(PerfectHash);
+        }
+    }
+
+    private void SetJudgeEffect(int pos, Sprite sprite)
+    {
+        if (!showLevel) return;
+        judgeEffects[pos].transform.GetChild(0).GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = sprite;
+    }
+
+    private void PlayFastLateEffect(int pos, JudgeGrade judge)
+    {
+        if (!showFL) return;
+
+        if (judge is JudgeGrade.Miss or JudgeGrade.Perfect)
+        {
+            fastLateEffects[pos].SetActive(false);
+            return;
+        }
+
+        fastLateEffects[pos].SetActive(true);
+        var isFast = (int)judge > 7;
+        if (isFast)
+            fastLateEffects[pos].transform.GetChild(0).GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = _skinManager.FastText;
+        else
+            fastLateEffects[pos].transform.GetChild(0).GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = _skinManager.LateText;
+        fastLateAnims[pos].SetTrigger(PerfectHash);
+    }
+
+    public void PlayEffect(int position, bool isBreak, JudgeGrade judge = JudgeGrade.Perfect)
+    {
+        judgeEffectRequests[position - 1] = new JudgeEffectData
+        {
+            HasEffect = true,
+            JudgeGrade = judge,
+            IsBreak = isBreak,
+        };
+    }
+
+    public void PlayFastLate(int position, JudgeGrade judge)
+    {
+        fastLateRequests[position - 1] = new FastLateData
+        {
+            HasEffect = true,
+            JudgeGrade = judge,
+        };
+    }
+
     public void ResetState()
     {
+        for (var i = 0; i < judgeEffectRequests.Length; i++)
+            judgeEffectRequests[i] = default;
+        for (var i = 0; i < fastLateRequests.Length; i++)
+            fastLateRequests[i] = default;
     }
+}
+
+public struct JudgeEffectData
+{
+    public bool HasEffect;
+    public JudgeGrade JudgeGrade;
+    public bool IsBreak;
+}
+
+public struct FastLateData
+{
+    public bool HasEffect;
+    public JudgeGrade JudgeGrade;
 }

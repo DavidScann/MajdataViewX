@@ -1,10 +1,14 @@
-﻿#region
+﻿#pragma warning disable CS8500 // 这会获取托管类型的地址、获取其大小或声明指向它的指针
+#region
 
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.MemoryMappedFiles;
 using MajSimai;
+using Unity.Burst;
+using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
 
 using static MajCtx;
@@ -21,10 +25,13 @@ public class TimeProvider : MonoBehaviour
     //notes get this value
     public float NoteTime { get; private set; }
     public float FakeNoteTime => GetPositionAtTime(NoteTime);
+    public float CurrentSpeed => IsRecord ? Time.timeScale : speed;
 
+    private NativeArray<BurstTimeData> _timeDataContainer = new(1, Allocator.Persistent); // == Native Reference
+    public unsafe BurstTimeData* TimeDataPtr => (BurstTimeData*)_timeDataContainer.GetUnsafePtr();
 
-    public List<(float time, float sVeloc)> SVList { get; } = new();
-    private List<Func<float, float>> PositionFunctions { get; } = new();
+    private static NativeList<(float time, float sVeloc)> SVList = new(20, Allocator.Persistent);
+    private static NativeArray<(float k, float b)> SVFuncArgs;
 
     private float startRealtime; //the beginning of the program is 0
     private float startAt; //the beginning of the audio is 0
@@ -33,7 +40,6 @@ public class TimeProvider : MonoBehaviour
     //for pause and resume
     private float accumulated;
 
-    public float CurrentSpeed => IsRecord ? Time.timeScale : speed;
 
     private string mmfAudioTimePath => Path.Combine(MajEnv.MajBase, "majdata_time.dat");
     private MemoryMappedFile mmfAudioTime;
@@ -51,7 +57,8 @@ public class TimeProvider : MonoBehaviour
             FileAccess.ReadWrite,
             FileShare.ReadWrite
         );
-
+        if (mmfAudioTimeFileStream.Length < sizeof(float))
+            mmfAudioTimeFileStream.SetLength(sizeof(float));
         mmfAudioTime = MemoryMappedFile.CreateFromFile(
             mmfAudioTimeFileStream,
             null,
@@ -60,11 +67,10 @@ public class TimeProvider : MonoBehaviour
             HandleInheritability.None,
             false
         );
-
         mmvAudioTime = mmfAudioTime.CreateViewAccessor();
     }
 
-    private void Update()
+    private unsafe void Update()
     {
         if (!IsStart) return;
 
@@ -80,25 +86,57 @@ public class TimeProvider : MonoBehaviour
         }
 
         mmvAudioTime.Write(0, AudioTime);
+
+        BurstTimeData* ptr = TimeDataPtr;
+        ptr->IsStart = IsStart;
+        ptr->NoteTime = NoteTime;
+        ptr->CurrentSpeed = CurrentSpeed;
+        ptr->deltaTime = Time.deltaTime;
     }
 
-    public float GetFrame()
-    {
-        return NoteTime * 1000 / 16.6667f;
-    }
-
-    public void LoadSV(ReadOnlySpan<SimaiTimingPoint> commaTimings)
+    public unsafe void LoadSV(ReadOnlySpan<SimaiTimingPoint> commaTimings)
     {
         SVList.Clear();
-        PositionFunctions.Clear();
+        if (SVFuncArgs.IsCreated) SVFuncArgs.Dispose();
         foreach (var timing in commaTimings)
         {
-            if (SVList.Count == 0 || SVList[^1].sVeloc != timing.SVeloc)
+            if (SVList.Length == 0 || SVList[^1].sVeloc != timing.SVeloc)
             {
                 SVList.Add(((float)timing.Timing, timing.SVeloc));
             }
         }
-        if (SVList.Count > 0) CalcSVPos();
+
+        if (SVList.Length == 0)
+        {
+            return;
+        }
+
+        SVFuncArgs = new(SVList.Length + 1, Allocator.Persistent);
+
+        float pos = 0f;
+        float lastTime = 0f;
+        float lastSpeed = 1f;
+
+        SVFuncArgs[0] = (1, 0);
+
+        for (var i = 0; i < SVList.Length; i++)
+        {
+            var (time, sveloc) = SVList[i];
+
+            pos += lastSpeed * (time - lastTime);
+
+            //PositionFunctions.Add((t) => pos + lastSpeed * (t - lastTime));
+            SVFuncArgs[i + 1] = (lastSpeed, pos - lastSpeed * lastTime);
+
+            lastTime = time;
+            lastSpeed = sveloc;
+        }
+
+        BurstTimeData* ptr = TimeDataPtr;
+        ptr->SVListPtr = SVList.GetUnsafeReadOnlyPtr();
+        ptr->SVListLength = SVList.Length;
+        ptr->SVFuncArgsPtr = SVFuncArgs.GetUnsafeReadOnlyPtr();
+        ptr->SVFuncArgsLength = SVFuncArgs.Length;
     }
 
     public void SetStartTime(double _startAt, double _offset, float _speed, PlaybackMode mode, int fps = 60)
@@ -169,6 +207,11 @@ public class TimeProvider : MonoBehaviour
         IsStart = true;
     }
 
+    // for before migrating only
+    public unsafe float GetFrame() => TimeDataPtr->GetFrame();
+    public unsafe float GetPositionAtTime(float t) => TimeDataPtr->GetPositionAtTime(t);
+
+
     public void ResetState()
     {
         IsStart = false;
@@ -184,44 +227,61 @@ public class TimeProvider : MonoBehaviour
         Time.captureFramerate = 0;
     }
 
-    public void CalcSVPos()
-    {
-        PositionFunctions.Clear();
-
-        float pos = 0f;
-        float lastTime = 0f;
-        float lastSpeed = 1f;
-
-        foreach (var (time, sVeloc) in SVList)
-        {
-            pos += lastSpeed * (time - lastTime);
-            pos += lastSpeed * (time - lastTime);
-
-            PositionFunctions.Add((t) => pos + lastSpeed * (t - lastTime));
-
-            lastTime = time;
-            lastSpeed = sVeloc;
-        }
-    }
-    public float GetPositionAtTime(float AudioT)
-    {
-        if (SVList.Count == 0) //无SV修改
-            return AudioT;
-        if (AudioT < SVList[0].time) //在第一个SV修改之前
-            return AudioT;
-        if (AudioT >= SVList[^1].time) //在最后一个SV修改之后
-            return PositionFunctions[SVList.Count](AudioT);
-        for (int i = 0; i < SVList.Count; i++) //在两个SV修改之间
-        {
-            if (AudioT < SVList[i].time)
-                return PositionFunctions[i](AudioT);
-        }
-        return PositionFunctions[SVList.Count](AudioT); //理论上不会到这里
-    }
-
     private void OnDestroy()
     {
         mmvAudioTime?.Dispose();
         mmfAudioTime?.Dispose();
+
+        if (_timeDataContainer.IsCreated) _timeDataContainer.Dispose();
+        if (SVList.IsCreated) SVList.Dispose();
+        if (SVFuncArgs.IsCreated) SVFuncArgs.Dispose();
     }
+}
+
+public struct BurstTimeData
+{
+    public bool IsStart;
+    public float NoteTime;
+    public readonly float FakeNoteTime => GetPositionAtTime(NoteTime);
+    public float CurrentSpeed;
+
+    public float deltaTime;
+
+    // public NativeList<(float time, float sVeloc)> SVList;
+    // public NativeArray<(float k, float b)> SVFuncArgs;
+    public unsafe void* SVListPtr;
+    public int SVListLength;
+    public unsafe void* SVFuncArgsPtr;
+    public int SVFuncArgsLength;
+    public readonly unsafe ReadOnlySpan<(float time, float sVeloc)> SVList => new(SVListPtr, SVListLength);
+    public readonly unsafe ReadOnlySpan<(float k, float b)> SVFuncArgs => new(SVFuncArgsPtr, SVFuncArgsLength);
+
+
+    [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Fast)]
+    public unsafe readonly float GetPositionAtTime(float t)
+    {
+        if (SVList.Length == 0)
+            return t;
+        if (t < SVList[0].time)
+            return t;
+        if (t >= SVList[^1].time)
+            return SVFuncArgs[^1].k * t + SVFuncArgs[^1].b;
+
+        // 二分查找
+        int low = 0;
+        int high = SVList.Length - 1;
+        while (low <= high)
+        {
+            int mid = (low + high) >> 1;
+            if (t < SVList[mid].time)
+            {
+                if (mid == 0 || t >= SVList[mid - 1].time) return SVFuncArgs[mid].k * t + SVFuncArgs[mid].b;
+                high = mid - 1;
+            }
+            else low = mid + 1;
+        }
+        return SVFuncArgs[^1].k * t + SVFuncArgs[^1].k;
+    }
+
+    public readonly float GetFrame() => NoteTime * 1000 / 16.6667f;
 }

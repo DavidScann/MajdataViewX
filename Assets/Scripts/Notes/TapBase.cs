@@ -163,7 +163,7 @@ public class TapBase : NoteBase
     {
         if (arg.Type != sensor)
             return;
-        if (isJudged || !_noteManager.CanJudge(gameObject, startPosition))
+        if (isJudged || !_noteJudgeManager.CanJudge(gameObject, startPosition))
             return;
         if (_inputManager.Mode is AutoPlayMode.Enable or AutoPlayMode.Random)
             return;
@@ -243,10 +243,10 @@ public class TapBase : NoteBase
     protected virtual void OnDestroy()
     {
         if (PlayManager.IsReloading) return;
-        _effectManager.PlayEffect(startPosition, isBreak, judgeResult);
-        _effectManager.PlayFastLate(startPosition, judgeResult);
-        _noteManager.NextNote(startPosition);
-        _objectCounter.ReportResult(SimaiNoteType.Tap, judgeResult, isBreak);
+        _effectManager.PlayEffect(startPosition, isBreak, (JudgeGrade)judgeResult);
+        _effectManager.PlayFastLate(startPosition, (JudgeGrade)judgeResult);
+        _noteJudgeManager.NextNote(startPosition);
+        _objectCounter.ReportResult(SimaiNoteType.Tap, (JudgeGrade)judgeResult, isBreak);
         _inputManager.UnbindArea(Check, sensor);
     }
 }
