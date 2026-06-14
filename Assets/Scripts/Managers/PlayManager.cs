@@ -58,7 +58,11 @@ public class PlayManager : MonoBehaviour
 
         new Thread(() =>
         {
-            while (true) _audioManager.OnUpdate();
+            while (true)
+            {
+                _audioManager.OnUpdate();
+                Thread.Sleep(1);
+            }
         }).Start();
 
         _state = CheckIsLoaded() ? ViewStatus.Loaded : ViewStatus.Idle;

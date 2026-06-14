@@ -1,6 +1,7 @@
 ﻿#region
 
 using System.IO;
+using Unity.Mathematics;
 using UnityEngine;
 
 using static MajCtx;
@@ -89,6 +90,11 @@ public class SkinManager : MonoBehaviour
     public Color Ex_Star;
     public Color Ex_Each;
     public Color Ex_Break;
+
+    public float4 Ex_f4;
+    public float4 Ex_Star_f4;
+    public float4 Ex_Each_f4;
+    public float4 Ex_Break_f4;
 
     public Sprite Line;
     public Sprite Line_Each;
@@ -307,5 +313,10 @@ public class SkinManager : MonoBehaviour
         Ex_Star = new Color32(172, 251, 255, 255);
         Ex_Each = new Color32(255, 254, 119, 255);
         Ex_Break = Ex_Each;
+
+        Ex_f4 = new float4(255, 172, 255, 255);
+        Ex_Star_f4 = new float4(172, 251, 255, 255);
+        Ex_Each_f4 = new float4(255, 254, 119, 255);
+        Ex_Break_f4 = Ex_Each_f4;
     }
 }

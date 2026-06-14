@@ -1,96 +1,83 @@
+using System.Threading.Tasks;
+using Unity.Mathematics;
 using UnityEngine;
 using static MajCtx;
+using static NoteSkinManager;
 
 public partial class NoteManager
 {
     public void SyncTap()
     {
+        _noteRenderData.Clear();
         for (int i = 0; i < taps.Length; i++)
         {
             var tap = taps[i];
 
-            if (tap.show)
+            if (tap.show) //sort by render order
             {
-                if (tap.ViewIndex < 0)
+                LoadTapSkin(tap,
+                    out var tapSprite,
+                    out var lineSprite,
+                    out var exSprite,
+                    out var exColor);
+                _noteRenderData.Add(new()     //tapLine
                 {
-                    tap.ViewIndex = _pool.Get(Notes_LAYER, tap.sort);
-                    tap.tapLine.ViewIndex = _pool.Get(HanteiLine_LAYER, 0);
-                    if (tap.isEx) tap.tapEx.ViewIndex = _pool.Get(Notes_LAYER, tap.sort);
-                    var view = _pool.GetView(tap.ViewIndex);
-                    var lineView = _pool.GetView(tap.tapLine.ViewIndex);
-                    var exView = _pool.GetView(tap.tapEx.ViewIndex);
-                    //no matter if exView is null, check later
-                    LoadTapSkin(tap, view, lineView, exView);
-                }
-
-                UpdateTapView(tap);
+                    pos = tap.tapLine.pos,
+                    angRad = Mathf.Deg2Rad * tap.tapLine.ang,
+                    scale = tap.tapLine.scale,
+                    spriteId = lineSprite,
+                    color = new float4(1, 1, 1, 1),
+                    brightness = 1f
+                });
+                if (tap.isEx) _noteRenderData.Add(new()     //tapEx
+                {
+                    pos = tap.tapEx.pos,
+                    angRad = 0,
+                    scale = tap.tapEx.scale,
+                    spriteId = exSprite,
+                    color = exColor,
+                    brightness = 1f
+                });
+                _noteRenderData.Add(new()     //tap
+                {
+                    pos = tap.pos,
+                    angRad = Mathf.Deg2Rad * tap.ang,
+                    scale = tap.scale,
+                    spriteId = tapSprite,
+                    color = new float4(1, 1, 1, 1),
+                    brightness = tap.brightness
+                });
             }
-            else
-            {
-                _pool.Release(tap.ViewIndex);
-                _pool.Release(tap.tapLine.ViewIndex);
-                _pool.Release(tap.tapEx.ViewIndex);
-                tap.ViewIndex = -1;
-                tap.tapLine.ViewIndex = -1;
-                tap.tapEx.ViewIndex = -1;
-            }
-
-            taps[i] = tap;
         }
     }
 
-    private void UpdateTapView(TapData tap)
+    private void LoadTapSkin(TapData tap,
+        out uint tapSpriteID, out uint lineSpriteID, out uint exSpriteID, out float4 exColor)
     {
-        var view = _pool.GetView(tap.ViewIndex);
-        var lineView = _pool.GetView(tap.tapLine.ViewIndex);
-        var exView = _pool.GetView(tap.tapEx.ViewIndex);
-
-        view.Transform.SetPositionAndRotation(tap.pos, tap.ang);
-        view.Transform.localScale = tap.scale;
-        if (tap.isBreak)
-        {
-            view.SetProperty(NoteView.BrightnessHash, tap.brightness);
-        }
-
-        lineView.Transform.SetPositionAndRotation(tap.tapLine.pos, tap.tapLine.ang);
-        lineView.Transform.localScale = tap.tapLine.scale;
-
-        if (tap.isEx)
-        {
-            exView.Transform.SetPositionAndRotation(tap.tapEx.pos, tap.tapEx.ang);
-            exView.Transform.localScale = tap.tapEx.scale;
-        }
-    }
-
-    private void LoadTapSkin(TapData tap, NoteView view, NoteView lineView, NoteView exView)
-    {
-        lineView.SpriteRenderer.sprite = _skinManager.Line;
-        view.SpriteRenderer.sprite = _skinManager.Tap;
-        if (tap.isEx)
-        {
-            exView.SpriteRenderer.sprite = _skinManager.Tap_Ex;
-            exView.SpriteRenderer.color = _skinManager.Ex;
-        }
+        tapSpriteID = TAP;
+        lineSpriteID = LINE;
+        exSpriteID = TAP_EX;
+        exColor = Ex;
         if (tap.isEach)
         {
-            view.SpriteRenderer.sprite = _skinManager.Tap_Each;
-            lineView.SpriteRenderer.sprite = _skinManager.Line_Each;
-            if (tap.isEx) exView.SpriteRenderer.color = _skinManager.Ex_Each;
+            tapSpriteID = TAP_EACH;
+            lineSpriteID = LINE_EACH;
+            if (tap.isEx) exColor = Ex_Each;
         }
         if (tap.isBreak)
         {
-            view.SpriteRenderer.sprite = _skinManager.Tap_Break;
-            view.SpriteRenderer.material = _skinManager.BreakMaterial;
-            lineView.SpriteRenderer.sprite = _skinManager.Line_Break;
-            if (tap.isEx) exView.SpriteRenderer.color = _skinManager.Ex_Break;
+            tapSpriteID = TAP_BREAK;
+            // view.SpriteRenderer.material = _skinManager.BreakMaterial;
+            lineSpriteID = LINE_BREAK;
+            if (tap.isEx) exColor = Ex_Break;
         }
         if (tap.isMine)
         {
             if (tap.isBreak)
-                view.SpriteRenderer.sprite = _skinManager.Tap_Break_Mine;
+                tapSpriteID = TAP_BREAK_MINE;
             else
-                view.SpriteRenderer.sprite = _skinManager.Tap_Mine;
-            lineView.SpriteRenderer.sprite = _skinManager.Line_Mine;
+                tapSpriteID = TAP_MINE;
+            lineSpriteID = LINE_MINE;
         }
     }
 }

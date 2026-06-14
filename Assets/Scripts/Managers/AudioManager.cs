@@ -33,8 +33,10 @@ public class AudioManager
     List<AnswerTimingPoint> answerTimingPoints = new();
     private readonly object answerSfxLock = new();
     //note SFX
+    //DO NOT TOUCH THIS IN THIS FILE, MAY CAUSE AtomicSafetyHandle Exception
     public NativeArray<bool> noteSfxPlaybackRequests = new(SFX_COUNT, Allocator.Persistent);
     public unsafe bool* SfxRequestsPtr => (bool*)noteSfxPlaybackRequests.GetUnsafePtr();
+    private unsafe bool* _sfxPtr;
     List<AudioSample> NoteSfxs = new(SFX_COUNT);
 
     //SFX for recording
@@ -75,9 +77,10 @@ public class AudioManager
 
     private bool isInited;
 
-    public AudioManager()
+    public unsafe AudioManager()
     {
         _audioManager = this;
+        _sfxPtr = SfxRequestsPtr;
         Bass.Configure(Configuration.UpdatePeriod, 20);
         Bass.Configure(Configuration.PlaybackBufferLength, 40);
         Bass.Init(-1, 44100);
@@ -157,7 +160,7 @@ public class AudioManager
         TrackSampleVolume = v.Track;
     }
 
-    public void UpdateAnswerSfx()
+    public unsafe void UpdateAnswerSfx()
     {
         lock (answerSfxLock)
         {
@@ -172,8 +175,8 @@ public class AudioManager
                 var delta = thisFrameSec - (timing.Timing + TRACK_ANSWER_PLAYBACK_OFFSET_SEC);
                 if (delta > 0)
                 {
-                    if (timing.IsClock) noteSfxPlaybackRequests[ANSWER_CLOCK] = true;
-                    else noteSfxPlaybackRequests[ANSWER] = true;
+                    if (timing.IsClock) _sfxPtr[ANSWER_CLOCK] = true;
+                    else _sfxPtr[ANSWER] = true;
 
                     timing.IsPlayed = true;
                 }
@@ -181,15 +184,15 @@ public class AudioManager
         }
     }
 
-    public void OnUpdate()
+    public unsafe void OnUpdate()
     {
         if (!isInited || _timeProvider.IsRecord) return;
 
         UpdateAnswerSfx();
 
-        for (var i = 0; i < noteSfxPlaybackRequests.Length; i++)
+        for (var i = 0; i < SFX_COUNT; i++)
         {
-            var isRequested = noteSfxPlaybackRequests[i];
+            var isRequested = _sfxPtr[i];
             switch (i)
             {
                 case TAP_PERFECT:
@@ -260,10 +263,10 @@ public class AudioManager
             }
         }
         //clear
-        for (var i = 0; i < noteSfxPlaybackRequests.Length; i++)
+        for (var i = 0; i < SFX_COUNT; i++)
         {
             if (i != TOUCHHOLD) //manual control
-                noteSfxPlaybackRequests[i] = false;
+                _sfxPtr[i] = false;
         }
     }
 
@@ -319,17 +322,17 @@ public class AudioManager
         TrackSample?.Stop();
     }
 
-    public void ResetState()
+    public unsafe void ResetState()
     {
         StopTrack();
         //StopTouchHoldSound();
-        noteSfxPlaybackRequests[TOUCHHOLD] = false;
+        _sfxPtr[TOUCHHOLD] = false;
         touchholdRiserPlayingTask.Clear();
 
         lock (answerSfxLock)
             answerTimingPoints.Clear();
-        for (var i = 0; i < noteSfxPlaybackRequests.Length; i++)
-            noteSfxPlaybackRequests[i] = false;
+        for (var i = 0; i < SFX_COUNT; i++)
+            _sfxPtr[i] = false;
     }
 
 
@@ -400,13 +403,13 @@ public class AudioManager
         }
     }
 
-    public void PlayTapSound(in JudgeType judgeType, bool isEx, bool isBreak)
+    public unsafe void PlayTapSound(in JudgeType judgeType, bool isEx, bool isBreak)
     {
         if (isBreak)
         {
             if (isEx)
             {
-                noteSfxPlaybackRequests[TAP_EX] = true;
+                _sfxPtr[TAP_EX] = true;
             }
 
             switch (judgeType)
@@ -423,11 +426,11 @@ public class AudioManager
                 case JudgeType.FastPerfect2:
                 case JudgeType.LatePerfect1:
                 case JudgeType.FastPerfect1:
-                    noteSfxPlaybackRequests[BREAK_JUDGE] = true;
+                    _sfxPtr[BREAK_JUDGE] = true;
                     break;
                 case JudgeType.Perfect:
-                    noteSfxPlaybackRequests[BREAK_JUDGE] = true;
-                    noteSfxPlaybackRequests[BREAK_SFX] = true;
+                    _sfxPtr[BREAK_JUDGE] = true;
+                    _sfxPtr[BREAK_SFX] = true;
                     break;
                 case JudgeType.Miss:
                 default:
@@ -438,7 +441,7 @@ public class AudioManager
 
         if (isEx)
         {
-            noteSfxPlaybackRequests[TAP_EX] = true;
+            _sfxPtr[TAP_EX] = true;
             return;
         }
 
@@ -446,7 +449,7 @@ public class AudioManager
         {
             case JudgeType.LateGood:
             case JudgeType.FastGood:
-                noteSfxPlaybackRequests[TAP_GOOD] = true;
+                _sfxPtr[TAP_GOOD] = true;
                 break;
             case JudgeType.LateGreat:
             case JudgeType.LateGreat1:
@@ -454,14 +457,14 @@ public class AudioManager
             case JudgeType.FastGreat2:
             case JudgeType.FastGreat1:
             case JudgeType.FastGreat:
-                noteSfxPlaybackRequests[TAP_GREAT] = true;
+                _sfxPtr[TAP_GREAT] = true;
                 break;
             case JudgeType.LatePerfect2:
             case JudgeType.FastPerfect2:
             case JudgeType.LatePerfect1:
             case JudgeType.FastPerfect1:
             case JudgeType.Perfect:
-                noteSfxPlaybackRequests[TAP_PERFECT] = true;
+                _sfxPtr[TAP_PERFECT] = true;
                 break;
             case JudgeType.Miss:
             default:
@@ -469,17 +472,17 @@ public class AudioManager
         }
     }
 
-    public void PlayTouchSound()
+    public unsafe void PlayTouchSound()
     {
-        noteSfxPlaybackRequests[TOUCH] = true;
+        _sfxPtr[TOUCH] = true;
     }
-    public void PlayHanabiSound()
+    public unsafe void PlayHanabiSound()
     {
-        noteSfxPlaybackRequests[FIREWORK] = true;
+        _sfxPtr[FIREWORK] = true;
     }
-    public void PlayTouchHoldSound(Guid guid)
+    public unsafe void PlayTouchHoldSound(Guid guid)
     {
-        noteSfxPlaybackRequests[TOUCHHOLD] = true;
+        _sfxPtr[TOUCHHOLD] = true;
         if (!touchholdRiserPlayingTask.Contains(guid))
             touchholdRiserPlayingTask.Add(guid);
     }
@@ -494,29 +497,29 @@ public class AudioManager
         if (isTouchholdRiserPlaying)
             NoteSfxs[TOUCHHOLD].Play();
     }
-    public void StopTouchHoldSound(Guid guid)
+    public unsafe void StopTouchHoldSound(Guid guid)
     {
         if (touchholdRiserPlayingTask.Contains(guid))
             touchholdRiserPlayingTask.Remove(guid);
 
         if (touchholdRiserPlayingTask.Count == 0)
-            noteSfxPlaybackRequests[TOUCHHOLD] = false;
+            _sfxPtr[TOUCHHOLD] = false;
     }
-    public void PlaySlideSound(bool isBreak)
+    public unsafe void PlaySlideSound(bool isBreak)
     {
         if (isBreak)
         {
-            noteSfxPlaybackRequests[BREAK_SLIDE] = true;
+            _sfxPtr[BREAK_SLIDE] = true;
         }
         else
         {
-            noteSfxPlaybackRequests[SLIDE] = true;
+            _sfxPtr[SLIDE] = true;
         }
     }
-    public void PlayBreakSlideEndSound()
+    public unsafe void PlayBreakSlideEndSound()
     {
-        noteSfxPlaybackRequests[BREAK_SLIDE_JUDGE] = true;
-        noteSfxPlaybackRequests[BREAK_SFX] = true;
+        _sfxPtr[BREAK_SLIDE_JUDGE] = true;
+        _sfxPtr[BREAK_SFX] = true;
     }
 
 

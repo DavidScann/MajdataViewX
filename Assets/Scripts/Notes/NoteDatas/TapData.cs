@@ -9,8 +9,6 @@ using Unity.Mathematics;
 [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Fast)]
 public struct TapData
 {
-    public int ViewIndex { get; set; }
-
     // args
     public float time;
     public SensorType key;
@@ -40,9 +38,9 @@ public struct TapData
 
     // outs
     public bool show;
-    public float3 pos;
-    public float3 scale;
-    public quaternion ang;
+    public float2 pos;
+    public float scale;
+    public float ang;
     public float brightness;
 
     // state
@@ -54,29 +52,22 @@ public struct TapData
 
     public void Init()
     {
-        ViewIndex = -1;
-
         show = false;
-        pos = float3.zero;
-        scale = float3.zero;
-        ang = quaternion.RotateZ(math.radians(-22.5f + -45f * (int)key));
+        pos = float2.zero;
+        scale = 1f;
+        ang = -22.5f + -45f * (int)key;
+        brightness = 1f;
 
         //tapLine
-        tapLine.ViewIndex = -1;
-
-        tapLine.show = false;
-        tapLine.pos = float3.zero;
-        tapLine.scale = float3.zero;
-        tapLine.ang = quaternion.RotateZ(math.radians(-22.5f + -45f * (int)key));
+        tapLine.pos = float2.zero;
+        tapLine.scale = 0f;
+        tapLine.ang = -22.5f + -45f * (int)key;
         tapLine.sort = sort;
 
         //tapEx
-        tapEx.ViewIndex = -1;
-
-        tapEx.show = isEx;
-        tapEx.pos = float3.zero;
-        tapEx.scale = new float3(1, 1, 1);
-        tapEx.ang = quaternion.RotateZ(math.radians(-22.5f + -45f * (int)key));
+        tapEx.pos = float2.zero;
+        tapEx.scale = 1f;
+        //tapEx.ang = -22.5f + -45f * (int)key;
         tapEx.sort = sort;
     }
 }
@@ -139,12 +130,9 @@ public struct TapUpdateJob : IJobParallelFor
 
         NoteHelper.GetPosFromDistance(clampedDistance, tap.key, out var pos);
         tap.pos = pos;
-        tap.scale = new float3(destScale);
+        tap.scale = destScale;
         if (rawDistance >= 1.225f)
         {
-            tap.tapLine.show = true;
-            tap.tapLine.scale = new float3(lineScale);
-
             if (tap.isBreak)
             {
                 var extra = math.max(math.sin(TimeDataPtr->GetFrame() * 0.17f) * 0.5f, 0f);
@@ -154,10 +142,11 @@ public struct TapUpdateJob : IJobParallelFor
 
         if (tap.isStar && tap.rotateSpeed != 0) // star rotate
         {
-            var deltaRot = quaternion.RotateZ(math.radians(-180f * tap.rotateSpeed * TimeDataPtr->deltaTime));
-            tap.ang = math.mul(tap.ang, deltaRot);
+            var deltaRot = -180f * tap.rotateSpeed * TimeDataPtr->deltaTime;
+            tap.ang += deltaRot;
         }
 
+        tap.tapLine.scale = lineScale;
         if (tap.isEx) //sync ex border
         {
             tap.tapEx.pos = tap.pos;

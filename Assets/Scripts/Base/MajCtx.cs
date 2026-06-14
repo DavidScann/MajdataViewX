@@ -11,7 +11,7 @@ public static class MajCtx
     public static MultTouchHandler _multTouchHandler { get; set; }
     public static NoteJudgeManager _noteJudgeManager { get; set; }
     public static NoteManager _noteManager { get; set; }
-    public static NoteViewPoolManager _noteViewPoolManager { get; set; }
+    public static NoteSkinManager _noteSkinManager { get; set; }
     public static ObjectCounter _objectCounter { get; set; }
     public static PlayManager _playManager { get; set; }
     public static ScreenRecorder _screenRecorder { get; set; }

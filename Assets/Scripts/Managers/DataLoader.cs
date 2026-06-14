@@ -229,10 +229,10 @@ public class DataLoader : MonoBehaviour
         _noteJudgeManager.ResetIndex();
         streamingRunning = true;
 
-        _noteManager.Load(chart);
+
         _noteManager.NoteSpeed = noteSpeed;
         _noteManager.TouchSpeed = touchSpeed;
-
+        _noteManager.Load(chart);
 
         var timings = chart.NoteTimings.ToArray();
         await StreamingCreate(timings, ignoreOffset);

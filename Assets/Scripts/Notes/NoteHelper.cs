@@ -34,20 +34,20 @@ public static class NoteHelper
     public const float DELUXE_HOLD_RELEASE_IGNORE_TIME_SEC = 2 * FRAME_LENGTH_SEC;
 
 
-    private static readonly float3[] _directions = new float3[]
+    private static readonly float2[] _directions = new float2[]
     {
-        new(0.38268343f, 0.92387953f, 0),  // A1
-        new(0.92387953f, 0.38268343f, 0),  // A2
-        new(0.92387953f, -0.38268343f, 0), // A3
-        new(0.38268343f, -0.92387953f, 0), // A4
-        new(-0.38268343f, -0.92387953f, 0),// A5
-        new(-0.92387953f, -0.38268343f, 0),// A6
-        new(-0.92387953f, 0.38268343f, 0), // A7
-        new(-0.38268343f, 0.92387953f, 0), // A8
+        new(0.38268343f, 0.92387953f),  // A1
+        new(0.92387953f, 0.38268343f),  // A2
+        new(0.92387953f, -0.38268343f), // A3
+        new(0.38268343f, -0.92387953f), // A4
+        new(-0.38268343f, -0.92387953f),// A5
+        new(-0.92387953f, -0.38268343f),// A6
+        new(-0.92387953f, 0.38268343f), // A7
+        new(-0.38268343f, 0.92387953f), // A8
     };
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Fast)]
-    public static void GetPosFromDistance(float distance, SensorType key, out float3 result)
+    public static void GetPosFromDistance(float distance, SensorType key, out float2 result)
     {
         int index = (int)key;
         if (index >= 0 && index < 8)
@@ -55,7 +55,7 @@ public static class NoteHelper
             result = _directions[index] * distance;
             return;
         }
-        result = float3.zero;
+        result = float2.zero;
     }
 
 
