@@ -463,18 +463,19 @@ public class NoteSkinManager : MonoBehaviour
             }
 
             float invSize = 1f / atlasSize;
+            float halfTexel = 0.5f * invSize;
             Uvs[index] = new float4(
-                px * invSize,
-                py * invSize,
-                (px + tex.width) * invSize,
-                (py + tex.height) * invSize
+                px * invSize + halfTexel,
+                py * invSize + halfTexel,
+                (px + tex.width) * invSize - halfTexel,
+                (py + tex.height) * invSize - halfTexel
             );
 
             Destroy(tex);
         }
 
         Atlas.SetPixels32(atlasPixels);
-        Atlas.Apply(false, false);
+        Atlas.Apply();
     }
 
     private void OnDestroy()
