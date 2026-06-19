@@ -1,5 +1,7 @@
+using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Linq;
 using MajSimai;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
@@ -11,19 +13,20 @@ using static MajCtx;
 
 public partial class NoteManager : MonoBehaviour
 {
-    NativeList<TapData> taps = new(1024, Allocator.Persistent);
+    //TODO: streaming load and play
+    NativeList<TapData> taps = new(2048, Allocator.Persistent);
 
 
-    GraphicsBuffer _noteRenderBuffer;
-    NativeList<NoteRenderData> _noteRenderData = new(1024, Allocator.Persistent);
-    GraphicsBuffer _noteArgsBuffer;
-    private GraphicsBuffer.IndirectDrawIndexedArgs[] _noteArgs = new GraphicsBuffer.IndirectDrawIndexedArgs[1];
+    NoteRenderGroup _tapLineGroup;
+    NoteRenderGroup _tapGroup;
+
     GraphicsBuffer _noteUvsBuffer;
-
+    Mesh _octagon;
     Mesh _quad;
     Material _mat;
 
     private JobHandle _currentUpdateJob;
+    bool _isJobScheduledThisFrame;
 
     void Awake()
     {
@@ -31,19 +34,12 @@ public partial class NoteManager : MonoBehaviour
     }
     void Start()
     {
+        _octagon = MeshBuilder.CreateOctagonMesh();
         _quad = Resources.GetBuiltinResource<Mesh>("Quad.fbx");
         _mat = new Material(Shader.Find("Custom/NoteIndirect"));
 
-        _noteRenderBuffer = new(
-            GraphicsBuffer.Target.Structured,
-            65536,
-            UnsafeUtility.SizeOf<NoteRenderData>());
-
-        _noteArgsBuffer = new GraphicsBuffer(
-            GraphicsBuffer.Target.IndirectArguments,
-            1,
-            GraphicsBuffer.IndirectDrawIndexedArgs.size
-        );
+        _tapLineGroup = new NoteRenderGroup(_mat, _octagon, 0);
+        _tapGroup = new NoteRenderGroup(_mat, _octagon, 1);
 
         _noteUvsBuffer = new(
             GraphicsBuffer.Target.Structured,
@@ -51,7 +47,6 @@ public partial class NoteManager : MonoBehaviour
             sizeof(float) * 4);
         _noteUvsBuffer.SetData(_noteSkinManager.Uvs, 0, 0, _noteSkinManager.Uvs.Length);
 
-        _mat.SetBuffer("_NoteBuffer", _noteRenderBuffer);
         _mat.SetBuffer("_SpriteRects", _noteUvsBuffer);
         _mat.SetTexture("_MainTex", _noteSkinManager.Atlas);
         _mat.SetFloat("_AtlasSize", 8192);
@@ -59,11 +54,19 @@ public partial class NoteManager : MonoBehaviour
     }
     void Update()
     {
-        if (!_timeProvider.IsStart) return;
         if (taps.Length == 0) return;
+
+        _tapLineGroup.AdvanceWrite();
+        _tapGroup.AdvanceWrite();
+
+        var tapLineRender = _tapLineGroup.LockForWrite();
+        var tapsRender = _tapGroup.LockForWrite();
 
         unsafe
         {
+            _tapLineGroup.ResetCount();
+            _tapGroup.ResetCount();
+
             _currentUpdateJob = new TapUpdateJob
             {
                 AutoPlayMode = _inputManager.Mode,
@@ -74,36 +77,45 @@ public partial class NoteManager : MonoBehaviour
                 ReportRequestsPtr = _objectCounter.ReportRequestsPtr,
                 ReportCountPtr = _objectCounter.ReportCountPtr,
 
-                taps = taps.AsArray()
+                taps = taps.AsArray(),
+
+                tapLinesRender = tapLineRender,
+                tapsRender = tapsRender,
+
+                TapLinesWriteCountPtr = _tapLineGroup.WriteCountPtr,
+                TapWriteCountPtr = _tapGroup.WriteCountPtr,
             }
-            .Schedule(taps.Length, 16);
+            .Schedule(taps.Length, 32);
         }
+        _isJobScheduledThisFrame = true;
     }
+
     void LateUpdate()
     {
-        // 不管有没有先完成掉避免占着
         _currentUpdateJob.Complete();
 
-        //if (!_timeProvider.IsStart) return;
-        if (taps.Length == 0) return;
 
-        SyncTap();
+        if (!_isJobScheduledThisFrame) return;
 
-        _noteRenderBuffer.SetData(_noteRenderData.AsArray(), 0, 0, _noteRenderData.Length);
+        _tapLineGroup.UnlockAndSortWrite();
+        _tapGroup.UnlockAndSortWrite();
 
-        _noteArgs[0].indexCountPerInstance = _quad.GetIndexCount(0);
-        _noteArgs[0].instanceCount = (uint)_noteRenderData.Length;
-        _noteArgsBuffer.SetData(_noteArgs);
+        _tapLineGroup.Render();
+        _tapGroup.Render();
 
-        var rp = new RenderParams(_mat)
-        {
-            worldBounds = new Bounds(Vector3.zero, Vector3.one * 10000)
-        };
+        _tapLineGroup.Swap();
+        _tapGroup.Swap();
 
-        Graphics.RenderMeshIndirect(rp, _quad, _noteArgsBuffer);
+        _isJobScheduledThisFrame = false;
     }
+
     void OnDestroy()
     {
+        _tapLineGroup?.Dispose();
+        _tapGroup?.Dispose();
+
+        _noteUvsBuffer?.Dispose();
+
         if (taps.IsCreated) taps.Dispose();
     }
 
@@ -116,7 +128,7 @@ public partial class NoteManager : MonoBehaviour
     }
 }
 
-public struct NoteRenderData
+public struct NoteRenderData : IComparable<NoteRenderData>
 {
     public float2 pos;
     public float angRad;
@@ -124,4 +136,15 @@ public struct NoteRenderData
     public uint spriteId;   // 贴图UV表索引
     public float4 color;
     public float brightness;
+
+    public uint exSpriteId;
+    public float4 exColor;
+
+    public uint sort;
+
+    public readonly int CompareTo(NoteRenderData other)
+    {
+        // reverse
+        return other.sort.CompareTo(sort);
+    }
 }

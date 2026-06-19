@@ -6,6 +6,9 @@ using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
 
+using static NoteSkinManager;
+
+
 [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Fast)]
 public struct TapData
 {
@@ -43,6 +46,13 @@ public struct TapData
     public float ang;
     public float brightness;
 
+    //sprite
+    public uint tapSprite;
+    public uint lineSprite;
+    public uint exSprite;
+    public float4 exColor;
+
+
     // state
     public bool isJudged;
     public float diff;
@@ -69,6 +79,42 @@ public struct TapData
         tapEx.scale = 1f;
         //tapEx.ang = -22.5f + -45f * (int)key;
         tapEx.sort = sort;
+
+        LoadTapSkin(this,
+            out tapSprite,
+            out lineSprite,
+            out exSprite,
+            out exColor);
+    }
+
+    private readonly void LoadTapSkin(TapData tap,
+        out uint tapSpriteID, out uint lineSpriteID, out uint exSpriteID, out float4 exColor)
+    {
+        tapSpriteID = TAP;
+        lineSpriteID = LINE;
+        exSpriteID = TAP_EX;
+        exColor = Ex;
+        if (tap.isEach)
+        {
+            tapSpriteID = TAP_EACH;
+            lineSpriteID = LINE_EACH;
+            if (tap.isEx) exColor = Ex_Each;
+        }
+        if (tap.isBreak)
+        {
+            tapSpriteID = TAP_BREAK;
+            // view.SpriteRenderer.material = _skinManager.BreakMaterial;
+            lineSpriteID = LINE_BREAK;
+            if (tap.isEx) exColor = Ex_Break;
+        }
+        if (tap.isMine)
+        {
+            if (tap.isBreak)
+                tapSpriteID = TAP_BREAK_MINE;
+            else
+                tapSpriteID = TAP_MINE;
+            lineSpriteID = LINE_MINE;
+        }
     }
 }
 
@@ -99,19 +145,29 @@ public struct TapUpdateJob : IJobParallelFor
     [NativeDisableUnsafePtrRestriction]
     public unsafe int* ReportCountPtr;
 
+    [NativeDisableUnsafePtrRestriction]
+    public unsafe int* TapLinesWriteCountPtr;
+    [NativeDisableUnsafePtrRestriction]
+    public unsafe int* TapWriteCountPtr;
+
 
     public NativeArray<TapData> taps;
+
+    [NativeDisableParallelForRestriction]
+    public NativeArray<NoteRenderData> tapLinesRender;
+    [NativeDisableParallelForRestriction]
+    public NativeArray<NoteRenderData> tapsRender;
 
     public void Execute(int index)
     {
         var tap = taps[index];
-        TransformUpdate(ref tap);
+        TransformUpdate(ref tap, index);
         AutoplayUpdate(ref tap);
         //CheckUpdate(ref tap);
         taps[index] = tap;
     }
 
-    public unsafe void TransformUpdate(ref TapData tap)
+    public unsafe void TransformUpdate(ref TapData tap, int index)
     {
         if (tap.isEnd) return;
 
@@ -126,8 +182,8 @@ public struct TapUpdateJob : IJobParallelFor
         var lineScale = clampedDistance / 4.8f;
 
         if (destScale < 0f) return;
-        tap.show = true;
 
+        // tap self
         NoteHelper.GetPosFromDistance(clampedDistance, tap.key, out var pos);
         tap.pos = pos;
         tap.scale = destScale;
@@ -139,20 +195,54 @@ public struct TapUpdateJob : IJobParallelFor
                 tap.brightness = 0.95f + extra;
             }
         }
-
-        if (tap.isStar && tap.rotateSpeed != 0) // star rotate
+        // star rotate
+        if (tap.isStar && tap.rotateSpeed != 0)
         {
             var deltaRot = -180f * tap.rotateSpeed * TimeDataPtr->deltaTime;
             tap.ang += deltaRot;
         }
-
+        //tapLine
         tap.tapLine.scale = lineScale;
-        if (tap.isEx) //sync ex border
+        //ex border
+        if (tap.isEx)
         {
             tap.tapEx.pos = tap.pos;
             // tap.tapEx.ang = tap.ang; // 0区别
             tap.tapEx.scale = tap.scale;
         }
+
+
+        //show tap
+        var tapIdx = Interlocked.Increment(ref *TapWriteCountPtr) - 1;
+        tapsRender[tapIdx] = new NoteRenderData()
+        {
+            pos = tap.pos,
+            angRad = math.radians(tap.ang),
+            scale = tap.scale,
+            spriteId = tap.tapSprite,
+            color = new float4(1, 1, 1, 1),
+            brightness = tap.brightness,
+
+            exSpriteId = tap.isEx ? tap.exSprite : 0,
+            exColor = tap.exColor,
+
+            sort = (uint)index,
+        };
+        // show tapline
+        var lineIdx = Interlocked.Increment(ref *TapLinesWriteCountPtr) - 1;
+        tapLinesRender[lineIdx] = new()
+        {
+            pos = tap.tapLine.pos,
+            angRad = math.radians(tap.tapLine.ang),
+            scale = tap.tapLine.scale,
+            spriteId = tap.lineSprite,
+            color = new float4(1, 1, 1, 1),
+            brightness = 1f,
+
+            exSpriteId = 0,
+
+            sort = (uint)index,
+        };
     }
 
     public unsafe void AutoplayUpdate(ref TapData tap)

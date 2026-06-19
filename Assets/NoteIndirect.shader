@@ -6,7 +6,7 @@ Shader "Custom/NoteIndirect"
 
         Pass
         {
-            Blend SrcAlpha OneMinusSrcAlpha
+            Blend One OneMinusSrcAlpha
             ZWrite Off
             Cull Off
 
@@ -27,6 +27,11 @@ Shader "Custom/NoteIndirect"
                 uint spriteId;
                 float4 color;
                 float brightness;
+
+                uint exSpriteId;
+                float4 exColor;
+
+                uint sort;
             };
 
             StructuredBuffer<NoteRenderData> _NoteBuffer;
@@ -84,15 +89,34 @@ Shader "Custom/NoteIndirect"
                 NoteRenderData note = _NoteBuffer[i.id];
 
                 float4 rect = _SpriteRects[note.spriteId];
-
                 float2 uv = lerp(rect.xy, rect.zw, i.uv);
-
                 float4 col = tex2D(_MainTex, uv);
 
-                col.rgb *= note.color.rgb;
+                col.rgb *= note.color.rgb * note.brightness;
                 col.a   *= note.color.a;
 
-                col.rgb *= note.brightness;
+                // 预乘Alpha (PMA)
+                col.rgb *= col.a;
+
+                if (note.exSpriteId != 0)
+                {
+                    float2 uvFrame = lerp(
+                        _SpriteRects[note.exSpriteId].xy,
+                        _SpriteRects[note.exSpriteId].zw,
+                        i.uv
+                    );
+                    float4 frame = tex2D(_MainTex, uvFrame);
+
+                    frame.rgb *= note.exColor.rgb;
+                    frame.a   *= note.exColor.a;
+
+                    frame.rgb *= frame.a;
+
+                    // 使用 PMA 的叠加法混合双层
+                    // 公式：最终颜色 = 上层颜色 + 下层颜色 * (1 - 上层透明度)
+                    col.rgb = frame.rgb + col.rgb * (1.0 - frame.a);
+                    col.a   = frame.a   + col.a   * (1.0 - frame.a);
+                }
 
                 return col;
             }
