@@ -88,25 +88,33 @@ Shader "Custom/NoteIndirect"
             {
                 NoteRenderData note = _NoteBuffer[i.id];
 
+                // 1. 采样底图
                 float4 rect = _SpriteRects[note.spriteId];
                 float2 uv = lerp(rect.xy, rect.zw, i.uv);
                 float4 col = tex2D(_MainTex, uv);
 
+                // 2. 混合 EX 边框 (非预乘形式)
                 if (note.exSpriteId != 0)
                 {
                     float2 uvFrame = lerp(_SpriteRects[note.exSpriteId].xy, _SpriteRects[note.exSpriteId].zw, i.uv);
                     float4 frame = tex2D(_MainTex, uvFrame);
                     
+                    // 保持 frame 为非预乘状态
                     frame.rgb *= note.exColor.rgb;
                     frame.a   *= note.exColor.a;
 
-                    col.rgb = frame.rgb + col.rgb * (1.0 - frame.a);
+                    // 标准 Alpha 混合公式：ResultRGB = TopRGB * TopA + BottomRGB * (1 - TopA)
+                    // 注意：这里我们让 col.rgb 暂时保留 Straight Alpha 状态，不执行 PMA 预乘
+                    col.rgb = frame.rgb * frame.a + col.rgb * (1.0 - frame.a);
                     col.a   = frame.a   + col.a   * (1.0 - frame.a);
                 }
 
+                // 3. 应用亮度和颜色 (在混合之后应用)
                 col.rgb *= note.color.rgb * note.brightness;
                 col.a   *= note.color.a;
 
+                // 4. 统一预乘 (这是你整个管线能够正常渲染的核心，必须保留)
+                // 无论前面怎么混合，最后输出给 GPU 帧缓存的必须是预乘结果
                 col.rgb *= col.a;
 
                 return col;
