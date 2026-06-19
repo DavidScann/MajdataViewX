@@ -7,20 +7,6 @@ public partial class NoteManager
     public float NoteSpeed = 7f;
     public float TouchSpeed = 7.5f;
 
-    private int _noteSortOrder;
-
-
-    private static int GetNoteLayerCount(SimaiNoteType type) => type switch
-    {
-        SimaiNoteType.Tap => 2,
-        SimaiNoteType.Hold => 3,
-        SimaiNoteType.Slide => 2,
-        SimaiNoteType.Touch => 7,
-        SimaiNoteType.TouchHold => 6,
-        _ => 0
-    };
-
-
 
 
     public void Load(SimaiChart chart)
@@ -45,12 +31,11 @@ public partial class NoteManager
                             key = (SensorType)(note.StartPosition - 1),
                             speed = NoteSpeed * timing.HSpeed,
 
-                            sort = _noteSortOrder,
-
                             tapLine = tapLine,
                             tapEx = tapEx,
 
                             isStar = note.IsForceStar,
+                            isDouble = false,
                             rotateSpeed = note.IsFakeRotate ? -440f : 0,
 
                             isEach = timing.Notes.Length > 1,
@@ -62,7 +47,6 @@ public partial class NoteManager
                         tap.Init();
 
                         taps.Add(tap);
-                        _noteSortOrder -= GetNoteLayerCount(note.Type);
                     }
                     break;
             }

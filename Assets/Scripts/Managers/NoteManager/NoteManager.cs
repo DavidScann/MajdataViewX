@@ -123,8 +123,6 @@ public partial class NoteManager : MonoBehaviour
     public void ResetState()
     {
         taps.Clear();
-
-        _noteSortOrder = 0;
     }
 }
 

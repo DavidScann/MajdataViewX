@@ -92,31 +92,22 @@ Shader "Custom/NoteIndirect"
                 float2 uv = lerp(rect.xy, rect.zw, i.uv);
                 float4 col = tex2D(_MainTex, uv);
 
-                col.rgb *= note.color.rgb * note.brightness;
-                col.a   *= note.color.a;
-
-                // 预乘Alpha (PMA)
-                col.rgb *= col.a;
-
                 if (note.exSpriteId != 0)
                 {
-                    float2 uvFrame = lerp(
-                        _SpriteRects[note.exSpriteId].xy,
-                        _SpriteRects[note.exSpriteId].zw,
-                        i.uv
-                    );
+                    float2 uvFrame = lerp(_SpriteRects[note.exSpriteId].xy, _SpriteRects[note.exSpriteId].zw, i.uv);
                     float4 frame = tex2D(_MainTex, uvFrame);
-
+                    
                     frame.rgb *= note.exColor.rgb;
                     frame.a   *= note.exColor.a;
 
-                    frame.rgb *= frame.a;
-
-                    // 使用 PMA 的叠加法混合双层
-                    // 公式：最终颜色 = 上层颜色 + 下层颜色 * (1 - 上层透明度)
                     col.rgb = frame.rgb + col.rgb * (1.0 - frame.a);
                     col.a   = frame.a   + col.a   * (1.0 - frame.a);
                 }
+
+                col.rgb *= note.color.rgb * note.brightness;
+                col.a   *= note.color.a;
+
+                col.rgb *= col.a;
 
                 return col;
             }

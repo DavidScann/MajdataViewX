@@ -17,8 +17,6 @@ public struct TapData
     public SensorType key;
     public float speed;
 
-    public int sort;
-
     // children(through the master's updater to 
     // get ViewIndex, and 'show' controls by master,
     // when the master not show, they will be reset too)
@@ -27,6 +25,7 @@ public struct TapData
 
     // attrs
     public bool isStar;
+    public bool isDouble;
     public float rotateSpeed;
 
     public bool isEach;
@@ -72,13 +71,11 @@ public struct TapData
         tapLine.pos = float2.zero;
         tapLine.scale = 0f;
         tapLine.ang = -22.5f + -45f * (int)key;
-        tapLine.sort = sort;
 
         //tapEx
         tapEx.pos = float2.zero;
         tapEx.scale = 1f;
         //tapEx.ang = -22.5f + -45f * (int)key;
-        tapEx.sort = sort;
 
         LoadTapSkin(this,
             out tapSprite,
@@ -90,30 +87,92 @@ public struct TapData
     private readonly void LoadTapSkin(TapData tap,
         out uint tapSpriteID, out uint lineSpriteID, out uint exSpriteID, out float4 exColor)
     {
-        tapSpriteID = TAP;
-        lineSpriteID = LINE;
-        exSpriteID = TAP_EX;
-        exColor = Ex;
-        if (tap.isEach)
+        if (tap.isStar)
         {
-            tapSpriteID = TAP_EACH;
-            lineSpriteID = LINE_EACH;
-            if (tap.isEx) exColor = Ex_Each;
-        }
-        if (tap.isBreak)
-        {
-            tapSpriteID = TAP_BREAK;
-            // view.SpriteRenderer.material = _skinManager.BreakMaterial;
-            lineSpriteID = LINE_BREAK;
-            if (tap.isEx) exColor = Ex_Break;
-        }
-        if (tap.isMine)
-        {
-            if (tap.isBreak)
-                tapSpriteID = TAP_BREAK_MINE;
+            if (tap.isDouble)
+            {
+                tapSpriteID = STAR_DOUBLE;
+                lineSpriteID = LINE_STAR;
+                exSpriteID = STAR_EX_DOUBLE;
+                exColor = Ex;
+                if (isEach)
+                {
+                    tapSpriteID = STAR_EACH_DOUBLE;
+                    lineSpriteID = LINE_EACH;
+                    exColor = Ex_Each;
+                }
+                if (isBreak)
+                {
+                    tapSpriteID = STAR_BREAK_DOUBLE;
+                    lineSpriteID = LINE_BREAK;
+                    exColor = Ex_Break;
+                    //spriteRenderer.material = _skinManager.BreakMaterial;
+                }
+                if (isMine)
+                {
+                    if (isBreak)
+                        tapSpriteID = STAR_BREAK_DOUBLE_MINE;
+                    else
+                        tapSpriteID = STAR_MINE_DOUBLE;
+                    lineSpriteID = LINE_MINE;
+                }
+            }
             else
-                tapSpriteID = TAP_MINE;
-            lineSpriteID = LINE_MINE;
+            {
+                tapSpriteID = STAR;
+                lineSpriteID = LINE_STAR;
+                exSpriteID = STAR_EX;
+                exColor = Ex;
+                if (isEach)
+                {
+                    tapSpriteID = STAR_EACH;
+                    lineSpriteID = LINE_EACH;
+                    exColor = Ex_Each;
+                }
+                if (isBreak)
+                {
+                    tapSpriteID = STAR_BREAK;
+                    lineSpriteID = LINE_BREAK;
+                    exColor = Ex_Break;
+                    //spriteRenderer.material = _skinManager.BreakMaterial;
+                }
+                if (isMine)
+                {
+                    if (isBreak)
+                        tapSpriteID = STAR_BREAK_MINE;
+                    else
+                        tapSpriteID = STAR_MINE;
+                    lineSpriteID = LINE_MINE;
+                }
+            }
+        }
+        else
+        {
+            tapSpriteID = TAP;
+            lineSpriteID = LINE;
+            exSpriteID = TAP_EX;
+            exColor = Ex;
+            if (tap.isEach)
+            {
+                tapSpriteID = TAP_EACH;
+                lineSpriteID = LINE_EACH;
+                exColor = Ex_Each;
+            }
+            if (tap.isBreak)
+            {
+                tapSpriteID = TAP_BREAK;
+                // view.SpriteRenderer.material = _skinManager.BreakMaterial;
+                lineSpriteID = LINE_BREAK;
+                exColor = Ex_Break;
+            }
+            if (tap.isMine)
+            {
+                if (tap.isBreak)
+                    tapSpriteID = TAP_BREAK_MINE;
+                else
+                    tapSpriteID = TAP_MINE;
+                lineSpriteID = LINE_MINE;
+            }
         }
     }
 }
@@ -187,13 +246,11 @@ public struct TapUpdateJob : IJobParallelFor
         NoteHelper.GetPosFromDistance(clampedDistance, tap.key, out var pos);
         tap.pos = pos;
         tap.scale = destScale;
-        if (rawDistance >= 1.225f)
+        // break shine
+        if (tap.isBreak)
         {
-            if (tap.isBreak)
-            {
-                var extra = math.max(math.sin(TimeDataPtr->GetFrame() * 0.17f) * 0.5f, 0f);
-                tap.brightness = 0.95f + extra;
-            }
+            var extra = math.max(math.sin(TimeDataPtr->GetFrame() * 0.17f) * 0.5f, 0f);
+            tap.brightness = 0.95f + extra;
         }
         // star rotate
         if (tap.isStar && tap.rotateSpeed != 0)
@@ -250,7 +307,7 @@ public struct TapUpdateJob : IJobParallelFor
         if (tap.isEnd) return;
 
         var timing = TimeDataPtr->NoteTime - tap.time;
-        if (timing < 0.01f) return;
+        if (timing < -0.01f) return;
         switch (AutoPlayMode)
         {
             case AutoPlayMode.Enable:
