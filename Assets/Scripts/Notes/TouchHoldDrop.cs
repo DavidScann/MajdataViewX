@@ -200,6 +200,8 @@ public class TouchHoldDrop : NoteLongBase
                     isTouched = true;
                     PlayHoldEffect();
                     _audioManager.PlayTouchHoldSound(guid);
+                    if (!isMine)
+                        _audioManager.PlayTouchSound();
                     return;
                 case AutoPlayMode.DJAuto:
                     if (!isMine)
@@ -226,6 +228,8 @@ public class TouchHoldDrop : NoteLongBase
                     }
                     PlayHoldEffect();
                     _audioManager.PlayTouchHoldSound(guid);
+                    if (!isMine)
+                        _audioManager.PlayTouchSound();
                     return;
                 case AutoPlayMode.Disable:
                 default:
