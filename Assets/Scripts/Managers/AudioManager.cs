@@ -223,7 +223,7 @@ public class AudioManager
                     if (isRequested)
                     {
                         NoteSfxs[BREAK_SLIDE_JUDGE].PlayOneShot();
-                        NoteSfxs[BREAK_SFX].PlayOneShot();
+                        // NoteSfxs[BREAK_SFX].PlayOneShot();   // blame @LeZi9916
                     }
                     break;
                 case TOUCH:
@@ -407,10 +407,11 @@ public class AudioManager
     {
         if (isBreak)
         {
-            if (isEx)
-            {
-                _sfxPtr[TAP_EX] = true;
-            }
+            // 官机上 Break-Ex 并不会播放 Ex 音效
+            // if (isEx)
+            // {
+            //     _sfxPtr[TAP_EX] = true;
+            // }
 
             switch (judgeType)
             {
@@ -511,15 +512,14 @@ public class AudioManager
         {
             _sfxPtr[BREAK_SLIDE] = true;
         }
-        else
-        {
-            _sfxPtr[SLIDE] = true;
-        }
+        // 官机上无论如何都会播放普通 slide 的启动音
+        _sfxPtr[SLIDE] = true;
+        
     }
     public unsafe void PlayBreakSlideEndSound()
     {
         _sfxPtr[BREAK_SLIDE_JUDGE] = true;
-        _sfxPtr[BREAK_SFX] = true;
+        // _sfxPtr[BREAK_SFX] = true;   // blame @LeZi9916
     }
 
 
