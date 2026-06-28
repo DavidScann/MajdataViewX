@@ -3,7 +3,10 @@
 #region
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 
 #endregion
 
@@ -815,8 +818,8 @@ public static class SlideTables
         };
     }
 
-    static SlideArea BuildSlideArea(SensorType[] type, int progressWhenOn,
-        int progressWhenFinished, bool isSkippable = true, bool isLast = false)
+    static SlideArea BuildSlideArea(SensorType[] type, int progressWhenOn, int progressWhenFinished,
+        bool isSkippable = true, bool isLast = false)
     {
         return new SlideArea()
         {
@@ -826,5 +829,151 @@ public static class SlideTables
             IsSkippable = isSkippable,
             IsLast = isLast
         };
+    }
+
+    // ==== Shape name lookup ====
+
+    public static Dictionary<string, int> ShapeNameToIndex;
+
+    public static void Init()
+    {
+        ShapeNameToIndex = new();
+        var shapeNames = new List<string>();
+        foreach (var table in SLIDE_TABLES)
+        {
+            ShapeNameToIndex[table.Name] = shapeNames.Count;
+            shapeNames.Add(table.Name);
+        }
+        ShapeNameToIndex["wifi"] = shapeNames.Count;
+        shapeNames.Add("wifi");
+
+        var areaList = new List<SlideAreaData>();
+        var tdList = new List<SlideTableData>();
+        foreach (var table in SLIDE_TABLES)
+        {
+            int off = areaList.Count;
+            foreach (var area in table.JudgeQueue)
+            {
+                areaList.Add(new SlideAreaData
+                {
+                    AreaCount = (byte)area.Areas.Length,
+                    Area0 = area.Areas[0],
+                    Area1 = area.Areas.Length > 1 ? area.Areas[1] : SensorType.A1,
+                    ArrowProgressWhenOn = (byte)area.ArrowProgressWhenOn,
+                    ArrowProgressWhenFinished = (byte)area.ArrowProgressWhenFinished,
+                    IsSkippable = area.IsSkippable,
+                    IsLast = area.IsLast
+                });
+            }
+            tdList.Add(new SlideTableData { Offset = off, Count = (byte)table.JudgeQueue.Length, Const = table.Const });
+        }
+
+        var wifiStart = areaList.Count;
+        var wifi = WIFI_TABLE;
+        var Loff = 0;
+        foreach (var a in wifi.Left)
+            areaList.Add(new SlideAreaData
+            {
+                AreaCount = (byte)a.Areas.Length, Area0 = a.Areas[0],
+                Area1 = a.Areas.Length > 1 ? a.Areas[1] : SensorType.A1,
+                ArrowProgressWhenOn = (byte)a.ArrowProgressWhenOn,
+                ArrowProgressWhenFinished = (byte)a.ArrowProgressWhenFinished,
+                IsSkippable = a.IsSkippable, IsLast = a.IsLast
+            });
+        var Coff = areaList.Count - wifiStart;
+        foreach (var a in wifi.Center)
+            areaList.Add(new SlideAreaData
+            {
+                AreaCount = (byte)a.Areas.Length, Area0 = a.Areas[0],
+                Area1 = a.Areas.Length > 1 ? a.Areas[1] : SensorType.A1,
+                ArrowProgressWhenOn = (byte)a.ArrowProgressWhenOn,
+                ArrowProgressWhenFinished = (byte)a.ArrowProgressWhenFinished,
+                IsSkippable = a.IsSkippable, IsLast = a.IsLast
+            });
+        var Roff = areaList.Count - wifiStart;
+        foreach (var a in wifi.Right)
+            areaList.Add(new SlideAreaData
+            {
+                AreaCount = (byte)a.Areas.Length, Area0 = a.Areas[0],
+                Area1 = a.Areas.Length > 1 ? a.Areas[1] : SensorType.A1,
+                ArrowProgressWhenOn = (byte)a.ArrowProgressWhenOn,
+                ArrowProgressWhenFinished = (byte)a.ArrowProgressWhenFinished,
+                IsSkippable = a.IsSkippable, IsLast = a.IsLast
+            });
+
+        // Areas (unchanged content/ordering)
+        var areas = new NativeArray<SlideAreaData>(areaList.Count, Allocator.Persistent);
+        for (int i = 0; i < areaList.Count; i++) areas[i] = areaList[i];
+
+        // Wifi
+        var wifiValue = new WifiTableData
+        {
+            LeftOffset = wifiStart + Loff, LeftCount = (byte)wifi.Left.Length,
+            CenterOffset = wifiStart + Coff, CenterCount = (byte)wifi.Center.Length,
+            RightOffset = wifiStart + Roff, RightCount = (byte)wifi.Right.Length,
+            Const = wifi.Const
+        };
+
+        // Arrows (unchanged content)
+        var arrowList = new List<ArrowPose>();
+        var aOff = new int[shapeNames.Count];
+        var aCnt = new byte[shapeNames.Count];
+        for (int i = 0; i < shapeNames.Count; i++)
+        {
+            aOff[i] = arrowList.Count;
+            var poses = SlideArrowTable.Get(shapeNames[i]);
+            if (poses != null)
+            {
+                aCnt[i] = (byte)poses.Length;
+                foreach (var p in poses)
+                    arrowList.Add(new ArrowPose { X = p.X, Y = p.Y, RotZ = p.RotZ });
+            }
+        }
+        var arrows = new NativeArray<ArrowPose>(arrowList.Count, Allocator.Persistent);
+        for (int i = 0; i < arrowList.Count; i++) arrows[i] = arrowList[i];
+
+        // OK list
+        var okList = new List<OKPose>();
+        for (int i = 0; i < shapeNames.Count; i++)
+        {
+            var ok = SlideOKTable.Get(shapeNames[i]);
+            okList.Add(ok.HasValue
+                ? new OKPose { X = ok.Value.X, Y = ok.Value.Y, RotZ = ok.Value.RotZ }
+                : default);
+        }
+
+        // Shapes — combine arrow offsets/counts, area offsets/counts, OK, and const
+        var shapes = new NativeArray<ShapeInfo>(shapeNames.Count, Allocator.Persistent);
+        for (int i = 0; i < shapeNames.Count; i++)
+        {
+            bool isWifi = i == shapeNames.Count - 1;
+            shapes[i] = new ShapeInfo
+            {
+                ArrowOffset = aOff[i],
+                ArrowCount = aCnt[i],
+                AreaOffset = isWifi ? 0 : tdList[i].Offset,
+                AreaCount = isWifi ? (byte)0 : tdList[i].Count,
+                OK = okList[i],
+                Const = isWifi ? wifiValue.Const : tdList[i].Const
+            };
+        }
+
+        // Unified store — no unsafe pointer wiring needed
+        NoteHelper.SlideTable = new SlideTableStore
+        {
+            Shapes = shapes,
+            ArrowPoses = arrows,
+            Areas = areas,
+            Wifi = wifiValue
+        };
+    }
+
+    public static void Dispose()
+    {
+        var st = NoteHelper.SlideTable;
+        if (st.Areas.IsCreated) st.Areas.Dispose();
+        if (st.ArrowPoses.IsCreated) st.ArrowPoses.Dispose();
+        if (st.Shapes.IsCreated) st.Shapes.Dispose();
+        NoteHelper.SlideTable = default;
     }
 }
