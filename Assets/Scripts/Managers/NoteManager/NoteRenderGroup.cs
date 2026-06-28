@@ -4,7 +4,7 @@ using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
 using UnityEngine;
 
-public class NoteRenderGroup : IDisposable
+public class NoteRenderGroup<T> : IDisposable where T : unmanaged, IComparable<T>
 {
     const int TRIPLE_COUNT = 3;
     const int MAX_INSTANCES = 65536;
@@ -21,7 +21,7 @@ public class NoteRenderGroup : IDisposable
     int _writeIndex = -1;
     int _renderIndex = -1;
 
-    NativeArray<NoteRenderData> _noteRenderDatasThisFrame;
+    NativeArray<T> _noteRenderDatasThisFrame;
 
     public NoteRenderGroup(Material mat, Mesh mesh, int priority)
     {
@@ -42,7 +42,7 @@ public class NoteRenderGroup : IDisposable
                 GraphicsBuffer.Target.Structured,
                 GraphicsBuffer.UsageFlags.LockBufferForWrite,
                 MAX_INSTANCES,
-                UnsafeUtility.SizeOf<NoteRenderData>());
+                UnsafeUtility.SizeOf<T>());
 
             _argsBuffers[i] = new GraphicsBuffer(
                 GraphicsBuffer.Target.IndirectArguments, 1,
@@ -59,17 +59,17 @@ public class NoteRenderGroup : IDisposable
         _writeIndex = (_writeIndex + 1) % TRIPLE_COUNT;
     }
 
-    public NativeArray<NoteRenderData> LockForWrite()
+    public NativeArray<T> LockForWrite()
     {
-        _noteRenderDatasThisFrame = _buffers[_writeIndex].LockBufferForWrite<NoteRenderData>(0, MAX_INSTANCES);
+        _noteRenderDatasThisFrame = _buffers[_writeIndex].LockBufferForWrite<T>(0, MAX_INSTANCES);
         return _noteRenderDatasThisFrame;
     }
 
-    public void UnlockAndSortWrite()
+    public void UnlockWrite(bool sort = true)
     {
         var count = _counts[_writeIndex];
-        _noteRenderDatasThisFrame.GetSubArray(0, count).Sort();
-        _buffers[_writeIndex].UnlockBufferAfterWrite<NoteRenderData>(count);
+        if (sort) _noteRenderDatasThisFrame.GetSubArray(0, count).Sort();
+        _buffers[_writeIndex].UnlockBufferAfterWrite<T>(count);
     }
 
     public unsafe int* WriteCountPtr

@@ -8,14 +8,12 @@ public static class MajCtx
     public static DataLoader _dataLoader { get; set; }
     public static EffectManager _effectManager { get; set; }
     public static InputManager _inputManager { get; set; }
-    public static MultTouchHandler _multTouchHandler { get; set; }
-    public static NoteJudgeManager _noteJudgeManager { get; set; }
+    public static JudgeManager _judgeManager { get; set; }
     public static NoteManager _noteManager { get; set; }
     public static NoteSkinManager _noteSkinManager { get; set; }
     public static ObjectCounter _objectCounter { get; set; }
     public static PlayManager _playManager { get; set; }
     public static ScreenRecorder _screenRecorder { get; set; }
-    public static SkinManager _skinManager { get; set; }
     public static TimeProvider _timeProvider { get; set; }
     public static WsServer _wsServer { get; set; }
 

@@ -257,7 +257,7 @@ public partial class ObjectCounter : MonoBehaviour
         for (int i = 0; i < count; i++)
         {
             var entry = reportRequests[i];
-            ReportResult(SimaiNoteType.Tap, entry.Grade, entry.IsBreak, updateAcc: false);
+            ReportResult(entry.NoteType, entry.Grade, entry.IsBreak, updateAcc: false);
         }
         UpdateAccRate();
         reportCount[0] = 0;
@@ -564,4 +564,5 @@ public struct ReportResultEntry
 {
     public JudgeGrade Grade;
     public bool IsBreak;
+    public SimaiNoteType NoteType;
 }

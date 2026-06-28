@@ -6,7 +6,7 @@ using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
-
+using UnityEditorInternal;
 using static NoteSkinManager;
 
 [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Fast)]
@@ -29,11 +29,19 @@ public struct SlideData
     public bool isWifi;
     public bool isMirror;
     public bool isJustR;
-    public bool isSpecialFlip;
     public bool smoothSlideAnime;
     public bool legacySlideLayer;
 
-    public byte shapeIndex;
+    public SlideTableMetadata metadata;
+    public unsafe SlideArea* judgeQueue;
+    public int judgeQueueCount;
+    public unsafe SlideArea* judgeQueueC;
+    public int judgeQueueCCount;
+    public unsafe SlideArea* judgeQueueR;
+    public int judgeQueueRCount;
+    public unsafe SlidePose* slideArrows;
+    public int slideArrowsCount;
+    public SlidePose okPose;
 
     public bool isEnd;
     public bool isSoundPlayed;
@@ -63,22 +71,59 @@ public struct SlideData
     public float fadeInDuration;
     public float slideAlpha; // 0->1
 
-    public float slideOKFadeOutProgress; // 1→0, fade-out alpha for slideOK (Just_curv animator)
-    public float judgeTime;          // Time when slide was judged (for fade-out calculation)
+    public float judgeTime; //被判定时的时间
+    public float slideOKAlpha; // 1->0
+    public const float SlideOKFadeOutDuration = 0.5f;
 
-    // Fade animation constants
-    public const float SlideOKFadeOutDuration = 0.5f; // Duration of Just_curv fade-out
-
-    public void Init()
+    public unsafe void Init()
     {
         starAlpha = 0;
         starScale = 0;
         process = 0;
         slideAlpha = 0;
-        slideOKFadeOutProgress = 1f;
+        slideOKAlpha = 1f;
         judgeTime = float.MinValue;
 
+
         ang = isMirror ? -45f * startPosition : -45f * (startPosition - 1);
+
+        var diff = math.abs(1 - startPosition);
+        if (!isWifi)
+        {
+            for (var i = 0; i < judgeQueueCount; i++)
+            {
+                if (isMirror)
+                {
+                    judgeQueue[i].Mirror(SensorType.A1);
+                }
+                if (diff != 0)
+                {
+                    judgeQueue[i].Diff(diff);
+                }
+            }
+        }
+        else
+        {
+            if (diff != 0)
+            {
+                for (var i = 0; i < judgeQueueCount; i++)
+                    judgeQueue[i].Diff(diff);
+                for (var i = 0; i < judgeQueueCCount; i++)
+                    judgeQueueC[i].Diff(diff);
+                for (var i = 0; i < judgeQueueRCount; i++)
+                    judgeQueueR[i].Diff(diff);
+            }
+        }
+
+        if (isMirror)
+        {
+            for (var i = 0; i < slideArrowsCount; i++)
+            {
+                slideArrows[i].X *= -1;
+                slideArrows[i].RotZ = -slideArrows[i].RotZ + 180f;
+            }
+        }
+
 
         // 计算Slide淡入时机
         // 在8.0速时应当提前300ms显示Slide
@@ -135,9 +180,6 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
     [NativeDisableUnsafePtrRestriction]
     public int* NotesWriteCountPtr;
 
-    [NativeDisableParallelForRestriction]
-    public SlideTableStore SlideTable;
-
     public void Execute(int index)
     {
         var slide = slides[index];
@@ -188,31 +230,28 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
 
     private void UpdateStarPosition(ref SlideData slide)
     {
-        var cnt = SlideTable.Shapes[slide.shapeIndex].ArrowCount;
-        var off = SlideTable.Shapes[slide.shapeIndex].ArrowOffset;
+        var cnt = slide.slideArrowsCount;
+
         var idxF = slide.process * (cnt - 1);
         var idx0 = (int)idxF;
         var idx1 = math.min(idx0 + 1, cnt - 1);
         var t = idxF - idx0;
-
-        var p0 = SlideTable.ArrowPoses[off + idx0];
-        var p1 = SlideTable.ArrowPoses[off + idx1];
+        var p0 = slide.slideArrows[idx0];
+        var p1 = slide.slideArrows[idx1];
 
         var ca = math.cos(math.radians(slide.ang));
         var sa = math.sin(math.radians(slide.ang));
-        var lx = math.lerp(p0.X, p1.X, t) * (slide.isMirror ? -1f : 1f);
+        var lx = math.lerp(p0.X, p1.X, t);
         var ly = math.lerp(p0.Y, p1.Y, t);
         slide.starPosX = lx * ca - ly * sa;
         slide.starPosY = lx * sa + ly * ca;
-        slide.starRot = slide.isMirror
-            ? -math.lerp(p0.RotZ, p1.RotZ, t) + 180f
-            : math.lerp(p0.RotZ, p1.RotZ, t);
+        slide.starRot = math.lerp(p0.RotZ, p1.RotZ, t);
     }
 
     private void RenderArrows(ref SlideData slide, int index)
     {
-        var cnt = SlideTable.Shapes[slide.shapeIndex].ArrowCount;
-        var off = SlideTable.Shapes[slide.shapeIndex].ArrowOffset;
+        var cnt = slide.slideArrowsCount;
+
         //TODO
         var eaten = math.max((int)(slide.process * cnt) - 1, 0);
 
@@ -223,8 +262,8 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
 
         for (int i = eaten; i < cnt; i++)
         {
-            var p = SlideTable.ArrowPoses[off + i];
-            var lx = p.X * (slide.isMirror ? -1f : 1f);
+            var p = slide.slideArrows[i];
+            var lx = p.X;
             var ly = p.Y;
             var wx = lx * ca - ly * sa;
             var wy = lx * sa + ly * ca;
@@ -233,7 +272,7 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
             slidesRender[idx] = new SimpleRenderData
             {
                 pos = new float2(wx, wy),
-                angRad = math.radians(slide.isMirror ? -p.RotZ + slide.ang + 180f : p.RotZ + slide.ang),
+                angRad = math.radians(p.RotZ + slide.ang),
                 scale = new float2(1, 1),
                 spriteId = slide.slideSprite,
                 color = color,
@@ -301,46 +340,39 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
             return;
         }
 
-        if (!slide.isWifi) CheckSingleQueue(ref slide);
-        else CheckWifiQueues(ref slide);
+        if (!slide.isWifi)
+        {
+            ProcessAreas(ref slide, slide.judgeQueue, slide.judgeQueueCount, ref slide.judgeCurrent);
+        }
+        else
+        {
+            ProcessAreas(ref slide, slide.judgeQueue, slide.judgeQueueCount, ref slide.judgeCurrent);
+            ProcessAreas(ref slide, slide.judgeQueueC, slide.judgeQueueCCount, ref slide.judgeC_Current);
+            ProcessAreas(ref slide, slide.judgeQueueR, slide.judgeQueueRCount, ref slide.judgeR_Current);
+        }
 
         // Check if all areas are finished → judge
         if (slide.isWifi)
         {
-            ref readonly var w = ref SlideTable.Wifi;
-            if (slide.judgeCurrent >= w.LeftCount &&
-            slide.judgeC_Current >= w.CenterCount &&
-            slide.judgeR_Current >= w.RightCount)
+            if (slide.judgeCurrent >= slide.judgeQueueCount &&
+            slide.judgeC_Current >= slide.judgeQueueCCount &&
+            slide.judgeR_Current >= slide.judgeQueueRCount)
                 CompleteSlide(ref slide);
         }
         else
         {
-            if (slide.judgeCurrent >= SlideTable.Shapes[slide.shapeIndex].AreaCount)
+            if (slide.judgeCurrent >= slide.judgeQueueCount)
                 CompleteSlide(ref slide);
         }
     }
 
-    private void CheckSingleQueue(ref SlideData slide)
-    {
-        ref readonly var td = ref SlideTable.Shapes[slide.shapeIndex];
-        ProcessAreas(ref slide, td.AreaOffset, td.AreaCount, ref slide.judgeCurrent);
-    }
-
-    private void CheckWifiQueues(ref SlideData slide)
-    {
-        ref var w = ref SlideTable.Wifi;
-        ProcessAreas(ref slide, w.LeftOffset, w.LeftCount, ref slide.judgeCurrent);
-        ProcessAreas(ref slide, w.CenterOffset, w.CenterCount, ref slide.judgeC_Current);
-        ProcessAreas(ref slide, w.RightOffset, w.RightCount, ref slide.judgeR_Current);
-    }
-
     // 检查 area 队列，更新 sensor On/Off 状态并推进游标
-    private void ProcessAreas(ref SlideData slide, int offset, byte count, ref byte cur)
+    private void ProcessAreas(ref SlideData slide, SlideArea* queue, int queueCount, ref byte cur)
     {
-        if (cur >= count) return;
+        if (cur >= queueCount) return;
 
-        ref var first = ref SlideTable.Areas[offset + cur];
-        var hasSecond = cur + 1 < count;
+        ref var first = ref queue[cur];
+        var hasSecond = cur + 1 < queueCount;
 
         CheckArea(ref first);
         if (first.On && !slide.isSoundPlayed)
@@ -351,7 +383,7 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
 
         if (hasSecond && (first.IsSkippable || first.On))
         {
-            ref var second = ref SlideTable.Areas[offset + cur + 1];
+            ref var second = ref queue[cur + 1];
             CheckArea(ref second);
 
             if (second.IsFinished) { cur += 2; return; }
@@ -359,15 +391,12 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
         }
 
         if (first.IsFinished) cur++;
-    }
 
-    // 检查 sensor，更新 On/Off
-    private static void CheckArea(ref SlideAreaData area)
-    {
-        for (int i = 0; i < area.AreaCount; i++)
+
+        static void CheckArea(ref SlideArea area)
         {
-            var sensor = i == 0 ? area.Area0 : area.Area1;
-            area.Judge(NoteHelper.SensorStates[(int)sensor].Status == SensorStatus.On);
+            area.Judge(NoteHelper.SensorStates[(int)area.Area0].Status == SensorStatus.On);
+            area.Judge(NoteHelper.SensorStates[(int)area.Area1].Status == SensorStatus.On);
         }
     }
 
@@ -383,14 +412,13 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
     {
         if (!slide.isWifi)
         {
-            return SlideTable.Shapes[slide.shapeIndex].AreaCount - slide.judgeCurrent;
+            return slide.judgeQueueCount - slide.judgeCurrent;
         }
         else
         {
-            ref readonly var w = ref SlideTable.Wifi;
-            return w.LeftCount - slide.judgeCurrent +
-            w.CenterCount - slide.judgeC_Current +
-            w.RightCount - slide.judgeR_Current;
+            return slide.judgeQueueCount - slide.judgeCurrent +
+                    slide.judgeQueueCCount - slide.judgeC_Current +
+                    slide.judgeQueueRCount - slide.judgeR_Current;
         }
     }
 
@@ -402,7 +430,7 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
 
     private void RenderSlideOK(ref SlideData slide)
     {
-        var ok = SlideTable.Shapes[slide.shapeIndex].OK;
+        ref readonly var ok = ref slide.okPose;
 
         var ca = math.cos(math.radians(slide.ang));
         var sa = math.sin(math.radians(slide.ang));
@@ -442,7 +470,7 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
         // Record judge time on first render, then fade out from 1→0 over SlideOKFadeOutDuration
         if (slide.judgeTime < 0f) slide.judgeTime = TimeDataPtr->NoteTime;
         var elapsedFromJudge = TimeDataPtr->NoteTime - slide.judgeTime;
-        slide.slideOKFadeOutProgress = math.saturate(1f - elapsedFromJudge / SlideData.SlideOKFadeOutDuration);
+        slide.slideOKAlpha = math.saturate(1f - elapsedFromJudge / SlideData.SlideOKFadeOutDuration);
 
         var idx = Interlocked.Increment(ref *SlidesWriteCountPtr) - 1;
         slidesRender[idx] = new SimpleRenderData
@@ -451,9 +479,8 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
             angRad = math.radians(okRotZ),
             scale = new float2(1, 1),
             spriteId = (uint)(baseJ + off),
-            color = new float4(1, 1, 1, slide.slideOKFadeOutProgress),
+            color = new float4(1, 1, 1, slide.slideOKAlpha),
             sort = 0xFFFFFF00u,
         };
     }
-
 }

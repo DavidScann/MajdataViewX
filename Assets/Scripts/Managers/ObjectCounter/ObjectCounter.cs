@@ -7,6 +7,11 @@ public partial class ObjectCounter : MonoBehaviour
     private void Awake()
     {
         _objectCounter = this;
+        unsafe
+        {
+            NoteHelper.ReportResults = ReportRequestsPtr;
+            NoteHelper.ReportCount = ReportCountPtr;
+        }
     }
 
     private void Start()

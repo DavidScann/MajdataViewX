@@ -133,10 +133,10 @@ public class TimeProvider : MonoBehaviour
         }
 
         BurstTimeData* ptr = TimeDataPtr;
-        ptr->SVListPtr = SVList.GetUnsafeReadOnlyPtr();
-        ptr->SVListLength = SVList.Length;
-        ptr->SVFuncArgsPtr = SVFuncArgs.GetUnsafeReadOnlyPtr();
-        ptr->SVFuncArgsLength = SVFuncArgs.Length;
+        ptr->__SVListPtr = SVList.GetUnsafeReadOnlyPtr();
+        ptr->__SVListLength = SVList.Length;
+        ptr->__SVFuncArgsPtr = SVFuncArgs.GetUnsafeReadOnlyPtr();
+        ptr->__SVFuncArgsLength = SVFuncArgs.Length;
     }
 
     public void SetStartTime(double _startAt, double _offset, float _speed, PlaybackMode mode, int fps = 60)
@@ -249,16 +249,17 @@ public struct BurstTimeData
 
     // public NativeList<(float time, float sVeloc)> SVList;
     // public NativeArray<(float k, float b)> SVFuncArgs;
-    public unsafe void* SVListPtr;
-    public int SVListLength;
-    public unsafe void* SVFuncArgsPtr;
-    public int SVFuncArgsLength;
-    public readonly unsafe ReadOnlySpan<(float time, float sVeloc)> SVList => new(SVListPtr, SVListLength);
-    public readonly unsafe ReadOnlySpan<(float k, float b)> SVFuncArgs => new(SVFuncArgsPtr, SVFuncArgsLength);
+    public unsafe void* __SVListPtr;
+    public int __SVListLength;
+    public unsafe void* __SVFuncArgsPtr;
+    public int __SVFuncArgsLength;
+
+    readonly unsafe ReadOnlySpan<(float time, float sVeloc)> SVList => new(__SVListPtr, __SVListLength);
+    readonly unsafe ReadOnlySpan<(float k, float b)> SVFuncArgs => new(__SVFuncArgsPtr, __SVFuncArgsLength);
 
 
     [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Fast)]
-    public unsafe readonly float GetPositionAtTime(float t)
+    public readonly float GetPositionAtTime(float t)
     {
         if (SVList.Length == 0)
             return t;

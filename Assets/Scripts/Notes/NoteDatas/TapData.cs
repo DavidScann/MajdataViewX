@@ -1,5 +1,6 @@
-#pragma warning disable CS8500 // 这会获取托管类型的地址、获取其大小或声明指向它的指针
+#pragma warning disable CS8500
 using System.Threading;
+using MajSimai;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
@@ -8,7 +9,6 @@ using Unity.Mathematics;
 
 using static NoteSkinManager;
 
-
 [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Fast)]
 public struct TapData
 {
@@ -16,12 +16,7 @@ public struct TapData
     public float time;
     public SensorType key;
     public float speed;
-
-    // children(through the master's updater to 
-    // get ViewIndex, and 'show' controls by master,
-    // when the master not show, they will be reset too)
-    public TapLineData tapLine;
-    public TapExData tapEx;
+    public int sensorOrderIndex;
 
     // attrs
     public bool isStar;
@@ -34,12 +29,7 @@ public struct TapData
     public bool isMine;
     public bool usingSV;
 
-    //---------in args ---------
-
-    //---------out args---------
-
     // outs
-    public bool show;
     public float2 pos;
     public float scale;
     public float ang;
@@ -51,7 +41,6 @@ public struct TapData
     public uint exSprite;
     public float4 exColor;
 
-
     // state
     public bool isJudged;
     public float diff;
@@ -61,117 +50,94 @@ public struct TapData
 
     public void Init()
     {
-        show = false;
         pos = float2.zero;
         scale = 1f;
         ang = -22.5f + -45f * (int)key;
         brightness = 1f;
 
-        //tapLine
-        tapLine.pos = float2.zero;
-        tapLine.scale = 0f;
-        tapLine.ang = -22.5f + -45f * (int)key;
-
-        //tapEx
-        tapEx.pos = float2.zero;
-        tapEx.scale = 1f;
-        //tapEx.ang = -22.5f + -45f * (int)key;
-
-        LoadTapSkin(this,
-            out tapSprite,
-            out lineSprite,
-            out exSprite,
-            out exColor);
-    }
-
-    private readonly void LoadTapSkin(TapData tap,
-        out uint tapSpriteID, out uint lineSpriteID, out uint exSpriteID, out float4 exColor)
-    {
-        if (tap.isStar)
+        // Load Skin
+        if (isStar)
         {
-            if (tap.isDouble)
+            if (isDouble)
             {
-                tapSpriteID = STAR_DOUBLE;
-                lineSpriteID = LINE_STAR;
-                exSpriteID = STAR_EX_DOUBLE;
+                tapSprite = STAR_DOUBLE;
+                lineSprite = LINE_STAR;
+                exSprite = STAR_EX_DOUBLE;
                 exColor = Ex;
                 if (isEach)
                 {
-                    tapSpriteID = STAR_EACH_DOUBLE;
-                    lineSpriteID = LINE_EACH;
+                    tapSprite = STAR_EACH_DOUBLE;
+                    lineSprite = LINE_EACH;
                     exColor = Ex_Each;
                 }
                 if (isBreak)
                 {
-                    tapSpriteID = STAR_BREAK_DOUBLE;
-                    lineSpriteID = LINE_BREAK;
+                    tapSprite = STAR_BREAK_DOUBLE;
+                    lineSprite = LINE_BREAK;
                     exColor = Ex_Break;
-                    //spriteRenderer.material = _skinManager.BreakMaterial;
                 }
                 if (isMine)
                 {
                     if (isBreak)
-                        tapSpriteID = STAR_BREAK_DOUBLE_MINE;
+                        tapSprite = STAR_BREAK_DOUBLE_MINE;
                     else
-                        tapSpriteID = STAR_MINE_DOUBLE;
-                    lineSpriteID = LINE_MINE;
+                        tapSprite = STAR_MINE_DOUBLE;
+                    lineSprite = LINE_MINE;
                 }
             }
             else
             {
-                tapSpriteID = STAR;
-                lineSpriteID = LINE_STAR;
-                exSpriteID = STAR_EX;
+                tapSprite = STAR;
+                lineSprite = LINE_STAR;
+                exSprite = STAR_EX;
                 exColor = Ex;
                 if (isEach)
                 {
-                    tapSpriteID = STAR_EACH;
-                    lineSpriteID = LINE_EACH;
+                    tapSprite = STAR_EACH;
+                    lineSprite = LINE_EACH;
                     exColor = Ex_Each;
                 }
                 if (isBreak)
                 {
-                    tapSpriteID = STAR_BREAK;
-                    lineSpriteID = LINE_BREAK;
+                    tapSprite = STAR_BREAK;
+                    lineSprite = LINE_BREAK;
                     exColor = Ex_Break;
-                    //spriteRenderer.material = _skinManager.BreakMaterial;
                 }
                 if (isMine)
                 {
                     if (isBreak)
-                        tapSpriteID = STAR_BREAK_MINE;
+                        tapSprite = STAR_BREAK_MINE;
                     else
-                        tapSpriteID = STAR_MINE;
-                    lineSpriteID = LINE_MINE;
+                        tapSprite = STAR_MINE;
+                    lineSprite = LINE_MINE;
                 }
             }
         }
         else
         {
-            tapSpriteID = TAP;
-            lineSpriteID = LINE;
-            exSpriteID = TAP_EX;
+            tapSprite = TAP;
+            lineSprite = LINE;
+            exSprite = TAP_EX;
             exColor = Ex;
-            if (tap.isEach)
+            if (isEach)
             {
-                tapSpriteID = TAP_EACH;
-                lineSpriteID = LINE_EACH;
+                tapSprite = TAP_EACH;
+                lineSprite = LINE_EACH;
                 exColor = Ex_Each;
             }
-            if (tap.isBreak)
+            if (isBreak)
             {
-                tapSpriteID = TAP_BREAK;
-                // view.SpriteRenderer.material = _skinManager.BreakMaterial;
-                lineSpriteID = LINE_BREAK;
+                tapSprite = TAP_BREAK;
+                lineSprite = LINE_BREAK;
                 exColor = Ex_Break;
             }
-            if (tap.isMine)
+            if (isMine)
             {
-                if (tap.isBreak)
-                    tapSpriteID = TAP_BREAK_MINE;
+                if (isBreak)
+                    tapSprite = TAP_BREAK_MINE;
                 else
-                    tapSpriteID = TAP_MINE;
-                lineSpriteID = LINE_MINE;
+                    tapSprite = TAP_MINE;
+                lineSprite = LINE_MINE;
             }
         }
     }
@@ -179,54 +145,32 @@ public struct TapData
 
 
 [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Fast)]
-public struct TapUpdateJob : IJobParallelFor
+public unsafe struct TapUpdateJob : IJobParallelFor
 {
-    // as _inputManager
-    public AutoPlayMode AutoPlayMode;
-
-    // as _timeProvider
     [NativeDisableUnsafePtrRestriction]
-    public unsafe BurstTimeData* TimeDataPtr;
-
-    // as _audioManager
-    [NativeDisableUnsafePtrRestriction]
-    public unsafe bool* SfxRequestsPtr;
-
-    // as _effectManager
-    [NativeDisableUnsafePtrRestriction]
-    public unsafe JudgeEffectData* JudgeEffectRequestsPtr;
-    [NativeDisableUnsafePtrRestriction]
-    public unsafe FastLateData* FastLateRequestsPtr;
-
-    // as _objectCounter
-    [NativeDisableUnsafePtrRestriction]
-    public unsafe ReportResultEntry* ReportRequestsPtr;
-    [NativeDisableUnsafePtrRestriction]
-    public unsafe int* ReportCountPtr;
-
-    [NativeDisableUnsafePtrRestriction]
-    public unsafe int* TapLinesWriteCountPtr;
-    [NativeDisableUnsafePtrRestriction]
-    public unsafe int* TapWriteCountPtr;
-
-
+    public BurstTimeData* TimeDataPtr;
     public NativeArray<TapData> taps;
 
     [NativeDisableParallelForRestriction]
-    public NativeArray<NoteRenderData> tapLinesRender;
+    public NativeArray<LineRenderData> tapLinesRender;
     [NativeDisableParallelForRestriction]
-    public NativeArray<NoteRenderData> tapsRender;
+    public NativeArray<NotesRenderData> notesRender;
+
+    [NativeDisableUnsafePtrRestriction]
+    public int* TapLinesWriteCountPtr;
+    [NativeDisableUnsafePtrRestriction]
+    public int* NotesWriteCountPtr;
 
     public void Execute(int index)
     {
         var tap = taps[index];
         TransformUpdate(ref tap, index);
         AutoplayUpdate(ref tap);
-        //CheckUpdate(ref tap);
+        CheckUpdate(ref tap);
         taps[index] = tap;
     }
 
-    public unsafe void TransformUpdate(ref TapData tap, int index)
+    private void TransformUpdate(ref TapData tap, int index)
     {
         if (tap.isEnd) return;
 
@@ -242,248 +186,145 @@ public struct TapUpdateJob : IJobParallelFor
 
         if (destScale < 0f) return;
 
-        // tap self
+        // show line
+        if (destScale > 0.3f)
+        {
+            var lineIdx = Interlocked.Increment(ref *TapLinesWriteCountPtr) - 1;
+            tapLinesRender[lineIdx] = new LineRenderData()
+            {
+                angRad = math.radians(tap.ang),
+                scale = lineScale,
+                spriteId = tap.lineSprite,
+                sort = (uint)index,
+            };
+        }
+
+        // show tap
         NoteHelper.GetPosFromDistance(clampedDistance, tap.key, out var pos);
         tap.pos = pos;
         tap.scale = destScale;
-        // break shine
+
         if (tap.isBreak)
         {
             var extra = math.max(math.sin(TimeDataPtr->GetFrame() * 0.17f) * 0.5f, 0f);
             tap.brightness = 0.95f + extra;
         }
-        // star rotate
         if (tap.isStar && tap.rotateSpeed != 0)
         {
             var deltaRot = -180f * tap.rotateSpeed * TimeDataPtr->deltaTime;
             tap.ang += deltaRot;
         }
-        //tapLine
-        tap.tapLine.scale = lineScale;
-        //ex border
-        if (tap.isEx)
-        {
-            tap.tapEx.pos = tap.pos;
-            // tap.tapEx.ang = tap.ang; // 0区别
-            tap.tapEx.scale = tap.scale;
-        }
 
-
-        //show tap
-        var tapIdx = Interlocked.Increment(ref *TapWriteCountPtr) - 1;
-        tapsRender[tapIdx] = new NoteRenderData()
+        var tapIdx = Interlocked.Increment(ref *NotesWriteCountPtr) - 1;
+        notesRender[tapIdx] = new NotesRenderData()
         {
             pos = tap.pos,
             angRad = math.radians(tap.ang),
-            scale = tap.scale,
+            scale = new float2(tap.scale, tap.scale),
             spriteId = tap.tapSprite,
             color = new float4(1, 1, 1, 1),
             brightness = tap.brightness,
 
-            exSpriteId = tap.isEx ? tap.exSprite : 0,
+            exSprite = tap.isEx ? tap.exSprite : 0,
             exColor = tap.exColor,
-
-            sort = (uint)index,
-        };
-        // show tapline
-        var lineIdx = Interlocked.Increment(ref *TapLinesWriteCountPtr) - 1;
-        tapLinesRender[lineIdx] = new()
-        {
-            pos = tap.tapLine.pos,
-            angRad = math.radians(tap.tapLine.ang),
-            scale = tap.tapLine.scale,
-            spriteId = tap.lineSprite,
-            color = new float4(1, 1, 1, 1),
-            brightness = 1f,
-
-            exSpriteId = 0,
+            sliceBorder = float2.zero,
 
             sort = (uint)index,
         };
     }
 
-    public unsafe void AutoplayUpdate(ref TapData tap)
+    private void AutoplayUpdate(ref TapData tap)
     {
         if (tap.isEnd) return;
 
         var timing = TimeDataPtr->NoteTime - tap.time;
         if (timing < -0.01f) return;
-        switch (AutoPlayMode)
+
+        switch (NoteHelper.AutoPlayMode)
         {
             case AutoPlayMode.Enable:
-                tap.judgeGrade = JudgeGrade.Perfect;
+                tap.judgeGrade = tap.isMine ? JudgeGrade.Miss : JudgeGrade.Perfect;
                 tap.isJudged = true;
                 tap.diff = 0;
-                End(ref tap);
+                EndNote(ref tap);
                 break;
             case AutoPlayMode.Random:
-                //TODO: use GUID or something as seed
+                // TODO: use guid as seed
                 var gradeIndex = new Random(114514).NextInt(1, 14);
                 if (tap.isMine)
-                {
-                    tap.judgeGrade = gradeIndex > 4
-                        ? JudgeGrade.Miss
-                        : JudgeGrade.Perfect;
-                }
+                    tap.judgeGrade = gradeIndex > 4 ? JudgeGrade.Miss : JudgeGrade.Perfect;
                 else
-                {
                     tap.judgeGrade = (JudgeGrade)gradeIndex;
-                }
                 tap.isJudged = true;
                 tap.diff = gradeIndex > 7 ? 11.4514f : -11.4514f;
-                End(ref tap);
-                break;
-            case AutoPlayMode.DJAuto:
-                if (tap.isJudged)
-                {
-                    break;
-                }
-                if (tap.isMine)
-                {
-                    break;
-                }
-                // TODO
-                //_inputManager.ClickArea(key);
+                EndNote(ref tap);
                 break;
         }
     }
 
-    public unsafe void CheckUpdate(ref TapData tap)
+    private void CheckUpdate(ref TapData tap)
     {
+        if (NoteHelper.AutoPlayMode is AutoPlayMode.Enable or AutoPlayMode.Random) return;
+        if (tap.isEnd) return;
+
         var diffSec = TimeDataPtr->NoteTime - tap.time;
+        var key = (int)tap.key;
 
-        if (AutoPlayMode is AutoPlayMode.Enable or AutoPlayMode.Random) return;
-        if (tap.isJudged) return;
+        var stateOn = NoteHelper.SensorStates[key].Status == SensorStatus.On;
+        var stateBusy = NoteHelper.SensorStates[key].IsJudging;
 
+        // ---- Mine: touched within window -> Miss, otherwise Perfect once survived.
+        //      Resolved independently of the sensor-order gate so it never softlocks. ----
         if (tap.isMine)
         {
-            if (diffSec * 1000 <= -NoteHelper.TOUCH_JUDGE_GOOD_AREA_MSEC) //Too Fast
-            {
-                return;
-            }
-            if (false) //TODO
-            {
-                tap.judgeGrade = NoteHelper.GetJudgeTap(diffSec, tap.isEx);
-                tap.isJudged = true;
-                End(ref tap);
-                return;
-            }
-            if (diffSec >= 0.016667f) //Too Late
-            {
-                tap.judgeGrade = JudgeGrade.Perfect;
-                tap.isJudged = true;
-                End(ref tap);
-                return;
-            }
-        }
-        else
-        {
-            if (diffSec > 0.15f)
+            if (stateOn && !stateBusy && diffSec >= -NoteHelper.TAP_JUDGE_GOOD_AREA_MSEC / 1000f)
             {
                 tap.judgeGrade = JudgeGrade.Miss;
                 tap.isJudged = true;
-                End(ref tap);
+                tap.diff = diffSec;
+                EndNote(ref tap);
                 return;
             }
-        }
-    }
-
-    public unsafe void PlaySfx(in JudgeResult judgeResult)
-    {
-        if (judgeResult.IsMine && judgeResult.IsMissOrTooFast)
-        {
-            //SfxRequests[AudioManager.MISS] = true;
-            return;
-        }
-
-        if (judgeResult.IsMissOrTooFast || judgeResult.IsMine)
-        {
-            return;
-        }
-
-        var isBreak = judgeResult.IsBreak;
-        var isEx = judgeResult.IsEX;
-
-
-        if (isBreak)
-        {
-            switch (judgeResult.Grade)
+            if (diffSec >= 0.016667f)
             {
-                case JudgeGrade.LateGood:
-                case JudgeGrade.FastGood:
-                case JudgeGrade.LateGreat:
-                case JudgeGrade.LateGreat2nd:
-                case JudgeGrade.LateGreat3rd:
-                case JudgeGrade.FastGreat3rd:
-                case JudgeGrade.FastGreat2nd:
-                case JudgeGrade.FastGreat:
-                case JudgeGrade.LatePerfect3rd:
-                case JudgeGrade.FastPerfect3rd:
-                case JudgeGrade.LatePerfect2nd:
-                case JudgeGrade.FastPerfect2nd:
-                    SfxRequestsPtr[AudioManager.BREAK_JUDGE] = true;
-                    break;
-                case JudgeGrade.Perfect:
-                    SfxRequestsPtr[AudioManager.BREAK_JUDGE] = true;
-                    SfxRequestsPtr[AudioManager.BREAK_SFX] = true;
-                    break;
+                tap.judgeGrade = JudgeGrade.Perfect;
+                tap.isJudged = true;
+                EndNote(ref tap);
             }
             return;
         }
-        else if (isEx)
+
+        // ---- Late timeout (independent of sensor, so an untouched tap still misses) ----
+        if (diffSec > 0.15f)
         {
-            SfxRequestsPtr[AudioManager.TAP_EX] = true;
+            tap.judgeGrade = JudgeGrade.Miss;
+            tap.isJudged = true;
+            EndNote(ref tap);
             return;
         }
 
-        switch (judgeResult.Grade)
+        // ---- Sensor input judgment ----
+        if (!stateOn || stateBusy) return;
+
+        if (diffSec >= -NoteHelper.TAP_JUDGE_GOOD_AREA_MSEC / 1000f)
         {
-            case JudgeGrade.LateGood:
-            case JudgeGrade.FastGood:
-                SfxRequestsPtr[AudioManager.TAP_GOOD] = true;
-                //_audioManager.PlaySFX("tap_good.wav");
-                break;
-            case JudgeGrade.LateGreat:
-            case JudgeGrade.LateGreat2nd:
-            case JudgeGrade.LateGreat3rd:
-            case JudgeGrade.FastGreat3rd:
-            case JudgeGrade.FastGreat2nd:
-            case JudgeGrade.FastGreat:
-                SfxRequestsPtr[AudioManager.TAP_GREAT] = true;
-                break;
-            case JudgeGrade.LatePerfect3rd:
-            case JudgeGrade.FastPerfect3rd:
-            case JudgeGrade.LatePerfect2nd:
-            case JudgeGrade.FastPerfect2nd:
-            case JudgeGrade.Perfect:
-                SfxRequestsPtr[AudioManager.TAP_PERFECT] = true;
-                break;
+            var orderIdx = NoteHelper.NextSensorIndex[key];
+            if (orderIdx == tap.sensorOrderIndex)
+            {
+                NoteHelper.SensorStates[key].IsJudging = true;
+                NoteHelper.NextSensorIndex[key] = orderIdx + 1;
+
+                tap.judgeGrade = NoteHelper.GetTapJudge(diffSec, tap.isEx);
+                tap.isJudged = true;
+                tap.diff = diffSec;
+                EndNote(ref tap);
+            }
         }
     }
 
-    public unsafe void PlayEffect(TapData tap)
+    private void EndNote(ref TapData tap)
     {
-        var key = (int)tap.key;
-        JudgeEffectRequestsPtr[key].HasEffect = true;
-        JudgeEffectRequestsPtr[key].IsBreak = tap.isBreak;
-        JudgeEffectRequestsPtr[key].JudgeGrade = tap.judgeGrade;
-        FastLateRequestsPtr[key].HasEffect = true;
-        FastLateRequestsPtr[key].JudgeGrade = tap.judgeGrade;
-    }
-
-    public unsafe void ReportJudge(TapData tap)
-    {
-        var idx = Interlocked.Increment(ref *ReportCountPtr) - 1;
-        ReportRequestsPtr[idx] = new ReportResultEntry
-        {
-            Grade = tap.judgeGrade,
-            IsBreak = tap.isBreak,
-        };
-    }
-
-    private void End(ref TapData tap)
-    {
-        PlaySfx(new JudgeResult
+        NoteHelper.PlayTapSound(new JudgeResult
         {
             Grade = tap.judgeGrade,
             IsBreak = tap.isBreak,
@@ -491,9 +332,9 @@ public struct TapUpdateJob : IJobParallelFor
             IsMine = tap.isMine,
             Diff = tap.diff
         });
-        PlayEffect(tap);
-        ReportJudge(tap);
-        tap.show = false;
+        NoteHelper.PlayJudgeEffect((int)tap.key, tap.judgeGrade, tap.isBreak);
+        NoteHelper.PlayFastLateEffect((int)tap.key, tap.judgeGrade);
+        NoteHelper.ReportResult(tap.judgeGrade, tap.isBreak, SimaiNoteType.Tap);
         tap.isEnd = true;
     }
 }

@@ -73,8 +73,6 @@ public partial class NoteManager : MonoBehaviour
         SetupMaterial(_matSimple);
         SetupMaterial(_matNotes);
         SetupMaterial(_matMask);
-
-        SlideTables.Init();
     }
 
     void Update()
@@ -153,7 +151,6 @@ public partial class NoteManager : MonoBehaviour
                     notesRender = notesRender,
                     SlidesWriteCountPtr = _slideGroup.WriteCountPtr,
                     NotesWriteCountPtr = _notesGroup.WriteCountPtr,
-                    SlideTable = NoteHelper.SlideTable,
                 }.Schedule(slides.Length, 32, h);
 
             if (touches.Length > 0)
@@ -232,8 +229,6 @@ public partial class NoteManager : MonoBehaviour
         if (slides.IsCreated) slides.Dispose();
         if (touches.IsCreated) touches.Dispose();
         if (touchHolds.IsCreated) touchHolds.Dispose();
-
-        SlideTables.Dispose();
     }
 
     public void ResetState()

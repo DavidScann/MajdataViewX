@@ -5,7 +5,7 @@ using System.IO;
 using Unity.Collections;
 using Unity.Mathematics;
 using UnityEngine;
-
+using UnityEngine.UI;
 using static MajCtx;
 
 #endregion
@@ -220,8 +220,22 @@ public class NoteSkinManager : MonoBehaviour
     public static readonly float4 Ex_Each = new float4(255, 254, 119, 255) / 255f;
     public static readonly float4 Ex_Break = Ex_Each;
 
+    public const float HoldBaseWidth = 1.22f;              // legacy spriteRenderer.size.x (244px / 200PPU)
+    public const float HoldCapAllowance = 1.4f;            // legacy total sprite height (280px / 200PPU)
+    public const float HoldCapEach = 0.29f;                // 58px / 200PPU
+    public static float HoldNativeWidth;                    // tex.width / 100, runtime computed
+    public static float HoldNativeHeight;                   // tex.height / 100, runtime computed
+    public static float2 HoldSliceBorder;                   // capWorld / nativeHeight, runtime computed
+
     public Texture2D Atlas;
     public NativeArray<float4> Uvs;
+
+    public Sprite[] JudgeText = new Sprite[5];
+    public Sprite JudgeText_Break;
+    public Sprite FastText;
+    public Sprite LateText;
+
+    public Sprite Outline;
 
     private void Awake()
     {
@@ -386,7 +400,38 @@ public class NoteSkinManager : MonoBehaviour
         Add(sources, HOLD_END_EACH, noteGuidePath + "/Hold_Each_End.png");
         Add(sources, HOLD_END_BREAK, noteGuidePath + "/Hold_Break_End.png");
 
+        // Load judge sprites separately for EffectManager (atlas textures get destroyed)
+        JudgeText[0] = LoadSprite(judgeTextPath + "/judge_text_miss.png");
+        JudgeText[1] = LoadSprite(judgeTextPath + "/judge_text_good.png");
+        JudgeText[2] = LoadSprite(judgeTextPath + "/judge_text_great.png");
+        JudgeText[3] = LoadSprite(judgeTextPath + "/judge_text_perfect.png");
+        JudgeText[4] = LoadSprite(judgeTextPath + "/judge_text_cPerfect.png");
+        JudgeText_Break = LoadSprite(judgeTextPath + "/judge_text_break.png");
+        FastText = LoadSprite(judgeTextPath + "/fast.png");
+        LateText = LoadSprite(judgeTextPath + "/late.png");
+
+        Outline = LoadSprite(Path.Combine(skinPath, "outline.png"));
+
+        // Read actual hold sprite pixel dimensions for resolution-independent sizing.
+        // Shader _PixelsPerUnit = 100, so worldSize = pixelSize / 100.
+        // sliceBorder = cap pixels / tex height (pure UV proportion, not world units).
+        foreach (var src in sources)
+        {
+            if (src.index == HOLD)
+            {
+                HoldNativeWidth = src.tex.width / 100f;
+                HoldNativeHeight = src.tex.height / 100f;
+                HoldSliceBorder = new float2(58f / src.tex.height, 58f / src.tex.height);
+                break;
+            }
+        }
+
         BuildAtlas(sources);
+    }
+
+    private void Start()
+    {
+        GetComponent<SpriteRenderer>().sprite = Outline;
     }
 
     private void Add(List<(string path, int index, Texture2D tex)> list, int index, string path)
@@ -403,6 +448,12 @@ public class NoteSkinManager : MonoBehaviour
         var bytes = File.ReadAllBytes(path);
         tex.LoadImage(bytes);
         return tex;
+    }
+
+    private static Sprite LoadSprite(string path)
+    {
+        var tex = LoadTextureFromFile(path);
+        return Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
     }
 
     private void BuildAtlas(List<(string path, int index, Texture2D tex)> sources)

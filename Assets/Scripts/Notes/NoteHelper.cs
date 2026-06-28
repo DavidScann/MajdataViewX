@@ -24,15 +24,12 @@ public static unsafe class NoteHelper
     public static ReportResultEntry* ReportResults;
     [NativeDisableUnsafePtrRestriction]
     public static int* ReportCount;
+
+
     [NativeDisableUnsafePtrRestriction]
     public static SensorState* SensorStates;
     [NativeDisableUnsafePtrRestriction]
     public static int* NextSensorIndex;
-    [NativeDisableUnsafePtrRestriction]
-    public static float2* SensorPositions;
-
-    // Unified slide table store (replaces 7 raw slide pointers)
-    public static SlideTableStore SlideTable;
 
     public static AutoPlayMode AutoPlayMode;
 

@@ -1,6 +1,7 @@
 ﻿#region
 
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 #endregion
@@ -17,7 +18,8 @@ public class ToggleFullScreen : MonoBehaviour
 
     private void Update()
     {
-        if (Input.GetKeyDown(KeyCode.Escape)) ToggleFullscreen();
+        if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
+            ToggleFullscreen();
     }
 
     public void ToggleFullscreen()

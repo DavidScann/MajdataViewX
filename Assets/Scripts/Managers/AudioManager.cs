@@ -81,6 +81,7 @@ public class AudioManager
     {
         _audioManager = this;
         _sfxPtr = SfxRequestsPtr;
+        NoteHelper.SfxRequests = _sfxPtr;
         Bass.Configure(Configuration.UpdatePeriod, 20);
         Bass.Configure(Configuration.PlaybackBufferLength, 40);
         Bass.Init(-1, 44100);

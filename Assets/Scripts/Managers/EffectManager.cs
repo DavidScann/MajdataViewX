@@ -40,6 +40,11 @@ public class EffectManager : MonoBehaviour
     private void Awake()
     {
         _effectManager = this;
+        unsafe
+        {
+            NoteHelper.JudgeEffectRequests = JudgeEffectRequestsPtr;
+            NoteHelper.FastLateRequests = FastLateRequestsPtr;
+        }
     }
 
     private void Start()
@@ -68,14 +73,14 @@ public class EffectManager : MonoBehaviour
             tapEffects[i].SetActive(false);
         }
 
-        judgeText = _skinManager.JudgeText;
+        judgeText = _noteSkinManager.JudgeText;
 
         foreach (var judgeEffect in judgeEffects)
         {
             judgeEffect.transform.GetChild(0).GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite =
-                _skinManager.JudgeText[0];
+                _noteSkinManager.JudgeText[0];
             judgeEffect.transform.GetChild(0).GetChild(1).gameObject.GetComponent<SpriteRenderer>().sprite =
-                _skinManager.JudgeText_Break;
+                _noteSkinManager.JudgeText_Break;
         }
     }
 
@@ -235,9 +240,9 @@ public class EffectManager : MonoBehaviour
         fastLateEffects[pos].SetActive(true);
         var isFast = (int)judge > 7;
         if (isFast)
-            fastLateEffects[pos].transform.GetChild(0).GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = _skinManager.FastText;
+            fastLateEffects[pos].transform.GetChild(0).GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = _noteSkinManager.FastText;
         else
-            fastLateEffects[pos].transform.GetChild(0).GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = _skinManager.LateText;
+            fastLateEffects[pos].transform.GetChild(0).GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = _noteSkinManager.LateText;
         fastLateAnims[pos].SetTrigger(PerfectHash);
     }
 

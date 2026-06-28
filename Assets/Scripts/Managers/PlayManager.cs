@@ -142,15 +142,15 @@ public class PlayManager : MonoBehaviour
             //chart
             _chart = await SimaiParser.ParseChartAsync(level, designer, fumen);
 
-            _dataLoader.noteSpeed = (float)(107.25 / (71.4184491 * Mathf.Pow(_setting.TapSpeed + 0.9975f, -0.985558604f)));
-            _dataLoader.touchSpeed = _setting.TouchSpeed;
-            _dataLoader.smoothSlideAnime = _setting.SmoothSlideAnime;
+            var noteSpeed = (float)(107.25 / (71.4184491 * Mathf.Pow(_setting.TapSpeed + 0.9975f, -0.985558604f)));
+            var touchSpeed = _setting.TouchSpeed;
             var ignoreOffset = startAt - offset;
             //UI
             _objectCounter.StartOutput(_setting.ComboStatusType, _setting.UIType);
             _effectManager.SetDisplayMode(_setting.JudgeDisplayMode);
             //simulate
             _inputManager.Mode = _setting.AutoMode;
+            NoteHelper.AutoPlayMode = _setting.AutoMode;
             _inputManager.ButtonFirst = _setting.ButtonFirst;
             //bg
             bgCover.color = new Color(0f, 0f, 0f, _setting.BackgroundDim);
@@ -168,16 +168,22 @@ public class PlayManager : MonoBehaviour
             switch (playmode)
             {
                 case PlaybackMode.Normal:
-                    await _dataLoader.Load(_chart,
-                    ignoreOffset, title, artist, difficulty, _setting.LegacySlideLayer);
+                    await _dataLoader.Load(
+                        _chart, ignoreOffset,
+                        title, artist, difficulty,
+                        noteSpeed, touchSpeed,
+                        _setting.SmoothSlideAnime, _setting.LegacySlideLayer);
 
                     _allPerfectManager.enabled = false;
                     _timeProvider.SetStartTime(startAt, offset, speed, playmode);
                     _audioManager.PlayTrack();
                     break;
                 case PlaybackMode.IncludeOp:
-                    await _dataLoader.Load(_chart,
-                    ignoreOffset, title, artist, difficulty, _setting.LegacySlideLayer);
+                    await _dataLoader.Load(
+                        _chart, ignoreOffset,
+                        title, artist, difficulty,
+                        noteSpeed, touchSpeed,
+                        _setting.SmoothSlideAnime, _setting.LegacySlideLayer);
 
                     _bgManager.PlaySongDetail();
                     _audioManager.noteSfxPlaybackRequests[AudioManager.TRACK_START] = true; //track_start
@@ -193,8 +199,11 @@ public class PlayManager : MonoBehaviour
                         throw new InvalidPathException($"maidata path is required");
                     }
 
-                    await _dataLoader.Load(_chart,
-                    ignoreOffset, title, artist, difficulty, _setting.LegacySlideLayer);
+                    await _dataLoader.Load(
+                        _chart, ignoreOffset,
+                        title, artist, difficulty,
+                        noteSpeed, touchSpeed,
+                        _setting.SmoothSlideAnime, _setting.LegacySlideLayer);
 
                     _bgManager.PlaySongDetail();
 
@@ -318,9 +327,8 @@ public class PlayManager : MonoBehaviour
     {
         _screenRecorder.ResetState();
         _objectCounter.ResetState();
-        UniTask.WhenAll(_noteJudgeManager.ResetState());
+        _judgeManager.ResetState();
         _noteManager.ResetState();
-        _multTouchHandler.ResetState();
         _timeProvider.ResetState();
         _audioManager.ResetState();
         _screenRecorder.ResetState();
