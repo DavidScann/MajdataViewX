@@ -105,13 +105,13 @@ namespace Notes.SlideUtils
             }
         }
 
-        public static void NodeToNode(SlidePathGenerator generator, Command last, Command current)
+        public static void NodeToNode(SlidePathConstructor constructor, Command last, Command current)
         {
             if (Command.IsSame(last, current)) return;
-            generator.LineToPoint(GetNodePosition(current));
+            constructor.LineToPoint(GetNodePosition(current));
         }
 
-        public static void NodeToOrbit(SlidePathGenerator generator, Command last, Command current)
+        public static void NodeToOrbit(SlidePathConstructor constructor, Command last, Command current)
         {
             var isCcw = (current.Type == CommandType.OrbitCcw);
             var node = GetNodePosition(last);
@@ -121,7 +121,7 @@ namespace Notes.SlideUtils
             {
                 if (last.Type == CommandType.NodeA && current.Value == 9)
                 {
-                    generator.TrySetLastParseMarker(ParametricSlidePath.ParseMarker.ForceAlign);
+                    constructor.TrySetLastParseMarker(ParametricSlidePath.ParseMarker.ForceAlign);
                 }
                 return;  // node on circle, do nothing
             }
@@ -129,10 +129,10 @@ namespace Notes.SlideUtils
             if (diff.Magnitude < orbit.Radius)
                 throw new ArgumentException($"impossible: {last.Type}{last.Value} -> Orbit{current.Value}");
         
-            generator.TangentToCircle(orbit, isCcw);
+            constructor.TangentToCircle(orbit, isCcw);
         }
     
-        public static void OrbitToNode(SlidePathGenerator generator, Command last, Command current)
+        public static void OrbitToNode(SlidePathConstructor constructor, Command last, Command current)
         {
             var isCcw = (last.Type == CommandType.OrbitCcw);
             var node = GetNodePosition(current);
@@ -140,17 +140,17 @@ namespace Notes.SlideUtils
             var diff = node - orbit.Center;
             if (Math.Abs(diff.Magnitude - orbit.Radius) < 0.1)
             {
-                generator.ArcToAngle(orbit.Center, diff.Phase, isCcw, false);
+                constructor.ArcToAngle(orbit.Center, diff.Phase, isCcw, false);
                 return;
             }
 
             if (diff.Magnitude < orbit.Radius)
                 throw new ArgumentException($"impossible: Orbit{last.Value} -> {current.Type}{current.Value}");
         
-            generator.ArcToTangentTowards(node, orbit.Center, isCcw).LineToPoint(node);
+            constructor.ArcToTangentTowards(node, orbit.Center, isCcw).LineToPoint(node);
         }
     
-        public static void OrbitToOrbit(SlidePathGenerator generator, Command last, Command current)
+        public static void OrbitToOrbit(SlidePathConstructor constructor, Command last, Command current)
         {
             if (current.Type != last.Type) throw new ArgumentException($"orbit type mismatch");
 
@@ -159,7 +159,7 @@ namespace Notes.SlideUtils
             var currentOrbit = MajGeometry.GetCircle(current.Value);
             if (current.Value == last.Value)
             {
-                generator.FullCircle(lastOrbit.Center, isCcw);
+                constructor.FullCircle(lastOrbit.Center, isCcw);
                 return;
             }
 
@@ -169,7 +169,7 @@ namespace Notes.SlideUtils
             if (current.Value == 9)
             {
                 var data = MajGeometry.TransferOutData(last.Value, isCcw);
-                generator.ArcToAngle(lastOrbit.Center, data.Item2, isCcw, false)
+                constructor.ArcToAngle(lastOrbit.Center, data.Item2, isCcw, false)
                     .ArcToAngle(data.Item1.Center, data.Item3, isCcw, false)
                     .TrySetLastParseMarker(ParametricSlidePath.ParseMarker.SmoothAlign);
                 return;
@@ -178,12 +178,12 @@ namespace Notes.SlideUtils
             if (last.Value == 9)
             {
                 var data = MajGeometry.TransferOutData(current.Value, !isCcw);
-                generator.ArcToAngle(lastOrbit.Center, data.Item3, isCcw, true)
+                constructor.ArcToAngle(lastOrbit.Center, data.Item3, isCcw, true)
                     .ArcToAngle(data.Item1.Center, data.Item2, isCcw, false);
                 return;
             }
         
-            generator.ExternTangentTransfer(lastOrbit.Center, currentOrbit, isCcw);
+            constructor.ExternTangentTransfer(lastOrbit.Center, currentOrbit, isCcw);
         }
     
         public static ParametricSlidePath Parse(string code)
@@ -193,7 +193,7 @@ namespace Notes.SlideUtils
                 var commands = ParseCommands(code);
                 var lastCmd = commands[0];
                 // The first command is guarantee to be 'A'
-                var generator = SlidePathGenerator.BeginAt(MajGeometry.PointGroupA(lastCmd.Value));
+                var generator = SlidePathConstructor.BeginAt(MajGeometry.PointGroupA(lastCmd.Value));
 
                 for (var i = 1; i < commands.Count; i++)
                 {

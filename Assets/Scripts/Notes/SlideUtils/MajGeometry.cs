@@ -4,6 +4,7 @@ using System.Numerics;
 namespace Notes.SlideUtils
 {
     /// <summary>
+    /// <p>Maimai 复平面坐标系的定义</p>
     /// <p>以 C 区中心为原点，朝右为实轴、朝上为虚轴，建立复平面</p>
     /// </summary>
     public static class MajGeometry
