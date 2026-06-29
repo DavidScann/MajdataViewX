@@ -3,24 +3,24 @@ using System.Numerics;
 
 namespace Notes.SlideUtils
 {
+    public struct CircleStruct
+    {
+        public Complex Center;
+        public double Radius;
+
+        public CircleStruct(Complex center, double radius)
+        {
+            Center = center;
+            Radius = radius;
+        }
+    }
+    
     /// <summary>
     /// <p>Maimai 复平面坐标系的定义</p>
     /// <p>以 C 区中心为原点，朝右为实轴、朝上为虚轴，建立复平面</p>
     /// </summary>
     public static class MajGeometry
     {
-        public struct CircleStruct
-        {
-            public Complex Center;
-            public double Radius;
-
-            public CircleStruct(Complex center, double radius)
-            {
-                Center = center;
-                Radius = radius;
-            }
-        }
-
         /// <summary>
         /// <p>这个参数定义了整个几何模型的长度单位</p>
         /// </summary>

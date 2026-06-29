@@ -121,7 +121,7 @@ namespace Notes.SlideUtils
             {
                 if (last.Type == CommandType.NodeA && current.Value == 9)
                 {
-                    constructor.TrySetLastParseMarker(ParametricSlidePath.ParseMarker.ForceAlign);
+                    constructor.TrySetLastParseMarker(SlideParseMarker.ForceAlign);
                 }
                 return;  // node on circle, do nothing
             }
@@ -171,7 +171,7 @@ namespace Notes.SlideUtils
                 var data = MajGeometry.TransferOutData(last.Value, isCcw);
                 constructor.ArcToAngle(lastOrbit.Center, data.Item2, isCcw, false)
                     .ArcToAngle(data.Item1.Center, data.Item3, isCcw, false)
-                    .TrySetLastParseMarker(ParametricSlidePath.ParseMarker.SmoothAlign);
+                    .TrySetLastParseMarker(SlideParseMarker.SmoothAlign);
                 return;
             }
 

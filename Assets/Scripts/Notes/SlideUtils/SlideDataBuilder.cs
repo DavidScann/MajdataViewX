@@ -4,29 +4,52 @@ using System.Numerics;
 
 namespace Notes.SlideUtils
 {
+    public readonly struct SlideArrowData
+    {
+        public readonly Complex Point;
+        public readonly Complex Direction;
+        public readonly double PathLength;
+
+        public SlideArrowData(Complex point, Complex direction, double pathLength)
+        {
+            Point = point;
+            Direction = direction;
+            PathLength = pathLength;
+        }
+    }
+
+    public readonly struct SlideAreaData
+    {
+        /// <summary>
+        /// 判定段激活以后 slide 完成的长度
+        /// </summary>
+        public readonly double LengthAfterPush;
+
+        /// <summary>
+        /// 判定段完成以后 slide 完成的长度
+        /// </summary>
+        public readonly double LengthAfterFinish;
+
+        public readonly int[] SensorAreas;
+
+        public SlideAreaData(double lengthAfterPush, double lengthAfterFinish, int[] areas)
+        {
+            LengthAfterPush = lengthAfterPush;
+            LengthAfterFinish = lengthAfterFinish;
+            SensorAreas = areas;
+        }
+    }
+
+
     /// <summary>
     /// <p>用于生成 slide 相关 metadata 的工具类</p>
     /// <p>目前包含箭头数据和判定区数据</p>
     /// </summary>
     public static class SlideDataBuilder
     {
-        public readonly struct ArrowData
+        public static List<SlideArrowData> BuildArrowData(ParametricSlidePath path)
         {
-            public readonly Complex Point;
-            public readonly Complex Direction;
-            public readonly double PathLength;
-
-            public ArrowData(Complex point, Complex direction, double pathLength)
-            {
-                Point = point;
-                Direction = direction;
-                PathLength = pathLength;
-            }
-        }
-    
-        public static List<ArrowData> BuildArrowData(ParametricSlidePath path)
-        {
-            var result = new List<ArrowData>();
+            var result = new List<SlideArrowData>();
             var totalLength = path.GetPathLength();
             var totalSegCount = path.Segments.Length;
 
@@ -43,21 +66,21 @@ namespace Notes.SlideUtils
                 {
                     // 在官机中，圆弧形 slide 箭头的朝向是“上个箭头 → 当前箭头”的延长线方向
                     // （严格来说前 4 ~ 6 个箭头有一个收敛过程，但我不想复刻这个）
-                    
+
                     var lastPoint = result[^1].Point;
                     tg = pt - lastPoint;
                     tg /= tg.Magnitude;
                 }
 
-                result.Add(new ArrowData(pt, tg, currentLength));
-                
+                result.Add(new SlideArrowData(pt, tg, currentLength));
+
                 // 计算下一个箭头放在哪里
                 var nextLength = currentLength + path.Segments[segIdx].ArrowDistance;
-                
+
                 if (segIdx < totalSegCount - 1 && nextLength >= path.AccumulatedLengths[segIdx])
                 {
                     // 即将切换 Segment
-                    if (path.Segments[segIdx + 1].ParseMarker == ParametricSlidePath.ParseMarker.SmoothAlign)
+                    if (path.Segments[segIdx + 1].ParseMarker == SlideParseMarker.SmoothAlign)
                     {
                         // SmoothAlign 标志的意思是，调节本段箭头间距使得结束时箭头位置恰好在本段终点
                         // P.S. 这种情况出现在 ppqq 圈进入判定线大圆，可以把转移轨道的箭头间距微调一下，让大圆的箭头对齐
@@ -67,7 +90,7 @@ namespace Notes.SlideUtils
                         nextLength = currentLength + delta / n;
                     }
 
-                    if (path.Segments[segIdx].ParseMarker == ParametricSlidePath.ParseMarker.ForceAlign)
+                    if (path.Segments[segIdx].ParseMarker == SlideParseMarker.ForceAlign)
                     {
                         // ForceAlign 标志的意思是，结束时把当前的位置强制对齐到本段的终点
                         // 于是下一个箭头应该出现在转折点之后一个间隔处
@@ -80,39 +103,19 @@ namespace Notes.SlideUtils
 
                 currentLength = nextLength;
             }
-        
+
             // 把路径终点补上
-            result.Add(new ArrowData(path.GetPointAt(1.0), path.GetTangentAt(1.0), totalLength));
+            result.Add(new SlideArrowData(path.GetPointAt(1.0), path.GetTangentAt(1.0), totalLength));
 
             return result;
         }
 
-        public readonly struct SlideAreaData
-        {
-            /// <summary>
-            /// 判定段激活以后 slide 完成的长度
-            /// </summary>
-            public readonly double LengthAfterPush;
-            /// <summary>
-            /// 判定段完成以后 slide 完成的长度
-            /// </summary>
-            public readonly double LengthAfterFinish;
-            public readonly int[] SensorAreas;
-
-            public SlideAreaData(double lengthAfterPush, double lengthAfterFinish, int[] areas)
-            {
-                LengthAfterPush = lengthAfterPush;
-                LengthAfterFinish = lengthAfterFinish;
-                SensorAreas = areas;
-            }
-        }
-    
         /// <summary>
         /// <p>key 是两个 5 bit 整数拼起来，表示高 5 位的判定区前往低 5 位的判定区</p>
         /// <p>5 bit 整数与判定区的对应符合<c>SensorType</c>的定义，可取范围 0~16</p>
         /// <p>value 记录这一段路径如何被各个判定段切割</p>
-        /// <p><c>PushDistance</c>是“判定区入点到出点”的距离</p>
-        /// <p><c>ReleaseDistance</c>是“判定区出点到下个判定区入点”的距离</p>
+        /// <p><c>LengthAfterPush</c>是“判定区出点”的位置</p>
+        /// <p><c>LengthAfterFinish</c>是“下个判定区入点”的位置</p>
         /// <p>这个字典只能应付由官机 slide 片段生成的 slide 形状，无法处理过于超前的形状</p>
         /// </summary>
         public static readonly Dictionary<int, SlideAreaData[]> HitAreasLookup = new();
@@ -136,7 +139,7 @@ namespace Notes.SlideUtils
             // 这里的各种 magic number 都是实测的数据，不要动
             var diff = (j - i) & 7; // 其实就是 % 8 ... 某种对负数的兼容性
             int tmp, tmp2;
-                
+
             // Ai -> Aj
             var key = (i << 5) | j;
             switch (diff)
@@ -166,7 +169,7 @@ namespace Notes.SlideUtils
                     break;
                 }
             }
-                    
+
             // Bi -> Bj
             key = ((i | 8) << 5) | (j | 8);
             switch (diff)
@@ -210,7 +213,7 @@ namespace Notes.SlideUtils
                     break;
                 }
             }
-                    
+
             // Ai <-> Bj
             key = (i << 5) | (j | 8);
             var key2 = ((j | 8) << 5) | i;
@@ -269,7 +272,7 @@ namespace Notes.SlideUtils
                     break;
                 }
             }
-                    
+
             // C <-> Bj
             // C 区不可能绕过 B 区直接去 A 区
             key = (16 << 5) | (j | 8);
@@ -288,13 +291,13 @@ namespace Notes.SlideUtils
 
         // 判定区探测算法的参数，不要动
         public static readonly double HitAreaCalcStep = MajGeometry.MainRadius / 48.0;
-        
+
         public static readonly double HitAreaARadius = MajGeometry.MainRadius * 80.0 / 480.0;
         public static readonly double HitAreaADistance = MajGeometry.MainRadius * 440.0 / 480.0;
         public static readonly double HitAreaBRadius = MajGeometry.MainRadius * 45.0 / 480.0;
         public static readonly double HitAreaBDistance = MajGeometry.MainRadius * 210.0 / 480.0;
         public static readonly double HitAreaCRadius = MajGeometry.MainRadius * 55.0 / 480.0;
-        
+
         public static readonly double LastDistanceCircle = MajGeometry.MainRadius * 175.0 / 480.0;
         public static readonly double LastDistanceShort = MajGeometry.MainRadius * 130.0 / 480.0;
         public static readonly double LastDistanceLong = MajGeometry.MainRadius * 159.0 / 480.0;
@@ -308,14 +311,14 @@ namespace Notes.SlideUtils
         {
             // 第一步，计算 slide 路径上“最接近每个判定区的点”
             // 不考虑 OR 判定区，只看恰好经过一个判定区的情况
-            
-            var nodeList = new List<Tuple<int, double>>();  // 保存判定区以及最接近它的点（用经过的路径长度表示）
+
+            var nodeList = new List<Tuple<int, double>>(); // 保存判定区以及最接近它的点（用经过的路径长度表示）
             var totalLength = path.GetPathLength();
             var count = (int)Math.Round(totalLength / HitAreaCalcStep);
-            
+
             int? lastNode = null;
             var enterLength = 0.0;
-            
+
             for (var i = 0; i < count; i++)
             {
                 // 计算现在的位置
@@ -328,21 +331,22 @@ namespace Notes.SlideUtils
                 {
                     node = 16;
                 }
-                else for (var j = 0; j < 8; j++)
-                {
-                    var phi = Math.PI * (3.0 / 8.0 - j / 4.0);
-                    if ((pt - Complex.FromPolarCoordinates(HitAreaADistance, phi)).Magnitude < HitAreaARadius)
+                else
+                    for (var j = 0; j < 8; j++)
                     {
-                        node = j;
-                        break;
-                    }
+                        var phi = Math.PI * (3.0 / 8.0 - j / 4.0);
+                        if ((pt - Complex.FromPolarCoordinates(HitAreaADistance, phi)).Magnitude < HitAreaARadius)
+                        {
+                            node = j;
+                            break;
+                        }
 
-                    if ((pt - Complex.FromPolarCoordinates(HitAreaBDistance, phi)).Magnitude < HitAreaBRadius)
-                    {
-                        node = j | 8;
-                        break;
+                        if ((pt - Complex.FromPolarCoordinates(HitAreaBDistance, phi)).Magnitude < HitAreaBRadius)
+                        {
+                            node = j | 8;
+                            break;
+                        }
                     }
-                }
                 // node 可能为 null，也可能为 0 ~ 16 中的某个
 
                 if (lastNode != node)
@@ -358,7 +362,7 @@ namespace Notes.SlideUtils
                     {
                         // 离开的情况，则认为进入和离开位置的中点是“最接近该判定区的点”
                         nodeList.Add(new Tuple<int, double>(lastNode.Value, (length + enterLength) / 2.0));
-                        
+
                         if (node != null)
                         {
                             // 正好又进入了新一个判定区的领域
@@ -366,24 +370,24 @@ namespace Notes.SlideUtils
                         }
                     }
                 }
-            
+
                 lastNode = node;
             }
-            
+
             // 补上最后一个区，此时必然位于某个 A 区领域内，所以 lastNode 必不为 null
             nodeList.Add(new Tuple<int, double>(lastNode!.Value, totalLength));
             // 把第一个判定区的“最接近点”设为 slide 起点
             // 因为按照上述算法，如果不这么做，“最接近点”将会是 起点~离开第一个区 这段路径的中点
             nodeList[0] = new Tuple<int, double>(nodeList[0].Item1, 0.0);
-        
+
             // ========== ========== ========== ========== ========== ========== ==========
             // 第二步，生成判定区列表，以及相应的 push 和 finish
             // OR 判定区在这一步根据预先打好的表生成
-            
+
             // ReSharper disable once UseObjectOrCollectionInitializer
             var result = new List<SlideAreaData>();
             result.Add(new SlideAreaData(0.0, 0.0, new[] { nodeList[0].Item1 }));
-            
+
             for (var i = 1; i < nodeList.Count; i++)
             {
                 // 生成查表的 key：高 5 位是上一判定区，低 5 位是下一判定区
@@ -391,10 +395,10 @@ namespace Notes.SlideUtils
                 // 这是“最接近”两判定区的点之间的距离
                 var lastLength = nodeList[i - 1].Item2;
                 var segmentLength = nodeList[i].Item2 - lastLength;
-                
+
                 var data = HitAreasLookup[key];
                 var area = result[^1];
-                
+
                 // 按照预先打表的性质，此时上一个区的 push 和 finish 应该都是“判定区中心”
                 // 那么这里再给 push 加上“中心到出点”，finish 加上“中心到下一个入点”
                 result[^1] = new SlideAreaData(
@@ -402,7 +406,7 @@ namespace Notes.SlideUtils
                     lastLength + segmentLength * data[0].LengthAfterFinish,
                     area.SensorAreas
                 );
-                
+
                 // 根据预先打好的表生成判定区
                 for (var j = 1; j < data.Length; j++)
                 {
@@ -416,10 +420,10 @@ namespace Notes.SlideUtils
 
             // ========== ========== ========== ========== ========== ========== ==========
             // 第三步，修正最后一个区的入点，使之差不多吻合官机的尾判时机
-            
+
             var lastDistance = 0.0;
-            
-            if (path.Segments[^1] is ParametricSlidePath.LineSegment)
+
+            if (path.Segments[^1] is LineSegment)
             {
                 // 最后一个区是直线进入
                 var diff = nodeList[^1].Item1 - nodeList[^2].Item1;
@@ -437,11 +441,13 @@ namespace Notes.SlideUtils
                 // 最后一个区是圆弧进入
                 lastDistance = LastDistanceCircle;
             }
+
             // 然后修正倒数第二区和最后一区的 push 和 finish
             // ReSharper disable once InconsistentNaming
             var last2ndArea = result[^2];
             var lastArea = result[^1];
-            result[^2] = new SlideAreaData(last2ndArea.LengthAfterPush, totalLength - lastDistance, last2ndArea.SensorAreas);
+            result[^2] = new SlideAreaData(last2ndArea.LengthAfterPush, totalLength - lastDistance,
+                last2ndArea.SensorAreas);
             result[^1] = new SlideAreaData(totalLength, totalLength, lastArea.SensorAreas);
 
             return result;

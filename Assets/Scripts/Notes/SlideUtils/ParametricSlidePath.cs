@@ -6,214 +6,215 @@ using System.Numerics;
 namespace Notes.SlideUtils
 {
     /// <summary>
+    /// <p>用来控制箭头对齐的标志</p>
+    /// </summary>
+    public enum SlideParseMarker
+    {
+        None = 0,
+
+        /// <summary>
+        /// 调整箭头间距，以保证本段结束时箭头位置恰好对齐本段终点
+        /// </summary>
+        SmoothAlign,
+
+        /// <summary>
+        /// 不调整箭头间距，但本段结束时把箭头位置强制设为本段终点
+        /// </summary>
+        ForceAlign,
+    }
+
+    /// <summary>
+    /// <p>一个 slide 路径片段的 abstract 类</p>
+    /// </summary>
+    public abstract class PathSegment
+    {
+        /// <summary>
+        /// <p>用来控制箭头对齐的标志</p>
+        /// </summary>
+        public SlideParseMarker ParseMarker { get; private set; } = SlideParseMarker.None;
+
+        /// <summary>
+        /// <p>这个参数表示这段路径上每隔多少距离放一个箭头</p>
+        /// <p>默认值是判定圆周长的 1/64</p>
+        /// </summary>
+        public double ArrowDistance { get; private set; } = MajGeometry.DefaultDistance;
+
+        public abstract bool IsCurve { get; }
+
+        /// <summary>
+        /// <p>计算路径上某点的坐标，保证均匀插值</p>
+        /// </summary>
+        /// <param name="t">0 ~ 1 (both inclusive)</param>
+        public abstract Complex GetPointAt(double t);
+
+        /// <summary>
+        /// <p>计算路径上某点处的有向切线，方向为路径前进方向</p>
+        /// </summary>
+        /// <param name="t">0 ~ 1 (both inclusive)</param>
+        /// <returns>complex (magnitude = 1)</returns>
+        public abstract Complex GetTangentAt(double t);
+
+        /// <summary>
+        /// <p>计算本段路径总长</p>
+        /// </summary>
+        public abstract double GetSegmentLength();
+
+        /// <summary>
+        /// <p>设置控制箭头对齐的标志，给 parser 用</p>
+        /// </summary>
+        public void SetParseMarker(SlideParseMarker marker) => ParseMarker = marker;
+
+        /// <summary>
+        /// <p>设置本段路径的箭头排列间距</p>
+        /// </summary>
+        public void SetArrowDistance(double distance) => ArrowDistance = distance;
+    }
+
+    /// <summary>
+    /// <p>slide 直线片段</p>
+    /// </summary>
+    public class LineSegment : PathSegment
+    {
+        public readonly Complex StartPoint;
+        public readonly Complex EndPoint;
+
+        public LineSegment(Complex start, Complex end)
+        {
+            StartPoint = start;
+            EndPoint = end;
+        }
+
+        public override bool IsCurve { get; } = false;
+
+        public override Complex GetPointAt(double t)
+        {
+            return StartPoint + (EndPoint - StartPoint) * t;
+        }
+
+        public override Complex GetTangentAt(double t)
+        {
+            var v = EndPoint - StartPoint;
+            return v / v.Magnitude;
+        }
+
+        public override double GetSegmentLength()
+        {
+            return (EndPoint - StartPoint).Magnitude;
+        }
+    }
+
+    /// <summary>
+    /// <p>slide 圆弧片段，对角度进行线性插值，不会自动扣除一整圈</p>
+    /// </summary>
+    public class ArcSegment : PathSegment
+    {
+        public readonly CircleStruct Circle;
+        public readonly double StartRadian;
+        public readonly double EndRadian;
+
+        public ArcSegment(CircleStruct circle, double startRadian, double endRadian)
+        {
+            Circle = circle;
+            StartRadian = startRadian;
+            EndRadian = endRadian;
+        }
+
+        public override bool IsCurve { get; } = true;
+
+        public override Complex GetPointAt(double t)
+        {
+            var angle = StartRadian + t * (EndRadian - StartRadian);
+            return Circle.Center + Complex.FromPolarCoordinates(Circle.Radius, angle);
+        }
+
+        public override Complex GetTangentAt(double t)
+        {
+            var angle = StartRadian + t * (EndRadian - StartRadian);
+            if (StartRadian < EndRadian)
+            {
+                return Complex.FromPolarCoordinates(1, angle) * Complex.ImaginaryOne;
+            }
+            else
+            {
+                return Complex.FromPolarCoordinates(-1, angle) * Complex.ImaginaryOne;
+            }
+        }
+
+        public override double GetSegmentLength()
+        {
+            return Math.Abs(EndRadian - StartRadian) * Circle.Radius;
+        }
+    }
+
+    /// <summary>
+    /// <p>slide 圆周片段，总之就是转一整圈</p>
+    /// </summary>
+    public class CircleSegment : PathSegment
+    {
+        public readonly CircleStruct Circle;
+        public readonly double StartRadian;
+        public readonly bool IsCcw;
+
+        public CircleSegment(CircleStruct circle, double startRadian, bool isCcw)
+        {
+            Circle = circle;
+            StartRadian = startRadian;
+            IsCcw = isCcw;
+        }
+
+        public override bool IsCurve { get; } = true;
+
+        public override Complex GetPointAt(double t)
+        {
+            double angle;
+            if (IsCcw)
+            {
+                angle = StartRadian + t * Math.PI * 2.0;
+            }
+            else
+            {
+                angle = StartRadian - t * Math.PI * 2.0;
+            }
+
+            return Circle.Center + Complex.FromPolarCoordinates(Circle.Radius, angle);
+        }
+
+        public override Complex GetTangentAt(double t)
+        {
+            double angle;
+            if (IsCcw)
+            {
+                angle = StartRadian + t * Math.PI * 2.0;
+                return Complex.FromPolarCoordinates(1, angle) * Complex.ImaginaryOne;
+            }
+            else
+            {
+                angle = StartRadian - t * Math.PI * 2.0;
+                return Complex.FromPolarCoordinates(-1, angle) * Complex.ImaginaryOne;
+            }
+        }
+
+        public override double GetSegmentLength()
+        {
+            return Math.PI * Circle.Radius * 2.0;
+        }
+    }
+
+    /// <summary>
     /// <p>参数化的 slide 路径曲线</p>
     /// </summary>
     public class ParametricSlidePath
     {
         /// <summary>
-        /// <p>用来控制箭头对齐的标志</p>
-        /// </summary>
-        public enum ParseMarker
-        {
-            None = 0,
-            /// <summary>
-            /// 调整箭头间距，以保证本段结束时箭头位置恰好对齐本段终点
-            /// </summary>
-            SmoothAlign,
-            /// <summary>
-            /// 不调整箭头间距，但本段结束时把箭头位置强制设为本段终点
-            /// </summary>
-            ForceAlign,
-        }
-    
-        /// <summary>
-        /// <p>一个 slide 路径片段的 abstract 类</p>
-        /// </summary>
-        public abstract class PathSegment
-        {
-            /// <summary>
-            /// <p>用来控制箭头对齐的标志</p>
-            /// </summary>
-            public ParseMarker ParseMarker { get; private set; } = ParseMarker.None;
-            
-            /// <summary>
-            /// <p>这个参数表示这段路径上每隔多少距离放一个箭头</p>
-            /// <p>默认值是判定圆周长的 1/64</p>
-            /// </summary>
-            public double ArrowDistance { get; private set; } = MajGeometry.DefaultDistance;
-            
-            public abstract bool IsCurve { get; }
-
-            /// <summary>
-            /// <p>计算路径上某点的坐标，保证均匀插值</p>
-            /// </summary>
-            /// <param name="t">0 ~ 1 (both inclusive)</param>
-            public abstract Complex GetPointAt(double t);
-        
-            /// <summary>
-            /// <p>计算路径上某点处的有向切线，方向为路径前进方向</p>
-            /// </summary>
-            /// <param name="t">0 ~ 1 (both inclusive)</param>
-            /// <returns>complex (magnitude = 1)</returns>
-            public abstract Complex GetTangentAt(double t);
-        
-            /// <summary>
-            /// <p>计算本段路径总长</p>
-            /// </summary>
-            public abstract double GetSegmentLength();
-
-            /// <summary>
-            /// <p>设置控制箭头对齐的标志，给 parser 用</p>
-            /// </summary>
-            public void SetParseMarker(ParseMarker marker) => ParseMarker = marker;
-        
-            /// <summary>
-            /// <p>设置本段路径的箭头排列间距</p>
-            /// </summary>
-            public void SetArrowDistance(double distance) => ArrowDistance = distance;
-        }
-    
-        /// <summary>
-        /// <p>slide 直线片段</p>
-        /// </summary>
-        public class LineSegment : PathSegment
-        {
-            public readonly Complex StartPoint;
-            public readonly Complex EndPoint;
-
-            public LineSegment(Complex start, Complex end)
-            {
-                StartPoint = start;
-                EndPoint = end;
-            }
-
-            public override bool IsCurve { get; } = false;
-
-            public override Complex GetPointAt(double t)
-            {
-                return StartPoint + (EndPoint - StartPoint) * t;
-            }
-
-            public override Complex GetTangentAt(double t)
-            {
-                var v = EndPoint - StartPoint;
-                return v / v.Magnitude;
-            }
-
-            public override double GetSegmentLength()
-            {
-                return (EndPoint - StartPoint).Magnitude;
-            }
-        }
-    
-        /// <summary>
-        /// <p>slide 圆弧片段，对角度进行线性插值，不会自动扣除一整圈</p>
-        /// </summary>
-        public class ArcSegment : PathSegment
-        {
-            public readonly MajGeometry.CircleStruct Circle;
-            public readonly double StartRadian;
-            public readonly double EndRadian;
-
-            public ArcSegment(MajGeometry.CircleStruct circle, double startRadian, double endRadian)
-            {
-                Circle = circle;
-                StartRadian = startRadian;
-                EndRadian = endRadian;
-            }
-
-            public override bool IsCurve { get; } = true;
-
-            public override Complex GetPointAt(double t)
-            {
-                var angle = StartRadian + t * (EndRadian - StartRadian);
-                return Circle.Center + Complex.FromPolarCoordinates(Circle.Radius, angle);
-            }
-
-            public override Complex GetTangentAt(double t)
-            {
-                var angle = StartRadian + t * (EndRadian - StartRadian);
-                if (StartRadian < EndRadian)
-                {
-                    return Complex.FromPolarCoordinates(1, angle) * Complex.ImaginaryOne;
-                }
-                else
-                {
-                    return Complex.FromPolarCoordinates(-1, angle) * Complex.ImaginaryOne;
-                }
-            }
-
-            public override double GetSegmentLength()
-            {
-                return Math.Abs(EndRadian - StartRadian) * Circle.Radius;
-            }
-        }
-
-        /// <summary>
-        /// <p>slide 圆周片段，总之就是转一整圈</p>
-        /// </summary>
-        public class CircleSegment : PathSegment
-        {
-            public readonly MajGeometry.CircleStruct Circle;
-            public readonly double StartRadian;
-            public readonly bool IsCcw;
-
-            public CircleSegment(MajGeometry.CircleStruct circle, double startRadian, bool isCcw)
-            {
-                Circle = circle;
-                StartRadian = startRadian;
-                IsCcw = isCcw;
-            }
-
-            public override bool IsCurve { get; } = true;
-
-            public override Complex GetPointAt(double t)
-            {
-                double angle;
-                if (IsCcw)
-                {
-                    angle = StartRadian + t * Math.PI * 2.0;
-                }
-                else
-                {
-                    angle = StartRadian - t * Math.PI * 2.0;
-                }
-
-                return Circle.Center + Complex.FromPolarCoordinates(Circle.Radius, angle);
-            }
-
-            public override Complex GetTangentAt(double t)
-            {
-                double angle;
-                if (IsCcw)
-                {
-                    angle = StartRadian + t * Math.PI * 2.0;
-                    return Complex.FromPolarCoordinates(1, angle) * Complex.ImaginaryOne;
-                }
-                else
-                {
-                    angle = StartRadian - t * Math.PI * 2.0;
-                    return Complex.FromPolarCoordinates(-1, angle) * Complex.ImaginaryOne;
-                }
-            }
-
-            public override double GetSegmentLength()
-            {
-                return Math.PI * Circle.Radius * 2.0;
-            }
-        }
-    
-    
-        /// <summary>
         /// <p>组成这条路径的所有片段</p>
         /// </summary>
         public readonly PathSegment[] Segments;
-        
+
         /// <summary>
         /// <p>片段之间的切割点，<c>Fractions[i]</c>是第 i 个片段的终点的 t 值</p>
         /// </summary>
         public readonly double[] Fractions;
-        
+
         /// <summary>
         /// <p>片段累积长度，<c>AccumulatedLengths[i]</c>是到第 i 个片段的终点为止经过的总长度</p>
         /// </summary>
@@ -226,6 +227,7 @@ namespace Notes.SlideUtils
             {
                 throw new ArgumentException("At least one path segment is required.");
             }
+
             var lengths = Segments.Select(s => s.GetSegmentLength());
             var sum = 0.0;
             AccumulatedLengths = lengths.Select(x => (sum += x)).ToArray();
@@ -251,7 +253,7 @@ namespace Notes.SlideUtils
                 segmentT = 1.0;
                 return Segments[^1];
             }
-            
+
             // The index of the specified value in the specified array, if value is found;
             // otherwise, a negative number.
             //
@@ -262,7 +264,7 @@ namespace Notes.SlideUtils
             // If value is not found and value is greater than all elements in array,
             // the negative number returned is the bitwise complement of (the index of the last element plus 1).
             var idx = Array.BinarySearch(Fractions, t);
-            
+
             if (idx < 0)
             {
                 // t 不在 Fractions 里，此时 idx 的按位取反是 第一个比 t 大的元素 的索引
@@ -285,11 +287,11 @@ namespace Notes.SlideUtils
                 segmentT = t / Fractions[0];
                 return Segments[0];
             }
-            
+
             segmentT = (t - Fractions[idx - 1]) / (Fractions[idx] - Fractions[idx - 1]);
             return Segments[idx];
         }
-    
+
         /// <summary>
         /// <p>计算路径总长</p>
         /// </summary>
