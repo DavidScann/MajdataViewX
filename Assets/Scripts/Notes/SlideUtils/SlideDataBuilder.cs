@@ -436,15 +436,8 @@ namespace Notes.SlideUtils
             if (path.Segments[^1] is LineSegment)
             {
                 // 最后一个区是直线进入
-                var diff = nodeList[^1].Item1 - nodeList[^2].Item1;
-                diff &= 7;
-                lastDistance = diff switch
-                {
-                    // A2->A1, A3->A1, B2->A1
-                    1 or 2 or 6 or 7 => LastDistanceShort,
-                    // B1->A1, B4->A1
-                    _ => LastDistanceLong
-                };
+                // 如果来自 A 区就用短的 LastDistance，例如 A3->A1 / A2->A1 的情况
+                lastDistance = nodeList[^2].Item1 <= 7 ? LastDistanceShort : LastDistanceLong;
             }
             else
             {
