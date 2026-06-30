@@ -24,6 +24,16 @@ namespace Notes.SlideUtils
     }
 
     /// <summary>
+    /// <p>slide 结尾的形状</p>
+    /// </summary>
+    public enum SlideEndShape
+    {
+        Straight,
+        CircleL,
+        CircleR
+    }
+
+    /// <summary>
     /// <p>一个 slide 路径片段的 abstract 类</p>
     /// </summary>
     public abstract class PathSegment
@@ -316,6 +326,22 @@ namespace Notes.SlideUtils
         {
             var segment = GetSegmentAt(t, out var segT);
             return segment.GetTangentAt(segT);
+        }
+        
+        public SlideEndShape GetEndShape()
+        {
+            var lastSegment = Segments[^1];
+            if (lastSegment is CircleSegment circle)
+            {
+                return circle.IsCcw ? SlideEndShape.CircleL : SlideEndShape.CircleR;
+            }
+
+            if (lastSegment is ArcSegment arc)
+            {
+                return (arc.EndRadian > arc.StartRadian) ? SlideEndShape.CircleL : SlideEndShape.CircleR;
+            }
+
+            return SlideEndShape.Straight;
         }
     }
 }

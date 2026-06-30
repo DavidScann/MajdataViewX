@@ -3,10 +3,10 @@ using System.Numerics;
 
 namespace Notes.SlideUtils
 {
-    public struct CircleStruct
+    public readonly struct CircleStruct
     {
-        public Complex Center;
-        public double Radius;
+        public readonly Complex Center;
+        public readonly double Radius;
 
         public CircleStruct(Complex center, double radius)
         {
