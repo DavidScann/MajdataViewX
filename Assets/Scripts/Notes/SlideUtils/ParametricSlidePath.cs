@@ -29,8 +29,8 @@ namespace Notes.SlideUtils
     public enum SlideEndShape
     {
         Straight,
-        CircleL,
-        CircleR
+        CircleCCW,
+        CircleCW
     }
 
     /// <summary>
@@ -306,15 +306,45 @@ namespace Notes.SlideUtils
         /// <p>计算路径总长</p>
         /// </summary>
         public double GetPathLength() => AccumulatedLengths[^1];
+        
+        /// <summary>
+        /// 是否关于“A1 - C - A5”反射路径
+        /// </summary>
+        public bool Reflected { get; private set; } = false;
+        /// <summary>
+        /// 顺时针旋转路径，多少个 45 度
+        /// </summary>
+        public int Rotated45CW { get; private set; } = 0;
+        
+        private Complex _rotor = Complex.One;
+
+        /// <summary>
+        /// 反射并旋转整条路径，先反射再旋转
+        /// </summary>
+        /// <param name="reflect">是否关于“A1 - C - A5”反射</param>
+        /// <param name="rotate45CW">顺时针旋转多少个 45 度，0~7</param>
+        public void SetRotoreflection(bool reflect, int rotate45CW)
+        {
+            Rotated45CW = rotate45CW;
+            Reflected = reflect;
+            var angle = reflect ? (135 - rotate45CW * 45) : (-rotate45CW * 45);
+            _rotor = Complex.FromPolarCoordinates(1, angle / 180.0 * Math.PI);
+        }
+
+        private Complex CalcRotoreflection(Complex z)
+        {
+            var x = Reflected ? Complex.Conjugate(z) : z;
+            return x * _rotor;
+        }
 
         /// <summary>
         /// <p>计算路径上某点的坐标，保证均匀插值</p>
         /// </summary>
         /// <param name="t">0 ~ 1 (both inclusive)</param>
-        public Complex GetPointAt(double t)
+        public virtual Complex GetPointAt(double t)
         {
             var segment = GetSegmentAt(t, out var segT);
-            return segment.GetPointAt(segT);
+            return CalcRotoreflection(segment.GetPointAt(segT));
         }
 
         /// <summary>
@@ -322,23 +352,23 @@ namespace Notes.SlideUtils
         /// </summary>
         /// <param name="t">0 ~ 1 (both inclusive)</param>
         /// <returns>complex (magnitude = 1)</returns>
-        public Complex GetTangentAt(double t)
+        public virtual Complex GetTangentAt(double t)
         {
             var segment = GetSegmentAt(t, out var segT);
-            return segment.GetTangentAt(segT);
+            return CalcRotoreflection(segment.GetTangentAt(segT));
         }
         
-        public SlideEndShape GetEndShape()
+        public virtual SlideEndShape GetEndShape()
         {
             var lastSegment = Segments[^1];
             if (lastSegment is CircleSegment circle)
             {
-                return circle.IsCcw ? SlideEndShape.CircleL : SlideEndShape.CircleR;
+                return circle.IsCcw != Reflected ? SlideEndShape.CircleCCW : SlideEndShape.CircleCW;
             }
 
             if (lastSegment is ArcSegment arc)
             {
-                return (arc.EndRadian > arc.StartRadian) ? SlideEndShape.CircleL : SlideEndShape.CircleR;
+                return (arc.EndRadian > arc.StartRadian) != Reflected ? SlideEndShape.CircleCCW : SlideEndShape.CircleCW;
             }
 
             return SlideEndShape.Straight;

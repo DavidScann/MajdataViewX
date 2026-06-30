@@ -30,13 +30,15 @@ namespace Notes.SlideUtils
         /// </summary>
         public readonly double LengthAfterFinish;
 
-        public readonly int[] SensorAreas;
+        public readonly int SensorA;
+        public readonly int SensorB;
 
-        public SlideAreaRawData(double lengthAfterPush, double lengthAfterFinish, int[] areas)
+        public SlideAreaRawData(double lengthAfterPush, double lengthAfterFinish, int sensorA, int sensorB = -1)
         {
             LengthAfterPush = lengthAfterPush;
             LengthAfterFinish = lengthAfterFinish;
-            SensorAreas = areas;
+            SensorA = sensorA;
+            SensorB = sensorB;
         }
     }
 
@@ -161,8 +163,8 @@ namespace Notes.SlideUtils
                 {
                     SlideAreaLookup[key] = new[]
                     {
-                        new SlideAreaRawData(0.32, 0.68, new[] { i }),
-                        new SlideAreaRawData(1.00, 1.00, new[] { j })
+                        new SlideAreaRawData(0.32, 0.68, i),
+                        new SlideAreaRawData(1.00, 1.00, j)
                     };
                     break;
                 }
@@ -172,9 +174,9 @@ namespace Notes.SlideUtils
                     tmp = (diff == 2) ? (i + 1) & 7 : (i - 1) & 7;
                     SlideAreaLookup[key] = new[]
                     {
-                        new SlideAreaRawData(0.20, 0.38, new[] { i }),
-                        new SlideAreaRawData(0.62, 0.80, new[] { tmp, tmp | 8 }),
-                        new SlideAreaRawData(1.00, 1.00, new[] { j })
+                        new SlideAreaRawData(0.20, 0.38, i),
+                        new SlideAreaRawData(0.62, 0.80, tmp, tmp | 8),
+                        new SlideAreaRawData(1.00, 1.00, j)
                     };
                     break;
                 }
@@ -191,8 +193,8 @@ namespace Notes.SlideUtils
                 {
                     SlideAreaLookup[key] = new[]
                     {
-                        new SlideAreaRawData(0.35, 0.65, new[] { i | 8 }),
-                        new SlideAreaRawData(1.00, 1.00, new[] { j | 8 })
+                        new SlideAreaRawData(0.35, 0.65, i | 8),
+                        new SlideAreaRawData(1.00, 1.00, j | 8)
                     };
                     break;
                 }
@@ -202,9 +204,9 @@ namespace Notes.SlideUtils
                     tmp = (diff == 2) ? (i + 1) & 7 : (i - 1) & 7;
                     SlideAreaLookup[key] = new[]
                     {
-                        new SlideAreaRawData(0.22, 0.40, new[] { i | 8 }),
-                        new SlideAreaRawData(0.60, 0.78, new[] { tmp | 8, 16 }),
-                        new SlideAreaRawData(1.00, 1.00, new[] { j | 8 })
+                        new SlideAreaRawData(0.22, 0.40, i | 8),
+                        new SlideAreaRawData(0.60, 0.78, tmp | 8, 16),
+                        new SlideAreaRawData(1.00, 1.00, j | 8)
                     };
                     break;
                 }
@@ -215,10 +217,10 @@ namespace Notes.SlideUtils
                     tmp2 = (diff == 3) ? (i + 2) & 7 : (i - 2) & 7;
                     SlideAreaLookup[key] = new[]
                     {
-                        new SlideAreaRawData(0.15, 0.28, new[] { i | 8 }),
-                        new SlideAreaRawData(0.43, 0.57, new[] { tmp | 8, 16 }),
-                        new SlideAreaRawData(0.72, 0.85, new[] { tmp2 | 8, 16 }),
-                        new SlideAreaRawData(1.00, 1.00, new[] { j | 8 })
+                        new SlideAreaRawData(0.15, 0.28, i | 8),
+                        new SlideAreaRawData(0.43, 0.57, tmp | 8, 16),
+                        new SlideAreaRawData(0.72, 0.85, tmp2 | 8, 16),
+                        new SlideAreaRawData(1.00, 1.00, j | 8)
                     };
                     break;
                 }
@@ -234,13 +236,13 @@ namespace Notes.SlideUtils
                 {
                     SlideAreaLookup[key] = new[]
                     {
-                        new SlideAreaRawData(0.50, 0.80, new[] { i }),
-                        new SlideAreaRawData(1.00, 1.00, new[] { j | 8 })
+                        new SlideAreaRawData(0.50, 0.80, i),
+                        new SlideAreaRawData(1.00, 1.00, j | 8)
                     };
                     SlideAreaLookup[key2] = new[]
                     {
-                        new SlideAreaRawData(0.20, 0.50, new[] { j | 8 }),
-                        new SlideAreaRawData(1.00, 1.00, new[] { i })
+                        new SlideAreaRawData(0.20, 0.50, j | 8),
+                        new SlideAreaRawData(1.00, 1.00, i)
                     };
                     break;
                 }
@@ -249,14 +251,14 @@ namespace Notes.SlideUtils
                 {
                     SlideAreaLookup[key] = new[]
                     {
-                        new SlideAreaRawData(0.45, 0.77, new[] { i }),
-                        new SlideAreaRawData(1.00, 1.00, new[] { j | 8 })
+                        new SlideAreaRawData(0.45, 0.77, i),
+                        new SlideAreaRawData(1.00, 1.00, j | 8)
                     };
                     SlideAreaLookup[key2] =
                         new[]
                         {
-                            new SlideAreaRawData(0.23, 0.55, new[] { j | 8 }),
-                            new SlideAreaRawData(1.00, 1.00, new[] { i })
+                            new SlideAreaRawData(0.23, 0.55, j | 8),
+                            new SlideAreaRawData(1.00, 1.00, i)
                         };
                     break;
                 }
@@ -267,17 +269,17 @@ namespace Notes.SlideUtils
                     tmp2 = (diff == 3) ? (i + 2) & 7 : (i - 2) & 7;
                     SlideAreaLookup[key] = new[]
                     {
-                        new SlideAreaRawData(0.20, 0.34, new[] { i }),
-                        new SlideAreaRawData(0.54, 0.67, new[] { i | 8, tmp | 8 }),
-                        new SlideAreaRawData(0.80, 0.90, new[] { tmp2 | 8, 16 }),
-                        new SlideAreaRawData(1.00, 1.00, new[] { j | 8 })
+                        new SlideAreaRawData(0.20, 0.34, i),
+                        new SlideAreaRawData(0.54, 0.67, i | 8, tmp | 8),
+                        new SlideAreaRawData(0.80, 0.90, tmp2 | 8, 16),
+                        new SlideAreaRawData(1.00, 1.00, j | 8)
                     };
                     SlideAreaLookup[key2] = new[]
                     {
-                        new SlideAreaRawData(0.10, 0.20, new[] { j | 8 }),
-                        new SlideAreaRawData(0.33, 0.46, new[] { tmp2 | 8, 16 }),
-                        new SlideAreaRawData(0.66, 0.80, new[] { i | 8, tmp | 8 }),
-                        new SlideAreaRawData(1.00, 1.00, new[] { i })
+                        new SlideAreaRawData(0.10, 0.20, j | 8),
+                        new SlideAreaRawData(0.33, 0.46, tmp2 | 8, 16),
+                        new SlideAreaRawData(0.66, 0.80, i | 8, tmp | 8),
+                        new SlideAreaRawData(1.00, 1.00, i)
                     };
                     break;
                 }
@@ -289,13 +291,13 @@ namespace Notes.SlideUtils
             key2 = ((j | 8) << 5) | 16;
             SlideAreaLookup[key] = new[]
             {
-                new SlideAreaRawData(0.40, 0.70, new[] { 16 }),
-                new SlideAreaRawData(1.00, 1.00, new[] { j | 8 })
+                new SlideAreaRawData(0.40, 0.70, 16),
+                new SlideAreaRawData(1.00, 1.00, j | 8)
             };
             SlideAreaLookup[key2] = new[]
             {
-                new SlideAreaRawData(0.30, 0.60, new[] { j | 8 }),
-                new SlideAreaRawData(1.00, 1.00, new[] { 16 })
+                new SlideAreaRawData(0.30, 0.60, j | 8),
+                new SlideAreaRawData(1.00, 1.00, 16)
             };
         }
 
@@ -320,7 +322,7 @@ namespace Notes.SlideUtils
             // 第一步，计算 slide 路径上“最接近每个判定区的点”
             // 不考虑 OR 判定区，只看恰好经过一个判定区的情况
 
-            var nodeList = new List<Tuple<int, double>>(); // 保存判定区以及最接近它的点（用经过的路径长度表示）
+            var nodeList = new List<(int, double)>(); // 保存判定区以及最接近它的点（用经过的路径长度表示）
             var totalLength = path.GetPathLength();
             var count = (int)Math.Round(totalLength / HitAreaCalcStep);
 
@@ -369,7 +371,7 @@ namespace Notes.SlideUtils
                     else
                     {
                         // 离开的情况，则认为进入和离开位置的中点是“最接近该判定区的点”
-                        nodeList.Add(new Tuple<int, double>(lastNode.Value, (length + enterLength) / 2.0));
+                        nodeList.Add((lastNode.Value, (length + enterLength) / 2.0));
 
                         if (node != null)
                         {
@@ -383,10 +385,10 @@ namespace Notes.SlideUtils
             }
 
             // 补上最后一个区，此时必然位于某个 A 区领域内，所以 lastNode 必不为 null
-            nodeList.Add(new Tuple<int, double>(lastNode!.Value, totalLength));
+            nodeList.Add((lastNode!.Value, totalLength));
             // 把第一个判定区的“最接近点”设为 slide 起点
             // 因为按照上述算法，如果不这么做，“最接近点”将会是 起点~离开第一个区 这段路径的中点
-            nodeList[0] = new Tuple<int, double>(nodeList[0].Item1, 0.0);
+            nodeList[0] = (nodeList[0].Item1, 0.0);
 
             // ========== ========== ========== ========== ========== ========== ==========
             // 第二步，生成判定区列表，以及相应的 push 和 finish
@@ -394,7 +396,7 @@ namespace Notes.SlideUtils
 
             // ReSharper disable once UseObjectOrCollectionInitializer
             var result = new List<SlideAreaRawData>();
-            result.Add(new SlideAreaRawData(0.0, 0.0, new[] { nodeList[0].Item1 }));
+            result.Add(new SlideAreaRawData(0.0, 0.0, nodeList[0].Item1));
 
             for (var i = 1; i < nodeList.Count; i++)
             {
@@ -412,7 +414,7 @@ namespace Notes.SlideUtils
                 result[^1] = new SlideAreaRawData(
                     lastLength + segmentLength * data[0].LengthAfterPush,
                     lastLength + segmentLength * data[0].LengthAfterFinish,
-                    area.SensorAreas
+                    area.SensorA, area.SensorB
                 );
 
                 // 根据预先打好的表生成判定区
@@ -421,7 +423,7 @@ namespace Notes.SlideUtils
                     result.Add(new SlideAreaRawData(
                         lastLength + segmentLength * data[j].LengthAfterPush,
                         lastLength + segmentLength * data[j].LengthAfterFinish,
-                        data[j].SensorAreas
+                        data[j].SensorA, data[j].SensorB
                     ));
                 }
             }
@@ -455,8 +457,8 @@ namespace Notes.SlideUtils
             var last2ndArea = result[^2];
             var lastArea = result[^1];
             result[^2] = new SlideAreaRawData(last2ndArea.LengthAfterPush, totalLength - lastDistance,
-                last2ndArea.SensorAreas);
-            result[^1] = new SlideAreaRawData(totalLength, totalLength, lastArea.SensorAreas);
+                last2ndArea.SensorA, last2ndArea.SensorB);
+            result[^1] = new SlideAreaRawData(totalLength, totalLength, lastArea.SensorA,  lastArea.SensorB);
 
             return result.ToArray();
         }

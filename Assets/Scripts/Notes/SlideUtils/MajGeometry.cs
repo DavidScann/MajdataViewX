@@ -72,11 +72,29 @@ namespace Notes.SlideUtils
         {
             return Complex.Zero;
         }
+        
+        /// <summary>
+        /// 获取指定判定区对应节点的坐标，判定区符合<c>SensorType</c>的定义，可取范围 0~16
+        /// </summary>
+        public static Complex GetPoint(int sensorIdx)
+        {
+            switch (sensorIdx)
+            {
+                case >= 0 and <= 7:
+                    return PointGroupA(sensorIdx + 1);
+                case >= 8 and <= 15:
+                    return PointGroupB(sensorIdx - 7);
+                case 16:
+                    return PointCenter();
+                default:
+                    return Complex.Zero;
+            }
+        }
 
         /// <summary>
         /// <p>10 个圆的圆心坐标和半径</p>
         /// <p>idx 0 is center circle (pq circle),</p>
-        /// <p>idx 1~8 are ppqq circles passing Dx panel,</p>
+        /// <p>idx 1~8 are ppqq circles passing D[idx] panel,</p>
         /// <p>idx 9 is outer circle (judge circle / &lt;&gt; circle)</p>
         /// </summary>
         public static CircleStruct GetCircle(int idx)
@@ -96,6 +114,9 @@ namespace Notes.SlideUtils
             return new CircleStruct(center, PPQQRadius);
         }
 
+        /// <summary>
+        /// 计算指定点进入指定圆的切线
+        /// </summary>
         public static double CalcTangentAngle(Complex point, CircleStruct circle, bool isCcw)
         {
             var hypot = point - circle.Center;
@@ -109,11 +130,11 @@ namespace Notes.SlideUtils
         /// <p>Note: idx is 1-based, not 0-based</p>
         /// </summary>
         /// <returns>CircleStruct TransferCircle, double TransferStartAngle, double TransferEndAngle</returns>
-        public static Tuple<CircleStruct, double, double> TransferOutData(int idx, bool isccw)
+        public static (CircleStruct, double, double) TransferOutData(int idx, bool isCcw)
         {
             var ppqqRad = Math.PI * (3.0 / 4.0 - idx / 4.0);
             double startRad, endRad;
-            if (isccw)
+            if (isCcw)
             {
                 startRad = ppqqRad - PPQQTransferRadian;
                 endRad = ppqqRad + EdgeTransferRadian;
@@ -125,8 +146,11 @@ namespace Notes.SlideUtils
             }
             var d = MainRadius - TransferRadius;
             var center = Complex.FromPolarCoordinates(d, endRad);
-            return new Tuple<CircleStruct, double, double>(new CircleStruct(center, TransferRadius),
-                Math.IEEERemainder(startRad, Math.PI * 2), Math.IEEERemainder(endRad, Math.PI * 2));
+            return (
+                new CircleStruct(center, TransferRadius),
+                Math.IEEERemainder(startRad, Math.PI * 2),
+                Math.IEEERemainder(endRad, Math.PI * 2)
+            );
         }
     }
 }
