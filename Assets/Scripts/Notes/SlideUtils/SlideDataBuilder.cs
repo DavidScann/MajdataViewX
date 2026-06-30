@@ -73,7 +73,7 @@ namespace Notes.SlideUtils
                 var pt = path.GetPointAt(t);
                 var tg = path.GetTangentAt(t);
 
-                if (path.GetSegmentAt(t, out _).IsCurve)
+                if (path.GetSegmentAt(t, out _).IsCurve && currentLength > 0)
                 {
                     // 在官机中，圆弧形 slide 箭头的朝向是“上个箭头 → 当前箭头”的延长线方向
                     // （严格来说前 4 ~ 6 个箭头有一个收敛过程，但我不想复刻这个）

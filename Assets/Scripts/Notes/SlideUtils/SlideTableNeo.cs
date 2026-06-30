@@ -379,6 +379,8 @@ namespace Notes.SlideUtils
         /// </summary>
         public static void InitializeStandardSlideTable()
         {
+            SlideDataBuilder.InitializeSlideAreaLookup();
+            
             SLIDE_TABLE.Clear();
             WIFI_TABLE.Clear();
             
@@ -402,8 +404,10 @@ namespace Notes.SlideUtils
             for (var diff = 0; diff <= 7; diff++)
             {
                 // 大圆逆时针
+                var phaseNudge = (diff is 1 or 5 or 7) ? -0.001 : 0.001;
+                // 官机上 1<2 1<6 1<8 会在 conn-slide 里有缝，剩下 5 种无缝，还原一下
                 var pathCircle = SlidePathConstructor.BeginAt((int)SensorType.A1)
-                    .ArcToAngle(9, MajGeometry.GetPoint(diff).Phase, true, false)
+                    .ArcToAngle(9, MajGeometry.GetPoint(diff).Phase + phaseNudge, true, false)
                     .GeneratePath();
                 // p slide
                 ParametricSlidePath pathP;
