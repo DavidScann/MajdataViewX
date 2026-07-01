@@ -127,7 +127,7 @@ namespace Notes.SlideUtils
         /// <p>value 记录这一段路径如何被各个判定段切割</p>
         /// <p><c>LengthAfterPush</c>是“判定区出点”的位置</p>
         /// <p><c>LengthAfterFinish</c>是“下个判定区入点”的位置</p>
-        /// <p>这个字典只能应付由官机 slide 片段生成的 slide 形状，无法处理过于超前的形状</p>
+        /// <p>这个字典只能应付由 slidecode 生成的 slide 形状，无法处理过于超前的形状</p>
         /// </summary>
         public static readonly Dictionary<int, SlideAreaRawData[]> SlideAreaLookup = new();
 

@@ -93,7 +93,7 @@ namespace Notes.SlideUtils
         /// <param name="center">圆心</param>
         /// <param name="endRad">目标辐角，应在 -pi ~ pi</param>
         /// <param name="isCcw">true 为逆时针绕行</param>
-        /// <param name="skipIfZero">true 表示当目标辐角和当前位置相等时不进行操作，false 会多绕一圈</param>
+        /// <param name="skipIfZero">true 表示当目标辐角和当前位置相距过小时不进行操作，false 会多绕一圈</param>
         /// <returns><c>this</c></returns>
         public SlidePathConstructor ArcToAngle(Complex center, double endRad, bool isCcw, bool skipIfZero)
         {

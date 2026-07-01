@@ -26,7 +26,7 @@ namespace Notes.SlideUtils
         /// </summary>
         public const double MainRadius = 4.80;
         public const double Epsilon = 0.0001;
-        public const double EpsilonRad = 0.001;
+        public const double EpsilonRad = 0.002;
         
         public static readonly double CenterRadius = MainRadius * Math.Cos(Math.PI * 3 / 8);
         public static readonly double GroupBRadius = CenterRadius / Math.Cos(Math.PI / 8);

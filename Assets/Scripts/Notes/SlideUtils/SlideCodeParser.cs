@@ -186,6 +186,13 @@ namespace Notes.SlideUtils
             constructor.ExternTangentTransfer(lastOrbit.Center, currentOrbit, isCcw);
         }
     
+        /// <summary>
+        /// Parse a specific slide-code into a path object
+        /// </summary>
+        /// <param name="code">Slide-code string</param>
+        /// <returns>Generated slide path</returns>
+        /// <exception cref="ArgumentException">The slide-code contains some invalid command sequence</exception>
+        /// <exception cref="ArgumentOutOfRangeException">Command type overflow</exception>
         public static ParametricSlidePath Parse(string code)
         {
             try
