@@ -1,6 +1,7 @@
 public enum SensorType
 {
-    A1,
+    Invalid = -1,
+    A1 = 0,
     A2,
     A3,
     A4,
