@@ -37,7 +37,10 @@ public class WsServer : MonoBehaviour
 
         QualitySettings.vSyncCount = 1;
 
-        webSocket = new WebSocketServer("ws://127.0.0.1:8083");
+        // Use port-based constructor: IL2CPP trimming removes the 'ws://' scheme
+        // from System.Uri, so the URL-based constructor throws
+        // ArgumentException: 'A relative URI' on Linux (works fine on Windows/.NET).
+        webSocket = new WebSocketServer(8083, false);
         webSocket.AddWebSocketService<MajdataWsService>("/majdata");
         webSocket.Start();
         _lifetimeCancellationToken = this.GetCancellationTokenOnDestroy();
