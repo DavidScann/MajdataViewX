@@ -100,6 +100,9 @@ public class AudioManager
         // dynamically triggered SFX. Bundled SFX assets are 48 kHz.
         //Bass.Configure(Configuration.UpdatePeriod, 20);
         //Bass.Configure(Configuration.PlaybackBufferLength, 40);
+#if UNITY_STANDALONE_LINUX
+        Bass.PluginLoad("libbassopus");
+#endif
         Bass.Init(-1, 48000);
 
         //Note SFX
