@@ -7,31 +7,16 @@ using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
-
+using UnityEngine;
 using static MajCtx;
 
-[BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Fast)]
+[BurstCompile]
 public static unsafe class NoteHelper
 {
-    // ---- Static pointers (set once by managers) ----
-    [NativeDisableUnsafePtrRestriction]
-    public static bool* SfxRequests;
-    [NativeDisableUnsafePtrRestriction]
-    public static JudgeEffectData* JudgeEffectRequests;
-    [NativeDisableUnsafePtrRestriction]
-    public static FastLateData* FastLateRequests;
-    [NativeDisableUnsafePtrRestriction]
-    public static ReportResultEntry* ReportResults;
-    [NativeDisableUnsafePtrRestriction]
-    public static int* ReportCount;
-
-
-    [NativeDisableUnsafePtrRestriction]
-    public static SensorState* SensorStates;
-    [NativeDisableUnsafePtrRestriction]
-    public static int* NextSensorIndex;
-
-    public static AutoPlayMode AutoPlayMode;
+    public static readonly SharedStatic<AutoPlayMode> AutoPlayModeSS =
+        SharedStatic<AutoPlayMode>.GetOrCreate<InputManager>();
+    public static readonly AutoPlayMode AutoPlayMode =
+        AutoPlayModeSS.Data;
 
     // ---- Judgment constants ----
     public const float TAP_JUDGE_SEG_1ST_PERFECT_MSEC = 1 * FRAME_LENGTH_MSEC;
@@ -59,35 +44,35 @@ public static unsafe class NoteHelper
     public const float TOUCH_HOLD_TAIL_IGNORE_LENGTH_SEC = 12 * FRAME_LENGTH_SEC;
     public const float DELUXE_HOLD_RELEASE_IGNORE_TIME_SEC = 2 * FRAME_LENGTH_SEC;
 
-    private static readonly float2[] _directions = new float2[]
-    {
-        new(0.38268343f, 0.92387953f),
-        new(0.92387953f, 0.38268343f),
-        new(0.92387953f, -0.38268343f),
-        new(0.38268343f, -0.92387953f),
-        new(-0.38268343f, -0.92387953f),
-        new(-0.92387953f, -0.38268343f),
-        new(-0.92387953f, 0.38268343f),
-        new(-0.38268343f, 0.92387953f),
-    };
-
     // ============== Pure Math ==============
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Fast)]
+    [BurstCompile]
     public static void GetPosFromDistance(float distance, SensorType key, out float2 result)
     {
         int index = (int)key;
         if (index >= 0 && index < 8)
         {
-            result = _directions[index] * distance;
+            float2 dir = index switch
+            {
+                0 => new(0.38268343f, 0.92387953f),
+                1 => new(0.92387953f, 0.38268343f),
+                2 => new(0.92387953f, -0.38268343f),
+                3 => new(0.38268343f, -0.92387953f),
+                4 => new(-0.38268343f, -0.92387953f),
+                5 => new(-0.92387953f, -0.38268343f),
+                6 => new(-0.92387953f, 0.38268343f),
+                7 => new(-0.38268343f, 0.92387953f),
+                _ => new(0, 0)
+            };
+            result = dir * distance;
             return;
         }
         result = float2.zero;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Fast)]
+    [BurstCompile]
     public static JudgeGrade GetTapJudge(float diffSec, bool isEx)
     {
         var isFast = diffSec < 0;
@@ -114,7 +99,7 @@ public static unsafe class NoteHelper
     /// is the effective hold length (already excluding head/tail ignore windows).</para>
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Fast)]
+    [BurstCompile]
     public static JudgeGrade GetHoldFinalGrade(JudgeGrade head, float percent, float realityHT)
     {
         if (realityHT <= 0f) return head;
@@ -149,23 +134,22 @@ public static unsafe class NoteHelper
     }
 
 
-    // ============== SFX (write to AudioManager's NativeArray) ==============
-
+    // ============== SFX ==============
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void PlayTapSound(in JudgeResult judgeResult)
+    [BurstCompile]
+    public static void PlayTapSound(bool* SfxRequests,
+        JudgeGrade grade, bool isBreak, bool isEx, bool isMine, float diff)
     {
-        if (judgeResult.IsMine && judgeResult.IsMissOrTooFast)
+        if (isMine &&
+            grade is JudgeGrade.Miss or JudgeGrade.TooFast)
             return;
 
-        if (judgeResult.IsMissOrTooFast || judgeResult.IsMine)
+        if (grade is JudgeGrade.Miss or JudgeGrade.TooFast || isMine)
             return;
-
-        var isBreak = judgeResult.IsBreak;
-        var isEx = judgeResult.IsEX;
 
         if (isBreak)
         {
-            switch (judgeResult.Grade)
+            switch (grade)
             {
                 case JudgeGrade.LateGood:
                 case JudgeGrade.FastGood:
@@ -195,7 +179,7 @@ public static unsafe class NoteHelper
             return;
         }
 
-        switch (judgeResult.Grade)
+        switch (grade)
         {
             case JudgeGrade.LateGood:
             case JudgeGrade.FastGood:
@@ -220,55 +204,60 @@ public static unsafe class NoteHelper
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void PlayHoldSound(in JudgeResult judgeResult)
+    public static void PlayHoldSound(bool* SfxRequests,
+        JudgeGrade grade, bool isBreak, bool isEx, bool isMine, float diff)
     {
-        PlayTapSound(judgeResult);
+        PlayTapSound(SfxRequests, grade, isBreak, isEx, isMine, diff);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void PlayTouchSound()
+    public static void PlayTouchSound(bool* SfxRequests)
     {
         SfxRequests[AudioManager.TOUCH] = true;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void PlayHanabiSound()
+    public static void PlayHanabiSound(bool* SfxRequests)
     {
         SfxRequests[AudioManager.FIREWORK] = true;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void PlaySlideSound(bool isBreak)
+    public static void PlaySlideSound(bool* SfxRequests, bool isBreak)
     {
         if (isBreak)
+        {
             SfxRequests[AudioManager.BREAK_SLIDE] = true;
-        else
-            SfxRequests[AudioManager.SLIDE] = true;
+        }
+        // 官机上无论如何都会播放普通 slide 的启动音
+        SfxRequests[AudioManager.SLIDE] = true;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void PlayBreakSlideEndSound()
+    public static void PlayBreakSlideEndSound(bool* SfxRequests)
     {
         SfxRequests[AudioManager.BREAK_SLIDE_JUDGE] = true;
-        SfxRequests[AudioManager.BREAK_SFX] = true;
+        // SfxRequests[AudioManager.BREAK_SFX] = true;  // blame @LeZi9916
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void SetTouchHoldSound(bool on)
+    public static void SetTouchHoldSound(bool* SfxRequests, bool on)
     {
         SfxRequests[AudioManager.TOUCHHOLD] = on;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void PlayAllPerfectSound()
+    public static void PlayAllPerfectSound(bool* SfxRequests)
     {
         SfxRequests[AudioManager.ALL_PERFECT] = true;
     }
 
-    // ============== Effect (write to EffectManager's NativeArray) ==============
+    // ============== Effect ==============
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void PlayJudgeEffect(int key, JudgeGrade judge, bool isBreak)
+    public static void PlayEffect(
+        EffectData* JudgeEffectRequests,
+        int key, JudgeGrade judge, bool isBreak)
     {
         JudgeEffectRequests[key].HasEffect = true;
         JudgeEffectRequests[key].IsBreak = isBreak;
@@ -276,23 +265,53 @@ public static unsafe class NoteHelper
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void PlayFastLateEffect(int key, JudgeGrade judge)
+    public static void SetHoldEffect(
+        EffectData* JudgeEffectRequests,
+        int key, JudgeGrade judge, bool hasHolding)
     {
-        FastLateRequests[key].HasEffect = true;
-        FastLateRequests[key].JudgeGrade = judge;
+        JudgeEffectRequests[key].HasHolding = hasHolding;
+        if (!hasHolding) return;
+
+        switch (judge)
+        {
+            case JudgeGrade.LateGood:
+            case JudgeGrade.FastGood:
+                JudgeEffectRequests[key].HoldingColor = new Color(0.56f, 1f, 0.59f); // Green
+                break;
+            case JudgeGrade.LateGreat:
+            case JudgeGrade.LateGreat2nd:
+            case JudgeGrade.LateGreat3rd:
+            case JudgeGrade.FastGreat3rd:
+            case JudgeGrade.FastGreat2nd:
+            case JudgeGrade.FastGreat:
+                JudgeEffectRequests[key].HoldingColor = new Color(1f, 0.70f, 0.94f); // Pink
+                break;
+            case JudgeGrade.LatePerfect3rd:
+            case JudgeGrade.FastPerfect3rd:
+            case JudgeGrade.LatePerfect2nd:
+            case JudgeGrade.FastPerfect2nd:
+            case JudgeGrade.Perfect:
+                JudgeEffectRequests[key].HoldingColor = new Color(1f, 0.93f, 0.61f); // Green
+                break;
+            case JudgeGrade.Miss:
+            case JudgeGrade.TooFast:
+                JudgeEffectRequests[key].HoldingColor = new Color(1f, 1f, 1f); // White
+                break;
+        }
     }
 
-    // ============== Report (write to ObjectCounter's NativeArray) ==============
+    // ============== Report ==============
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void ReportResult(JudgeGrade grade, bool isBreak, SimaiNoteType noteType)
+    public static void ReportResult(
+        NativeList<ReportResultEntry>.ParallelWriter ReportResults,
+        JudgeGrade grade, bool isBreak, SimaiNoteType noteType)
     {
-        var idx = Interlocked.Increment(ref *ReportCount) - 1;
-        ReportResults[idx] = new ReportResultEntry
+        ReportResults.AddNoResize(new ReportResultEntry
         {
             Grade = grade,
             IsBreak = isBreak,
             NoteType = noteType,
-        };
+        });
     }
 }

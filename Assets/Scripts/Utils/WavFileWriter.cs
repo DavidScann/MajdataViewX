@@ -50,7 +50,7 @@ public static class WavFileWriter
         }
     }
 
-    [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Fast)]
+    [BurstCompile]
     private struct WriteBufferJob : IJobFor
     {
         [ReadOnly] public NativeArray<float> Source;

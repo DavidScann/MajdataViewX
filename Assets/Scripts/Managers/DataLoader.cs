@@ -8,6 +8,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 using static MajCtx;
+using static MajBurst;
 
 #endregion
 
@@ -52,7 +53,7 @@ public class DataLoader : MonoBehaviour
 
         _timeProvider.LoadSV(chart.CommaTimings);
 
-        _judgeManager.ResetIndex();
+        MajBurst.InputData.ResetIndex();
 
         _noteManager.NoteSpeed = noteSpeed;
         _noteManager.TouchSpeed = touchSpeed;

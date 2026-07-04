@@ -13,6 +13,7 @@ using Unity.Properties;
 using UnityEngine;
 
 using static MajCtx;
+using static MajBurst;
 
 #endregion
 
@@ -64,6 +65,12 @@ public class PlayManager : MonoBehaviour
                 Thread.Sleep(1);
             }
         }).Start();
+        MajBurst.__DataSS.Data = new MajBurstData
+        {
+            TimeData = new TimeDataB(),
+            InputData = new InputDataB()
+        };
+        MajBurst.InputData.Init();
 
         _state = CheckIsLoaded() ? ViewStatus.Loaded : ViewStatus.Idle;
     }
@@ -150,7 +157,7 @@ public class PlayManager : MonoBehaviour
             _effectManager.SetDisplayMode(_setting.JudgeDisplayMode);
             //simulate
             _inputManager.Mode = _setting.AutoMode;
-            NoteHelper.AutoPlayMode = _setting.AutoMode;
+            NoteHelper.AutoPlayModeSS.Data = _setting.AutoMode;
             _inputManager.ButtonFirst = _setting.ButtonFirst;
             //bg
             bgCover.color = new Color(0f, 0f, 0f, _setting.BackgroundDim);
@@ -327,23 +334,26 @@ public class PlayManager : MonoBehaviour
     {
         _screenRecorder.ResetState();
         _objectCounter.ResetState();
-        _judgeManager.ResetState();
+        MajBurst.InputData.ResetState();
         _noteManager.ResetState();
         _timeProvider.ResetState();
         _audioManager.ResetState();
         _screenRecorder.ResetState();
         _bgManager.ResetState();
-        //_effectManager.ResetState();
+        _effectManager.ResetState();
         _inputManager.ResetState();
         _allPerfectManager.ResetState();
         _dataLoader.ResetState();
 
         _state = CheckIsLoaded() ? ViewStatus.Loaded : ViewStatus.Idle;
         bgCover.color = new Color(0f, 0f, 0f, 0f);
+
+        IsReloading = false;
     }
 
     private void OnDestroy()
     {
         _audioManager.OnDestroy();
+        MajBurst.InputData.Dispose();
     }
 }

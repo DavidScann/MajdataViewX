@@ -1,4 +1,4 @@
-﻿public struct ViewSummary
+﻿public readonly struct ViewSummary
 {
     public ViewStatus State { get; init; }
     public string ErrMsg { get; init; }

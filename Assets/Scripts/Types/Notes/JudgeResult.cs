@@ -1,3 +1,5 @@
+using System.Runtime.InteropServices;
+
 public readonly ref struct JudgeResult
 {
     public JudgeGrade Grade { get; init; }

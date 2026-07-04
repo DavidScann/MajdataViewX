@@ -18,7 +18,8 @@ Shader "Custom/NoteRich"
             {
                 float2 pos;
                 float angRad;
-                float2 scale;
+                float scale;
+                float stretchY;
                 uint spriteId;
                 float4 color;
                 float brightness;
@@ -42,7 +43,10 @@ Shader "Custom/NoteRich"
                 NotesRenderData note = _NoteBuffer[id];
                 float4 rect = _SpriteRects[note.spriteId];
                 float2 worldSize = (rect.zw - rect.xy) * _AtlasSize / _PixelsPerUnit;
-                float2 p = v.vertex.xy * note.scale * worldSize;
+                float2 finalSize = worldSize;
+                finalSize.y += note.stretchY;
+                finalSize *= note.scale;
+                float2 p = v.vertex.xy * finalSize;
                 float s = sin(note.angRad); float c = cos(note.angRad);
                 float2 r = float2(p.x*c - p.y*s, p.x*s + p.y*c);
                 r += note.pos;
@@ -63,10 +67,17 @@ Shader "Custom/NoteRich"
                 {
                     float spriteH_uv = rect.w - rect.y;
                     float nativeH = spriteH_uv * _AtlasSize / _PixelsPerUnit;
-                    float renderedH = nativeH * note.scale.y;
-                    float topCapFrac = (note.sliceBorder.x * nativeH) / renderedH;
-                    float botCapFrac = (note.sliceBorder.y * nativeH) / renderedH;
+                    float renderedH =
+                        (nativeH + note.stretchY)
+                        * note.scale;
+                    float topCapFrac =
+                        (note.sliceBorder.x * nativeH * note.scale)
+                        / renderedH;
+                    float botCapFrac =
+                        (note.sliceBorder.y * nativeH * note.scale)
+                        / renderedH;                    
                     float middleFrac = 1.0 - topCapFrac - botCapFrac;
+                    middleFrac = max(middleFrac, 1e-6);
                     float sliceMid = 1.0 - note.sliceBorder.x - note.sliceBorder.y;
 
                     float uvY = i.uv.y;
