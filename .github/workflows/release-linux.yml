@@ -64,11 +64,15 @@ jobs:
           fetch-depth: 0   # need full history for tag auto-increment
 
       - name: Checkout MajdataEdit-Neo (sister repo)
-        uses: actions/checkout@v4
-        with:
-          repository: DavidScann/MajdataEdit-Neo-Linux
-          path: ../MajdataEdit-Neo-Linux
-          fetch-depth: 0
+        # actions/checkout refuses to clone outside $GITHUB_WORKSPACE, so we
+        # do it manually with the workflow's GITHUB_TOKEN.
+        run: |
+          cd "$RUNNER_TEMP"
+          git clone \
+            "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/DavidScann/MajdataEdit-Neo-Linux.git" \
+            MajdataEdit-Neo-Linux
+          cd MajdataEdit-Neo-Linux
+          git log -1 --oneline
 
       - name: Install .NET ${{ env.DOTNET_VERSION }}
         uses: actions/setup-dotnet@v4
@@ -80,8 +84,8 @@ jobs:
         with:
           path: |
             Library
-            ../MajdataEdit-Neo-Linux/bin
-            ../MajdataEdit-Neo-Linux/obj
+            ${{ runner.temp }}/MajdataEdit-Neo-Linux/bin
+            ${{ runner.temp }}/MajdataEdit-Neo-Linux/obj
           key: lib-${{ runner.os }}-${{ env.UNITY_VERSION }}-${{ hashFiles('Packages/manifest.json', 'ProjectSettings/ProjectVersion.txt') }}
           restore-keys: |
             lib-${{ runner.os }}-${{ env.UNITY_VERSION }}-
@@ -125,13 +129,13 @@ jobs:
           echo "Next version: ${VERSION}"
 
       - name: Build MajdataEdit-Neo (.NET)
-        working-directory: ../MajdataEdit-Neo-Linux
+        working-directory: ${{ runner.temp }}/MajdataEdit-Neo-Linux
         run: |
           dotnet publish MajdataEdit-Neo.csproj \
             -c Release \
             -r linux-x64 \
             --self-contained false \
-            -o $GITHUB_WORKSPACE/dist/editor-publish
+            -o "$GITHUB_WORKSPACE/dist/editor-publish"
 
       - name: Assemble bundle
         run: |
