@@ -65,6 +65,13 @@
 |:---:|:---:|
 | master | 正常分支，release 时的分支，继续维护原汁原味 Majdata Edit&View，[下载](https://github.com/re-poem/MajdataViewX/releases) |
 | yours | 旧版 yours 分支，从 v4.4.0 修改而来，[你知道的](https://www.bilibili.com/video/BV16UYhzdED7/) |
+| linux-port | Linux Standalone x86_64 移植分支 / Linux port |
+
+## 在 Linux 上运行 / Running on Linux
+
+- 安装 `ffmpeg` 并确保它在 `$PATH` 中 / Install `ffmpeg` and ensure it is on `$PATH`
+- 启动器脚本 `MajdataView`（无扩展名，与二进制同级）调用 `./MajdataView.x86_64` / launcher script `MajdataView` (no extension, same dir as binary) invokes `./MajdataView.x86_64`
+- 端口 / Port: `127.0.0.1:8083`（与 MajdataEdit 一致 / matches MajdataEdit）
 
 ## 已知问题 / Known Issues
 

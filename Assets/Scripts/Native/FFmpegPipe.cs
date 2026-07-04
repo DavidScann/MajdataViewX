@@ -6,7 +6,7 @@ using System.Runtime.InteropServices;
 public static class FFmpegPipe
 {
 #if !UNITY_EDITOR
-#if UNITY_STANDALONE_WIN
+#if UNITY_STANDALONE_WIN || UNITY_STANDALONE_LINUX
     const string DllName = "ffmpeg_pipe";
 #else
     const string DllName = "__Internal";
