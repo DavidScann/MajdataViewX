@@ -37,10 +37,7 @@ public class WsServer : MonoBehaviour
 
         Application.targetFrameRate = -1;
 
-        // Use port-based constructor: IL2CPP trimming removes the 'ws://' scheme
-        // from System.Uri, so the URL-based constructor throws
-        // ArgumentException: 'A relative URI' on Linux (works fine on Windows/.NET).
-        webSocket = new WebSocketServer(8083, false);
+        webSocket = new WebSocketServer("ws://127.0.0.1:8083");
         webSocket.AddWebSocketService<MajdataWsService>("/majdata");
         webSocket.Start();
         ProcessQueue().Forget();
@@ -62,7 +59,7 @@ public class WsServer : MonoBehaviour
                 while (_playManager == null)
                     await UniTask.Yield();
 
-                Debug.Log($"dequeue: {json}");
+                Debug.Log("dequeue: " + json);
                 await HandleMessageAsync(json);
             }
             else
@@ -192,6 +189,7 @@ public class MajdataWsService : WebSocketBehavior, IDisposable
 {
     public MajdataWsService()
     {
+        Debug.Log("[WsDiag] MajdataWsService instance CREATED");
         _ = UniTask.RunOnThreadPool(() =>
         {
             while (true)
