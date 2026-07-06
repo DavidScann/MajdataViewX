@@ -37,7 +37,9 @@ public class WsServer : MonoBehaviour
 
         Application.targetFrameRate = -1;
 
-        webSocket = new WebSocketServer("ws://127.0.0.1:8083");
+        webSocket = new WebSocketServer(System.Net.IPAddress.Loopback, 8083, false);
+        webSocket.AddWebSocketService<MajdataWsService>("/majdata");
+        webSocket.Start();
         webSocket.AddWebSocketService<MajdataWsService>("/majdata");
         webSocket.Start();
         ProcessQueue().Forget();
