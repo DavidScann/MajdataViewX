@@ -36,6 +36,9 @@ public class BgManager : MonoBehaviour
     public bool IsBgLoaded => !hasBg || Bg != null;
     public bool IsVideoLoaded => !hasVideo || !string.IsNullOrWhiteSpace(VideoUrl);
 
+    private Sprite _emptySprite;
+
+
     private void Awake()
     {
         _bgManager = this;
@@ -43,6 +46,7 @@ public class BgManager : MonoBehaviour
 
     private void Start()
     {
+        _emptySprite = Sprite.Create(new Texture2D(1080, 1080), new Rect(0, 0, 1080, 1080), new Vector2(0.5f, 0.5f));
         jacketImage = GameObject.Find("Jacket").GetComponent<RawImage>();
         songDetail = GameObject.Find("CanvasSongDetail");
         songDetail.SetActive(false);
@@ -116,8 +120,7 @@ public class BgManager : MonoBehaviour
             videoPlayer.Prepare();
 
             //secret hack: if not so, the bg won't be set to defaultBg but full white
-            spriteRender.sprite =
-                Sprite.Create(new Texture2D(1080, 1080), new Rect(0, 0, 1080, 1080), new Vector2(0.5f, 0.5f));
+            spriteRender.sprite = _emptySprite;
 
             while (_timeProvider.AudioTime <= 0) yield return new WaitForEndOfFrame();
             while (!videoPlayer.isPrepared) yield return new WaitForEndOfFrame();

@@ -16,6 +16,17 @@ public static class NativeArrayExtensions
     {
         return new UnsafeNativeArrayScope<T>(managedArray);
     }
+
+    /// <summary>
+    /// 获取引用便于直接修改结构体数组中的内容
+    /// </summary>
+    /// <example>array.ElementRef(index).Data = new();</example>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public unsafe static ref T ElementRef<T>(this NativeArray<T> array, int index)
+        where T : unmanaged
+    {
+        return ref ((T*)array.GetUnsafePtr())[index];
+    }
 }
 
 /// <summary>

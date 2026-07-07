@@ -19,4 +19,7 @@ public static class MajCtx
 
     public const float FRAME_LENGTH_SEC = 1f / 60;
     public const float FRAME_LENGTH_MSEC = FRAME_LENGTH_SEC * 1000;
+
+    public const int BUTTON_COUNT = 8;
+    public const int SENSOR_COUNT = 33;
 }

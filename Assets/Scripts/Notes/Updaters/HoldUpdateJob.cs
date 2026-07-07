@@ -19,15 +19,11 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
     public NativeArray<LineRenderData> tapLinesRender;
     [NativeDisableParallelForRestriction]
     public NativeArray<NotesRenderData> notesRender;
-    [NativeDisableParallelForRestriction]
-    public NativeArray<SimpleRenderData> simpleRender;
 
     [NativeDisableUnsafePtrRestriction]
     public int* TapLinesWriteCountPtr;
     [NativeDisableUnsafePtrRestriction]
     public int* NotesWriteCountPtr;
-    [NativeDisableUnsafePtrRestriction]
-    public int* SimpleWriteCountPtr;
 
     [NativeDisableUnsafePtrRestriction]
     public bool* SfxRequests;
@@ -68,6 +64,8 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
 
         // ---- Invisible ----
         if (destScale < 0f) return;
+
+        var sortTime = (uint)math.clamp(hold.time * 100f, 0f, 0xFFFFF);
 
         // ---- shine ----
         if (hold.isBreak)           // break shine
@@ -131,7 +129,7 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
                 angRad = math.radians(hold.ang),
                 scale = lineScale,
                 spriteId = hold.lineSprite,
-                sort = (uint)index,
+                sort = sortTime,
             };
         }
 
@@ -183,22 +181,27 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
                 exSprite = hold.isEx ? hold.exSprite : 0u,
                 exColor = hold.exColor,
                 sliceBorder = hold.sliceBorder,
-                sort = (uint)index,
+                sort = sortTime,
             };
         }
 
         // ---- Write holdEnd
         if (hold.holdEndScale > 0f)
         {
-            var endIdx = Interlocked.Increment(ref *SimpleWriteCountPtr) - 1;
-            simpleRender[endIdx] = new SimpleRenderData
+            var endIdx = Interlocked.Increment(ref *NotesWriteCountPtr) - 1;
+            notesRender[endIdx] = new NotesRenderData
             {
                 pos = hold.holdEndPos,
                 angRad = math.radians(hold.ang),
-                scale = new float2(1f, 1f),
+                scale = 1f,
+                stretchY = 0,
                 spriteId = hold.endSprite,
                 color = new float4(1, 1, 1, 1),
-                sort = (uint)index,
+                brightness = 1f,
+                exSprite = 0,
+                exColor = float4.zero,
+                sliceBorder = float2.zero,
+                sort = sortTime,
             };
         }
     }
@@ -315,7 +318,7 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
             hold.isMine,
             hold.headDiff
         );
-        NoteHelper.PlayEffect(JudgeEffectRequests,
+        NoteHelper.PlayTapEffect(JudgeEffectRequests,
             (int)hold.key,
             hold.judgeGrade,
             hold.isBreak

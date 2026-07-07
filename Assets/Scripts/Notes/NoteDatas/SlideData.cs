@@ -8,6 +8,7 @@ using Unity.Jobs;
 using Unity.Mathematics;
 using static NoteSkinManager;
 using static MajBurst;
+using Notes.SlideUtils;
 
 [BurstCompile]
 public struct SlideData
@@ -15,8 +16,6 @@ public struct SlideData
     public float tapTime;
     public float time;
     public float LastFor;
-    public int startPosition;
-    public int endPosition;
     public float speed;
     public int sensorOrderIndex;
 
@@ -27,28 +26,29 @@ public struct SlideData
     public bool usingSV;
 
     public bool isWifi;
-    public bool isMirror;
-    public bool isJustR;
     public bool smoothSlideAnime;
     public bool legacySlideLayer;
 
-    public SlideTableMetadata metadata;
+    public int judgeQueueOffset;
     public unsafe SlideArea* judgeQueue;
     public int judgeQueueCount;
-    public unsafe SlideArea* judgeQueueC;
-    public int judgeQueueCCount;
+    public int judgeQueueLOffset;
+    public unsafe SlideArea* judgeQueueL;
+    public int judgeQueueLCount;
+    public int judgeQueueROffset;
     public unsafe SlideArea* judgeQueueR;
     public int judgeQueueRCount;
+    public float Const;
+    public int slideArrowsOffset;
     public unsafe SlidePose* slideArrows;
     public int slideArrowsCount;
+    public SlideOkType okType;
     public SlidePose okPose;
 
     public bool isEnd;
     public bool isSoundPlayed;
 
     //slide
-    public float2 pos;
-    public float ang;
     public uint slideSprite;
     //star
     public float process;
@@ -62,8 +62,8 @@ public struct SlideData
     public bool isJudged;
     public JudgeGrade judgeGrade;
 
-    public byte judgeCurrent; //SLide / Wifi Left
-    public byte judgeC_Current; //Wifi Center
+    public byte judgeCurrent; //SLide / Wifi Center
+    public byte judgeL_Current; //Wifi Left
     public byte judgeR_Current; //Wifi Right
 
     // Animation state
@@ -73,9 +73,8 @@ public struct SlideData
 
     public float judgeTime; //被判定时
     public float slideOKAlpha; // 1->0
-    public const float SlideOKFadeOutDuration = 0.5f;
 
-    public unsafe void Init()
+    public void Init()
     {
         starAlpha = 0;
         starScale = 0;
@@ -83,47 +82,6 @@ public struct SlideData
         slideAlpha = 0;
         slideOKAlpha = 1f;
         judgeTime = float.MinValue;
-
-
-        ang = isMirror ? -45f * startPosition : -45f * (startPosition - 1);
-
-        var diff = math.abs(1 - startPosition);
-        if (!isWifi)
-        {
-            for (var i = 0; i < judgeQueueCount; i++)
-            {
-                if (isMirror)
-                {
-                    judgeQueue[i].Mirror(SensorType.A1);
-                }
-                if (diff != 0)
-                {
-                    judgeQueue[i].Diff(diff);
-                }
-            }
-        }
-        else
-        {
-            if (diff != 0)
-            {
-                for (var i = 0; i < judgeQueueCount; i++)
-                    judgeQueue[i].Diff(diff);
-                for (var i = 0; i < judgeQueueCCount; i++)
-                    judgeQueueC[i].Diff(diff);
-                for (var i = 0; i < judgeQueueRCount; i++)
-                    judgeQueueR[i].Diff(diff);
-            }
-        }
-
-        if (isMirror)
-        {
-            for (var i = 0; i < slideArrowsCount; i++)
-            {
-                slideArrows[i].X *= -1;
-                slideArrows[i].RotZ = -slideArrows[i].RotZ + 180f;
-            }
-        }
-
 
         // 计算Slide淡入时机
         // 8.0速时应当提前300ms显示Slide
@@ -135,29 +93,60 @@ public struct SlideData
         fadeInDuration = fadeInFinishTiming - fadeInStartTiming;
 
         // Load Skin
-        slideSprite = SLIDE;
-        starSprite = STAR;
-        if (isEach)
+        if (!isWifi)
         {
-            slideSprite = SLIDE_EACH;
-            starSprite = STAR_EACH;
-        }
-        if (isBreak)
-        {
-            slideSprite = SLIDE_BREAK;
-            starSprite = STAR_BREAK;
-        }
-        if (isMine)
-        {
+            slideSprite = SLIDE;
+            starSprite = STAR;
+            if (isEach)
+            {
+                slideSprite = SLIDE_EACH;
+                starSprite = STAR_EACH;
+            }
             if (isBreak)
             {
-                slideSprite = SLIDE_BREAK_MINE;
-                starSprite = STAR_BREAK_MINE;
+                slideSprite = SLIDE_BREAK;
+                starSprite = STAR_BREAK;
             }
-            else
+            if (isMine)
             {
-                slideSprite = SLIDE_MINE;
-                starSprite = STAR_MINE;
+                if (isBreak)
+                {
+                    slideSprite = SLIDE_BREAK_MINE;
+                    starSprite = STAR_BREAK_MINE;
+                }
+                else
+                {
+                    slideSprite = SLIDE_MINE;
+                    starSprite = STAR_MINE;
+                }
+            }
+        }
+        else
+        {
+            slideSprite = WIFI_0;
+            starSprite = STAR;
+            if (isEach)
+            {
+                slideSprite = WIFI_EACH_0;
+                starSprite = STAR_EACH;
+            }
+            if (isBreak)
+            {
+                slideSprite = WIFI_BREAK_0;
+                starSprite = STAR_BREAK;
+            }
+            if (isMine)
+            {
+                if (isBreak)
+                {
+                    slideSprite = WIFI_BREAK_MINE_0;
+                    starSprite = STAR_BREAK_MINE;
+                }
+                else
+                {
+                    slideSprite = WIFI_MINE_0;
+                    starSprite = STAR_MINE;
+                }
             }
         }
     }

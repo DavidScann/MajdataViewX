@@ -33,10 +33,11 @@ public class AudioManager
     List<AnswerTimingPoint> answerTimingPoints = new();
     private readonly object answerSfxLock = new();
     //note SFX
-    //DO NOT TOUCH THIS IN THIS FILE, MAY CAUSE AtomicSafetyHandle Exception
+    //DO NOT USE THIS IN THIS FILE, MAY CAUSE AtomicSafetyHandle Exception
     public NativeArray<bool> noteSfxPlaybackRequests = new(SFX_COUNT, Allocator.Persistent);
     public unsafe bool* SfxRequestsPtr => (bool*)noteSfxPlaybackRequests.GetUnsafePtr();
-    private unsafe bool* _sfxPtr;
+    private unsafe bool* _sfxPtr;    // USE THIS INSTEAD
+
     List<AudioSample> NoteSfxs = new(SFX_COUNT);
 
     //SFX for recording

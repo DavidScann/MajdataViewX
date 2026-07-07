@@ -12,8 +12,9 @@ using MajSimai;
 using Unity.Properties;
 using UnityEngine;
 
+using Notes.SlideUtils;
+
 using static MajCtx;
-using static MajBurst;
 
 #endregion
 
@@ -34,8 +35,8 @@ public class PlayManager : MonoBehaviour
     private static string _errMsg = string.Empty;
     private static float _thisFrameSec = 0f;
 
-    private static double? _trackTime;
-    private static double? _offset;
+    private static Thread? _audioManagerThread;
+
     private static float? _speed;
 
     private static MajViewSetting _setting = new();
@@ -57,20 +58,29 @@ public class PlayManager : MonoBehaviour
         bgCover = GameObject.Find("BackgroundCover").GetComponent<SpriteRenderer>();
         canvasButtons = GameObject.Find("CanvasButtons");
 
-        new Thread(() =>
+        _audioManagerThread = new Thread(() =>
         {
             while (true)
             {
                 _audioManager.OnUpdate();
                 Thread.Sleep(1);
             }
-        }).Start();
+        });
+        _audioManagerThread.Start();
+
+
         MajBurst.__DataSS.Data = new MajBurstData
         {
-            TimeData = new TimeDataB(),
-            InputData = new InputDataB()
+            TimeData = new(),
+            InputData = new(),
+            MultTouchHandler = new()
         };
+        //MajBurst.TimeData.Init();
         MajBurst.InputData.Init();
+        MajBurst.MultTouchHandler.Init();
+
+
+        SlideTableNeo.InitializeStandardSlideTable();
 
         _state = CheckIsLoaded() ? ViewStatus.Loaded : ViewStatus.Idle;
     }
@@ -354,6 +364,7 @@ public class PlayManager : MonoBehaviour
     private void OnDestroy()
     {
         _audioManager.OnDestroy();
+        _audioManagerThread?.Abort();
         MajBurst.InputData.Dispose();
     }
 }

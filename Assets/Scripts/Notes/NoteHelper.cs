@@ -15,7 +15,7 @@ public static unsafe class NoteHelper
 {
     public static readonly SharedStatic<AutoPlayMode> AutoPlayModeSS =
         SharedStatic<AutoPlayMode>.GetOrCreate<InputManager>();
-    public static readonly AutoPlayMode AutoPlayMode =
+    public static AutoPlayMode AutoPlayMode =>
         AutoPlayModeSS.Data;
 
     // ---- Judgment constants ----
@@ -254,16 +254,38 @@ public static unsafe class NoteHelper
 
     // ============== Effect ==============
 
+    /// <summary>
+    /// 播放tap类型打击特效
+    /// </summary>
+    /// <param name="key">对应的button/sensor位置，注意sensor需要+8，以区分键与A区</param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void PlayEffect(
+    public static void PlayTapEffect(
         EffectData* JudgeEffectRequests,
         int key, JudgeGrade judge, bool isBreak)
     {
-        JudgeEffectRequests[key].HasEffect = true;
+        JudgeEffectRequests[key].Effect = EffectType.Tap;
         JudgeEffectRequests[key].IsBreak = isBreak;
         JudgeEffectRequests[key].JudgeGrade = judge;
     }
 
+    /// <summary>
+    /// 播放touch类型打击特效
+    /// </summary>
+    /// <param name="key">对应的button/sensor位置，注意sensor需要+8，以区分键与A区</param>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void PlayTouchEffect(
+        EffectData* JudgeEffectRequests,
+        int key, JudgeGrade judge, bool isBreak)
+    {
+        JudgeEffectRequests[key].Effect = EffectType.Touch;
+        JudgeEffectRequests[key].IsBreak = isBreak;
+        JudgeEffectRequests[key].JudgeGrade = judge;
+    }
+
+    /// <summary>
+    /// 播放hold按住特效
+    /// </summary>
+    /// <param name="key">对应的button/sensor位置，注意sensor需要+8，以区分键与A区</param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void SetHoldEffect(
         EffectData* JudgeEffectRequests,

@@ -9,6 +9,7 @@ using static MajCtx;
 using static MajBurst;
 using Unity.Collections;
 using Unity.Burst;
+using UnityEngine.UI;
 
 public class InputManager : MonoBehaviour
 {
@@ -22,7 +23,7 @@ public class InputManager : MonoBehaviour
         _inputManager = this;
 
         //get sensor positions
-        var sensors = GameObject.Find("Sensors").transform;
+        var sensors = GameObject.Find("SensorRects").transform;
         var childCount = sensors.childCount;
         _sensorWorldPositions = new Vector2[sensors.childCount];
         for (var i = 0; i < childCount; i++)
@@ -126,9 +127,6 @@ public class InputManager : MonoBehaviour
 [BurstCompile]
 public struct InputDataB
 {
-    public const int BUTTON_COUNT = 8;
-    public const int SENSOR_COUNT = 34;
-
     NativeArray<SensorState> ButtonStates;
     NativeArray<SensorState> SensorStates;
     NativeArray<int> NextButtonIndex;
@@ -216,6 +214,8 @@ public struct InputDataB
     {
         if (SensorStates.IsCreated) SensorStates.Dispose();
         if (NextSensorIndex.IsCreated) NextSensorIndex.Dispose();
+        if (ButtonStates.IsCreated) ButtonStates.Dispose();
+        if (NextButtonIndex.IsCreated) NextButtonIndex.Dispose();
     }
 }
 

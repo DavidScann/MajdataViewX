@@ -46,39 +46,89 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
     {
         if (th.isEnd) return;
 
-        var timing = TimeData.NoteTime - th.time;
-        var fakeTiming = TimeData.FakeNoteTime - TimeData.GetPositionAtTime(th.time);
+        var sortTime = (uint)math.clamp(th.time * 100f, 0f, 0xFFFFF);
+
+        var timing = th.usingSV
+            ? TimeData.FakeNoteTime - TimeData.GetPositionAtTime(th.time)
+            : TimeData.NoteTime - th.time;
+        var lastFor = th.usingSV
+            ? TimeData.GetPositionAtTime(th.time + th.LastFor) - TimeData.GetPositionAtTime(th.time)
+            : th.LastFor;
 
         var wholeDuration = 3.209385682f * math.pow(th.speed, -0.9549621752f);
         var moveDuration = 0.8f * wholeDuration;
         var displayDuration = 0.2f * wholeDuration;
 
-        var pow = -math.exp(8f * (fakeTiming * 0.43f / moveDuration) - 0.85f) + 0.42f;
+        var pow = -math.exp(8f * (timing * 0.43f / moveDuration) - 0.85f) + 0.42f;
         var fanDist = math.clamp(pow, 0f, 0.4f);
-        th.fanProgress = fanDist;
 
-        if (-fakeTiming <= wholeDuration && -fakeTiming > moveDuration)
+        if (-timing > wholeDuration)
         {
-            var fadeT = (-fakeTiming - moveDuration) / displayDuration;
-            th.fanAlpha = math.saturate(fadeT);
-            th.show = true;
+            return;
         }
-        else if (-fakeTiming < moveDuration)
+        else if (-timing <= wholeDuration && -timing > moveDuration)
+        {
+            var fadeT = (-timing - moveDuration) / displayDuration;
+            th.fanAlpha = math.saturate(fadeT);
+        }
+        else if (-timing <= moveDuration)
         {
             th.fanAlpha = 1f;
-            th.show = true;
         }
 
-        var fakeLastFor = TimeData.FakeNoteTime - TimeData.GetPositionAtTime(th.time + th.LastFor);
-        if (th.isJudged && fakeTiming >= 0)
+        if (th.isJudged && timing >= 0)
         {
-            th.maskProgress = math.clamp((fakeLastFor - fakeTiming) / math.max(fakeLastFor, 0.001f), 0f, 1f);
+            th.maskProgress = math.clamp(timing / lastFor, 0f, 1f);
         }
 
-        if (!th.show) return;
+        // ---- hold effect ----
+        NoteHelper.SetHoldEffect(JudgeEffectRequests,
+            (int)th.sensor + 8,
+            th.judgeGrade,
+            th.isHolding
+        );
+
+        // ---- hold on/off skin ----
+        if (th.LastFor > 0.3f && // 忽略短hold
+            timing >= 0.1f &&    // 忽略头6帧
+            !th.isMine)          // 忽略mine
+        {
+            if (th.isHolding)
+            {
+                th.borderSprite = th._borderOnSpriteCache;
+            }
+            else
+            {
+                th.borderSprite = TOUCH_HOLD_BORDER_MISS;
+            }
+        }
 
         var centerPos = th.centerPos;
         var color = new float4(th.fanAlpha, th.fanAlpha, th.fanAlpha, 1);
+
+        var radius = 0.226f + fanDist;
+        var c = math.SQRT2 / 2f;
+        var fanPositions = stackalloc float2[4]
+        {
+            centerPos + new float2(radius * c, radius * c),
+            centerPos + new float2(radius * c, -radius * c),
+            centerPos + new float2(-radius * c, -radius * c),
+            centerPos + new float2(-radius * c, radius * c),
+        };
+
+        for (int i = 0; i < 4; i++)
+        {
+            var tIdx = Interlocked.Increment(ref *SimpleWriteCountPtr) - 1;
+            simpleRender[tIdx] = new SimpleRenderData
+            {
+                pos = fanPositions[i],
+                angRad = math.radians(135f - 90f * i),
+                scale = new float2(1, 1),
+                spriteId = th.fanSprite + (uint)i,
+                color = color,
+                sort = (sortTime << 4) | 0x3,
+            };
+        }
 
         var ptIdx = Interlocked.Increment(ref *SimpleWriteCountPtr) - 1;
         simpleRender[ptIdx] = new SimpleRenderData
@@ -88,37 +138,8 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
             scale = new float2(1, 1),
             spriteId = th.pointSprite,
             color = color,
-            sort = (uint)index,
+            sort = (sortTime << 4) | 0x2,
         };
-
-        var fanPositions = stackalloc float2[4]
-        {
-            centerPos + new float2(0.226f + fanDist, 0),
-            centerPos + new float2(0, 0.226f + fanDist),
-            centerPos + new float2(-(0.226f + fanDist), 0),
-            centerPos + new float2(0, -(0.226f + fanDist)),
-        };
-
-        for (int i = 0; i < 4; i++)
-        {
-            var tIdx = Interlocked.Increment(ref *SimpleWriteCountPtr) - 1;
-            simpleRender[tIdx] = new SimpleRenderData
-            {
-                pos = fanPositions[i],
-                angRad = 0,
-                scale = new float2(1, 1),
-                spriteId = th.fanSprite + (uint)math.min(i, 3),
-                color = color,
-                sort = (uint)index + (uint)i * 0x10000u,
-            };
-        }
-
-        float maskCutoff = 0;
-        if (th.isJudged && fakeTiming >= 0)
-        {
-            var progress = (fakeLastFor - fakeTiming) / math.max(fakeLastFor, 0.001f);
-            maskCutoff = math.clamp(0.91f * (1f - progress), 0f, 1f);
-        }
 
         var borderIdx = Interlocked.Increment(ref *MaskWriteCountPtr) - 1;
         maskRender[borderIdx] = new MaskRenderData
@@ -128,8 +149,8 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
             scale = new float2(1, 1),
             spriteId = th.borderSprite,
             color = color,
-            maskCutoff = maskCutoff,
-            sort = (uint)index + 8u * 0x10000u,
+            maskCutoff = th.maskProgress,
+            sort = sortTime,
         };
     }
 
@@ -267,11 +288,10 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
         else
             NoteHelper.PlayTouchSound(SfxRequests);
 
-        NoteHelper.PlayEffect(JudgeEffectRequests, (int)th.sensor, th.judgeGrade, th.isBreak);
+        NoteHelper.PlayTouchEffect(JudgeEffectRequests, (int)th.sensor + 8, th.judgeGrade, th.isBreak);
         NoteHelper.ReportResult(ReportResults, th.judgeGrade, th.isBreak, SimaiNoteType.TouchHold);
 
         MajBurst.InputData.NextTouch(th.sensor);
-        th.show = false;
         th.isEnd = true;
     }
 }

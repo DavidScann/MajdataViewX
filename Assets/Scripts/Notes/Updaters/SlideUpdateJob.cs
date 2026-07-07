@@ -7,6 +7,7 @@ using Unity.Jobs;
 using Unity.Mathematics;
 using static NoteSkinManager;
 using static MajBurst;
+using Notes.SlideUtils;
 
 [BurstCompile]
 public unsafe struct SlideUpdateJob : IJobParallelFor
@@ -27,6 +28,9 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
     public bool* SfxRequests;
     public NativeList<ReportResultEntry>.ParallelWriter ReportResults;
 
+    public const float SlideOKKeepDuration = 17 * MajCtx.FRAME_LENGTH_SEC;
+    public const float SlideOKFadeOutDuration = 8 * MajCtx.FRAME_LENGTH_SEC;
+
     public void Execute(int index)
     {
         var slide = slides[index];
@@ -39,6 +43,11 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
     private void TransformUpdate(ref SlideData slide, int index)
     {
         if (slide.isEnd) return;
+        if (slide.isJudged)
+        {
+            RenderSlideOK(ref slide);
+            return;
+        }
 
         var tapTiming = slide.usingSV
             ? TimeData.FakeNoteTime - TimeData.GetPositionAtTime(slide.tapTime)
@@ -72,7 +81,6 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
 
         RenderArrows(ref slide, index);
         RenderStar(ref slide, index);
-        if (slide.isJudged) RenderSlideOK(ref slide);
     }
 
     private void UpdateStarPosition(ref SlideData slide)
@@ -86,12 +94,8 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
         var p0 = slide.slideArrows[idx0];
         var p1 = slide.slideArrows[idx1];
 
-        var ca = math.cos(math.radians(slide.ang));
-        var sa = math.sin(math.radians(slide.ang));
-        var lx = math.lerp(p0.X, p1.X, t);
-        var ly = math.lerp(p0.Y, p1.Y, t);
-        slide.starPosX = lx * ca - ly * sa;
-        slide.starPosY = lx * sa + ly * ca;
+        slide.starPosX = math.lerp(p0.X, p1.X, t);
+        slide.starPosY = math.lerp(p0.Y, p1.Y, t);
         slide.starRot = math.lerp(p0.RotZ, p1.RotZ, t);
     }
 
@@ -104,26 +108,22 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
 
         var color = new float4(1, 1, 1, slide.slideAlpha);
 
-        var ca = math.cos(math.radians(slide.ang));
-        var sa = math.sin(math.radians(slide.ang));
+        var sortTime = (uint)math.clamp(slide.tapTime * 100f, 0f, 0xFFFFF);
+        var timePart = slide.legacySlideLayer ? (0xFFFFFu - sortTime) : sortTime;
 
-        for (int i = eaten; i < cnt; i++)
+        for (var i = eaten; i < cnt; i++)
         {
             var p = slide.slideArrows[i];
-            var lx = p.X;
-            var ly = p.Y;
-            var wx = lx * ca - ly * sa;
-            var wy = lx * sa + ly * ca;
 
             var idx = Interlocked.Increment(ref *SlidesWriteCountPtr) - 1;
             slidesRender[idx] = new SimpleRenderData
             {
-                pos = new float2(wx, wy),
-                angRad = math.radians(p.RotZ + slide.ang),
+                pos = new float2(p.X, p.Y),
+                angRad = math.radians(p.RotZ),
                 scale = new float2(1, 1),
-                spriteId = slide.slideSprite,
+                spriteId = slide.isWifi ? slide.slideSprite + (uint)i : slide.slideSprite,
                 color = color,
-                sort = (uint)(index + i * 0x100u),
+                sort = (timePart << 8) | (uint)i,
             };
         }
     }
@@ -131,6 +131,8 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
     private void RenderStar(ref SlideData slide, int index)
     {
         if (slide.starAlpha <= 0) return;
+        var sortTime = (uint)math.clamp(slide.tapTime * 100f, 0f, 0xFFFFF);
+        var timePart = slide.legacySlideLayer ? (0xFFFFFu - sortTime) : sortTime;
         var nIdx = Interlocked.Increment(ref *NotesWriteCountPtr) - 1;
         notesRender[nIdx] = new NotesRenderData
         {
@@ -144,28 +146,28 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
             exSprite = 0,
             exColor = float4.zero,
             sliceBorder = new float2(0, 0),
-            sort = (uint)index,
+            sort = 0x100000u + timePart,
         };
     }
 
     private void AutoplayUpdate(ref SlideData slide)
     {
-        if (slide.isEnd) return;
+        if (slide.isEnd || slide.isJudged) return;
         var timing = TimeData.NoteTime - slide.time;
         if (timing < -0.01f) return;
-        if (math.max(slide.LastFor - timing, 0) <= 0)
+        if (slide.LastFor - timing <= 0)
         {
             switch (NoteHelper.AutoPlayMode)
             {
                 case AutoPlayMode.Enable:
                     slide.judgeGrade = JudgeGrade.Perfect;
                     slide.isJudged = true;
-                    EndNote(ref slide);
+                    CompleteSlide(ref slide);
                     break;
                 case AutoPlayMode.Random:
                     slide.judgeGrade = (JudgeGrade)new Random(114514).NextInt(1, 14);
                     slide.isJudged = true;
-                    EndNote(ref slide);
+                    CompleteSlide(ref slide);
                     break;
             }
         }
@@ -174,7 +176,7 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
     private void CheckUpdate(ref SlideData slide, int index)
     {
         if (NoteHelper.AutoPlayMode is AutoPlayMode.Enable or AutoPlayMode.Random) return;
-        if (slide.isEnd) return;
+        if (slide.isEnd || slide.isJudged) return;
 
         var timing = TimeData.NoteTime - slide.time;
         var remaining = math.max(slide.LastFor - timing, 0);
@@ -184,7 +186,7 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
         {
             slide.judgeGrade = GetRemainingAreaCount(slide) <= 1 ? JudgeGrade.LateGood : JudgeGrade.Miss;
             slide.isJudged = true;
-            EndNote(ref slide);
+            CompleteSlide(ref slide);
             return;
         }
 
@@ -195,7 +197,7 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
         else
         {
             ProcessAreas(ref slide, slide.judgeQueue, slide.judgeQueueCount, ref slide.judgeCurrent);
-            ProcessAreas(ref slide, slide.judgeQueueC, slide.judgeQueueCCount, ref slide.judgeC_Current);
+            ProcessAreas(ref slide, slide.judgeQueueL, slide.judgeQueueLCount, ref slide.judgeL_Current);
             ProcessAreas(ref slide, slide.judgeQueueR, slide.judgeQueueRCount, ref slide.judgeR_Current);
         }
 
@@ -203,7 +205,7 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
         if (slide.isWifi)
         {
             if (slide.judgeCurrent >= slide.judgeQueueCount &&
-            slide.judgeC_Current >= slide.judgeQueueCCount &&
+            slide.judgeL_Current >= slide.judgeQueueLCount &&
             slide.judgeR_Current >= slide.judgeQueueRCount)
                 CompleteSlide(ref slide);
         }
@@ -221,6 +223,7 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
 
         ref var first = ref queue[cur];
         var hasSecond = cur + 1 < queueCount;
+        var isSecondLast = hasSecond && cur + 2 >= queueCount;
 
         CheckArea(ref first);
         if (first.On && !slide.isSoundPlayed)
@@ -234,26 +237,29 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
             ref var second = ref queue[cur + 1];
             CheckArea(ref second);
 
-            if (second.IsFinished) { cur += 2; return; }
+            if (second.IsFinished(isSecondLast)) { cur += 2; return; }
             if (second.On) { cur += 1; return; }
         }
 
-        if (first.IsFinished) cur++;
+        if (first.IsFinished(!hasSecond)) cur++;
 
 
         static void CheckArea(ref SlideArea area)
         {
-            area.Judge(MajBurst.InputData.GetSensorState(area.Area0).Status);
-            area.Judge(MajBurst.InputData.GetSensorState(area.Area1).Status);
+            area.Judge(MajBurst.InputData.GetSensorState(area.SensorA).Status);
+            if (area.SensorB != SensorType.Invalid)
+            {
+                area.Judge(MajBurst.InputData.GetSensorState(area.SensorB).Status);
+            }
         }
     }
 
     private void CompleteSlide(ref SlideData slide)
     {
-        slide.judgeGrade = JudgeGrade.Perfect;
+        slide.judgeTime = TimeData.NoteTime;
         slide.isJudged = true;
         if (slide.isBreak) NoteHelper.PlayBreakSlideEndSound(SfxRequests);
-        EndNote(ref slide);
+        NoteHelper.ReportResult(ReportResults, slide.judgeGrade, slide.isBreak, SimaiNoteType.Slide);
     }
 
     private int GetRemainingAreaCount(SlideData slide)
@@ -265,70 +271,65 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
         else
         {
             return slide.judgeQueueCount - slide.judgeCurrent +
-                    slide.judgeQueueCCount - slide.judgeC_Current +
+                    slide.judgeQueueLCount - slide.judgeL_Current +
                     slide.judgeQueueRCount - slide.judgeR_Current;
         }
-    }
-
-    private void EndNote(ref SlideData slide)
-    {
-        NoteHelper.ReportResult(ReportResults, slide.judgeGrade, slide.isBreak, SimaiNoteType.Slide);
-        slide.isEnd = true;
     }
 
     private void RenderSlideOK(ref SlideData slide)
     {
         ref readonly var ok = ref slide.okPose;
 
-        var ca = math.cos(math.radians(slide.ang));
-        var sa = math.sin(math.radians(slide.ang));
-        var lx = ok.X * (slide.isMirror ? -1f : 1f);
-        var ly = ok.Y;
-        var wx = lx * ca - ly * sa;
-        var wy = lx * sa + ly * ca;
-
-        var okRotZ = ok.RotZ;
-        if (slide.isMirror) okRotZ += 180f;
-
-        // isJustR flip: for non-wifi curv slides, the sprite may need 180° flip + shift
-        if (!slide.isWifi)
+        var baseJ = slide.okType switch
         {
-            bool needsFlip;
-            if (slide.isJustR) needsFlip = slide.isMirror;
-            else needsFlip = !slide.isMirror;
-            if (needsFlip)
-            {
-                okRotZ += 180f;
-                var flipRad = math.radians(okRotZ);
-                wx += math.sin(flipRad) * 0.27f;
-                wy += math.cos(flipRad) * -0.27f;
-            }
-        }
-
-        var baseJ = slide.isWifi ? JUST_2 : (slide.isJustR ? JUST_0 : JUST_3);
+            SlideOkType.StraightL => JUST_STR_L,
+            SlideOkType.StraightR => JUST_STR_R,
+            SlideOkType.CircleL => JUST_CURV_L,
+            SlideOkType.CircleR => JUST_CURV_R,
+            SlideOkType.WifiU => JUST_WIFI_U,
+            SlideOkType.WifiD => JUST_WIFI_D,
+            _ => JUST_STR_L,
+        };
         var off = slide.judgeGrade switch
         {
             JudgeGrade.Perfect or JudgeGrade.LatePerfect2nd or JudgeGrade.FastPerfect2nd or JudgeGrade.LatePerfect3rd or JudgeGrade.FastPerfect3rd => 0,
-            JudgeGrade.LateGreat or JudgeGrade.FastGreat or JudgeGrade.LateGreat2nd or JudgeGrade.FastGreat2nd or JudgeGrade.LateGreat3rd or JudgeGrade.FastGreat3rd => 5,
-            JudgeGrade.LateGood or JudgeGrade.FastGood => 11,
-            _ => 23,
+            JudgeGrade.FastGreat or JudgeGrade.FastGreat2nd or JudgeGrade.FastGreat3rd => 5,
+            JudgeGrade.LateGreat or JudgeGrade.LateGreat2nd or JudgeGrade.LateGreat3rd => 11,
+            JudgeGrade.FastGood => 17,
+            JudgeGrade.LateGood => 23,
+            _ => 30,
         };
 
         // SlideOK fade-out animation (Just_curv animator equivalent):
         // Record judge time on first render, then fade out from 1→0 over SlideOKFadeOutDuration
-        if (slide.judgeTime < 0f) slide.judgeTime = TimeData.NoteTime;
         var elapsedFromJudge = TimeData.NoteTime - slide.judgeTime;
-        slide.slideOKAlpha = math.saturate(1f - elapsedFromJudge / SlideData.SlideOKFadeOutDuration);
+
+        slide.slideOKAlpha = elapsedFromJudge switch
+        {
+            < 0 => 0f,
+            < 2 * MajCtx.FRAME_LENGTH_SEC => math.saturate(elapsedFromJudge / (2 * MajCtx.FRAME_LENGTH_SEC)),
+            < 17 * MajCtx.FRAME_LENGTH_SEC => 1f,
+            < 25 * MajCtx.FRAME_LENGTH_SEC => math.saturate(1f - (elapsedFromJudge - 17 * MajCtx.FRAME_LENGTH_SEC) / (8 * MajCtx.FRAME_LENGTH_SEC)),
+            _ => 0f,
+        };
+
+        if (elapsedFromJudge > 25 * MajCtx.FRAME_LENGTH_SEC)
+            EndNote(ref slide);
 
         var idx = Interlocked.Increment(ref *SlidesWriteCountPtr) - 1;
         slidesRender[idx] = new SimpleRenderData
         {
-            pos = new float2(wx, wy),
-            angRad = math.radians(okRotZ),
+            pos = new float2(ok.X, ok.Y),
+            angRad = math.radians(ok.RotZ),
             scale = new float2(1, 1),
             spriteId = (uint)(baseJ + off),
             color = new float4(1, 1, 1, slide.slideOKAlpha),
-            sort = 0xFFFFFF00u,
+            sort = 0u,
         };
+    }
+
+    private void EndNote(ref SlideData slide)
+    {
+        slide.isEnd = true;
     }
 }

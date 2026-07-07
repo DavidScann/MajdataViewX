@@ -55,7 +55,21 @@ Shader "Custom/NoteMask"
                 float4 rect = _SpriteRects[note.spriteId];
                 float2 uv = lerp(rect.xy, rect.zw, i.uv);
                 float4 col = tex2D(_MainTex, uv);
-                if (col.a < note.maskCutoff) discard;
+
+                float2 dir = i.uv - float2(0.5, 0.5);
+
+                // atan2(x, y)：把顶部作为0点，并且顺时针增加
+                float angle = atan2(dir.x, dir.y);
+
+                // 转换到 0~1
+                float normalizedAngle = angle / (2 * UNITY_PI);
+
+                if (normalizedAngle < 0)
+                    normalizedAngle += 1;
+
+                if (normalizedAngle > note.maskCutoff)
+                    discard;
+    
                 col.rgb *= note.color.rgb;
                 col.a   *= note.color.a;
                 col.rgb *= col.a; // premultiply

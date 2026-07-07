@@ -24,18 +24,18 @@ public struct TouchHoldData
     public bool isEx;
     public bool isBreak;
     public bool isMine;
+    public bool usingSV;
 
-    public bool show;
     public bool isEnd;
     public float2 centerPos;
 
-    public float fanProgress;
     public float fanAlpha;
     public float maskProgress;
 
     public uint fanSprite;
     public uint pointSprite;
     public uint borderSprite;
+    public uint _borderOnSpriteCache;
 
     public bool isJudged;
     public JudgeGrade judgeGrade;
@@ -46,31 +46,29 @@ public struct TouchHoldData
 
     public void Init()
     {
-        show = false;
-        fanProgress = 0;
         fanAlpha = 0;
         maskProgress = 0;
 
-        centerPos = TouchData.GetAreaPos(sensor);
+        centerPos = MajPos.GetAreaPos(sensor);
 
         fanSprite = TOUCH_HOLD_0;
         pointSprite = TOUCH_POINT;
-        borderSprite = TOUCH_HOLD_BORDER;
+        _borderOnSpriteCache = borderSprite = TOUCH_HOLD_BORDER;
 
         if (isBreak)
         {
             fanSprite = TOUCH_HOLD_BREAK_0;
             pointSprite = TOUCH_POINT_BREAK;
-            borderSprite = TOUCH_HOLD_BORDER_BREAK;
+            _borderOnSpriteCache = borderSprite = TOUCH_HOLD_BORDER_BREAK;
         }
         if (isMine)
         {
             fanSprite = TOUCH_HOLD_MINE_0;
             pointSprite = TOUCH_POINT_MINE;
             if (isBreak)
-                borderSprite = TOUCH_HOLD_BORDER_BREAK_MINE;
+                _borderOnSpriteCache = borderSprite = TOUCH_HOLD_BORDER_BREAK_MINE;
             else
-                borderSprite = TOUCH_HOLD_BORDER_MINE;
+                _borderOnSpriteCache = borderSprite = TOUCH_HOLD_BORDER_MINE;
         }
     }
 }

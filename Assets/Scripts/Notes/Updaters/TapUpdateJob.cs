@@ -53,6 +53,8 @@ public unsafe struct TapUpdateJob : IJobParallelFor
 
         if (destScale < 0f) return;
 
+        var sortTime = (uint)math.clamp(tap.Time * 100f, 0f, 0xFFFFF);
+
         // show line
         if (destScale > 0.3f)
         {
@@ -62,7 +64,7 @@ public unsafe struct TapUpdateJob : IJobParallelFor
                 angRad = math.radians(tap.Ang),
                 scale = lineScale,
                 spriteId = tap.LineSprite,
-                sort = (uint)index,
+                sort = sortTime,
             };
         }
 
@@ -97,7 +99,7 @@ public unsafe struct TapUpdateJob : IJobParallelFor
             exColor = tap.ExColor,
             sliceBorder = float2.zero,
 
-            sort = (uint)index,
+            sort = sortTime,
         };
     }
 
@@ -188,7 +190,7 @@ public unsafe struct TapUpdateJob : IJobParallelFor
             tap.IsMine,
             tap.Diff
         );
-        NoteHelper.PlayEffect(JudgeEffectRequests,
+        NoteHelper.PlayTapEffect(JudgeEffectRequests,
             (int)tap.Key,
             tap.JudgeGrade,
             tap.IsBreak

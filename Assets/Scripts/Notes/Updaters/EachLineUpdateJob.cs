@@ -47,7 +47,7 @@ public unsafe struct EachLineUpdateJob : IJobParallelFor
             angRad = math.radians(el.ang),
             scale = el.scale,
             spriteId = el.lineSprite,
-            sort = (uint)index,
+            sort = (uint)math.clamp(el.time * 100f, 0f, 0xFFFFF),
         };
 
         eachLines[index] = el;

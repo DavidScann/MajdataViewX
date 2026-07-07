@@ -1,5 +1,6 @@
 #region
 
+using System;
 using System.Collections.Generic;
 using System.IO;
 using Unity.Collections;
@@ -12,6 +13,7 @@ using static MajCtx;
 
 public class NoteSkinManager : MonoBehaviour
 {
+    // ============ Note Skin ============
     public const int COUNT = 184;
 
     public const int TAP = 0;
@@ -109,42 +111,47 @@ public class NoteSkinManager : MonoBehaviour
     public const int HOLD_BREAK_MINE_ON = 88;
     public const int HOLD_EX = 89;
 
-    public const int JUST_0 = 90;
-    public const int JUST_1 = 91;
-    public const int JUST_2 = 92;
-    public const int JUST_3 = 93;
-    public const int JUST_4 = 94;
-    public const int JUST_5 = 95;
-    public const int JUST_6 = 96;
-    public const int JUST_7 = 97;
-    public const int JUST_8 = 98;
-    public const int JUST_9 = 99;
-    public const int JUST_10 = 100;
-    public const int JUST_11 = 101;
-    public const int JUST_12 = 102;
-    public const int JUST_13 = 103;
-    public const int JUST_14 = 104;
-    public const int JUST_15 = 105;
-    public const int JUST_16 = 106;
-    public const int JUST_17 = 107;
-    public const int JUST_18 = 108;
-    public const int JUST_19 = 109;
-    public const int JUST_20 = 110;
-    public const int JUST_21 = 111;
-    public const int JUST_22 = 112;
-    public const int JUST_23 = 113;
-    public const int JUST_24 = 114;
-    public const int JUST_25 = 115;
-    public const int JUST_26 = 116;
-    public const int JUST_27 = 117;
-    public const int JUST_28 = 118;
-    public const int JUST_29 = 119;
-    public const int JUST_30 = 120;
-    public const int JUST_31 = 121;
-    public const int JUST_32 = 122;
-    public const int JUST_33 = 123;
-    public const int JUST_34 = 124;
-    public const int JUST_35 = 125;
+    public const int JUST_STR_L = 90;
+    public const int JUST_STR_R = 91;
+    public const int JUST_CURV_L = 92;
+    public const int JUST_CURV_R = 93;
+    public const int JUST_WIFI_U = 94;
+    public const int JUST_WIFI_D = 95;
+
+    public const int JUST_STR_L_FAST_GR = 96;
+    public const int JUST_STR_R_FAST_GR = 97;
+    public const int JUST_CURV_L_FAST_GR = 98;
+    public const int JUST_CURV_R_FAST_GR = 99;
+    public const int JUST_WIFI_U_FAST_GR = 100;
+    public const int JUST_WIFI_D_FAST_GR = 101;
+
+    public const int JUST_STR_L_FAST_GD = 102;
+    public const int JUST_STR_R_FAST_GD = 103;
+    public const int JUST_CURV_L_FAST_GD = 104;
+    public const int JUST_CURV_R_FAST_GD = 105;
+    public const int JUST_WIFI_U_FAST_GD = 106;
+    public const int JUST_WIFI_D_FAST_GD = 107;
+
+    public const int JUST_STR_L_LATE_GR = 108;
+    public const int JUST_STR_R_LATE_GR = 109;
+    public const int JUST_CURV_L_LATE_GR = 110;
+    public const int JUST_CURV_R_LATE_GR = 111;
+    public const int JUST_WIFI_U_LATE_GR = 112;
+    public const int JUST_WIFI_D_LATE_GR = 113;
+
+    public const int JUST_STR_L_LATE_GD = 114;
+    public const int JUST_STR_R_LATE_GD = 115;
+    public const int JUST_CURV_L_LATE_GD = 116;
+    public const int JUST_CURV_R_LATE_GD = 117;
+    public const int JUST_WIFI_U_LATE_GD = 118;
+    public const int JUST_WIFI_D_LATE_GD = 119;
+
+    public const int JUST_STR_L_MISS = 120;
+    public const int JUST_STR_R_MISS = 121;
+    public const int JUST_CURV_L_MISS = 122;
+    public const int JUST_CURV_R_MISS = 123;
+    public const int JUST_WIFI_U_MISS = 124;
+    public const int JUST_WIFI_D_MISS = 125;
 
     public const int JUDGE_TEXT_0 = 126;
     public const int JUDGE_TEXT_1 = 127;
@@ -230,10 +237,18 @@ public class NoteSkinManager : MonoBehaviour
     public Texture2D Atlas;
     public NativeArray<float4> Uvs;
 
+    // =========== Other Skin ============
+
     public Sprite[] JudgeText = new Sprite[5];
-    public Sprite JudgeText_Break;
+    public Sprite JudgeText_BPerfect;
     public Sprite FastText;
     public Sprite LateText;
+
+    public Sprite[] TouchBorder_Normal = new Sprite[2];
+    public Sprite[] TouchBorder_Each = new Sprite[2];
+    public Sprite[] TouchBorder_Break = new Sprite[2];
+    public Sprite[] TouchBorder_Mine = new Sprite[2];
+    public Sprite[] TouchBorder_Break_Mine = new Sprite[2];
 
     public Sprite Outline;
 
@@ -303,42 +318,47 @@ public class NoteSkinManager : MonoBehaviour
         Add(sources, HOLD_MINE_ON, File.Exists(holdPath + "/hold_mine_on.png") ? holdPath + "/hold_mine_on.png" : holdPath + "/hold_mine.png");
         Add(sources, HOLD_BREAK_MINE_ON, File.Exists(holdPath + "/hold_break_mine_on.png") ? holdPath + "/hold_break_mine_on.png" : holdPath + "/hold_break_mine.png");
 
-        Add(sources, JUST_0, slideOkPath + "/just_curv_r.png");
-        Add(sources, JUST_1, slideOkPath + "/just_str_r.png");
-        Add(sources, JUST_2, slideOkPath + "/just_wifi_u.png");
-        Add(sources, JUST_3, slideOkPath + "/just_curv_l.png");
-        Add(sources, JUST_4, slideOkPath + "/just_str_l.png");
-        Add(sources, JUST_5, slideOkPath + "/just_wifi_d.png");
-        Add(sources, JUST_6, slideOkPath + "/just_curv_r_fast_gr.png");
-        Add(sources, JUST_7, slideOkPath + "/just_str_r_fast_gr.png");
-        Add(sources, JUST_8, slideOkPath + "/just_wifi_u_fast_gr.png");
-        Add(sources, JUST_9, slideOkPath + "/just_curv_l_fast_gr.png");
-        Add(sources, JUST_10, slideOkPath + "/just_str_l_fast_gr.png");
-        Add(sources, JUST_11, slideOkPath + "/just_wifi_d_fast_gr.png");
-        Add(sources, JUST_12, slideOkPath + "/just_curv_r_fast_gd.png");
-        Add(sources, JUST_13, slideOkPath + "/just_str_r_fast_gd.png");
-        Add(sources, JUST_14, slideOkPath + "/just_wifi_u_fast_gd.png");
-        Add(sources, JUST_15, slideOkPath + "/just_curv_l_fast_gd.png");
-        Add(sources, JUST_16, slideOkPath + "/just_str_l_fast_gd.png");
-        Add(sources, JUST_17, slideOkPath + "/just_wifi_d_fast_gd.png");
-        Add(sources, JUST_18, slideOkPath + "/just_curv_r_late_gr.png");
-        Add(sources, JUST_19, slideOkPath + "/just_str_r_late_gr.png");
-        Add(sources, JUST_20, slideOkPath + "/just_wifi_u_late_gr.png");
-        Add(sources, JUST_21, slideOkPath + "/just_curv_l_late_gr.png");
-        Add(sources, JUST_22, slideOkPath + "/just_str_l_late_gr.png");
-        Add(sources, JUST_23, slideOkPath + "/just_wifi_d_late_gr.png");
-        Add(sources, JUST_24, slideOkPath + "/just_curv_r_late_gd.png");
-        Add(sources, JUST_25, slideOkPath + "/just_str_r_late_gd.png");
-        Add(sources, JUST_26, slideOkPath + "/just_wifi_u_late_gd.png");
-        Add(sources, JUST_27, slideOkPath + "/just_curv_l_late_gd.png");
-        Add(sources, JUST_28, slideOkPath + "/just_str_l_late_gd.png");
-        Add(sources, JUST_29, slideOkPath + "/just_wifi_d_late_gd.png");
-        Add(sources, JUST_30, slideOkPath + "/miss_curv_r.png");
-        Add(sources, JUST_31, slideOkPath + "/miss_str_r.png");
-        Add(sources, JUST_32, slideOkPath + "/miss_wifi_u.png");
-        Add(sources, JUST_33, slideOkPath + "/miss_curv_l.png");
-        Add(sources, JUST_34, slideOkPath + "/miss_str_l.png");
-        Add(sources, JUST_35, slideOkPath + "/miss_wifi_d.png");
+        Add(sources, JUST_STR_L, slideOkPath + "/just_str_l.png");
+        Add(sources, JUST_STR_R, slideOkPath + "/just_str_r.png");
+        Add(sources, JUST_CURV_L, slideOkPath + "/just_curv_l.png");
+        Add(sources, JUST_CURV_R, slideOkPath + "/just_curv_r.png");
+        Add(sources, JUST_WIFI_U, slideOkPath + "/just_wifi_u.png");
+        Add(sources, JUST_WIFI_D, slideOkPath + "/just_wifi_d.png");
+
+        Add(sources, JUST_STR_L_FAST_GR, slideOkPath + "/just_str_l_fast_gr.png");
+        Add(sources, JUST_STR_R_FAST_GR, slideOkPath + "/just_str_r_fast_gr.png");
+        Add(sources, JUST_CURV_L_FAST_GR, slideOkPath + "/just_curv_l_fast_gr.png");
+        Add(sources, JUST_CURV_R_FAST_GR, slideOkPath + "/just_curv_r_fast_gr.png");
+        Add(sources, JUST_WIFI_U_FAST_GR, slideOkPath + "/just_wifi_u_fast_gr.png");
+        Add(sources, JUST_WIFI_D_FAST_GR, slideOkPath + "/just_wifi_d_fast_gr.png");
+
+        Add(sources, JUST_STR_L_FAST_GD, slideOkPath + "/just_str_l_fast_gd.png");
+        Add(sources, JUST_STR_R_FAST_GD, slideOkPath + "/just_str_r_fast_gd.png");
+        Add(sources, JUST_CURV_L_FAST_GD, slideOkPath + "/just_curv_l_fast_gd.png");
+        Add(sources, JUST_CURV_R_FAST_GD, slideOkPath + "/just_curv_r_fast_gd.png");
+        Add(sources, JUST_WIFI_U_FAST_GD, slideOkPath + "/just_wifi_u_fast_gd.png");
+        Add(sources, JUST_WIFI_D_FAST_GD, slideOkPath + "/just_wifi_d_fast_gd.png");
+
+        Add(sources, JUST_STR_L_LATE_GR, slideOkPath + "/just_str_l_late_gr.png");
+        Add(sources, JUST_STR_R_LATE_GR, slideOkPath + "/just_str_r_late_gr.png");
+        Add(sources, JUST_CURV_L_LATE_GR, slideOkPath + "/just_curv_l_late_gr.png");
+        Add(sources, JUST_CURV_R_LATE_GR, slideOkPath + "/just_curv_r_late_gr.png");
+        Add(sources, JUST_WIFI_U_LATE_GR, slideOkPath + "/just_wifi_u_late_gr.png");
+        Add(sources, JUST_WIFI_D_LATE_GR, slideOkPath + "/just_wifi_d_late_gr.png");
+
+        Add(sources, JUST_STR_L_LATE_GD, slideOkPath + "/just_str_l_late_gd.png");
+        Add(sources, JUST_STR_R_LATE_GD, slideOkPath + "/just_str_r_late_gd.png");
+        Add(sources, JUST_CURV_L_LATE_GD, slideOkPath + "/just_curv_l_late_gd.png");
+        Add(sources, JUST_CURV_R_LATE_GD, slideOkPath + "/just_curv_r_late_gd.png");
+        Add(sources, JUST_WIFI_U_LATE_GD, slideOkPath + "/just_wifi_u_late_gd.png");
+        Add(sources, JUST_WIFI_D_LATE_GD, slideOkPath + "/just_wifi_d_late_gd.png");
+
+        Add(sources, JUST_STR_L_MISS, slideOkPath + "/miss_str_l.png");
+        Add(sources, JUST_STR_R_MISS, slideOkPath + "/miss_str_r.png");
+        Add(sources, JUST_CURV_L_MISS, slideOkPath + "/miss_curv_l.png");
+        Add(sources, JUST_CURV_R_MISS, slideOkPath + "/miss_curv_r.png");
+        Add(sources, JUST_WIFI_U_MISS, slideOkPath + "/miss_wifi_u.png");
+        Add(sources, JUST_WIFI_D_MISS, slideOkPath + "/miss_wifi_d.png");
 
         Add(sources, JUDGE_TEXT_0, judgeTextPath + "/judge_text_miss.png");
         Add(sources, JUDGE_TEXT_1, judgeTextPath + "/judge_text_good.png");
@@ -406,9 +426,20 @@ public class NoteSkinManager : MonoBehaviour
         JudgeText[2] = LoadSprite(judgeTextPath + "/judge_text_great.png");
         JudgeText[3] = LoadSprite(judgeTextPath + "/judge_text_perfect.png");
         JudgeText[4] = LoadSprite(judgeTextPath + "/judge_text_cPerfect.png");
-        JudgeText_Break = LoadSprite(judgeTextPath + "/judge_text_break.png");
+        JudgeText_BPerfect = LoadSprite(judgeTextPath + "/judge_text_break.png");
         FastText = LoadSprite(judgeTextPath + "/fast.png");
         LateText = LoadSprite(judgeTextPath + "/late.png");
+
+        TouchBorder_Normal[0] = LoadSprite(touchPath + "/TouchSkins/touch_border_2.png");
+        TouchBorder_Normal[1] = LoadSprite(touchPath + "/TouchSkins/touch_border_3.png");
+        TouchBorder_Each[0] = LoadSprite(touchPath + "/TouchSkins/touch_border_2_each.png");
+        TouchBorder_Each[1] = LoadSprite(touchPath + "/TouchSkins/touch_border_3_each.png");
+        TouchBorder_Break[0] = LoadSprite(touchPath + "/TouchSkins/touch_break_border_2.png");
+        TouchBorder_Break[1] = LoadSprite(touchPath + "/TouchSkins/touch_break_border_3.png");
+        TouchBorder_Mine[0] = LoadSprite(touchPath + "/TouchSkins/touch_mine_border_2.png");
+        TouchBorder_Mine[1] = LoadSprite(touchPath + "/TouchSkins/touch_mine_border_3_mine.png");
+        TouchBorder_Break_Mine[0] = LoadSprite(touchPath + "/TouchSkins/touch_break_mine_border_2.png");
+        TouchBorder_Break_Mine[1] = LoadSprite(touchPath + "/TouchSkins/touch_break_mine_border_3.png");
 
         Outline = LoadSprite(Path.Combine(skinPath, "outline.png"));
 

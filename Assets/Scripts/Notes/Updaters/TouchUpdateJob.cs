@@ -1,14 +1,15 @@
 #pragma warning disable CS8500
-using System.Threading;
 using MajSimai;
+using System.ComponentModel;
+using System.Runtime.InteropServices.ComTypes;
+using System.Threading;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
-
-using static NoteSkinManager;
 using static MajBurst;
+using static NoteSkinManager;
 
 [BurstCompile]
 public unsafe struct TouchUpdateJob : IJobParallelFor
@@ -40,42 +41,31 @@ public unsafe struct TouchUpdateJob : IJobParallelFor
     {
         if (touch.isEnd) return;
 
-        var timing = TimeData.NoteTime - touch.time;
-        var fakeTiming = TimeData.FakeNoteTime - TimeData.GetPositionAtTime(touch.time);
+        var sortTime = (uint)math.clamp(touch.time * 100f, 0f, 0xFFFFF);
 
-        var wholeDuration = 3.209385682f * math.pow(touch.speed, -0.9549621752f);
-        var moveDuration = 0.8f * wholeDuration;
-        var displayDuration = 0.2f * wholeDuration;
-
-        var pow = -math.exp(8f * (fakeTiming * 0.43f / moveDuration) - 0.85f) + 0.42f;
+        var timing = touch.usingSV
+            ? TimeData.FakeNoteTime - TimeData.GetPositionAtTime(touch.time)
+            : TimeData.NoteTime - touch.time;
+        var pow = -math.exp(8f * (timing * 0.43f / touch.moveDuration) - 0.85f) + 0.42f;
         var fanDist = math.clamp(pow, 0f, 0.4f);
-        touch.fanProgress = fanDist;
 
-        if (-fakeTiming <= wholeDuration && -fakeTiming > moveDuration)
+        if (-timing > touch.wholeDuration)
         {
-            var fadeT = (-fakeTiming - moveDuration) / displayDuration;
-            touch.fanAlpha = math.saturate(fadeT);
-            touch.show = true;
+            return;
         }
-        else if (-fakeTiming < moveDuration)
+        else if (-timing < touch.wholeDuration && -timing >= touch.moveDuration)
+        {
+            var fadeT = (timing - -touch.moveDuration) / touch.displayDuration;
+            touch.fanAlpha = math.saturate(fadeT);
+            pow = -math.exp(-0.85f) + 0.42f;
+            fanDist = math.clamp(pow, 0f, 0.4f);
+        }
+        else if (-timing <= touch.moveDuration)
         {
             touch.fanAlpha = 1f;
-            touch.show = true;
         }
 
-        if (!touch.show) return;
-
         var centerPos = touch.centerPos;
-        var ptIdx = Interlocked.Increment(ref *TouchesWriteCountPtr) - 1;
-        touchesRender[ptIdx] = new SimpleRenderData
-        {
-            pos = centerPos,
-            angRad = 0,
-            scale = new float2(1, 1),
-            spriteId = touch.pointSprite,
-            color = new float4(touch.fanAlpha, touch.fanAlpha, touch.fanAlpha, 1),
-            sort = (uint)index,
-        };
 
         var fanPositions = stackalloc float2[4]
         {
@@ -84,41 +74,75 @@ public unsafe struct TouchUpdateJob : IJobParallelFor
             centerPos + new float2(-(0.226f + fanDist), 0),
             centerPos + new float2(0, -(0.226f + fanDist)),
         };
-
         for (int i = 0; i < 4; i++)
         {
             var tIdx = Interlocked.Increment(ref *TouchesWriteCountPtr) - 1;
             touchesRender[tIdx] = new SimpleRenderData
             {
                 pos = fanPositions[i],
-                angRad = 0,
+                angRad = math.radians(90f * (i + 1)),
                 scale = new float2(1, 1),
                 spriteId = touch.fanSprite,
-                color = new float4(touch.fanAlpha, touch.fanAlpha, touch.fanAlpha, 1),
-                sort = (uint)index + (uint)i * 0x10000u,
+                color = new float4(1, 1, 1, touch.fanAlpha),
+                sort = (sortTime << 4) | 0x3,
             };
         }
 
-        var borderIdx = Interlocked.Increment(ref *TouchesWriteCountPtr) - 1;
-        touchesRender[borderIdx] = new SimpleRenderData
+        var ptIdx = Interlocked.Increment(ref *TouchesWriteCountPtr) - 1;
+        touchesRender[ptIdx] = new SimpleRenderData
         {
             pos = centerPos,
             angRad = 0,
             scale = new float2(1, 1),
-            spriteId = touch.borderSprite0,
-            color = new float4(touch.fanAlpha, touch.fanAlpha, touch.fanAlpha, 1),
-            sort = (uint)index + 8u * 0x10000u,
+            spriteId = touch.pointSprite,
+            color = new float4(1, 1, 1, touch.fanAlpha),
+            sort = (sortTime << 4) | 0x2,
         };
-        var borderIdx2 = Interlocked.Increment(ref *TouchesWriteCountPtr) - 1;
-        touchesRender[borderIdx2] = new SimpleRenderData
+
+        if (timing > -0.02f)
         {
-            pos = centerPos,
-            angRad = 0,
-            scale = new float2(1, 1),
-            spriteId = touch.borderSprite1,
-            color = new float4(touch.fanAlpha, touch.fanAlpha, touch.fanAlpha, 1),
-            sort = (uint)index + 9u * 0x10000u,
-        };
+            var justIdx = Interlocked.Increment(ref *TouchesWriteCountPtr) - 1;
+            touchesRender[justIdx] = new SimpleRenderData
+            {
+                pos = centerPos,
+                angRad = 0,
+                scale = new float2(1, 1),
+                spriteId = touch.justSprite,
+                color = new float4(1),
+                sort = (sortTime << 4) | 0x1,
+            };
+        }
+
+        if (-timing < touch.wholeDuration &&
+            MajBurst.MultTouchHandler.CanShowBorder(touch.sensor, out var isThree, out var sprite))
+        {
+            if (!isThree)
+            {
+                var borderIdx = Interlocked.Increment(ref *TouchesWriteCountPtr) - 1;
+                touchesRender[borderIdx] = new SimpleRenderData
+                {
+                    pos = centerPos,
+                    angRad = 0,
+                    scale = new float2(1, 1),
+                    spriteId = (uint)sprite,
+                    color = new float4(1, 1, 1, touch.fanAlpha),
+                    sort = sortTime << 4,
+                };
+            }
+            else
+            {
+                var borderIdx = Interlocked.Increment(ref *TouchesWriteCountPtr) - 1;
+                touchesRender[borderIdx] = new SimpleRenderData
+                {
+                    pos = centerPos,
+                    angRad = 0,
+                    scale = new float2(1, 1),
+                    spriteId = (uint)sprite,
+                    color = new float4(1, 1, 1, touch.fanAlpha),
+                    sort = sortTime << 4,
+                };
+            }
+        }
     }
 
     private void AutoplayUpdate(ref TouchData touch)
@@ -144,12 +168,6 @@ public unsafe struct TouchUpdateJob : IJobParallelFor
                 touch.isJudged = true;
                 touch.diff = gradeIndex > 7 ? 11.4514f : -11.4514f;
                 EndNote(ref touch);
-                break;
-            case AutoPlayMode.DJAuto:
-                if (!touch.isJudged && !touch.isMine)
-                {
-                    MajBurst.InputData.SetSensorState(touch.sensor, true);
-                }
                 break;
         }
     }
@@ -221,11 +239,11 @@ public unsafe struct TouchUpdateJob : IJobParallelFor
         else
             NoteHelper.PlayTouchSound(SfxRequests);
 
-        NoteHelper.PlayEffect(JudgeEffectRequests, (int)touch.sensor, touch.judgeGrade, touch.isBreak);
+        NoteHelper.PlayTouchEffect(JudgeEffectRequests, (int)touch.sensor + 8, touch.judgeGrade, touch.isBreak);
         NoteHelper.ReportResult(ReportResults, touch.judgeGrade, touch.isBreak, SimaiNoteType.Touch);
 
         MajBurst.InputData.NextTouch(touch.sensor);
-        touch.show = false;
+        MajBurst.MultTouchHandler.Unregister(touch.sensor);
         touch.isEnd = true;
     }
 }
