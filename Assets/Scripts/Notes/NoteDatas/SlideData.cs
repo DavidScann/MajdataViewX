@@ -15,6 +15,11 @@ public struct SlideData
 {
     public float tapTime;
     public float time;
+
+    // FOR WIFI STARS CALCULATE ONLY
+    public int startPos;
+    public int endPos;
+
     public float LastFor;
     public float speed;
     public int sensorOrderIndex;
@@ -52,12 +57,14 @@ public struct SlideData
     public uint slideSprite;
     //star
     public float process;
-    public float starPosX;
-    public float starPosY;
-    public float starRot;
     public float starAlpha;
     public float starScale;
     public uint starSprite;
+    //FOR WIFI
+    public float2 starPosStart;
+    public float2 starPosConstL;
+    public float2 starPosConstC;
+    public float2 starPosConstR;
 
     public bool isJudged;
     public JudgeGrade judgeGrade;
@@ -148,6 +155,16 @@ public struct SlideData
                     starSprite = STAR_MINE;
                 }
             }
+
+            //FOR WIFI STARS
+            var endPosC = endPos;
+            var endPosL = endPosC + 1 > 8 ? 0 : endPosC + 1;
+            var endPosR = endPosC - 1 < 1 ? 8 : endPosC - 1;
+
+            starPosStart = MajPos.GetBtnPos(startPos - 1);
+            starPosConstC = MajPos.GetBtnPos(endPosC - 1) - starPosStart;
+            starPosConstL = MajPos.GetBtnPos(endPosL - 1) - starPosStart;
+            starPosConstR = MajPos.GetBtnPos(endPosR - 1) - starPosStart;
         }
     }
 }

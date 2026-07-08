@@ -10,7 +10,6 @@ public static class MajBurst
     public static readonly SharedStatic<MajBurstData> __DataSS =
         SharedStatic<MajBurstData>.GetOrCreate<MajBurstKey>();
 
-
     public static ref TimeDataB TimeData =>
         ref __DataSS.Data.TimeData;
     public static ref InputDataB InputData =>

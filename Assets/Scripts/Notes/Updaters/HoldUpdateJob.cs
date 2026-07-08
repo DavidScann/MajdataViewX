@@ -1,4 +1,3 @@
-#pragma warning disable CS8500
 using System.Threading;
 using MajSimai;
 using Unity.Burst;
@@ -33,11 +32,10 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
 
     public void Execute(int index)
     {
-        var hold = holds[index];
+        ref var hold = ref holds.ElementRef(index);
         TransformUpdate(ref hold, index);
         AutoplayUpdate(ref hold);
         CheckUpdate(ref hold);
-        holds[index] = hold;
     }
 
     private void TransformUpdate(ref HoldData hold, int index)

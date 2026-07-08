@@ -28,7 +28,7 @@ Shader "Custom/NoteLine"
             float _PixelsPerUnit;
 
             struct appdata { float4 vertex : POSITION; float2 uv : TEXCOORD0; };
-            struct v2f   { float4 pos : SV_POSITION; float2 uv : TEXCOORD0; uint id : TEXCOORD1; };
+            struct v2f   { float4 pos : SV_POSITION; float2 uv : TEXCOORD0; float4 rect : TEXCOORD1; };
 
             v2f vert(appdata v, uint id : SV_InstanceID)
             {
@@ -41,15 +41,13 @@ Shader "Custom/NoteLine"
                 float2 r = float2(p.x*c - p.y*s, p.x*s + p.y*c);
                 o.pos = UnityObjectToClipPos(float4(r, 0, 1));
                 o.uv = v.uv;
-                o.id = id;
+                o.rect = rect;
                 return o;
             }
 
             float4 frag(v2f i) : SV_Target
             {
-                LineRenderData note = _NoteBuffer[i.id];
-                float4 rect = _SpriteRects[note.spriteId];
-                float2 uv = lerp(rect.xy, rect.zw, i.uv);
+                float2 uv = lerp(i.rect.xy, i.rect.zw, i.uv);
                 float4 col = tex2D(_MainTex, uv);
                 col.rgb *= col.a; // premultiply (color = white by default)
                 return col;

@@ -62,14 +62,14 @@ public class InputManager : MonoBehaviour
 
     private void CheckButton(Keyboard keyboard)
     {
-        MajBurst.InputData.SetButtonState(SensorType.A1, keyboard[Key.W].isPressed);
-        MajBurst.InputData.SetButtonState(SensorType.A2, keyboard[Key.E].isPressed);
-        MajBurst.InputData.SetButtonState(SensorType.A3, keyboard[Key.D].isPressed);
-        MajBurst.InputData.SetButtonState(SensorType.A4, keyboard[Key.C].isPressed);
-        MajBurst.InputData.SetButtonState(SensorType.A5, keyboard[Key.X].isPressed);
-        MajBurst.InputData.SetButtonState(SensorType.A6, keyboard[Key.Z].isPressed);
-        MajBurst.InputData.SetButtonState(SensorType.A7, keyboard[Key.A].isPressed);
-        MajBurst.InputData.SetButtonState(SensorType.A8, keyboard[Key.Q].isPressed);
+        InputData.SetButtonState(SensorType.A1, keyboard[Key.W].isPressed);
+        InputData.SetButtonState(SensorType.A2, keyboard[Key.E].isPressed);
+        InputData.SetButtonState(SensorType.A3, keyboard[Key.D].isPressed);
+        InputData.SetButtonState(SensorType.A4, keyboard[Key.C].isPressed);
+        InputData.SetButtonState(SensorType.A5, keyboard[Key.X].isPressed);
+        InputData.SetButtonState(SensorType.A6, keyboard[Key.Z].isPressed);
+        InputData.SetButtonState(SensorType.A7, keyboard[Key.A].isPressed);
+        InputData.SetButtonState(SensorType.A8, keyboard[Key.Q].isPressed);
     }
 
     private void WriteWorldPosition(Vector2 screenPos)
@@ -91,7 +91,7 @@ public class InputManager : MonoBehaviour
             var dy = pos.y - sp.y;
             var distSq = dx * dx + dy * dy;
 
-            var s = MajBurst.InputData.GetSensorState((SensorType)i);
+            var s = InputData.GetSensorState((SensorType)i);
             if (distSq <= combinedSq)
             {
                 if (!s.Status)
@@ -102,7 +102,7 @@ public class InputManager : MonoBehaviour
                 if (s.Status)
                     s.Status = false;
             }
-            MajBurst.InputData.SetSensorState((SensorType)i, s.Status);
+            InputData.SetSensorState((SensorType)i, s.Status);
         }
     }
 
@@ -192,22 +192,18 @@ public struct InputDataB
         return order == NextSensorIndex[(int)pos];
     }
 
-    public void ResetIndex()
-    {
-        for (var i = 0; i < BUTTON_COUNT; i++)
-            NextButtonIndex[i] = 0;
-        for (var i = 0; i < SENSOR_COUNT; i++)
-            NextSensorIndex[i] = 0;
-    }
-
     public void ResetState()
     {
-        ResetIndex();
-
         for (var i = 0; i < BUTTON_COUNT; i++)
+        {
             ButtonStates[i] = default;
+            NextButtonIndex[i] = 0;
+        }
         for (var i = 0; i < SENSOR_COUNT; i++)
+        {
             SensorStates[i] = default;
+            NextSensorIndex[i] = 0;
+        }
     }
 
     public void Dispose()

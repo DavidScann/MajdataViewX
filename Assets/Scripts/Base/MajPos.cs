@@ -1,15 +1,27 @@
+using Unity.Burst;
 using Unity.Mathematics;
 
 public static class MajPos
 {
-    public static float2 GetBtnPos(SensorType sensor)
+    /// <summary>
+    /// 获取按键的世界坐标
+    /// </summary>
+    /// <param name="key">按键索引，注意是在0~7之间</param>
+    /// <returns></returns>
+    [BurstCompile]
+    public static float2 GetBtnPos(int key)
     {
-        int i = (int)sensor;
-        if (i >= 0 && i <= 7)
-            return RingPos(4.8f, i + 1, false);
+        if (key >= 0 && key <= 7)
+            return RingPos(4.8f, key + 1, false);
         return float2.zero;
     }
 
+    /// <summary>
+    /// 获取判定区的世界坐标
+    /// </summary>
+    /// <param name="sensor">判定区</param>
+    /// <returns></returns>
+    [BurstCompile]
     public static float2 GetAreaPos(SensorType sensor)
     {
         int i = (int)sensor;
@@ -26,6 +38,7 @@ public static class MajPos
         return float2.zero;
     }
 
+    [BurstCompile]
     private static float2 RingPos(float radius, int index1, bool altAngle)
     {
         var a = altAngle

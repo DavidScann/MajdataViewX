@@ -1,7 +1,7 @@
 using System;
 using Unity.Mathematics;
 
-public struct SimpleRenderData : IComparable<SimpleRenderData>
+public struct SimpleRenderData : IComparable<SimpleRenderData>, ISortableRenderData
 {
     public float2 pos;
     public float angRad;
@@ -11,4 +11,5 @@ public struct SimpleRenderData : IComparable<SimpleRenderData>
     public uint sort;
 
     public readonly int CompareTo(SimpleRenderData o) => o.sort.CompareTo(sort);
+    public readonly uint SortKey => sort;
 }

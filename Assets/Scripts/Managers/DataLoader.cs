@@ -44,7 +44,6 @@ public class DataLoader : MonoBehaviour
         artistText.text = artist;
         diffText.text = GetDifficultyText(diff);
         cardImage.color = diffColors[diff];
-
         levelText.text = chart.Level;
         designText.text = chart.Designer;
 
@@ -53,29 +52,28 @@ public class DataLoader : MonoBehaviour
 
         _timeProvider.LoadSV(chart.CommaTimings);
 
-        MajBurst.InputData.ResetIndex();
-
         _noteManager.NoteSpeed = noteSpeed;
         _noteManager.TouchSpeed = touchSpeed;
-        _noteManager.legacySlideLayer = legacySlideLayer;
-        _noteManager.smoothSlideAnime = smoothSlideAnime;
+        _noteManager.LegacySlideLayer = legacySlideLayer;
+        _noteManager.SmoothSlideAnime = smoothSlideAnime;
+        _noteManager.Ignore = ignoreOffset;
         _noteManager.Load(chart);
 
         await UniTask.Yield();
     }
 
-    private static string GetDifficultyText(int difficulty)
-    {
-        return difficulty switch
+    public static string GetDifficultyText(int index) =>
+        index switch
         {
-            0 => "Basic",
-            1 => "Advanced",
-            2 => "Expert",
-            3 => "Master",
-            4 => "Re:Master",
-            _ => "?"
+            0 => "EASY",
+            1 => "BASIC",
+            2 => "ADVANCED",
+            3 => "EXPERT",
+            4 => "MASTER",
+            5 => "Re:MASTER",
+            6 => "ORIGINAL",
+            _ => "DEFAULT"
         };
-    }
 
     public void ResetState()
     {

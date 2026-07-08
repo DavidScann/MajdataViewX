@@ -103,7 +103,6 @@ public class TimeProvider : MonoBehaviour
                 SVList.Add(((float)timing.Timing, timing.SVeloc));
             }
         }
-
         if (SVList.Length == 0)
         {
             return;
@@ -120,12 +119,10 @@ public class TimeProvider : MonoBehaviour
         for (var i = 0; i < SVList.Length; i++)
         {
             var (time, sveloc) = SVList[i];
-
             pos += lastSpeed * (time - lastTime);
 
-            //PositionFunctions.Add((t) => pos + lastSpeed * (t - lastTime));
-            SVFuncArgs[i + 1] = (lastSpeed, pos - lastSpeed * lastTime);
-
+            // 使用当前点的时间和当前新的速度构建往后的运动方程
+            SVFuncArgs[i + 1] = (sveloc, pos - sveloc * time);
             lastTime = time;
             lastSpeed = sveloc;
         }
@@ -273,7 +270,7 @@ public struct TimeDataB
             }
             else low = mid + 1;
         }
-        return SVFuncArgs[^1].k * t + SVFuncArgs[^1].k;
+        return SVFuncArgs[^1].k * t + SVFuncArgs[^1].b;
     }
 
     public readonly float GetFrame() => NoteTime * 1000 / 16.6667f;

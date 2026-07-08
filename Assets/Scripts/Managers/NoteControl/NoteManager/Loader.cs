@@ -1,25 +1,29 @@
-using System;
-using System.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 using MajSimai;
-using Unity.Collections.LowLevel.Unsafe;
-using UnityEngine;
 using Notes.SlideUtils;
-
-using static MajCtx;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Linq;
-using System.Text;
-using Unity.Collections;
-using WebSocketSharp;
 using System.Drawing;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Threading.Tasks;
+using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
+using UnityEditor.Experimental.GraphView;
+using UnityEngine;
+using WebSocketSharp;
+using static MajCtx;
 
 public partial class NoteManager
 {
     public float NoteSpeed = 7f;
     public float TouchSpeed = 7.5f;
-    public bool legacySlideLayer = false;
-    public bool smoothSlideAnime = true;
+    public bool LegacySlideLayer = false;
+    public bool SmoothSlideAnime = true;
+
+    public double Ignore = 0f;
 
     private readonly int[] _buttonOrderIndex = new int[BUTTON_COUNT];
     private readonly int[] _sensorOrderIndex = new int[SENSOR_COUNT];
@@ -50,7 +54,12 @@ public partial class NoteManager
                 loadedTouches[i] = new();
 
         foreach (var timing in chart.NoteTimings)
-            LoadTiming(timing);
+        {
+            if (timing.Timing < Ignore)
+                LoadIgnore(timing);
+            else
+                LoadTiming(timing);
+        }
 
         slideAreaPool = (SlideArea*)UnsafeUtility.Malloc(
             areaPoolIndex * sizeof(SlideArea),
@@ -99,6 +108,30 @@ public partial class NoteManager
         loadedSlidePoseArrays.Clear();
 
         MajBurst.MultTouchHandler.Load(loadedTouches);
+    }
+
+    private void LoadIgnore(in SimaiTimingPoint timing)
+    {
+        var holdLength = 0d;
+        foreach (var note in timing.Notes)
+        {
+            if (note.HoldTime > holdLength)
+                holdLength = note.HoldTime;
+
+            if (note.SlideStartTime + note.SlideTime > Ignore)
+            {
+                LoadTiming(timing);
+                return;
+            }
+        }
+
+        if (timing.Timing + holdLength > Ignore)
+        {
+            LoadTiming(timing);
+            return;
+        }
+
+        _objectCounter.CountIgnoreNoteCountAsync(timing.Notes).Forget();
     }
 
     private void CalcEach(in SimaiTimingPoint timing, out bool isNoteEach, out bool isSlideEach)
@@ -348,6 +381,8 @@ public partial class NoteManager
             {
                 tapTime = (float)timing.Timing,
                 time = (float)note.SlideStartTime,
+                startPos = noteContent[0] - '0',
+                endPos = noteContent[2] - '0',
                 LastFor = (float)note.SlideTime,
                 speed = NoteSpeed * timing.HSpeed,
                 sensorOrderIndex = _sensorOrderIndex[note.StartPosition - 1]++,
@@ -371,8 +406,8 @@ public partial class NoteManager
                 isBreak = note.IsSlideBreak,
                 isMine = note.IsMineSlide,
                 usingSV = note.UsingSV,
-                smoothSlideAnime = smoothSlideAnime,
-                legacySlideLayer = legacySlideLayer,
+                smoothSlideAnime = SmoothSlideAnime,
+                legacySlideLayer = LegacySlideLayer,
             };
             slide.Init();
             slides.Add(slide);
@@ -411,6 +446,7 @@ public partial class NoteManager
                 taps.Add(starTapD);
             }
 
+            //ignore start/end pos
             var slideData = new SlideData
             {
                 tapTime = (float)timing.Timing,
@@ -432,8 +468,8 @@ public partial class NoteManager
                 isBreak = note.IsSlideBreak,
                 isMine = note.IsMineSlide,
                 usingSV = note.UsingSV,
-                smoothSlideAnime = smoothSlideAnime,
-                legacySlideLayer = legacySlideLayer,
+                smoothSlideAnime = SmoothSlideAnime,
+                legacySlideLayer = LegacySlideLayer,
             };
             slideData.Init();
             slides.Add(slideData);

@@ -30,11 +30,10 @@ public unsafe struct TapUpdateJob : IJobParallelFor
 
     public void Execute(int index)
     {
-        var tap = taps[index];
+        ref var tap = ref taps.ElementRef(index);
         TransformUpdate(ref tap, index);
         AutoplayUpdate(ref tap);
         CheckUpdate(ref tap);
-        taps[index] = tap;
     }
 
     private void TransformUpdate(ref TapData tap, int index)

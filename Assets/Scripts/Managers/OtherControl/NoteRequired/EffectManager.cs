@@ -55,7 +55,7 @@ public class EffectManager : MonoBehaviour
             float2 pos;
             if (i < BUTTON_COUNT)
             {
-                pos = MajPos.GetBtnPos((SensorType)i);
+                pos = MajPos.GetBtnPos(i);
             }
             else
             {

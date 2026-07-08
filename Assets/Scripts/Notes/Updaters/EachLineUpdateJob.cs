@@ -20,7 +20,7 @@ public unsafe struct EachLineUpdateJob : IJobParallelFor
 
     public void Execute(int index)
     {
-        var el = eachLines[index];
+        ref var el = ref eachLines.ElementRef(index);
         if (el.isEnd) return;
 
         var timing = el.usingSV
@@ -49,7 +49,5 @@ public unsafe struct EachLineUpdateJob : IJobParallelFor
             spriteId = el.lineSprite,
             sort = (uint)math.clamp(el.time * 100f, 0f, 0xFFFFF),
         };
-
-        eachLines[index] = el;
     }
 }

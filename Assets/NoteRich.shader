@@ -35,7 +35,16 @@ Shader "Custom/NoteRich"
             float _PixelsPerUnit;
 
             struct appdata { float4 vertex : POSITION; float2 uv : TEXCOORD0; };
-            struct v2f   { float4 pos : SV_POSITION; float2 uv : TEXCOORD0; uint id : TEXCOORD1; };
+            struct v2f   { 
+                float4 pos : SV_POSITION; 
+                float2 uv : TEXCOORD0; 
+                float4 rect : TEXCOORD1;
+                float4 color : TEXCOORD2;
+                float4 exRect : TEXCOORD3;
+                float4 exColor : TEXCOORD4;
+                float2 sliceBorder : TEXCOORD5;
+                float4 caps : TEXCOORD6; // x: topCapFrac, y: botCapFrac, z: middleFrac, w: sliceMid
+            };
 
             v2f vert(appdata v, uint id : SV_InstanceID)
             {
@@ -52,33 +61,50 @@ Shader "Custom/NoteRich"
                 r += note.pos;
                 o.pos = UnityObjectToClipPos(float4(r, 0, 1));
                 o.uv = v.uv;
-                o.id = id;
+                o.rect = rect;
+                
+                // Color with brightness applied
+                o.color = note.color;
+                o.color.rgb *= note.brightness;
+                
+                if (note.exSprite != 0) {
+                    o.exRect = _SpriteRects[note.exSprite];
+                    o.exColor = note.exColor;
+                } else {
+                    o.exRect = float4(0,0,0,0);
+                    o.exColor = float4(0,0,0,0); // a=0 means won't affect color
+                }
+                
+                o.sliceBorder = note.sliceBorder;
+                
+                if (note.sliceBorder.x + note.sliceBorder.y > 0.0) {
+                    float spriteH_uv = rect.w - rect.y;
+                    float nativeH = spriteH_uv * _AtlasSize / _PixelsPerUnit;
+                    float renderedH = (nativeH + note.stretchY) * note.scale;
+                    renderedH = max(renderedH, 1e-6);
+                    float topCapFrac = (note.sliceBorder.x * nativeH * note.scale) / renderedH;
+                    float botCapFrac = (note.sliceBorder.y * nativeH * note.scale) / renderedH;                    
+                    float middleFrac = 1.0 - topCapFrac - botCapFrac;
+                    middleFrac = max(middleFrac, 1e-6);
+                    float sliceMid = 1.0 - note.sliceBorder.x - note.sliceBorder.y;
+                    o.caps = float4(topCapFrac, botCapFrac, middleFrac, sliceMid);
+                } else {
+                    o.caps = float4(0, 0, 1, 1);
+                }
+
                 return o;
             }
 
             float4 frag(v2f i) : SV_Target
             {
-                NotesRenderData note = _NoteBuffer[i.id];
-                float4 rect = _SpriteRects[note.spriteId];
-
                 // ---- 3-slice Y-axis UV remap ----
                 float2 uv;
-                if (note.sliceBorder.x + note.sliceBorder.y > 0.0)
+                if (i.sliceBorder.x + i.sliceBorder.y > 0.0)
                 {
-                    float spriteH_uv = rect.w - rect.y;
-                    float nativeH = spriteH_uv * _AtlasSize / _PixelsPerUnit;
-                    float renderedH =
-                        (nativeH + note.stretchY)
-                        * note.scale;
-                    float topCapFrac =
-                        (note.sliceBorder.x * nativeH * note.scale)
-                        / renderedH;
-                    float botCapFrac =
-                        (note.sliceBorder.y * nativeH * note.scale)
-                        / renderedH;                    
-                    float middleFrac = 1.0 - topCapFrac - botCapFrac;
-                    middleFrac = max(middleFrac, 1e-6);
-                    float sliceMid = 1.0 - note.sliceBorder.x - note.sliceBorder.y;
+                    float topCapFrac = i.caps.x;
+                    float botCapFrac = i.caps.y;
+                    float middleFrac = i.caps.z;
+                    float sliceMid = i.caps.w;
 
                     float uvY = i.uv.y;
                     float remapY;
@@ -86,43 +112,43 @@ Shader "Custom/NoteRich"
                     {
                         // Top cap: map to top of sprite
                         float t = (uvY - (1.0 - topCapFrac)) / topCapFrac;
-                        remapY = (1.0 - note.sliceBorder.x) + t * note.sliceBorder.x;
+                        remapY = (1.0 - i.sliceBorder.x) + t * i.sliceBorder.x;
                     }
                     else if (uvY <= botCapFrac)
                     {
                         // Bottom cap: map to bottom of sprite
                         float t = uvY / botCapFrac;
-                        remapY = t * note.sliceBorder.y;
+                        remapY = t * i.sliceBorder.y;
                     }
                     else
                     {
                         // Middle stretch: map to stretchable middle of sprite
                         float t = (uvY - botCapFrac) / middleFrac;
-                        remapY = note.sliceBorder.y + t * sliceMid;
+                        remapY = i.sliceBorder.y + t * sliceMid;
                     }
-                    uv = float2(lerp(rect.x, rect.z, i.uv.x), lerp(rect.y, rect.w, remapY));
+                    uv = float2(lerp(i.rect.x, i.rect.z, i.uv.x), lerp(i.rect.y, i.rect.w, remapY));
                 }
                 else
                 {
-                    uv = lerp(rect.xy, rect.zw, i.uv);
+                    uv = lerp(i.rect.xy, i.rect.zw, i.uv);
                 }
 
                 float4 col = tex2D(_MainTex, uv);
 
                 // ---- EX frame overlay (from NoteIndirect.shader) ----
-                if (note.exSprite != 0)
+                if (i.exColor.a > 0.0)
                 {
-                    float2 uvFrame = lerp(_SpriteRects[note.exSprite].xy, _SpriteRects[note.exSprite].zw, i.uv);
+                    float2 uvFrame = lerp(i.exRect.xy, i.exRect.zw, i.uv);
                     float4 frame = tex2D(_MainTex, uvFrame);
-                    frame.rgb *= note.exColor.rgb;
-                    frame.a   *= note.exColor.a;
+                    frame.rgb *= i.exColor.rgb;
+                    frame.a   *= i.exColor.a;
                     col.rgb = frame.rgb * frame.a + col.rgb * (1.0 - frame.a);
                     col.a   = frame.a   + col.a   * (1.0 - frame.a);
                 }
 
                 // ---- Brightness + color ----
-                col.rgb *= note.color.rgb * note.brightness;
-                col.a   *= note.color.a;
+                col.rgb *= i.color.rgb;
+                col.a   *= i.color.a;
                 col.rgb *= col.a; // premultiply
                 return col;
             }

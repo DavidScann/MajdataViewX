@@ -31,7 +31,13 @@ Shader "Custom/NoteMask"
             float _PixelsPerUnit;
 
             struct appdata { float4 vertex : POSITION; float2 uv : TEXCOORD0; };
-            struct v2f   { float4 pos : SV_POSITION; float2 uv : TEXCOORD0; uint id : TEXCOORD1; };
+            struct v2f   { 
+                float4 pos : SV_POSITION; 
+                float2 uv : TEXCOORD0; 
+                float4 rect : TEXCOORD1;
+                float4 color : TEXCOORD2;
+                float maskCutoff : TEXCOORD3;
+            };
 
             v2f vert(appdata v, uint id : SV_InstanceID)
             {
@@ -45,15 +51,15 @@ Shader "Custom/NoteMask"
                 r += note.pos;
                 o.pos = UnityObjectToClipPos(float4(r, 0, 1));
                 o.uv = v.uv;
-                o.id = id;
+                o.rect = rect;
+                o.color = note.color;
+                o.maskCutoff = note.maskCutoff;
                 return o;
             }
 
             float4 frag(v2f i) : SV_Target
             {
-                MaskRenderData note = _NoteBuffer[i.id];
-                float4 rect = _SpriteRects[note.spriteId];
-                float2 uv = lerp(rect.xy, rect.zw, i.uv);
+                float2 uv = lerp(i.rect.xy, i.rect.zw, i.uv);
                 float4 col = tex2D(_MainTex, uv);
 
                 float2 dir = i.uv - float2(0.5, 0.5);
@@ -67,11 +73,11 @@ Shader "Custom/NoteMask"
                 if (normalizedAngle < 0)
                     normalizedAngle += 1;
 
-                if (normalizedAngle > note.maskCutoff)
+                if (normalizedAngle > i.maskCutoff)
                     discard;
     
-                col.rgb *= note.color.rgb;
-                col.a   *= note.color.a;
+                col.rgb *= i.color.rgb;
+                col.a   *= i.color.a;
                 col.rgb *= col.a; // premultiply
                 return col;
             }

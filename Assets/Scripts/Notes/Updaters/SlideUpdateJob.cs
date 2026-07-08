@@ -33,11 +33,10 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
 
     public void Execute(int index)
     {
-        var slide = slides[index];
+        ref var slide = ref slides.ElementRef(index);
         TransformUpdate(ref slide, index);
         AutoplayUpdate(ref slide);
         CheckUpdate(ref slide, index);
-        slides[index] = slide;
     }
 
     private void TransformUpdate(ref SlideData slide, int index)
@@ -77,26 +76,9 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
             slide.starAlpha = 1f;
             slide.starScale = 1.5f;
         }
-        UpdateStarPosition(ref slide);
 
         RenderArrows(ref slide, index);
         RenderStar(ref slide, index);
-    }
-
-    private void UpdateStarPosition(ref SlideData slide)
-    {
-        var cnt = slide.slideArrowsCount;
-
-        var idxF = slide.process * (cnt - 1);
-        var idx0 = (int)idxF;
-        var idx1 = math.min(idx0 + 1, cnt - 1);
-        var t = idxF - idx0;
-        var p0 = slide.slideArrows[idx0];
-        var p1 = slide.slideArrows[idx1];
-
-        slide.starPosX = math.lerp(p0.X, p1.X, t);
-        slide.starPosY = math.lerp(p0.Y, p1.Y, t);
-        slide.starRot = math.lerp(p0.RotZ, p1.RotZ, t);
     }
 
     private void RenderArrows(ref SlideData slide, int index)
@@ -104,19 +86,20 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
         var cnt = slide.slideArrowsCount;
 
         //TODO
-        var eaten = math.max((int)(slide.process * cnt) - 1, 0);
+        var eaten = math.max((int)(slide.process * cnt), 0);
 
         var color = new float4(1, 1, 1, slide.slideAlpha);
 
         var sortTime = (uint)math.clamp(slide.tapTime * 100f, 0f, 0xFFFFF);
         var timePart = slide.legacySlideLayer ? (0xFFFFFu - sortTime) : sortTime;
 
+        var writeCount = cnt - eaten;
+        var idx = Interlocked.Add(ref *SlidesWriteCountPtr, writeCount) - writeCount;
         for (var i = eaten; i < cnt; i++)
         {
-            var p = slide.slideArrows[i];
+            ref readonly var p = ref slide.slideArrows[i];
 
-            var idx = Interlocked.Increment(ref *SlidesWriteCountPtr) - 1;
-            slidesRender[idx] = new SimpleRenderData
+            slidesRender[idx + i - eaten] = new SimpleRenderData
             {
                 pos = new float2(p.X, p.Y),
                 angRad = math.radians(p.RotZ),
@@ -131,23 +114,66 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
     private void RenderStar(ref SlideData slide, int index)
     {
         if (slide.starAlpha <= 0) return;
+
         var sortTime = (uint)math.clamp(slide.tapTime * 100f, 0f, 0xFFFFF);
         var timePart = slide.legacySlideLayer ? (0xFFFFFu - sortTime) : sortTime;
-        var nIdx = Interlocked.Increment(ref *NotesWriteCountPtr) - 1;
-        notesRender[nIdx] = new NotesRenderData
+        if (!slide.isWifi)
         {
-            pos = new float2(slide.starPosX, slide.starPosY),
-            angRad = math.radians(slide.starRot + 90),
-            scale = slide.starScale,
-            stretchY = 0,
-            spriteId = slide.starSprite,
-            color = new float4(1, 1, 1, slide.starAlpha),
-            brightness = 1f,
-            exSprite = 0,
-            exColor = float4.zero,
-            sliceBorder = new float2(0, 0),
-            sort = 0x100000u + timePart,
-        };
+            var cnt = slide.slideArrowsCount;
+
+            var idxF = slide.process * (cnt - 1);
+            var idx0 = (int)idxF;
+            var idx1 = math.min(idx0 + 1, cnt - 1);
+            var t = idxF - idx0;
+            var p0 = slide.slideArrows[idx0];
+            var p1 = slide.slideArrows[idx1];
+
+            var starPosX = math.lerp(p0.X, p1.X, t);
+            var starPosY = math.lerp(p0.Y, p1.Y, t);
+            var starRot = math.lerp(p0.RotZ, p1.RotZ, t);
+
+            var nIdx = Interlocked.Increment(ref *NotesWriteCountPtr) - 1;
+            notesRender[nIdx] = new NotesRenderData
+            {
+                pos = new float2(starPosX, starPosY),
+                angRad = math.radians(starRot + 90),
+                scale = slide.starScale,
+                stretchY = 0,
+                spriteId = slide.starSprite,
+                color = new float4(1, 1, 1, slide.starAlpha),
+                brightness = 1f,
+                exSprite = 0,
+                exColor = float4.zero,
+                sliceBorder = new float2(0, 0),
+                sort = 0x100000u + timePart,
+            };
+        }
+        else
+        {
+            var starPos = stackalloc float2[3]; // L, C, R
+            starPos[0] = slide.starPosConstL * slide.process + slide.starPosStart;
+            starPos[1] = slide.starPosConstC * slide.process + slide.starPosStart;
+            starPos[2] = slide.starPosConstR * slide.process + slide.starPosStart;
+            var nIdx = Interlocked.Add(ref *NotesWriteCountPtr, 3) - 3;
+            for (var i = 0; i < 3; i++)
+            {
+                var rotZ = slide.slideArrows[0].RotZ - 22.5f * (i - 1);
+                notesRender[nIdx + i] = new NotesRenderData
+                {
+                    pos = starPos[i],
+                    angRad = math.radians(rotZ + 90),
+                    scale = slide.starScale,
+                    stretchY = 0,
+                    spriteId = slide.starSprite,
+                    color = new float4(1, 1, 1, slide.starAlpha),
+                    brightness = 1f,
+                    exSprite = 0,
+                    exColor = float4.zero,
+                    sliceBorder = new float2(0, 0),
+                    sort = 0x100000u + timePart,
+                };
+            }
+        }
     }
 
     private void AutoplayUpdate(ref SlideData slide)

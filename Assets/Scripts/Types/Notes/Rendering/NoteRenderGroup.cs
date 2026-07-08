@@ -4,7 +4,9 @@ using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
 using UnityEngine;
 
-public class NoteRenderGroup<T> : IDisposable where T : unmanaged, IComparable<T>
+using Unity.Jobs;
+
+public class NoteRenderGroup<T> : IDisposable where T : unmanaged, IComparable<T>, ISortableRenderData
 {
     const int TRIPLE_COUNT = 3;
     const int MAX_INSTANCES = 65536;
@@ -68,7 +70,16 @@ public class NoteRenderGroup<T> : IDisposable where T : unmanaged, IComparable<T
     public void UnlockWrite(bool sort = true)
     {
         var count = _counts[_writeIndex];
-        if (sort) _noteRenderDatasThisFrame.GetSubArray(0, count).Sort();
+        if (sort && count > 1)
+        {
+            var subArray = _noteRenderDatasThisFrame.GetSubArray(0, count);
+            using var temp = new NativeArray<T>(count, Allocator.TempJob);
+            new RadixSort.RadixSortJob<T>
+            {
+                Data = subArray,
+                Temp = temp
+            }.Run();
+        }
         _buffers[_writeIndex].UnlockBufferAfterWrite<T>(count);
     }
 

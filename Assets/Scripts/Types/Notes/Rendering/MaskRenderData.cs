@@ -1,7 +1,7 @@
 using System;
 using Unity.Mathematics;
 
-public struct MaskRenderData : IComparable<MaskRenderData>
+public struct MaskRenderData : IComparable<MaskRenderData>, ISortableRenderData
 {
     public float2 pos;
     public float angRad;
@@ -12,4 +12,5 @@ public struct MaskRenderData : IComparable<MaskRenderData>
     public uint sort;
 
     public readonly int CompareTo(MaskRenderData o) => o.sort.CompareTo(sort);
+    public readonly uint SortKey => sort;
 }
