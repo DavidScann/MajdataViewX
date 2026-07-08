@@ -136,7 +136,6 @@ public class PlayManager : MonoBehaviour
         {
             _errMsg = ex.ToString();
             _state = ViewStatus.Error;
-            throw;
         }
     }
 
@@ -250,7 +249,7 @@ public class PlayManager : MonoBehaviour
         {
             _errMsg = ex.ToString();
             _state = ViewStatus.Error;
-            throw;
+            return false;
         }
     }
 
@@ -282,7 +281,6 @@ public class PlayManager : MonoBehaviour
         {
             _errMsg = ex.ToString();
             _state = ViewStatus.Error;
-            throw;
         }
     }
 
@@ -309,7 +307,6 @@ public class PlayManager : MonoBehaviour
         {
             _errMsg = ex.ToString();
             _state = ViewStatus.Error;
-            throw;
         }
     }
 
@@ -336,7 +333,6 @@ public class PlayManager : MonoBehaviour
         {
             _errMsg = ex.ToString();
             _state = ViewStatus.Error;
-            throw;
         }
     }
 

@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 
 #region
 
@@ -144,7 +144,6 @@ public class WsServer : MonoBehaviour
         catch (Exception ex)
         {
             Error(ex);
-            throw;
         }
     }
 
@@ -165,12 +164,12 @@ public class WsServer : MonoBehaviour
             Broadcast(JsonConvert.SerializeObject(rsp));
     }
 
-    void Error<T>(T exception) where T : Exception
+    public void Error<T>(T exception) where T : Exception
     {
         Response(MajWsResponseType.Error, exception.ToString());
     }
 
-    void Error(string errMsg)
+    public void Error(string errMsg)
     {
         Response(MajWsResponseType.Error, errMsg);
     }

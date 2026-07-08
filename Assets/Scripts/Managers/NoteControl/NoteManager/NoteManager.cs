@@ -42,6 +42,7 @@ public partial class NoteManager : MonoBehaviour
     {
         _quad = Resources.GetBuiltinResource<Mesh>("Quad.fbx");
 
+        //REMEMBER TO FORCE INCLUDE
         _matLine = new Material(Shader.Find("Custom/NoteLine"));
         _matSimple = new Material(Shader.Find("Custom/NoteSimple"));
         _matNotes = new Material(Shader.Find("Custom/NoteRich"));

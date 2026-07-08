@@ -169,15 +169,46 @@ public partial class NoteManager
         isSlideEach = slideCount > 1;
     }
 
-    private unsafe void LoadTiming(in SimaiTimingPoint timing)
+    protected virtual void OnNoteLoadFailed(SimaiNote note, Exception e)
     {
+        var sb = new StringBuilder();
+        sb.AppendLine($"[Note Load Failed] Exception: {e.Message}");
+        if (e.InnerException != null)
+        {
+            sb.AppendLine($"  ---> Inner Exception: {e.InnerException.Message}");
+        }
+        sb.AppendLine($"  Stack Trace:");
+        sb.AppendLine(e.StackTrace);
+        sb.AppendLine("Note Properties:");
         try
         {
-            CalcEach(timing, out var isNoteEach, out var isSlideEach);
+            foreach (var prop in typeof(SimaiNote).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
+            {
+                sb.AppendLine($"  {prop.Name}: {prop.GetValue(note)}");
+            }
+            foreach (var field in typeof(SimaiNote).GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
+            {
+                sb.AppendLine($"  {field.Name}: {field.GetValue(note)}");
+            }
+        }
+        catch (Exception ex)
+        {
+            sb.AppendLine($"  (Failed to reflect properties: {ex.Message})");
+        }
+        var errorMsg = sb.ToString();
+        Debug.LogError(errorMsg);
+        _wsServer?.Error(errorMsg);
+    }
 
-            var nonMineCount = 0;
-            var startPositions = stackalloc int[timing.Notes.Length];
-            foreach (var note in timing.Notes)
+    private unsafe void LoadTiming(in SimaiTimingPoint timing)
+    {
+        CalcEach(timing, out var isNoteEach, out var isSlideEach);
+
+        var nonMineCount = 0;
+        var startPositions = stackalloc int[timing.Notes.Length];
+        foreach (var note in timing.Notes)
+        {
+            try
             {
                 switch (note.Type)
                 {
@@ -204,18 +235,21 @@ public partial class NoteManager
                         break;
                 }
             }
-
-            if (nonMineCount > 1)
+            catch (Exception e)
             {
-                for (int i = 0; i < nonMineCount - 1; i++)
-                {
-                    var s = (float)timing.Timing;
-                    var spd = NoteSpeed * timing.HSpeed;
-                    CreateEachLine(s, startPositions[i], startPositions[i + 1], spd);
-                }
+                OnNoteLoadFailed(note, e);
             }
         }
-        catch (Exception) { throw; }
+
+        if (nonMineCount > 1)
+        {
+            for (int i = 0; i < nonMineCount - 1; i++)
+            {
+                var s = (float)timing.Timing;
+                var spd = NoteSpeed * timing.HSpeed;
+                CreateEachLine(s, startPositions[i], startPositions[i + 1], spd);
+            }
+        }
     }
 
     private void CreateEachLine(float time, int startPosA, int startPosB, float speed)
