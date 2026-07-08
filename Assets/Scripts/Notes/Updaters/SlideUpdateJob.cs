@@ -36,7 +36,7 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
         ref var slide = ref slides.ElementRef(index);
         TransformUpdate(ref slide, index);
         AutoplayUpdate(ref slide);
-        CheckUpdate(ref slide, index);
+        CheckUpdate(ref slide);
     }
 
     private void TransformUpdate(ref SlideData slide, int index)
@@ -84,9 +84,7 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
     private void RenderArrows(ref SlideData slide, int index)
     {
         var cnt = slide.slideArrowsCount;
-
-        //TODO
-        var eaten = math.max((int)(slide.process * cnt), 0);
+        var eaten = slide.eaten;
 
         var color = new float4(1, 1, 1, slide.slideAlpha);
 
@@ -178,9 +176,11 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
 
     private void AutoplayUpdate(ref SlideData slide)
     {
+        if (NoteHelper.AutoPlayMode is AutoPlayMode.DJAuto or AutoPlayMode.Disable) return;
         if (slide.isEnd || slide.isJudged) return;
         var timing = TimeData.NoteTime - slide.time;
         if (timing < -0.01f) return;
+        slide.eaten = math.max((int)(slide.process * slide.slideArrowsCount), 0);
         if (slide.LastFor - timing <= 0)
         {
             switch (NoteHelper.AutoPlayMode)
@@ -199,13 +199,15 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
         }
     }
 
-    private void CheckUpdate(ref SlideData slide, int index)
+    private void CheckUpdate(ref SlideData slide)
     {
         if (NoteHelper.AutoPlayMode is AutoPlayMode.Enable or AutoPlayMode.Random) return;
         if (slide.isEnd || slide.isJudged) return;
 
         var timing = TimeData.NoteTime - slide.time;
-        var remaining = math.max(slide.LastFor - timing, 0);
+        if (timing < -0.05f) return;
+
+        var remaining = slide.LastFor - timing;
 
         // too late
         if (remaining <= 0)
@@ -227,18 +229,43 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
             ProcessAreas(ref slide, slide.judgeQueueR, slide.judgeQueueRCount, ref slide.judgeR_Current);
         }
 
-        // Check if all areas are finished → judge
-        if (slide.isWifi)
+        if (!slide.isWifi)
         {
-            if (slide.judgeCurrent >= slide.judgeQueueCount &&
-            slide.judgeL_Current >= slide.judgeQueueLCount &&
-            slide.judgeR_Current >= slide.judgeQueueRCount)
+            if (slide.judgeCurrent >= slide.judgeQueueCount)
+            {
                 CompleteSlide(ref slide);
+                return;
+            }
+
+            ref readonly var curArea = ref slide.judgeQueue[slide.judgeCurrent];
+            if (curArea.On && !curArea.Off)
+                slide.eaten = curArea.ArrowProgressPush;
+            else if (slide.judgeCurrent > 0)
+                slide.eaten = slide.judgeQueue[slide.judgeCurrent - 1].ArrowProgressFinish;
         }
         else
         {
-            if (slide.judgeCurrent >= slide.judgeQueueCount)
+            if (slide.judgeCurrent >= slide.judgeQueueCount &&
+                slide.judgeL_Current >= slide.judgeQueueLCount &&
+                slide.judgeR_Current >= slide.judgeQueueRCount)
+            {
                 CompleteSlide(ref slide);
+                return;
+            }
+
+            ref readonly var curArea = ref slide.judgeQueue[slide.judgeCurrent];
+            ref readonly var curAreaL = ref slide.judgeQueue[slide.judgeL_Current];
+            ref readonly var curAreaR = ref slide.judgeQueue[slide.judgeR_Current];
+            var min = slide.judgeCurrent;
+            if (slide.judgeL_Current < min) min = slide.judgeL_Current;
+            if (slide.judgeR_Current < min) min = slide.judgeR_Current;
+
+            if (curArea.On && !curArea.Off &&
+                curAreaL.On && !curAreaL.Off &&
+                curAreaR.On && !curAreaR.Off)
+                slide.eaten = curArea.ArrowProgressPush;
+            else if (min > 0)
+                slide.eaten = slide.judgeQueue[min - 1].ArrowProgressFinish;
         }
     }
 
@@ -263,21 +290,42 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
             ref var second = ref queue[cur + 1];
             CheckArea(ref second);
 
-            if (second.IsFinished(isSecondLast)) { cur += 2; return; }
-            if (second.On) { cur += 1; return; }
-        }
-
-        if (first.IsFinished(!hasSecond)) cur++;
-
-
-        static void CheckArea(ref SlideArea area)
-        {
-            area.Judge(MajBurst.InputData.GetSensorState(area.SensorA).Status);
-            if (area.SensorB != SensorType.Invalid)
+            if (second.On)
             {
-                area.Judge(MajBurst.InputData.GetSensorState(area.SensorB).Status);
+                if (isSecondLast)
+                {
+                    cur += 2;
+                }
+                else
+                {
+                    cur += 1;
+                }
+                return;
             }
         }
+
+        if (first.On)
+        {
+            if (!hasSecond)
+            {
+                cur++;
+            }
+            else if (first.Off)
+            {
+                cur++;
+            }
+            return;
+        }
+    }
+
+    private static void CheckArea(ref SlideArea area)
+    {
+        var status = MajBurst.InputData.GetSensorState(area.SensorA).Status;
+        if (area.SensorB != SensorType.Invalid)
+        {
+            status |= MajBurst.InputData.GetSensorState(area.SensorB).Status;
+        }
+        area.Judge(status);
     }
 
     private void CompleteSlide(ref SlideData slide)

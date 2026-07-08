@@ -105,6 +105,7 @@ public unsafe struct TapUpdateJob : IJobParallelFor
     private void AutoplayUpdate(ref TapData tap)
     {
         if (tap.IsEnd) return;
+        if (NoteHelper.AutoPlayMode is AutoPlayMode.DJAuto or AutoPlayMode.Disable) return;
 
         var timing = TimeData.NoteTime - tap.Time;
         if (timing < -0.01f) return;

@@ -75,6 +75,11 @@ public partial class NoteManager
             slide.judgeQueueL = slideAreaPool + slide.judgeQueueLOffset;
             slide.judgeQueueR = slideAreaPool + slide.judgeQueueROffset;
             slide.slideArrows = slidePosePool + slide.slideArrowsOffset;
+            //init过了，无奈出此下策
+            if (slide.judgeQueueCount <= 3)
+            {
+                slide.judgeQueue[1].IsSkippable = false;
+            }
             slides[i] = slide;
         }
 
@@ -403,8 +408,8 @@ public partial class NoteManager
 
                 isEach = isSlideEach,
                 isEx = note.IsEx,
-                isBreak = note.IsSlideBreak,
-                isMine = note.IsMineSlide,
+                isBreak = note.IsBreak,
+                isMine = note.IsMine,
                 usingSV = note.UsingSV,
                 smoothSlideAnime = SmoothSlideAnime,
                 legacySlideLayer = LegacySlideLayer,
@@ -438,8 +443,8 @@ public partial class NoteManager
                     RotateSpeed = 0,
                     IsEach = isNoteEach,
                     IsEx = note.IsEx,
-                    IsBreak = note.IsSlideBreak,
-                    IsMine = note.IsMineSlide,
+                    IsBreak = note.IsBreak,
+                    IsMine = note.IsMine,
                     UsingSV = note.UsingSV,
                 };
                 starTapD.Init();

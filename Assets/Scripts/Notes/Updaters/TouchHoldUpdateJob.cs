@@ -156,6 +156,7 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
     private void AutoplayUpdate(ref TouchHoldData th)
     {
         if (th.isEnd) return;
+        if (NoteHelper.AutoPlayMode is AutoPlayMode.DJAuto or AutoPlayMode.Disable) return;
 
         var timing = TimeData.NoteTime - th.time;
         if (timing < -0.01f) return;
@@ -200,10 +201,6 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
                         EndNote(ref th);
                     }
                 }
-                break;
-            case AutoPlayMode.DJAuto:
-                if (th.isMine) break;
-                MajBurst.InputData.SetSensorState(th.sensor, true);
                 break;
         }
     }

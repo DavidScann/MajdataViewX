@@ -18,6 +18,12 @@ public class InputManager : MonoBehaviour
 
     private Vector2[] _sensorWorldPositions;
 
+    /// <summary>
+    /// 按下时设置为2，在不按下时每帧递减1，为0时允许清空判定区状态
+    /// 给予点击2帧保持时间防止note难以判定
+    /// </summary>
+    byte lastMouseState;
+
     private void Awake()
     {
         _inputManager = this;
@@ -44,7 +50,22 @@ public class InputManager : MonoBehaviour
         if (mouse != null)
         {
             if (mouse.leftButton.isPressed)
+            {
+                lastMouseState = 2;
                 WriteWorldPosition(mouse.position.ReadValue());
+            }
+            else if (lastMouseState > 0)
+            {
+                lastMouseState--;
+
+                if (lastMouseState == 0)
+                {
+                    for (var i = 0; i < SENSOR_COUNT; i++)
+                    {
+                        InputData.SetSensorState((SensorType)i, false);
+                    }
+                }
+            }
         }
 
         var touchscreen = Touchscreen.current;
@@ -75,7 +96,6 @@ public class InputManager : MonoBehaviour
     private void WriteWorldPosition(Vector2 screenPos)
     {
         var mainCamera = Camera.main;
-        if (mainCamera == null) return;
         var worldPos = mainCamera.ScreenToWorldPoint(new Vector3(screenPos.x, screenPos.y, 10f));
         var pos = (Vector2)worldPos;
 

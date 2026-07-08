@@ -55,6 +55,7 @@ public struct SlideData
 
     //slide
     public uint slideSprite;
+    public int eaten;
     //star
     public float process;
     public float starAlpha;
@@ -98,6 +99,9 @@ public struct SlideData
         var fadeInFinishTiming = math.min(fadeInStartTiming + 0.2f, 0);
         //淡入时机与正解帧间隔尝于200ms时，加快淡入动画的播放速度，这个过程现在是自然实现的        
         fadeInDuration = fadeInFinishTiming - fadeInStartTiming;
+
+        // Calc Skippable (V slides calc is in SlideTableNeo)
+        // in NoteManager->Loader
 
         // Load Skin
         if (!isWifi)

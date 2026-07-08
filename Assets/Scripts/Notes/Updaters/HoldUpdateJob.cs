@@ -207,6 +207,7 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
     private void AutoplayUpdate(ref HoldData hold)
     {
         if (hold.isEnd) return;
+        if (NoteHelper.AutoPlayMode is AutoPlayMode.DJAuto or AutoPlayMode.Disable) return;
 
         var timing = TimeData.NoteTime - hold.time;
         if (timing < -0.01f) return;

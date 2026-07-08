@@ -147,6 +147,7 @@ public unsafe struct TouchUpdateJob : IJobParallelFor
     private void AutoplayUpdate(ref TouchData touch)
     {
         if (touch.isEnd) return;
+        if (NoteHelper.AutoPlayMode is AutoPlayMode.DJAuto or AutoPlayMode.Disable) return;
 
         var timing = TimeData.NoteTime - touch.time;
         if (timing < -0.01f) return;
