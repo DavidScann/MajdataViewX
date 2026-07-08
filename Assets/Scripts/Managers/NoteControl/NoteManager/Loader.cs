@@ -541,7 +541,8 @@ public partial class NoteManager
                     var curKey = c - '0';
                     if (lastKey != -1 && lastShape != string.Empty)
                     {
-                        slideMetadatas.Add(SlideTableNeo.MakeCustomSlide($"{lastKey}{lastShape.ToString()}{curKey}"));
+                        var shape = $"{lastKey}{lastShape.ToString()}{curKey}";
+                        slideMetadatas.Add(SlideTableNeo.MakeCustomSlide(shape));
                         lastShape = string.Empty;
                     }
                     lastKey = curKey;
@@ -556,7 +557,8 @@ public partial class NoteManager
                     i++;
                     if (lastKey != -1 && lastShape != string.Empty)
                     {
-                        slideMetadatas.Add(SlideTableNeo.GetStandardSlide($"{lastKey}{lastShape.ToString()}{VKey}{curKey}"));
+                        var shape = $"{lastKey}{lastShape.ToString()}{VKey}{curKey}";
+                        slideMetadatas.Add(SlideTableNeo.GetStandardSlide(shape));
                         lastShape = string.Empty;
                     }
                     lastKey = curKey;
@@ -566,7 +568,10 @@ public partial class NoteManager
                     var curKey = c - '0';
                     if (lastKey != -1 && !lastShape.IsEmpty)
                     {
-                        slideMetadatas.Add(SlideTableNeo.GetStandardSlide($"{lastKey}{lastShape.ToString()}{curKey}"));
+                        if (lastShape.Length == 1 && lastShape[0] == '^')
+                            lastShape = TranslateAutoSlide(lastKey, curKey);
+                        var shape = $"{lastKey}{lastShape.ToString()}{curKey}";
+                        slideMetadatas.Add(SlideTableNeo.GetStandardSlide(shape));
                         lastShape = string.Empty;
                     }
                     lastKey = curKey;
@@ -602,5 +607,29 @@ public partial class NoteManager
         }
 
         return slideMetadatas;
+
+
+        static string TranslateAutoSlide(int from, int to)
+        {
+            int cw = (to - from + 8) % 8;   // 顺时针距离
+            int ccw = (from - to + 8) % 8;  // 逆时针距离
+
+            if (from is 1 or 2 or 7 or 8)
+            {
+                if (cw < ccw)
+                    return ">";
+                else if (ccw < cw)
+                    return "<";
+            }
+            else if (from is 3 or 4 or 5 or 6)
+            {
+                if (cw < ccw)
+                    return "<";
+                else if (ccw < cw)
+                    return ">";
+            }
+
+            throw new Exception("CNM");
+        }
     }
 }
