@@ -279,11 +279,11 @@ public partial class NoteManager
         var hold = new HoldData
         {
             time = (float)timing.Timing,
-            key = key,
+            Key = key,
             speed = NoteSpeed * timing.HSpeed,
             LastFor = (float)note.HoldTime,
-            buttonOrderIndex = _buttonOrderIndex[(int)key]++,
-            sensorOrderIndex = _sensorOrderIndex[(int)key]++,
+            ButtonOrderIndex = _buttonOrderIndex[(int)key]++,
+            SensorOrderIndex = _sensorOrderIndex[(int)key]++,
 
             isEach = isEach,
             isEx = note.IsEx,
@@ -368,6 +368,7 @@ public partial class NoteManager
                     Time = (float)timing.Timing,
                     Key = (SensorType)(note.StartPosition - 1),
                     Speed = NoteSpeed * timing.HSpeed,
+                    ButtonOrderIndex = _buttonOrderIndex[note.StartPosition - 1]++,
                     SensorOrderIndex = _sensorOrderIndex[note.StartPosition - 1]++,
                     IsStar = true,
                     IsDouble = false,
@@ -390,7 +391,7 @@ public partial class NoteManager
                 endPos = noteContent[2] - '0',
                 LastFor = (float)note.SlideTime,
                 speed = NoteSpeed * timing.HSpeed,
-                sensorOrderIndex = _sensorOrderIndex[note.StartPosition - 1]++,
+                sensorOrderIndex = _sensorOrderIndex[note.StartPosition - 1],
 
                 isWifi = true,
 
@@ -437,6 +438,7 @@ public partial class NoteManager
                     Time = (float)timing.Timing,
                     Key = (SensorType)(note.StartPosition - 1),
                     Speed = NoteSpeed * timing.HSpeed,
+                    ButtonOrderIndex = _buttonOrderIndex[note.StartPosition - 1]++,
                     SensorOrderIndex = _sensorOrderIndex[note.StartPosition - 1]++,
                     IsStar = true,
                     IsDouble = false,
@@ -458,7 +460,7 @@ public partial class NoteManager
                 time = (float)note.SlideStartTime,
                 LastFor = (float)note.SlideTime,
                 speed = NoteSpeed * timing.HSpeed,
-                sensorOrderIndex = _sensorOrderIndex[note.StartPosition - 1]++,
+                sensorOrderIndex = _sensorOrderIndex[note.StartPosition - 1],
 
                 judgeQueueOffset = areaPoolIndex,
                 judgeQueueCount = judgeQueueCount,

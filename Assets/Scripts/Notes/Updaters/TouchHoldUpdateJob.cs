@@ -75,7 +75,7 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
             th.fanAlpha = 1f;
         }
 
-        if (th.isJudged && timing >= 0)
+        if (timing >= 0)
         {
             th.maskProgress = math.clamp(timing / lastFor, 0f, 1f);
         }

@@ -138,13 +138,21 @@ public unsafe struct TapUpdateJob : IJobParallelFor
         if (tap.IsEnd) return;
 
         var diffSec = TimeData.NoteTime - tap.Time;
-        var stateOn = MajBurst.InputData.GetSensorState(tap.Key).Status;
+
+        var buttonOn = InputData.GetButtonState(tap.Key).Status;
+        var sensorOn = InputData.GetSensorState(tap.Key).Status;
+        var buttonClicked = buttonOn && !tap.ButtonLastState;
+        var sensorClicked = sensorOn && !tap.SensorLastState;
+        tap.ButtonLastState = buttonOn;
+        tap.SensorLastState = sensorOn;
+
+        var clicked = sensorClicked || buttonClicked;
 
         // ---- Mine: touched within window -> Miss, otherwise Perfect once survived.
         //      Resolved independently of the sensor-order gate so it never softlocks. ----
         if (tap.IsMine)
         {
-            if (stateOn && diffSec >= -NoteHelper.TAP_JUDGE_GOOD_AREA_MSEC / 1000f)
+            if (clicked && diffSec >= -NoteHelper.TAP_JUDGE_GOOD_AREA_MSEC / 1000f)
             {
                 tap.JudgeGrade = JudgeGrade.Miss;
                 tap.IsJudged = true;
@@ -152,7 +160,7 @@ public unsafe struct TapUpdateJob : IJobParallelFor
                 EndNote(ref tap);
                 return;
             }
-            if (diffSec >= 0.016667f)
+            if (diffSec >= MajCtx.FRAME_LENGTH_SEC * 1)
             {
                 tap.JudgeGrade = JudgeGrade.Perfect;
                 tap.IsJudged = true;
@@ -171,9 +179,12 @@ public unsafe struct TapUpdateJob : IJobParallelFor
         }
 
         // ---- Sensor input judgment ----
-        if (!stateOn) return;
+        if (!clicked) return;
         if (diffSec < -NoteHelper.TAP_JUDGE_GOOD_AREA_MSEC / 1000f) return;
-        if (!MajBurst.InputData.CanJudgeSensor(tap.Key, tap.SensorOrderIndex)) return;
+        var canJudge =
+            (buttonClicked && InputData.CanJudgeButton(tap.Key, tap.ButtonOrderIndex)) ||
+            (sensorClicked && InputData.CanJudgeSensor(tap.Key, tap.SensorOrderIndex));
+        if (!canJudge) return;
 
         tap.JudgeGrade = NoteHelper.GetTapJudge(diffSec, tap.IsEx);
         tap.IsJudged = true;

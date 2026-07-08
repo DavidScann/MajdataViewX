@@ -1,13 +1,13 @@
-using System.Threading;
 using MajSimai;
+using System.Threading;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
-
-using static NoteSkinManager;
+using UnityEngine.UIElements;
 using static MajBurst;
+using static NoteSkinManager;
 
 [BurstCompile]
 public unsafe struct HoldUpdateJob : IJobParallelFor
@@ -80,7 +80,7 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
 
         // ---- hold effect ----
         NoteHelper.SetHoldEffect(JudgeEffectRequests,
-            (int)hold.key,
+            (int)hold.Key,
             hold.judgeGrade,
             hold.isHolding
         );
@@ -134,7 +134,7 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
         // ---- body ----
         if (headDistance < 1.225f)
         {
-            NoteHelper.GetPosFromDistance(1.225f, hold.key, out var pos);
+            NoteHelper.GetPosFromDistance(1.225f, hold.Key, out var pos);
             hold.pos = pos;
             hold.scale = destScale;
             hold.stretchY = -0.58f; //原图带有一定高度
@@ -147,14 +147,14 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
             var barLen = math.max(headClamped - tailClamped, 0f);
             var midDist = (headClamped + tailClamped) * 0.5f;
 
-            NoteHelper.GetPosFromDistance(midDist, hold.key, out var pos);
+            NoteHelper.GetPosFromDistance(midDist, hold.Key, out var pos);
             hold.pos = pos;
             hold.scale = 1;
             hold.stretchY = barLen - 0.58f;
 
             if (tailDistance >= 1.225f)
             {
-                NoteHelper.GetPosFromDistance(math.min(tailDistance, 4.8f), hold.key, out var endPos);
+                NoteHelper.GetPosFromDistance(math.min(tailDistance, 4.8f), hold.Key, out var endPos);
                 hold.holdEndPos = endPos;
                 hold.holdEndScale = 1f;
             }
@@ -255,7 +255,7 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
 
         var noteTime = TimeData.NoteTime;
         var timing = noteTime - hold.time;
-        var key = (int)hold.key;
+        var key = (int)hold.Key;
 
         // ---- Head judgment ----
         if (!hold.isJudged)
@@ -277,9 +277,21 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
                 return;
             }
 
-            if (!MajBurst.InputData.GetSensorState(hold.key).Status) return;
+            var buttonOn = InputData.GetButtonState(hold.Key).Status;
+            var sensorOn = InputData.GetSensorState(hold.Key).Status;
+            var buttonClicked = buttonOn && !hold.ButtonLastState;
+            var sensorClicked = sensorOn && !hold.SensorLastState;
+            hold.ButtonLastState = buttonOn;
+            hold.SensorLastState = sensorOn;
+
+            var clicked = sensorClicked || buttonClicked;
+
+            if (!clicked) return;
             if (timing < -NoteHelper.TAP_JUDGE_GOOD_AREA_MSEC / 1000f) return;
-            if (!MajBurst.InputData.CanJudgeSensor(hold.key, hold.sensorOrderIndex)) return;
+            var canJudge =
+                (buttonClicked && InputData.CanJudgeButton(hold.Key, hold.ButtonOrderIndex)) ||
+                (sensorClicked && InputData.CanJudgeSensor(hold.Key, hold.SensorOrderIndex));
+            if (!canJudge) return;
 
             hold.judgeGrade = NoteHelper.GetTapJudge(timing, hold.isEx);
             hold.isJudged = true;
@@ -303,7 +315,7 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
 
         if (!TimeData.IsStart) return;
 
-        var on = MajBurst.InputData.GetSensorState(hold.key).Status;
+        var on = MajBurst.InputData.GetSensorState(hold.Key).Status;
         if (timing > 0.25f && remainingTime > 0.2f && !on)
             hold.playerIdleTime += TimeData.deltaTime;
     }
@@ -318,7 +330,7 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
             hold.headDiff
         );
         NoteHelper.PlayTapEffect(JudgeEffectRequests,
-            (int)hold.key,
+            (int)hold.Key,
             hold.judgeGrade,
             hold.isBreak
         );
@@ -328,7 +340,7 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
             SimaiNoteType.Hold
         );
         MajBurst.InputData.NextTapHold(
-            hold.key
+            hold.Key
         );
         hold.isEnd = true;
     }

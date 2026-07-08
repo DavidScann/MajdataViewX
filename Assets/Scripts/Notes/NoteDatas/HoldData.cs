@@ -14,11 +14,11 @@ using static MajBurst;
 public struct HoldData
 {
     public float time;
-    public SensorType key;
+    public SensorType Key;
     public float speed;
     public float LastFor;
-    public int buttonOrderIndex;
-    public int sensorOrderIndex;
+    public int ButtonOrderIndex;
+    public int SensorOrderIndex;
 
     public bool isEach;
     public bool isEx;
@@ -42,6 +42,9 @@ public struct HoldData
 
     public float2 sliceBorder;
     public float brightness;
+
+    public bool ButtonLastState { get; set; }
+    public bool SensorLastState { get; set; }
     public bool isJudged;
     public JudgeGrade judgeGrade;
     public float headDiff;
@@ -52,7 +55,7 @@ public struct HoldData
     public void Init()
     {
         pos = float2.zero;
-        ang = -22.5f + -45f * (int)key;
+        ang = -22.5f + -45f * (int)Key;
         scale = 1f;
         stretchY = 0f;
         holdEndPos = float2.zero;
