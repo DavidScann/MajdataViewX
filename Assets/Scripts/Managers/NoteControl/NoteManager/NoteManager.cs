@@ -41,6 +41,8 @@ public partial class NoteManager : MonoBehaviour
     void Start()
     {
         _quad = Resources.GetBuiltinResource<Mesh>("Quad.fbx");
+        var lineMesh = MeshGenerator.CreateRingMesh(10, 0.5f, 0.45f);
+        var noteMesh = MeshGenerator.CreateCircleMesh(8);
 
         //REMEMBER TO FORCE INCLUDE
         _matLine = new Material(Shader.Find("Custom/NoteLine"));
@@ -48,10 +50,10 @@ public partial class NoteManager : MonoBehaviour
         _matNotes = new Material(Shader.Find("Custom/NoteRich"));
         _matMask = new Material(Shader.Find("Custom/NoteMask"));
 
-        _tapLineGroup = new NoteRenderGroup<LineRenderData>(_matLine, _quad, 0);
-        _eachLineGroup = new NoteRenderGroup<LineRenderData>(_matLine, _quad, 1);
+        _tapLineGroup = new NoteRenderGroup<LineRenderData>(_matLine, lineMesh, 0);
+        _eachLineGroup = new NoteRenderGroup<LineRenderData>(_matLine, lineMesh, 1);
         _slideGroup = new NoteRenderGroup<SimpleRenderData>(_matSimple, _quad, 2);
-        _notesGroup = new NoteRenderGroup<NotesRenderData>(_matNotes, _quad, 3);
+        _notesGroup = new NoteRenderGroup<NotesRenderData>(_matNotes, noteMesh, 3);
         _thBorderGroup = new NoteRenderGroup<MaskRenderData>(_matMask, _quad, 4);
         _touchGroup = new NoteRenderGroup<SimpleRenderData>(_matSimple, _quad, 5);
 
