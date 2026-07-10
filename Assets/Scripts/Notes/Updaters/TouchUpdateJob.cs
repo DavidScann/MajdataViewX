@@ -52,12 +52,17 @@ public unsafe struct TouchUpdateJob : IJobParallelFor
         {
             return;
         }
-        else if (-timing < touch.wholeDuration && -timing >= touch.moveDuration)
+
+        if (!touch.isAppeared)
         {
-            var fadeT = (timing - -touch.moveDuration) / touch.displayDuration;
-            touch.fanAlpha = math.saturate(fadeT);
-            pow = -math.exp(-0.85f) + 0.42f;
-            fanDist = math.clamp(pow, 0f, 0.4f);
+            touch.isAppeared = true;
+            MajBurst.MultTouchHandler.RegisterActive(touch.sensor);
+        }
+
+        if (-timing < touch.wholeDuration && -timing >= touch.moveDuration)
+        {
+            touch.fanAlpha = 1 - math.saturate((-timing - touch.moveDuration) / touch.displayDuration);
+            fanDist = 0.4f;
         }
         else if (-timing <= touch.moveDuration)
         {
@@ -83,6 +88,7 @@ public unsafe struct TouchUpdateJob : IJobParallelFor
                 scale = new float2(1, 1),
                 spriteId = touch.fanSprite,
                 color = new float4(1, 1, 1, touch.fanAlpha),
+                brightness = 1f,
                 sort = (sortTime << 4) | 0x3,
             };
         }
@@ -95,6 +101,7 @@ public unsafe struct TouchUpdateJob : IJobParallelFor
             scale = new float2(1, 1),
             spriteId = touch.pointSprite,
             color = new float4(1, 1, 1, touch.fanAlpha),
+            brightness = 1f,
             sort = (sortTime << 4) | 0x2,
         };
 
@@ -108,6 +115,7 @@ public unsafe struct TouchUpdateJob : IJobParallelFor
                 scale = new float2(1, 1),
                 spriteId = touch.justSprite,
                 color = new float4(1),
+                brightness = 1f,
                 sort = (sortTime << 4) | 0x1,
             };
         }
@@ -125,6 +133,7 @@ public unsafe struct TouchUpdateJob : IJobParallelFor
                     scale = new float2(1, 1),
                     spriteId = (uint)sprite,
                     color = new float4(1, 1, 1, touch.fanAlpha),
+                    brightness = 1f,
                     sort = sortTime << 4,
                 };
             }
@@ -138,6 +147,7 @@ public unsafe struct TouchUpdateJob : IJobParallelFor
                     scale = new float2(1, 1),
                     spriteId = (uint)sprite,
                     color = new float4(1, 1, 1, touch.fanAlpha),
+                    brightness = 1f,
                     sort = sortTime << 4,
                 };
             }
@@ -147,7 +157,7 @@ public unsafe struct TouchUpdateJob : IJobParallelFor
     private void AutoplayUpdate(ref TouchData touch)
     {
         if (touch.isEnd) return;
-        if (NoteHelper.AutoPlayMode is AutoPlayMode.DJAuto or AutoPlayMode.Disable) return;
+        if (NoteHelper.AutoPlayMode is AutoPlayMode.Disable) return;
 
         var timing = TimeData.NoteTime - touch.time;
         if (timing < -0.01f) return;
@@ -169,13 +179,20 @@ public unsafe struct TouchUpdateJob : IJobParallelFor
                 touch.diff = gradeIndex > 7 ? 11.4514f : -11.4514f;
                 EndNote(ref touch);
                 break;
+            case AutoPlayMode.DJAutoButton:
+            case AutoPlayMode.DJAutoSensor:
+                if (!touch.isJudged)
+                {
+                    InputData.DJAutoSetSensorState(touch.sensor, true);
+                }
+                break;
         }
     }
 
     private void CheckUpdate(ref TouchData touch)
     {
-        if (NoteHelper.AutoPlayMode is AutoPlayMode.Enable or AutoPlayMode.Random) return;
         if (touch.isJudged || touch.isEnd) return;
+        if (!NoteHelper.IsSimulated) return;
 
         var noteTime = TimeData.NoteTime;
         var diffSec = noteTime - touch.time;
@@ -226,6 +243,9 @@ public unsafe struct TouchUpdateJob : IJobParallelFor
 
     private void EndNote(ref TouchData touch)
     {
+        if (NoteHelper.AutoPlayMode is AutoPlayMode.DJAutoButton or AutoPlayMode.DJAutoSensor)
+            InputData.DJAutoSetSensorState(touch.sensor, false);
+
         if (touch.isBreak)
             NoteHelper.PlayTapSound(SfxRequests,
                 touch.judgeGrade,
@@ -234,16 +254,30 @@ public unsafe struct TouchUpdateJob : IJobParallelFor
                 false,
                 touch.diff
             );
-        else if (touch.isHanabi)
-            NoteHelper.PlayHanabiSound(SfxRequests);
         else
-            NoteHelper.PlayTouchSound(SfxRequests);
-
-        NoteHelper.PlayTouchEffect(JudgeEffectRequests, (int)touch.sensor + 8, touch.judgeGrade, touch.isBreak);
-        NoteHelper.ReportResult(ReportResults, touch.judgeGrade, touch.isBreak, SimaiNoteType.Touch);
+            NoteHelper.PlayTouchSound(SfxRequests,
+                touch.judgeGrade,
+                touch.isMine,
+                touch.isHanabi
+            );
+        NoteHelper.PlayTouchEffect(JudgeEffectRequests,
+            (int)touch.sensor + 8,
+            touch.judgeGrade,
+            touch.isBreak
+        );
+        NoteHelper.ReportResult(ReportResults,
+            touch.judgeGrade,
+            touch.isBreak,
+            SimaiNoteType.Touch
+        );
 
         MajBurst.InputData.NextTouch(touch.sensor);
         MajBurst.MultTouchHandler.Unregister(touch.sensor);
+        if (touch.isAppeared)
+        {
+            touch.isAppeared = false;
+            MajBurst.MultTouchHandler.UnregisterActive(touch.sensor);
+        }
         touch.isEnd = true;
     }
 }

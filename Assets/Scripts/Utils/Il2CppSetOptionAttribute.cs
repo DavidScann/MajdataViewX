@@ -1,5 +1,12 @@
 ﻿using System;
 
+#if !UNITY_EDITOR //非editor全给你禁了
+using Unity.IL2CPP.CompilerServices;
+[assembly: Il2CppSetOption(Option.NullChecks, false)]
+[assembly: Il2CppSetOption(Option.ArrayBoundsChecks, false)]
+[assembly: Il2CppSetOption(Option.DivideByZeroChecks, false)]
+#endif
+
 #pragma warning disable IDE0130 // 命名空间与文件夹结构不匹配
 namespace Unity.IL2CPP.CompilerServices
 {

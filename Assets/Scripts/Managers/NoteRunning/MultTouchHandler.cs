@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -18,13 +18,15 @@ public struct MultTouchHandler
 {
     private NativeArray<NoteRegisterSpan> _spans;
     private NativeArray<NoteRegister> _registers;
+    private NativeArray<int> _activeCounts;
 
     public void Init()
     {
         _spans = new(MajCtx.SENSOR_COUNT, Allocator.Persistent);
+        _activeCounts = new(MajCtx.SENSOR_COUNT, Allocator.Persistent);
     }
 
-    public void Load(IList<NoteRegister>[] registers)
+    public void Load(List<NoteRegister>[] registers)
     {
         if (_registers.IsCreated) _registers.Dispose();
 
@@ -53,21 +55,36 @@ public struct MultTouchHandler
     public void Clear()
     {
         for (var i = 0; i < MajCtx.SENSOR_COUNT; i++)
+        {
             _spans[i] = default;
+            _activeCounts[i] = 0;
+        }
         if (_registers.IsCreated) _registers.Dispose();
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void RegisterActive(SensorType area)
+    {
+        System.Threading.Interlocked.Increment(ref _activeCounts.ElementRef((int)area));
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void UnregisterActive(SensorType area)
+    {
+        System.Threading.Interlocked.Decrement(ref _activeCounts.ElementRef((int)area));
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Unregister(SensorType area)
     {
-        _spans.ElementRef((int)area).Current++;
+        System.Threading.Interlocked.Increment(ref _spans.ElementRef((int)area).Current);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public readonly bool CanShowBorder(SensorType area, out bool isThree, out int sprite)
     {
         ref readonly var span = ref _spans.ElementRef((int)area);
-        var diff = span.Count - span.Current;
+        var diff = _activeCounts[(int)area];
         if (diff <= 1)
         {
             isThree = false;
@@ -116,14 +133,15 @@ public struct MultTouchHandler
     {
         if (_registers.IsCreated) _registers.Dispose();
         if (_spans.IsCreated) _spans.Dispose();
+        if (_activeCounts.IsCreated) _activeCounts.Dispose();
     }
 
 
 
     struct NoteRegisterSpan
     {
-        public int Current { get; set; }
-        public int Count { get; set; }
+        public int Current;
+        public int Count;
     }
 }
 public struct NoteRegister

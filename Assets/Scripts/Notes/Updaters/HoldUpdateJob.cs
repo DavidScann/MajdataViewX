@@ -77,6 +77,10 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
             var extra = (1f - math.abs(frame - 8f) / 8f) * 0.5f; //0->0.5->0
             hold.brightness = 1f + extra;
         }
+        else
+        {
+            hold.brightness = 1f;
+        }
 
         // ---- hold effect ----
         NoteHelper.SetHoldEffect(JudgeEffectRequests,
@@ -207,7 +211,7 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
     private void AutoplayUpdate(ref HoldData hold)
     {
         if (hold.isEnd) return;
-        if (NoteHelper.AutoPlayMode is AutoPlayMode.DJAuto or AutoPlayMode.Disable) return;
+        if (NoteHelper.AutoPlayMode is AutoPlayMode.Disable) return;
 
         var timing = TimeData.NoteTime - hold.time;
         if (timing < -0.01f) return;
@@ -215,34 +219,46 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
         switch (NoteHelper.AutoPlayMode)
         {
             case AutoPlayMode.Enable:
-                if (!hold.isJudged)
+                if (!hold.isHeadJudged)
                 {
                     hold.judgeGrade = hold.isMine ? JudgeGrade.Miss : JudgeGrade.Perfect;
-                    hold.isJudged = true;
+                    hold.isHeadJudged = true;
                     hold.isHolding = true;
                     hold.headDiff = 0;
                 }
-                if (hold.isJudged && math.max(hold.LastFor - timing, 0) <= 0)
+                if (hold.isHeadJudged && math.max(hold.LastFor - timing, 0) <= 0)
                 {
                     hold.holdPercent = 1f;
                     EndNote(ref hold);
                 }
                 break;
             case AutoPlayMode.Random:
-                if (!hold.isJudged)
+                if (!hold.isHeadJudged)
                 {
                     var gradeIndex = new Random(114514).NextInt(1, 14);
                     hold.judgeGrade = hold.isMine
                         ? (gradeIndex > 4 ? JudgeGrade.Miss : JudgeGrade.Perfect)
                         : (JudgeGrade)gradeIndex;
-                    hold.isJudged = true;
+                    hold.isHeadJudged = true;
                     hold.isHolding = true;
                     hold.headDiff = gradeIndex > 7 ? 11.4514f : -11.4514f;
                 }
-                if (hold.isJudged && hold.LastFor - timing <= 0)
+                if (hold.isHeadJudged && hold.LastFor - timing <= 0)
                 {
                     hold.holdPercent = 1f;
                     EndNote(ref hold);
+                }
+                break;
+            case AutoPlayMode.DJAutoButton:
+                if (!hold.isHeadJudged)
+                {
+                    InputData.DJAutoSetButtonState(hold.Key, true);
+                }
+                break;
+            case AutoPlayMode.DJAutoSensor:
+                if (!hold.isHeadJudged)
+                {
+                    InputData.DJAutoSetSensorState(hold.Key, true);
                 }
                 break;
         }
@@ -250,29 +266,27 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
 
     private void CheckUpdate(ref HoldData hold)
     {
-        if (NoteHelper.AutoPlayMode is AutoPlayMode.Enable or AutoPlayMode.Random) return;
         if (hold.isEnd) return;
+        if (!NoteHelper.IsSimulated) return;
 
         var noteTime = TimeData.NoteTime;
         var timing = noteTime - hold.time;
-        var key = (int)hold.Key;
 
         // ---- Head judgment ----
-        if (!hold.isJudged)
+        if (!hold.isHeadJudged)
         {
             if (hold.isMine && timing >= 0.016667f)
             {
                 hold.judgeGrade = JudgeGrade.Perfect;
-                hold.isJudged = true;
-                hold.isHolding = true;
+                hold.isHeadJudged = true;
                 return;
             }
             if (!hold.isMine && timing > 0.15f)
             {
                 hold.judgeGrade = JudgeGrade.Miss;
-                hold.isJudged = true;
+                hold.isHeadJudged = true;
                 hold.headDiff = 0.15f;
-                // NOTE: do NOT EndNote here. A missed head keeps tracking the body and
+                // NOTE: DO NOT EndNote here. A missed head keeps tracking the body and
                 // can still be recovered to LateGood by the release-percent mapping below.
                 return;
             }
@@ -294,9 +308,15 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
             if (!canJudge) return;
 
             hold.judgeGrade = NoteHelper.GetTapJudge(timing, hold.isEx);
-            hold.isJudged = true;
-            hold.isHolding = true;
+            hold.isHeadJudged = true;
             hold.headDiff = timing;
+            NoteHelper.PlayHoldSound(SfxRequests,
+                hold.judgeGrade,
+                hold.isBreak,
+                hold.isEx,
+                hold.isMine,
+                hold.headDiff
+            );
             return;
         }
 
@@ -315,19 +335,25 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
 
         if (!TimeData.IsStart) return;
 
-        var on = MajBurst.InputData.GetSensorState(hold.Key).Status;
+        var on = InputData.GetSensorState(hold.Key).Status || InputData.GetButtonState(hold.Key).Status;
+        hold.isHolding = on;
         if (timing > 0.25f && remainingTime > 0.2f && !on)
             hold.playerIdleTime += TimeData.deltaTime;
     }
 
     private void EndNote(ref HoldData hold)
     {
-        NoteHelper.PlayHoldSound(SfxRequests,
+        if (NoteHelper.AutoPlayMode is AutoPlayMode.DJAutoButton)
+            InputData.DJAutoSetButtonState(hold.Key, false);
+        else if (NoteHelper.AutoPlayMode is AutoPlayMode.DJAutoSensor)
+            InputData.DJAutoSetSensorState(hold.Key, false);
+
+        NoteHelper.PlayTapSound(SfxRequests,
             hold.judgeGrade,
-            hold.isBreak,
-            hold.isEx,
-            hold.isMine,
-            hold.headDiff
+            false,
+            false,
+            false,
+            0
         );
         NoteHelper.PlayTapEffect(JudgeEffectRequests,
             (int)hold.Key,

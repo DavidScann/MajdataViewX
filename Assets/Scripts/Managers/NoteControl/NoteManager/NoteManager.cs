@@ -17,15 +17,14 @@ public partial class NoteManager : MonoBehaviour
     NativeList<TouchData> touches = new(1024, Allocator.Persistent);
     NativeList<TouchHoldData> touchHolds = new(1024, Allocator.Persistent);
 
-    NoteRenderGroup<LineRenderData> _tapLineGroup;
-    NoteRenderGroup<LineRenderData> _eachLineGroup;
-    NoteRenderGroup<SimpleRenderData> _slideGroup;
-    NoteRenderGroup<NotesRenderData> _notesGroup;
-    NoteRenderGroup<MaskRenderData> _thBorderGroup;
-    NoteRenderGroup<SimpleRenderData> _touchGroup;
+    RenderGroup<LineRenderData> _tapLineGroup;
+    RenderGroup<LineRenderData> _eachLineGroup;
+    RenderGroup<SimpleRenderData> _slideGroup;
+    RenderGroup<NotesRenderData> _notesGroup;
+    RenderGroup<MaskRenderData> _thBorderGroup;
+    RenderGroup<SimpleRenderData> _touchGroup;
 
     GraphicsBuffer _noteUvsBuffer;
-    Mesh _quad;
     Material _matLine;
     Material _matSimple;
     Material _matNotes;
@@ -40,9 +39,7 @@ public partial class NoteManager : MonoBehaviour
     }
     void Start()
     {
-        _quad = Resources.GetBuiltinResource<Mesh>("Quad.fbx");
-        var lineMesh = MeshGenerator.CreateRingMesh(10, 0.5f, 0.45f);
-        var noteMesh = MeshGenerator.CreateCircleMesh(8);
+        var lineMesh = MeshGenerator.CreateRingMesh(16, 0.5f, 0.3f);
 
         //REMEMBER TO FORCE INCLUDE
         _matLine = new Material(Shader.Find("Custom/NoteLine"));
@@ -50,12 +47,12 @@ public partial class NoteManager : MonoBehaviour
         _matNotes = new Material(Shader.Find("Custom/NoteRich"));
         _matMask = new Material(Shader.Find("Custom/NoteMask"));
 
-        _tapLineGroup = new NoteRenderGroup<LineRenderData>(_matLine, lineMesh, 0);
-        _eachLineGroup = new NoteRenderGroup<LineRenderData>(_matLine, lineMesh, 1);
-        _slideGroup = new NoteRenderGroup<SimpleRenderData>(_matSimple, _quad, 2);
-        _notesGroup = new NoteRenderGroup<NotesRenderData>(_matNotes, noteMesh, 3);
-        _thBorderGroup = new NoteRenderGroup<MaskRenderData>(_matMask, _quad, 4);
-        _touchGroup = new NoteRenderGroup<SimpleRenderData>(_matSimple, _quad, 5);
+        _tapLineGroup = new RenderGroup<LineRenderData>(_matLine, lineMesh, 0);
+        _eachLineGroup = new RenderGroup<LineRenderData>(_matLine, lineMesh, 1);
+        _slideGroup = new RenderGroup<SimpleRenderData>(_matSimple, QuadMesh, 2);
+        _notesGroup = new RenderGroup<NotesRenderData>(_matNotes, QuadMesh, 3);
+        _thBorderGroup = new RenderGroup<MaskRenderData>(_matMask, QuadMesh, 4);
+        _touchGroup = new RenderGroup<SimpleRenderData>(_matSimple, QuadMesh, 5);
 
         _noteUvsBuffer = new(
             GraphicsBuffer.Target.Structured,
@@ -188,32 +185,36 @@ public partial class NoteManager : MonoBehaviour
     {
         _prevChain.Complete();
 
-        if (!_isJobScheduledThisFrame) return;
+        if (_isJobScheduledThisFrame)
+        {
+            _tapLineGroup.UnlockWrite();
+            _eachLineGroup.UnlockWrite();
+            _slideGroup.UnlockWrite();
+            _notesGroup.UnlockWrite();
+            _thBorderGroup.UnlockWrite();
+            _touchGroup.UnlockWrite();
 
-        _tapLineGroup.UnlockWrite();
-        _eachLineGroup.UnlockWrite();
-        _slideGroup.UnlockWrite();
-        _notesGroup.UnlockWrite();
-        _thBorderGroup.UnlockWrite();
-        _touchGroup.UnlockWrite();
+            _tapLineGroup.Render();
+            _eachLineGroup.Render();
+            _slideGroup.Render();
+            _notesGroup.Render();
+            _thBorderGroup.Render();
+            _touchGroup.Render();
 
-        _tapLineGroup.Render();
-        _eachLineGroup.Render();
-        _slideGroup.Render();
-        _notesGroup.Render();
-        _thBorderGroup.Render();
-        _touchGroup.Render();
+            _tapLineGroup.Swap();
+            _eachLineGroup.Swap();
+            _slideGroup.Swap();
+            _notesGroup.Swap();
+            _thBorderGroup.Swap();
+            _touchGroup.Swap();
 
-        _tapLineGroup.Swap();
-        _eachLineGroup.Swap();
-        _slideGroup.Swap();
-        _notesGroup.Swap();
-        _thBorderGroup.Swap();
-        _touchGroup.Swap();
+            _objectCounter.ProcessReportRequests();
+            MajBurst.InputData.ApplyNextIndices();
 
-        _objectCounter.ProcessReportRequests();
+            _isJobScheduledThisFrame = false;
+        }
 
-        _isJobScheduledThisFrame = false;
+        _inputManager.RenderHit();
     }
 
     void OnDestroy()

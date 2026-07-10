@@ -1,10 +1,10 @@
 
-using System;
 using Unity.Burst;
-using UnityEngine;
+using Unity.IL2CPP.CompilerServices;
 
 public struct MajBurstKey { }
 
+[Il2CppEagerStaticClassConstruction]
 public static class MajBurst
 {
     public static readonly SharedStatic<MajBurstData> __DataSS =

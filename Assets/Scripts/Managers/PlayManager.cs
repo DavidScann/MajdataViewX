@@ -163,11 +163,9 @@ public class PlayManager : MonoBehaviour
             var ignoreOffset = startAt - offset;
             //UI
             _objectCounter.StartOutput(_setting.ComboStatusType, _setting.UIType);
-            _effectManager.SetDisplayMode(_setting.JudgeDisplayMode);
             //simulate
-            _inputManager.Mode = _setting.AutoMode;
             NoteHelper.AutoPlayModeSS.Data = _setting.AutoMode;
-            _inputManager.ButtonFirst = _setting.ButtonFirst;
+            MajBurst.InputData.ShowHand = _setting.ShowHand;
             //bg
             bgCover.color = new Color(0f, 0f, 0f, _setting.BackgroundDim);
             _bgManager.ShowBG();

@@ -45,7 +45,7 @@ public struct HoldData
 
     public bool ButtonLastState { get; set; }
     public bool SensorLastState { get; set; }
-    public bool isJudged;
+    public bool isHeadJudged;
     public JudgeGrade judgeGrade;
     public float headDiff;
     public float playerIdleTime;

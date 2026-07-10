@@ -86,6 +86,7 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
             th.judgeGrade,
             th.isHolding
         );
+        NoteHelper.SetTouchHoldSound(SfxRequests, th.isHolding);
 
         // ---- hold on/off skin ----
         if (th.LastFor > 0.3f && // 忽略短hold
@@ -125,6 +126,7 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
                 scale = new float2(1, 1),
                 spriteId = th.fanSprite + (uint)i,
                 color = color,
+                brightness = 1f,
                 sort = (sortTime << 4) | 0x3,
             };
         }
@@ -137,6 +139,7 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
             scale = new float2(1, 1),
             spriteId = th.pointSprite,
             color = color,
+            brightness = 1f,
             sort = (sortTime << 4) | 0x2,
         };
 
@@ -156,7 +159,7 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
     private void AutoplayUpdate(ref TouchHoldData th)
     {
         if (th.isEnd) return;
-        if (NoteHelper.AutoPlayMode is AutoPlayMode.DJAuto or AutoPlayMode.Disable) return;
+        if (NoteHelper.AutoPlayMode is AutoPlayMode.Disable) return;
 
         var timing = TimeData.NoteTime - th.time;
         if (timing < -0.01f) return;
@@ -164,14 +167,14 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
         switch (NoteHelper.AutoPlayMode)
         {
             case AutoPlayMode.Enable:
-                if (!th.isJudged)
+                if (!th.isHeadJudged)
                 {
                     th.judgeGrade = th.isMine ? JudgeGrade.Miss : JudgeGrade.Perfect;
-                    th.isJudged = true;
+                    th.isHeadJudged = true;
                     th.isHolding = true;
                     th.headDiff = 0;
                 }
-                if (th.isJudged)
+                if (th.isHeadJudged)
                 {
                     var remaining = math.max(th.LastFor - timing, 0);
                     if (remaining <= 0)
@@ -182,17 +185,17 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
                 }
                 break;
             case AutoPlayMode.Random:
-                if (!th.isJudged)
+                if (!th.isHeadJudged)
                 {
                     var gradeIndex = new Random(114514).NextInt(1, 14);
                     th.judgeGrade = th.isMine
                         ? (gradeIndex > 4 ? JudgeGrade.Miss : JudgeGrade.Perfect)
                         : (JudgeGrade)gradeIndex;
-                    th.isJudged = true;
+                    th.isHeadJudged = true;
                     th.isHolding = true;
                     th.headDiff = gradeIndex > 7 ? 11.4514f : -11.4514f;
                 }
-                if (th.isJudged)
+                if (th.isHeadJudged)
                 {
                     var remaining = math.max(th.LastFor - timing, 0);
                     if (remaining <= 0)
@@ -202,47 +205,54 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
                     }
                 }
                 break;
+            case AutoPlayMode.DJAutoButton:
+            case AutoPlayMode.DJAutoSensor:
+                if (!th.isHeadJudged)
+                {
+                    InputData.DJAutoSetSensorState(th.sensor, true);
+                }
+                break;
         }
     }
 
     private void CheckUpdate(ref TouchHoldData th)
     {
-        if (NoteHelper.AutoPlayMode is AutoPlayMode.Enable or AutoPlayMode.Random) return;
         if (th.isEnd) return;
+        if (!NoteHelper.IsSimulated) return;
 
         var noteTime = TimeData.NoteTime;
         var timing = noteTime - th.time;
 
-        if (!th.isJudged)
+        if (!th.isHeadJudged)
         {
             if (th.isMine && timing >= 0.016667f)
             {
                 th.judgeGrade = JudgeGrade.Perfect;
-                th.isJudged = true;
-                th.isHolding = true;
+                th.isHeadJudged = true;
                 return;
             }
             if (!th.isMine && timing > 0.316667f)
             {
                 th.judgeGrade = JudgeGrade.Miss;
-                th.isJudged = true;
+                th.isHeadJudged = true;
                 th.headDiff = 0.316667f;
                 return;
             }
 
-            var stateOn = MajBurst.InputData.GetSensorState(th.sensor).Status;
-            if (!stateOn) return;
+            var _on = InputData.GetSensorState(th.sensor).Status;
+            var clicked = _on && !th.SensorLastState;
+            th.SensorLastState = _on;
 
+            if (!clicked) return;
             var diffMSec = math.abs(timing * 1000);
             if (diffMSec > 150f && timing < 0) return;
-            if (!MajBurst.InputData.CanJudgeSensor(th.sensor, th.sensorOrderIndex)) return;
+            if (!InputData.CanJudgeSensor(th.sensor, th.sensorOrderIndex)) return;
 
             th.judgeGrade = diffMSec <= 150 ? JudgeGrade.Perfect
                 : diffMSec <= 200 ? JudgeGrade.LatePerfect2nd
                 : diffMSec <= 250 ? JudgeGrade.LateGreat
                 : JudgeGrade.LateGood;
-            th.isJudged = true;
-            th.isHolding = true;
+            th.isHeadJudged = true;
             th.headDiff = timing;
             return;
         }
@@ -261,14 +271,19 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
 
         if (!TimeData.IsStart) return;
 
-        var on = MajBurst.InputData.GetSensorState(th.sensor).Status;
-
+        var on = InputData.GetSensorState(th.sensor).Status;
+        th.isHolding = on;
         if (timing > 0.25f && remainingTime > 0.2f && !on)
             th.playerIdleTime += TimeData.deltaTime;
     }
 
     private void EndNote(ref TouchHoldData th)
     {
+        if (NoteHelper.AutoPlayMode is AutoPlayMode.DJAutoButton)
+            InputData.DJAutoSetButtonState(th.sensor, false);
+        else if (NoteHelper.AutoPlayMode is AutoPlayMode.DJAutoSensor)
+            InputData.DJAutoSetSensorState(th.sensor, false);
+
         NoteHelper.SetTouchHoldSound(SfxRequests, false);
 
         if (th.isBreak)
@@ -279,13 +294,22 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
                 false,
                 th.headDiff
             );
-        else if (th.isHanabi)
-            NoteHelper.PlayHanabiSound(SfxRequests);
         else
-            NoteHelper.PlayTouchSound(SfxRequests);
-
-        NoteHelper.PlayTouchEffect(JudgeEffectRequests, (int)th.sensor + 8, th.judgeGrade, th.isBreak);
-        NoteHelper.ReportResult(ReportResults, th.judgeGrade, th.isBreak, SimaiNoteType.TouchHold);
+            NoteHelper.PlayTouchSound(SfxRequests,
+                th.judgeGrade,
+                th.isMine,
+                th.isHanabi
+            );
+        NoteHelper.PlayTouchEffect(JudgeEffectRequests,
+            (int)th.sensor + 8,
+            th.judgeGrade,
+            th.isBreak
+        );
+        NoteHelper.ReportResult(ReportResults,
+            th.judgeGrade,
+            th.isBreak,
+            SimaiNoteType.TouchHold
+        );
 
         MajBurst.InputData.NextTouch(th.sensor);
         th.isEnd = true;

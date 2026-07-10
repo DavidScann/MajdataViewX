@@ -102,10 +102,6 @@ public class EffectManager : MonoBehaviour
         if (judgeEffectRequests.IsCreated) judgeEffectRequests.Dispose();
     }
 
-    public void SetDisplayMode(JudgeDisplayMode mode)
-    {
-    }
-
     public void ProcessEffectRequests()
     {
         for (var i = 0; i < judgeEffectRequests.Length; i++)

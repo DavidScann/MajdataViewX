@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
@@ -11,7 +11,8 @@ internal static class MeshGenerator
     /// <param name="segments">近似分段数量</param>
     public static Mesh CreateCircleMesh(
         int segments,
-        float radius = 0.5f)
+        float radius = 0.5f,
+        bool circumscribe = false)
     {
         var mesh = new Mesh();
 
@@ -26,8 +27,14 @@ internal static class MeshGenerator
         {
             float angle = i * Mathf.PI * 2f / segments;
 
-            float x = Mathf.Cos(angle) * radius;
-            float y = Mathf.Sin(angle) * radius;
+            float adjustedRadius = radius;
+            if (circumscribe)
+            {
+                adjustedRadius = radius / Mathf.Cos(Mathf.PI / segments);
+            }
+
+            float x = Mathf.Cos(angle) * adjustedRadius;
+            float y = Mathf.Sin(angle) * adjustedRadius;
 
             vertices[i + 1] = new Vector3(x, y, 0);
 

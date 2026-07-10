@@ -1,45 +1,56 @@
 #nullable enable
 
 using System.Collections.Generic;
+using System.Threading;
+using Unity.Burst;
+using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
+using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.InputSystem;
-using TouchPhase = UnityEngine.InputSystem.TouchPhase;
-
-using static MajCtx;
+using Unity.Jobs;
 using static MajBurst;
-using Unity.Collections;
-using Unity.Burst;
-using UnityEngine.UI;
+using static MajCtx;
+using TouchPhase = UnityEngine.InputSystem.TouchPhase;
 
 public class InputManager : MonoBehaviour
 {
     public AutoPlayMode Mode { get; set; }
-    public bool ButtonFirst { get; set; }
 
-    private Vector2[] _sensorWorldPositions;
-
-    /// <summary>
-    /// 按下时设置为2，在不按下时每帧递减1，为0时允许清空判定区状态
-    /// 给予点击2帧保持时间防止note难以判定
-    /// </summary>
-    byte lastMouseState;
+    RenderGroup<HitRenderData> _hitGroup;
 
     private void Awake()
     {
         _inputManager = this;
-
-        //get sensor positions
-        var sensors = GameObject.Find("SensorRects").transform;
-        var childCount = sensors.childCount;
-        _sensorWorldPositions = new Vector2[sensors.childCount];
-        for (var i = 0; i < childCount; i++)
-        {
-            _sensorWorldPositions[i] = sensors.GetChild(i).transform.position;
-        }
     }
 
-    private void Update()
+    private void Start()
     {
+        //get sensor positions
+        var sensors = GameObject.Find("SensorRects").transform;
+        for (var i = 0; i < SENSOR_COUNT; i++)
+        {
+            InputData.SensorWorldPositions[i] = (Vector2)sensors.GetChild(i).transform.position;
+        }
+
+        //REMEMBER TO FORCE INCLUDE
+        var matHit = new Material(Shader.Find("Custom/Hit"));
+        var hitMesh = MeshGenerator.CreateCircleMesh(8, 1f, true);
+        _hitGroup = new(matHit, hitMesh, 6); // larger than notes
+    }
+
+    private unsafe void Update()
+    {
+        // UPDATE MUST BE EARLIER THAN NoteManager's UPDATE!!
+        // (set in Script Execution Order)
+        _hitGroup.AdvanceWrite();
+        var hitRender = _hitGroup.LockForWrite();
+        _hitGroup.ResetCount();
+
+        InputData.hitRender = (HitRenderData*)hitRender.GetUnsafePtr();
+        InputData.HitWriteCountPtr = _hitGroup.WriteCountPtr;
+        InputData.BeginHandler();
+
         var keyboard = Keyboard.current;
         if (keyboard != null)
         {
@@ -51,20 +62,7 @@ public class InputManager : MonoBehaviour
         {
             if (mouse.leftButton.isPressed)
             {
-                lastMouseState = 2;
                 WriteWorldPosition(mouse.position.ReadValue());
-            }
-            else if (lastMouseState > 0)
-            {
-                lastMouseState--;
-
-                if (lastMouseState == 0)
-                {
-                    for (var i = 0; i < SENSOR_COUNT; i++)
-                    {
-                        InputData.SetSensorState((SensorType)i, false);
-                    }
-                }
             }
         }
 
@@ -81,161 +79,299 @@ public class InputManager : MonoBehaviour
         }
     }
 
+    public void RenderHit() // in NoteManager, wait for slide
+    {
+        InputData.EndHandler();
+        _hitGroup.UnlockWrite();
+        _hitGroup.Render();
+        _hitGroup.Swap();
+    }
+
     private void CheckButton(Keyboard keyboard)
     {
-        InputData.SetButtonState(SensorType.A1, keyboard[Key.W].isPressed);
-        InputData.SetButtonState(SensorType.A2, keyboard[Key.E].isPressed);
-        InputData.SetButtonState(SensorType.A3, keyboard[Key.D].isPressed);
-        InputData.SetButtonState(SensorType.A4, keyboard[Key.C].isPressed);
-        InputData.SetButtonState(SensorType.A5, keyboard[Key.X].isPressed);
-        InputData.SetButtonState(SensorType.A6, keyboard[Key.Z].isPressed);
-        InputData.SetButtonState(SensorType.A7, keyboard[Key.A].isPressed);
-        InputData.SetButtonState(SensorType.A8, keyboard[Key.Q].isPressed);
+        InputData.HandleButtonInput(SensorType.A1, keyboard[Key.W].isPressed);
+        InputData.HandleButtonInput(SensorType.A2, keyboard[Key.E].isPressed);
+        InputData.HandleButtonInput(SensorType.A3, keyboard[Key.D].isPressed);
+        InputData.HandleButtonInput(SensorType.A4, keyboard[Key.C].isPressed);
+        InputData.HandleButtonInput(SensorType.A5, keyboard[Key.X].isPressed);
+        InputData.HandleButtonInput(SensorType.A6, keyboard[Key.Z].isPressed);
+        InputData.HandleButtonInput(SensorType.A7, keyboard[Key.A].isPressed);
+        InputData.HandleButtonInput(SensorType.A8, keyboard[Key.Q].isPressed);
     }
 
     private void WriteWorldPosition(Vector2 screenPos)
     {
         var mainCamera = Camera.main;
-        var worldPos = mainCamera.ScreenToWorldPoint(new Vector3(screenPos.x, screenPos.y, 10f));
-        var pos = (Vector2)worldPos;
+        var pos = (Vector2)mainCamera.ScreenToWorldPoint(new Vector3(screenPos.x, screenPos.y, 10f));
 
-        const float HAND_RADIUS = 0.39f;
-        const float SENSOR_RADIUS = 0.39f;
-        var combinedR = HAND_RADIUS + SENSOR_RADIUS;
-        var combinedSq = combinedR * combinedR;
-
-        for (int i = 0; i < _sensorWorldPositions.Length; i++)
-        {
-            var sp = _sensorWorldPositions[i];
-            var dx = pos.x - sp.x;
-            var dy = pos.y - sp.y;
-            var distSq = dx * dx + dy * dy;
-
-            var s = InputData.GetSensorState((SensorType)i);
-            if (distSq <= combinedSq)
-            {
-                if (!s.Status)
-                    s.Status = true;
-            }
-            else
-            {
-                if (s.Status)
-                    s.Status = false;
-            }
-            InputData.SetSensorState((SensorType)i, s.Status);
-        }
+        InputData.HandleWorldPosition(pos);
     }
 
     public static SensorType GetSensor(char areaPos, int startPos)
     {
-        switch (areaPos)
+        return areaPos switch
         {
-            case 'A': return (SensorType)(startPos - 1);
-            case 'B': return (SensorType)(startPos + 7);
-            case 'C': return SensorType.C;
-            case 'D': return (SensorType)(startPos + 16);
-            case 'E': return (SensorType)(startPos + 24);
-            default: return SensorType.A1;
-        }
+            'A' => (SensorType)(startPos - 1),
+            'B' => (SensorType)(startPos + 7),
+            'C' => SensorType.C,
+            'D' => (SensorType)(startPos + 16),
+            'E' => (SensorType)(startPos + 24),
+            _ => SensorType.A1,
+        };
     }
 
     public void ResetState()
     {
+    }
+
+    private void OnDestroy()
+    {
+        _hitGroup?.Dispose();
     }
 }
 
 [BurstCompile]
-public struct InputDataB
+public unsafe struct InputDataB
 {
-    NativeArray<SensorState> ButtonStates;
-    NativeArray<SensorState> SensorStates;
-    NativeArray<int> NextButtonIndex;
-    NativeArray<int> NextSensorIndex;
+    public bool ShowHand;
+
+    public NativeArray<float2> SensorWorldPositions;
+
+    NativeArray<SensorState> _buttonStates;
+    NativeArray<SensorState> _sensorStates;
+    NativeArray<int> _nextButtonIndex;
+    NativeArray<int> _nextSensorIndex;
+    NativeArray<int> _nextButtonIndexNextFrame;
+    NativeArray<int> _nextSensorIndexNextFrame;
+
+    [NativeDisableUnsafePtrRestriction]
+    public HitRenderData* hitRender;
+    [NativeDisableUnsafePtrRestriction]
+    public int* HitWriteCountPtr;
+    public const float BUTTON_HIT_RENDER_RADIUS = 0.4f;
 
     public void Init()
     {
-        ButtonStates = new(BUTTON_COUNT, Allocator.Persistent);
-        SensorStates = new(SENSOR_COUNT, Allocator.Persistent);
-        NextButtonIndex = new(BUTTON_COUNT, Allocator.Persistent);
-        NextSensorIndex = new(SENSOR_COUNT, Allocator.Persistent);
+        SensorWorldPositions = new(SENSOR_COUNT, Allocator.Persistent);
+
+        _buttonStates = new(BUTTON_COUNT, Allocator.Persistent);
+        _sensorStates = new(SENSOR_COUNT, Allocator.Persistent);
+        _nextButtonIndex = new(BUTTON_COUNT, Allocator.Persistent);
+        _nextSensorIndex = new(SENSOR_COUNT, Allocator.Persistent);
+        _nextButtonIndexNextFrame = new(BUTTON_COUNT, Allocator.Persistent);
+        _nextSensorIndexNextFrame = new(SENSOR_COUNT, Allocator.Persistent);
 
         for (var i = 0; i < BUTTON_COUNT; i++)
-            ButtonStates[i] = new();
+            _buttonStates[i] = new();
         for (var i = 0; i < SENSOR_COUNT; i++)
-            SensorStates[i] = new();
+            _sensorStates[i] = new();
     }
 
-    public void SetButtonState(SensorType type, bool status)
+
+
+
+
+
+    // ==========button/sensor management==========
+    public readonly SensorState GetButtonState(SensorType type) => _buttonStates[(int)type];
+    public readonly SensorState GetSensorState(SensorType type) => _sensorStates[(int)type];
+
+
+    public void DJAutoSetButtonState(SensorType type, bool status)
     {
-        ButtonStates[(int)type] = new SensorState
+        ref var button = ref _buttonStates.ElementRef((int)type);
+        if (status)
         {
-            Status = status
+            button.TaskCount++;
+            button.HoldFrames = 2;
+        }
+        else
+        {
+            button.TaskCount = math.max(button.TaskCount - 1, 0);
+        }
+    }
+    public void DJAutoSetSensorState(SensorType type, bool status)
+    {
+        ref var sensor = ref _sensorStates.ElementRef((int)type);
+        if (status)
+        {
+            sensor.TaskCount++;
+            sensor.HoldFrames = 2;
+        }
+        else
+        {
+            sensor.TaskCount = math.max(sensor.TaskCount - 1, 0);
+        }
+    }
+
+
+    public void BeginHandler()
+    {
+        for (int i = 0; i < BUTTON_COUNT; i++)
+        {
+            ref var button = ref _buttonStates.ElementRef(i);
+            if (button.TaskCount > 0) button.HoldFrames = 2;
+            else if (button.HoldFrames > 0) button.HoldFrames--;
+            button.PressCount = 0;
+        }
+        for (int i = 0; i < SENSOR_COUNT; i++)
+        {
+            ref var sensor = ref _sensorStates.ElementRef(i);
+            if (sensor.TaskCount > 0) sensor.HoldFrames = 2;
+            else if (sensor.HoldFrames > 0) sensor.HoldFrames--;
+            sensor.PressCount = 0;
+        }
+    }
+    public void HandleButtonInput(SensorType type, bool status)
+    {
+        if (status)
+        {
+            ref var button = ref _buttonStates.ElementRef((int)type);
+            Interlocked.Increment(ref button.PressCount);
+        }
+    }
+    public void HandleWorldPosition(in float2 pos)
+    {
+        for (int i = 0; i < SensorWorldPositions.Length; i++)
+        {
+            var combinedR = DJAUTO_HAND_RADIUS + MajPos.GetSensorRadius((SensorType)i);
+            var combinedSq = combinedR * combinedR;
+            ref readonly var sp = ref SensorWorldPositions.ElementRef(i);
+            var dx = pos.x - sp.x;
+            var dy = pos.y - sp.y;
+            var distSq = dx * dx + dy * dy;
+
+            if (distSq <= combinedSq)
+            {
+                ref var sensor = ref _sensorStates.ElementRef(i);
+                Interlocked.Increment(ref sensor.PressCount);
+            }
+        }
+
+        var idx = Interlocked.Increment(ref *HitWriteCountPtr) - 1;
+        hitRender[idx] = new HitRenderData
+        {
+            pos = pos,
+            radius = DJAUTO_HAND_RADIUS,
+            color = new float4(1, 0, 0, 1) // Exact hand position color
         };
     }
 
-    public readonly SensorState GetButtonState(SensorType type)
+    public void EndHandler()
     {
-        return ButtonStates[(int)type];
-    }
-
-    public void SetSensorState(SensorType type, bool status)
-    {
-        SensorStates[(int)type] = new SensorState
+        for (int i = 0; i < BUTTON_COUNT; i++)
         {
-            Status = status
-        };
+            if (_buttonStates[i].Status)
+            {
+                var idx = Interlocked.Increment(ref *HitWriteCountPtr) - 1;
+                hitRender[idx] = new HitRenderData
+                {
+                    pos = MajPos.GetBtnPos(i),
+                    radius = BUTTON_HIT_RENDER_RADIUS,
+                    color = new float4(0, 1, 1, 0.5f) // Cyan responsive color
+                };
+            }
+        }
+        for (int i = 0; i < SENSOR_COUNT; i++)
+        {
+            if (_sensorStates[i].Status)
+            {
+                var idx = Interlocked.Increment(ref *HitWriteCountPtr) - 1;
+                hitRender[idx] = new HitRenderData
+                {
+                    pos = SensorWorldPositions[i],
+                    radius = MajPos.GetSensorRadius((SensorType)i),
+                    color = new float4(0, 1, 1, 0.5f) // Cyan responsive color
+                };
+            }
+        }
     }
 
-    public readonly SensorState GetSensorState(SensorType type)
-    {
-        return SensorStates[(int)type];
-    }
 
+
+
+    // ==========judge management==========
     public void NextTapHold(SensorType pos)
     {
-        NextButtonIndex[(int)pos]++;
-        NextSensorIndex[(int)pos]++;
+        Interlocked.Increment(ref _nextButtonIndexNextFrame.ElementRef((int)pos));
+        Interlocked.Increment(ref _nextSensorIndexNextFrame.ElementRef((int)pos));
     }
-
     public void NextTouch(SensorType pos)
     {
-        NextSensorIndex[(int)pos]++;
+        Interlocked.Increment(ref _nextSensorIndexNextFrame.ElementRef((int)pos));
     }
-
+    public void ApplyNextIndices()
+    {
+        for (int i = 0; i < BUTTON_COUNT; i++)
+        {
+            _nextButtonIndex[i] = _nextButtonIndexNextFrame[i];
+        }
+        for (int i = 0; i < SENSOR_COUNT; i++)
+        {
+            _nextSensorIndex[i] = _nextSensorIndexNextFrame[i];
+        }
+    }
     public readonly bool CanJudgeButton(SensorType pos, int order)
     {
-        return order == NextButtonIndex[(int)pos];
+        return order == _nextButtonIndex[(int)pos];
     }
-
     public readonly bool CanJudgeSensor(SensorType pos, int order)
     {
-        return order == NextSensorIndex[(int)pos];
+        return order == _nextSensorIndex[(int)pos];
     }
+
+
+
 
     public void ResetState()
     {
         for (var i = 0; i < BUTTON_COUNT; i++)
         {
-            ButtonStates[i] = default;
-            NextButtonIndex[i] = 0;
+            _buttonStates[i] = default;
+            _nextButtonIndex[i] = 0;
+            _nextButtonIndexNextFrame[i] = 0;
         }
         for (var i = 0; i < SENSOR_COUNT; i++)
         {
-            SensorStates[i] = default;
-            NextSensorIndex[i] = 0;
+            _sensorStates[i] = default;
+            _nextSensorIndex[i] = 0;
+            _nextSensorIndexNextFrame[i] = 0;
         }
     }
 
     public void Dispose()
     {
-        if (SensorStates.IsCreated) SensorStates.Dispose();
-        if (NextSensorIndex.IsCreated) NextSensorIndex.Dispose();
-        if (ButtonStates.IsCreated) ButtonStates.Dispose();
-        if (NextButtonIndex.IsCreated) NextButtonIndex.Dispose();
+        if (SensorWorldPositions.IsCreated) SensorWorldPositions.Dispose();
+        if (_sensorStates.IsCreated) _sensorStates.Dispose();
+        if (_nextSensorIndex.IsCreated) _nextSensorIndex.Dispose();
+        if (_nextSensorIndexNextFrame.IsCreated) _nextSensorIndexNextFrame.Dispose();
+        if (_buttonStates.IsCreated) _buttonStates.Dispose();
+        if (_nextButtonIndex.IsCreated) _nextButtonIndex.Dispose();
+        if (_nextButtonIndexNextFrame.IsCreated) _nextButtonIndexNextFrame.Dispose();
     }
 }
 
 public struct SensorState
 {
-    public bool Status;
+    public readonly bool Status => TaskCount > 0 || PressCount > 0 || HoldFrames > 0;
+    public int TaskCount;
+    public int PressCount;
+    public int HoldFrames;
+}
+// for coming MuriDX
+public readonly struct HitInfo
+{
+    public readonly bool IsButton;
+    public readonly SensorType Type;
+    public readonly float Radius;
+    public readonly float Time;
+    public readonly float Duration;
+    public HitInfo(bool isButton, SensorType type, float radius, float duration)
+    {
+        IsButton = isButton;
+        Type = type;
+        Radius = radius;
+        Time = TimeData.NoteTime;
+        Duration = duration;
+    }
 }

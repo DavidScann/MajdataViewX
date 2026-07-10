@@ -105,7 +105,7 @@ public unsafe struct TapUpdateJob : IJobParallelFor
     private void AutoplayUpdate(ref TapData tap)
     {
         if (tap.IsEnd) return;
-        if (NoteHelper.AutoPlayMode is AutoPlayMode.DJAuto or AutoPlayMode.Disable) return;
+        if (NoteHelper.AutoPlayMode is AutoPlayMode.Disable) return;
 
         var timing = TimeData.NoteTime - tap.Time;
         if (timing < -0.01f) return;
@@ -119,8 +119,7 @@ public unsafe struct TapUpdateJob : IJobParallelFor
                 EndNote(ref tap);
                 break;
             case AutoPlayMode.Random:
-                // TODO: use guid as seed
-                var gradeIndex = new Random(114514).NextInt(1, 14);
+                var gradeIndex = new Random((uint)tap.SensorOrderIndex).NextInt(1, 14);
                 if (tap.IsMine)
                     tap.JudgeGrade = gradeIndex > 4 ? JudgeGrade.Miss : JudgeGrade.Perfect;
                 else
@@ -129,13 +128,25 @@ public unsafe struct TapUpdateJob : IJobParallelFor
                 tap.Diff = gradeIndex > 7 ? 11.4514f : -11.4514f;
                 EndNote(ref tap);
                 break;
+            case AutoPlayMode.DJAutoButton:
+                if (!tap.IsJudged)
+                {
+                    InputData.DJAutoSetButtonState(tap.Key, true);
+                }
+                break;
+            case AutoPlayMode.DJAutoSensor:
+                if (!tap.IsJudged)
+                {
+                    InputData.DJAutoSetSensorState(tap.Key, true);
+                }
+                break;
         }
     }
 
     private void CheckUpdate(ref TapData tap)
     {
-        if (NoteHelper.AutoPlayMode is AutoPlayMode.Enable or AutoPlayMode.Random) return;
         if (tap.IsEnd) return;
+        if (!NoteHelper.IsSimulated) return;
 
         var diffSec = TimeData.NoteTime - tap.Time;
 
@@ -194,6 +205,11 @@ public unsafe struct TapUpdateJob : IJobParallelFor
 
     private void EndNote(ref TapData tap)
     {
+        if (NoteHelper.AutoPlayMode is AutoPlayMode.DJAutoButton)
+            InputData.DJAutoSetButtonState(tap.Key, false);
+        else if (NoteHelper.AutoPlayMode is AutoPlayMode.DJAutoSensor)
+            InputData.DJAutoSetSensorState(tap.Key, false);
+
         NoteHelper.PlayTapSound(SfxRequests,
             tap.JudgeGrade,
             tap.IsBreak,

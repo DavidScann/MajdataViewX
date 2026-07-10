@@ -63,9 +63,12 @@ public struct SlideData
     public uint starSprite;
     //FOR WIFI
     public float2 starPosStart;
-    public float2 starPosConstL;
     public float2 starPosConstC;
+    public float2 starPosConstL;
     public float2 starPosConstR;
+    public float2 starPos;
+    public float2 starPosL;
+    public float2 starPosR;
 
     public bool isJudged;
     public JudgeGrade judgeGrade;
@@ -81,6 +84,7 @@ public struct SlideData
 
     public float judgeTime; //被判定时
     public float slideOKAlpha; // 1->0
+    public float brightness;
 
     public void Init()
     {
@@ -89,6 +93,7 @@ public struct SlideData
         process = 0;
         slideAlpha = 0;
         slideOKAlpha = 1f;
+        brightness = 1f;
         judgeTime = float.MinValue;
 
         // 计算Slide淡入时机
@@ -97,7 +102,7 @@ public struct SlideData
         // Slide完全淡入时机
         // 正常情况下应为负值；速度过高将忽略淡入      
         var fadeInFinishTiming = math.min(fadeInStartTiming + 0.2f, 0);
-        //淡入时机与正解帧间隔尝于200ms时，加快淡入动画的播放速度，这个过程现在是自然实现的        
+        //淡入时机与正解帧间隔小于200ms时，加快淡入动画的播放速度，这个过程现在是自然实现的        
         fadeInDuration = fadeInFinishTiming - fadeInStartTiming;
 
         // Calc Skippable (V slides calc is in SlideTableNeo)

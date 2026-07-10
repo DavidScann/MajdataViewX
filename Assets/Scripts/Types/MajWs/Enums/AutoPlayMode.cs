@@ -1,7 +1,9 @@
 ﻿public enum AutoPlayMode
 {
     Enable,
-    DJAuto,
+    DJAutoButton,
+    DJAutoSensor,
+    MuriDX,
     Random,
     Disable
 }

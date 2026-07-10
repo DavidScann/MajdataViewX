@@ -109,7 +109,10 @@ public partial class ObjectCounter : MonoBehaviour
                 case AutoPlayMode.Enable:
                     objAutoMode.text = "ENABLED\nNONE";
                     break;
-                case AutoPlayMode.DJAuto:
+                case AutoPlayMode.DJAutoButton:
+                    objAutoMode.text = "ENABLED\nDJAuto (Btn)";
+                    break;
+                case AutoPlayMode.DJAutoSensor:
                     objAutoMode.text = "ENABLED\nDJAuto";
                     break;
                 case AutoPlayMode.Random:

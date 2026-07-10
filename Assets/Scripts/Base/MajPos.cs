@@ -3,6 +3,29 @@ using Unity.Mathematics;
 
 public static class MajPos
 {
+    public const float A_RADIUS = 0.987f;
+    public const float B_RADIUS = 0.673f;
+    public const float C_RADIUS = 1.215f;
+    public const float D_RADIUS = 0.974f;
+    public const float E_RADIUS = 0.515f;
+
+    [BurstCompile]
+    public static float GetSensorRadius(SensorType sensor)
+    {
+        int i = (int)sensor;
+        if (i >= 0 && i <= 7)
+            return A_RADIUS;
+        if (i >= 8 && i <= 15)
+            return B_RADIUS;
+        if (i == 16)
+            return C_RADIUS;
+        if (i >= 17 && i <= 24)
+            return D_RADIUS;
+        if (i >= 25 && i <= 32)
+            return E_RADIUS;
+        return MajCtx.DJAUTO_HAND_RADIUS;
+    }
+
     /// <summary>
     /// 获取按键的世界坐标
     /// </summary>
@@ -37,7 +60,6 @@ public static class MajPos
             return RingPos(3.0f, i - 24, true);
         return float2.zero;
     }
-
     [BurstCompile]
     private static float2 RingPos(float radius, int index1, bool altAngle)
     {

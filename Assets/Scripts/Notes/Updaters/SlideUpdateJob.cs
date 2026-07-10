@@ -66,6 +66,12 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
             slide.slideAlpha = 1f;
         }
 
+        if (slide.isBreak) // break shine
+        {
+            var extra = math.max(math.sin(TimeData.GetFrame() * 0.17f) * 0.5f, 0f);
+            slide.brightness = 0.95f + extra;
+        }
+
         if (timing <= 0)
         {
             slide.starAlpha = math.saturate(tapTiming / (slide.time - slide.tapTime));
@@ -104,6 +110,7 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
                 scale = new float2(1, 1),
                 spriteId = slide.isWifi ? slide.slideSprite + (uint)i : slide.slideSprite,
                 color = color,
+                brightness = slide.brightness,
                 sort = (timePart << 8) | (uint)i,
             };
         }
@@ -131,9 +138,10 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
             var starRot = math.lerp(p0.RotZ, p1.RotZ, t);
 
             var nIdx = Interlocked.Increment(ref *NotesWriteCountPtr) - 1;
+            slide.starPos = new float2(starPosX, starPosY);
             notesRender[nIdx] = new NotesRenderData
             {
-                pos = new float2(starPosX, starPosY),
+                pos = slide.starPos,
                 angRad = math.radians(starRot + 90),
                 scale = slide.starScale,
                 stretchY = 0,
@@ -148,10 +156,10 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
         }
         else
         {
-            var starPos = stackalloc float2[3]; // L, C, R
-            starPos[0] = slide.starPosConstL * slide.process + slide.starPosStart;
-            starPos[1] = slide.starPosConstC * slide.process + slide.starPosStart;
-            starPos[2] = slide.starPosConstR * slide.process + slide.starPosStart;
+            var starPos = stackalloc float2[3]; //C, L, R
+            slide.starPos = starPos[0] = slide.starPosConstC * slide.process + slide.starPosStart;
+            slide.starPosL = starPos[1] = slide.starPosConstL * slide.process + slide.starPosStart;
+            slide.starPosR = starPos[2] = slide.starPosConstR * slide.process + slide.starPosStart;
             var nIdx = Interlocked.Add(ref *NotesWriteCountPtr, 3) - 3;
             for (var i = 0; i < 3; i++)
             {
@@ -176,26 +184,42 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
 
     private void AutoplayUpdate(ref SlideData slide)
     {
-        if (NoteHelper.AutoPlayMode is AutoPlayMode.DJAuto or AutoPlayMode.Disable) return;
+        if (NoteHelper.AutoPlayMode is AutoPlayMode.Disable) return;
         if (slide.isEnd || slide.isJudged) return;
         var timing = TimeData.NoteTime - slide.time;
         if (timing < -0.01f) return;
-        slide.eaten = math.max((int)(slide.process * slide.slideArrowsCount), 0);
-        if (slide.LastFor - timing <= 0)
+
+        switch (NoteHelper.AutoPlayMode)
         {
-            switch (NoteHelper.AutoPlayMode)
-            {
-                case AutoPlayMode.Enable:
+            case AutoPlayMode.Enable:
+                slide.eaten = math.max((int)(slide.process * slide.slideArrowsCount), 0);
+
+                if (slide.LastFor - timing <= 0)
+                {
                     slide.judgeGrade = JudgeGrade.Perfect;
                     slide.isJudged = true;
                     CompleteSlide(ref slide);
-                    break;
-                case AutoPlayMode.Random:
+                }
+                break;
+            case AutoPlayMode.Random:
+                slide.eaten = math.max((int)(slide.process * slide.slideArrowsCount), 0);
+
+                if (slide.LastFor - timing <= 0)
+                {
                     slide.judgeGrade = (JudgeGrade)new Random(114514).NextInt(1, 14);
                     slide.isJudged = true;
                     CompleteSlide(ref slide);
-                    break;
-            }
+                }
+                break;
+            case AutoPlayMode.DJAutoButton:
+            case AutoPlayMode.DJAutoSensor:
+                InputData.HandleWorldPosition(slide.starPos);
+                if (slide.isWifi)
+                {
+                    InputData.HandleWorldPosition(slide.starPosL);
+                    InputData.HandleWorldPosition(slide.starPosR);
+                }
+                break;
         }
     }
 
@@ -205,7 +229,7 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
         if (slide.isEnd || slide.isJudged) return;
 
         var timing = TimeData.NoteTime - slide.time;
-        if (timing < -0.05f) return;
+        if (timing < -0.1f) return; // 提前100ms接受判定
 
         var remaining = slide.LastFor - timing;
 
@@ -295,7 +319,9 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
         CheckArea(ref first);
         if (first.On && !slide.isSoundPlayed)
         {
-            NoteHelper.PlaySlideSound(SfxRequests, slide.isBreak);
+            NoteHelper.PlaySlideSound(SfxRequests,
+                slide.isBreak
+            );
             slide.isSoundPlayed = true;
         }
 
@@ -400,7 +426,11 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
     {
         slide.judgeTime = TimeData.NoteTime;
         slide.isJudged = true;
-        if (slide.isBreak) NoteHelper.PlayBreakSlideEndSound(SfxRequests);
+        NoteHelper.PlaySlideEndSound(SfxRequests,
+            slide.judgeGrade,
+            slide.isMine,
+            slide.isBreak
+        );
         NoteHelper.ReportResult(ReportResults, slide.judgeGrade, slide.isBreak, SimaiNoteType.Slide);
     }
 
@@ -466,6 +496,7 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
             scale = new float2(1, 1),
             spriteId = (uint)(baseJ + off),
             color = new float4(1, 1, 1, slide.slideOKAlpha),
+            brightness = slide.brightness,  // TODO: shine
             sort = 0u,
         };
     }

@@ -6,7 +6,7 @@ using UnityEngine;
 
 using Unity.Jobs;
 
-public class NoteRenderGroup<T> : IDisposable where T : unmanaged, IComparable<T>, ISortableRenderData
+public class RenderGroup<T> : IDisposable where T : unmanaged, ISortableRenderData
 {
     const int TRIPLE_COUNT = 3;
     const int MAX_INSTANCES = 65536;
@@ -25,7 +25,7 @@ public class NoteRenderGroup<T> : IDisposable where T : unmanaged, IComparable<T
 
     NativeArray<T> _noteRenderDatasThisFrame;
 
-    public NoteRenderGroup(Material mat, Mesh mesh, int priority)
+    public RenderGroup(Material mat, Mesh mesh, int priority)
     {
         _mesh = mesh;
         _mpb = new();

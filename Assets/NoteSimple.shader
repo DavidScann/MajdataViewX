@@ -21,6 +21,7 @@ Shader "Custom/NoteSimple"
                 float2 scale;
                 uint spriteId;
                 float4 color;
+                float brightness;
                 uint sort;
             };
 
@@ -51,6 +52,7 @@ Shader "Custom/NoteSimple"
                 o.uv = v.uv;
                 o.rect = rect;
                 o.color = note.color;
+                o.color.rgb *= note.brightness;
                 return o;
             }
 

@@ -25,6 +25,7 @@ public struct TouchData
     public bool isMine;
     public bool usingSV;
 
+    public bool isAppeared;
     public bool isEnd;
     public float2 centerPos;
 
@@ -49,8 +50,8 @@ public struct TouchData
         centerPos = MajPos.GetAreaPos(sensor);
 
         wholeDuration = 3.209385682f * math.pow(speed, -0.9549621752f);
-        moveDuration = 0.8f * wholeDuration;
         displayDuration = 0.2f * wholeDuration;
+        moveDuration = 0.8f * wholeDuration;
 
         fanSprite = TOUCH;
         pointSprite = TOUCH_POINT;

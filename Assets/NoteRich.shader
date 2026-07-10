@@ -97,8 +97,9 @@ Shader "Custom/NoteRich"
 
             float4 frag(v2f i) : SV_Target
             {
-                // ---- 3-slice Y-axis UV remap ----
-                float2 uv;
+                // ---- Calculate shared 3-slice UV ----
+                float2 spriteUV = i.uv;
+
                 if (i.sliceBorder.x + i.sliceBorder.y > 0.0)
                 {
                     float topCapFrac = i.caps.x;
@@ -108,48 +109,62 @@ Shader "Custom/NoteRich"
 
                     float uvY = i.uv.y;
                     float remapY;
+
                     if (uvY >= 1.0 - topCapFrac)
                     {
-                        // Top cap: map to top of sprite
-                        float t = (uvY - (1.0 - topCapFrac)) / topCapFrac;
+                        // Top cap
+                        float t = (uvY - (1.0 - topCapFrac)) / max(topCapFrac, 1e-6);
                         remapY = (1.0 - i.sliceBorder.x) + t * i.sliceBorder.x;
                     }
                     else if (uvY <= botCapFrac)
                     {
-                        // Bottom cap: map to bottom of sprite
-                        float t = uvY / botCapFrac;
+                        // Bottom cap
+                        float t = uvY / max(botCapFrac, 1e-6);
                         remapY = t * i.sliceBorder.y;
                     }
                     else
                     {
-                        // Middle stretch: map to stretchable middle of sprite
-                        float t = (uvY - botCapFrac) / middleFrac;
+                        // Middle stretch
+                        float t = (uvY - botCapFrac) / max(middleFrac, 1e-6);
                         remapY = i.sliceBorder.y + t * sliceMid;
                     }
-                    uv = float2(lerp(i.rect.x, i.rect.z, i.uv.x), lerp(i.rect.y, i.rect.w, remapY));
+
+                    spriteUV.y = remapY;
                 }
-                else
-                {
-                    uv = lerp(i.rect.xy, i.rect.zw, i.uv);
-                }
+
+                // ---- Main sprite ----
+                float2 uv = float2(
+                    lerp(i.rect.x, i.rect.z, spriteUV.x),
+                    lerp(i.rect.y, i.rect.w, spriteUV.y)
+                );
 
                 float4 col = tex2D(_MainTex, uv);
 
-                // ---- EX frame overlay (from NoteIndirect.shader) ----
+                // ---- EX overlay (uses same 3-slice UV) ----
                 if (i.exColor.a > 0.0)
                 {
-                    float2 uvFrame = lerp(i.exRect.xy, i.exRect.zw, i.uv);
+                    float2 uvFrame = float2(
+                        lerp(i.exRect.x, i.exRect.z, spriteUV.x),
+                        lerp(i.exRect.y, i.exRect.w, spriteUV.y)
+                    );
+
                     float4 frame = tex2D(_MainTex, uvFrame);
+
                     frame.rgb *= i.exColor.rgb;
                     frame.a   *= i.exColor.a;
+
+                    // Standard alpha blend
                     col.rgb = frame.rgb * frame.a + col.rgb * (1.0 - frame.a);
-                    col.a   = frame.a   + col.a   * (1.0 - frame.a);
+                    col.a   = frame.a + col.a * (1.0 - frame.a);
                 }
 
-                // ---- Brightness + color ----
+                // ---- Vertex color + brightness ----
                 col.rgb *= i.color.rgb;
                 col.a   *= i.color.a;
-                col.rgb *= col.a; // premultiply
+
+                // Premultiply alpha
+                col.rgb *= col.a;
+
                 return col;
             }
             ENDHLSL

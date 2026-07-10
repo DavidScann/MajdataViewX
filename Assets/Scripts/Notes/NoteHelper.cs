@@ -18,6 +18,9 @@ public static unsafe class NoteHelper
     public static AutoPlayMode AutoPlayMode =>
         AutoPlayModeSS.Data;
 
+    public static bool IsSimulated => AutoPlayMode is
+        AutoPlayMode.DJAutoSensor or AutoPlayMode.DJAutoButton or AutoPlayMode.MuriDX or AutoPlayMode.Disable;
+
     // ---- Judgment constants ----
     public const float TAP_JUDGE_SEG_1ST_PERFECT_MSEC = 1 * FRAME_LENGTH_MSEC;
     public const float TAP_JUDGE_SEG_2ND_PERFECT_MSEC = 2 * FRAME_LENGTH_MSEC;
@@ -140,11 +143,13 @@ public static unsafe class NoteHelper
     public static void PlayTapSound(bool* SfxRequests,
         JudgeGrade grade, bool isBreak, bool isEx, bool isMine, float diff)
     {
-        if (isMine &&
-            grade is JudgeGrade.Miss or JudgeGrade.TooFast)
+        if (isMine && grade is JudgeGrade.Miss or JudgeGrade.TooFast)
+        {
+            //TODO
             return;
+        }
 
-        if (grade is JudgeGrade.Miss or JudgeGrade.TooFast || isMine)
+        if (isMine || grade is JudgeGrade.Miss or JudgeGrade.TooFast)
             return;
 
         if (isBreak)
@@ -211,19 +216,26 @@ public static unsafe class NoteHelper
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void PlayTouchSound(bool* SfxRequests)
+    public static void PlayTouchSound(bool* SfxRequests,
+        JudgeGrade grade, bool isMine, bool isHanabi)
     {
+        if (isMine && grade is JudgeGrade.Miss or JudgeGrade.TooFast)
+        {
+            //MEYBE TODO
+            return;
+        }
+
+        if (isMine || grade is JudgeGrade.Miss or JudgeGrade.TooFast)
+            return;
+
         SfxRequests[AudioManager.TOUCH] = true;
+        if (isHanabi)
+            SfxRequests[AudioManager.FIREWORK] = true;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void PlayHanabiSound(bool* SfxRequests)
-    {
-        SfxRequests[AudioManager.FIREWORK] = true;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void PlaySlideSound(bool* SfxRequests, bool isBreak)
+    public static void PlaySlideSound(bool* SfxRequests,
+        bool isBreak)
     {
         if (isBreak)
         {
@@ -234,10 +246,23 @@ public static unsafe class NoteHelper
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void PlayBreakSlideEndSound(bool* SfxRequests)
+    public static void PlaySlideEndSound(bool* SfxRequests,
+        JudgeGrade grade, bool isMine, bool isBreak)
     {
-        SfxRequests[AudioManager.BREAK_SLIDE_JUDGE] = true;
-        // SfxRequests[AudioManager.BREAK_SFX] = true;  // blame @LeZi9916
+        if (isMine && grade is JudgeGrade.Miss or JudgeGrade.TooFast)
+        {
+            //MAYBE TODO
+            return;
+        }
+
+        if (isMine || grade is JudgeGrade.Miss or JudgeGrade.TooFast)
+            return;
+
+        if (isBreak)
+        {
+            SfxRequests[AudioManager.BREAK_SLIDE_JUDGE] = true;
+            // SfxRequests[AudioManager.BREAK_SFX] = true;  // blame @LeZi9916
+        }
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
