@@ -299,8 +299,8 @@ public partial class ObjectCounter : MonoBehaviour
                     break;
                 case JudgeGrade.LateGreat3rd:
                 case JudgeGrade.LateGreat2nd:
-                case JudgeGrade.LateGreat:
-                case JudgeGrade.FastGreat:
+                case JudgeGrade.LateGreat1st:
+                case JudgeGrade.FastGreat1st:
                 case JudgeGrade.FastGreat2nd:
                 case JudgeGrade.FastGreat3rd:
                     CurrentNoteBaseScore += (long)(baseScore * 0.8);
@@ -346,8 +346,8 @@ public partial class ObjectCounter : MonoBehaviour
                     LostNoteExtraScore += 60;
                     LostNoteExtraScoreClassic += 100;
                     break;
-                case JudgeGrade.LateGreat:
-                case JudgeGrade.FastGreat:
+                case JudgeGrade.LateGreat1st:
+                case JudgeGrade.FastGreat1st:
                     CurrentNoteBaseScore += 2000;
                     CurrentNoteExtraScore += 40;
                     LostNoteBaseScore += 500;
@@ -369,7 +369,8 @@ public partial class ObjectCounter : MonoBehaviour
                     LostNoteExtraScore += 25;
                     LostNoteExtraScoreClassic += 50;
                     break;
-                case JudgeGrade.Perfect:
+                case JudgeGrade.LateCritical:
+                case JudgeGrade.FastCritical:
                     CurrentNoteBaseScore += 2500;
                     CurrentNoteExtraScore += 100;
                     CurrentNoteExtraScoreClassic += 100;
@@ -453,7 +454,8 @@ public partial class ObjectCounter : MonoBehaviour
                 combo = 0;
                 lostDXScore -= 3;
                 break;
-            case JudgeGrade.Perfect:
+            case JudgeGrade.LateCritical:
+            case JudgeGrade.FastCritical:
                 cPerfectCount++;
                 break;
             case JudgeGrade.LatePerfect3rd:
@@ -465,8 +467,8 @@ public partial class ObjectCounter : MonoBehaviour
                 break;
             case JudgeGrade.LateGreat3rd:
             case JudgeGrade.LateGreat2nd:
-            case JudgeGrade.LateGreat:
-            case JudgeGrade.FastGreat:
+            case JudgeGrade.LateGreat1st:
+            case JudgeGrade.FastGreat1st:
             case JudgeGrade.FastGreat2nd:
             case JudgeGrade.FastGreat3rd:
                 lostDXScore -= 2;
@@ -483,15 +485,15 @@ public partial class ObjectCounter : MonoBehaviour
     {
         if (judge is JudgeGrade.Miss or JudgeGrade.TooFast)
             return;
-        if ((int)judge < 7)
+        if (judge < JudgeGrade.FastCritical)
             fastCount++;
-        else if ((int)judge > 7)
+        else if (judge > JudgeGrade.LateCritical)
             lateCount++;
     }
 
     public void ResetState()
     {
-        for (var i = 0; i <= 14; i++)
+        for (var i = 0; i <= 15; i++)
         {
             judgedTapCount[(JudgeGrade)i] = 0;
             judgedHoldCount[(JudgeGrade)i] = 0;

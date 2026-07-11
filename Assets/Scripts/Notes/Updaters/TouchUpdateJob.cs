@@ -166,18 +166,19 @@ public unsafe struct TouchUpdateJob : IJobParallelFor
         switch (NoteHelper.AutoPlayMode)
         {
             case AutoPlayMode.Enable:
-                touch.judgeGrade = touch.isMine ? JudgeGrade.Miss : JudgeGrade.Perfect;
+                touch.judgeGrade = touch.isMine ? JudgeGrade.Miss : JudgeGrade.LateCritical;
                 touch.isJudged = true;
                 touch.diff = 0;
                 EndNote(ref touch);
                 break;
             case AutoPlayMode.Random:
-                var gradeIndex = new Random(114514).NextInt(1, 14);
+                // TODO:这谁写的random？
+                var grade = (JudgeGrade)(new Random(114514).NextInt((int)JudgeGrade.FastGood, (int)JudgeGrade.Miss));
                 touch.judgeGrade = touch.isMine
-                    ? (gradeIndex > 4 ? JudgeGrade.Miss : JudgeGrade.Perfect)
-                    : (JudgeGrade)gradeIndex;
+                    ? (grade < JudgeGrade.FastPerfect3rd ? JudgeGrade.Miss : JudgeGrade.LateCritical)
+                    : grade;
                 touch.isJudged = true;
-                touch.diff = gradeIndex > 7 ? 11.4514f : -11.4514f;
+                touch.diff = grade >= JudgeGrade.LateCritical ? 11.4514f : -11.4514f;
                 EndNote(ref touch);
                 break;
             case AutoPlayMode.DJAutoButton:
@@ -211,7 +212,7 @@ public unsafe struct TouchUpdateJob : IJobParallelFor
             }
             if (diffSec >= 0.016667f)
             {
-                touch.judgeGrade = JudgeGrade.Perfect;
+                touch.judgeGrade = JudgeGrade.LateCritical;
                 touch.isJudged = true;
                 EndNote(ref touch);
             }
@@ -238,13 +239,17 @@ public unsafe struct TouchUpdateJob : IJobParallelFor
 
         if (!stateOn) return;
 
-        var diffMSec = math.abs(diffSec * 1000);
-        if (diffMSec > 150f && diffSec < 0) return;
+        var diffMSec = diffSec * 1000;
+        if (diffMSec < -150f) return;
         if (!MajBurst.InputData.CanJudgeSensor(touch.sensor, touch.sensorOrderIndex)) return;
 
-        touch.judgeGrade = diffMSec <= 150 ? JudgeGrade.Perfect
-            : diffMSec <= 200 ? JudgeGrade.LatePerfect2nd
-            : diffMSec <= 250 ? JudgeGrade.LateGreat
+        touch.judgeGrade = diffMSec < 0 ? JudgeGrade.FastCritical
+            : diffMSec <= 150 ? JudgeGrade.LateCritical
+            : diffMSec <= 175 ? JudgeGrade.LatePerfect2nd
+            : diffMSec <= 200 ? JudgeGrade.LatePerfect3rd
+            : diffMSec <= 216.6667f ? JudgeGrade.LateGreat1st
+            : diffMSec <= 233.3333f ? JudgeGrade.LateGreat2nd
+            : diffMSec <= 250 ? JudgeGrade.LateGreat3rd
             : JudgeGrade.LateGood;
         touch.isJudged = true;
         touch.diff = diffSec;

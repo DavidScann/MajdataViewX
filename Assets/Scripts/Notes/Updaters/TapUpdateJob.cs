@@ -113,19 +113,21 @@ public unsafe struct TapUpdateJob : IJobParallelFor
         switch (NoteHelper.AutoPlayMode)
         {
             case AutoPlayMode.Enable:
-                tap.JudgeGrade = tap.IsMine ? JudgeGrade.Miss : JudgeGrade.Perfect;
+                tap.JudgeGrade = tap.IsMine ? JudgeGrade.Miss : JudgeGrade.LateCritical;
                 tap.IsJudged = true;
                 tap.Diff = 0;
                 EndNote(ref tap);
                 break;
             case AutoPlayMode.Random:
-                var gradeIndex = new Random((uint)tap.SensorOrderIndex).NextInt(1, 14);
+                // TODO:不管了反正random都给你标上
+                var grade = (JudgeGrade)(new Random((uint)tap.SensorOrderIndex)
+                        .NextInt((int)JudgeGrade.FastGood, (int)JudgeGrade.Miss));
                 if (tap.IsMine)
-                    tap.JudgeGrade = gradeIndex > 4 ? JudgeGrade.Miss : JudgeGrade.Perfect;
+                    tap.JudgeGrade = grade < JudgeGrade.FastPerfect3rd ? JudgeGrade.Miss : JudgeGrade.LateCritical;
                 else
-                    tap.JudgeGrade = (JudgeGrade)gradeIndex;
+                    tap.JudgeGrade = grade;
                 tap.IsJudged = true;
-                tap.Diff = gradeIndex > 7 ? 11.4514f : -11.4514f;
+                tap.Diff = grade >= JudgeGrade.LateCritical ? 11.4514f : -11.4514f;
                 EndNote(ref tap);
                 break;
             case AutoPlayMode.DJAutoButton:
@@ -173,7 +175,7 @@ public unsafe struct TapUpdateJob : IJobParallelFor
             }
             if (diffSec >= MajCtx.FRAME_LENGTH_SEC * 1)
             {
-                tap.JudgeGrade = JudgeGrade.Perfect;
+                tap.JudgeGrade = JudgeGrade.LateCritical;
                 tap.IsJudged = true;
                 EndNote(ref tap);
             }
