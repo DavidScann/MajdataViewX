@@ -35,6 +35,12 @@ public static class BuildScript
                 Il2CppCompilerConfiguration.Master);
         }
 
+        // Disable managed code stripping to prevent websocket-sharp's HTTP header
+        // parsing members from being removed (causes WebSocket 400 on Linux IL2CPP).
+        PlayerSettings.SetManagedStrippingLevel(
+            BuildTargetGroup.Standalone,
+            ManagedStrippingLevel.Disabled);
+
         var options = new BuildPlayerOptions
         {
             scenes = new[]
