@@ -2,6 +2,7 @@
 
 #region
 
+using System;
 using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
@@ -102,12 +103,13 @@ public class BgManager : MonoBehaviour
 
     public void LoadVideo(string path)
     {
-        VideoUrl = "file://" + path;
+        VideoUrl = new Uri(path).AbsoluteUri;
     }
 
     public void ShowVideo()
     {
-        if (!hasVideo) return;
+        if (!hasVideo)
+            return;
 
         videoPlayer.url = VideoUrl;
         StartCoroutine(WaitFumenStart());
