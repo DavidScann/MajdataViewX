@@ -119,13 +119,10 @@ public unsafe struct TapUpdateJob : IJobParallelFor
                 EndNote(ref tap);
                 break;
             case AutoPlayMode.Random:
-                // TODO:不管了反正random都给你标上
-                var grade = (JudgeGrade)(new Random((uint)tap.SensorOrderIndex)
-                        .NextInt((int)JudgeGrade.FastGood, (int)JudgeGrade.Miss));
-                if (tap.IsMine)
-                    tap.JudgeGrade = grade < JudgeGrade.FastPerfect3rd ? JudgeGrade.Miss : JudgeGrade.LateCritical;
-                else
-                    tap.JudgeGrade = grade;
+                var grade = (JudgeGrade)GlobalRandom.NextInt((int)JudgeGrade.FastGood, (int)JudgeGrade.Miss);
+                tap.JudgeGrade = tap.IsMine
+                    ? (grade < JudgeGrade.FastPerfect3rd ? JudgeGrade.Miss : JudgeGrade.LateCritical)
+                    : grade;
                 tap.IsJudged = true;
                 tap.Diff = grade >= JudgeGrade.LateCritical ? 11.4514f : -11.4514f;
                 EndNote(ref tap);
@@ -173,7 +170,7 @@ public unsafe struct TapUpdateJob : IJobParallelFor
                 EndNote(ref tap);
                 return;
             }
-            if (diffSec >= MajCtx.FRAME_LENGTH_SEC * 1)
+            if (diffSec >= NoteHelper.MINE_END_SEC)
             {
                 tap.JudgeGrade = JudgeGrade.LateCritical;
                 tap.IsJudged = true;
@@ -183,7 +180,7 @@ public unsafe struct TapUpdateJob : IJobParallelFor
         }
 
         // ---- Late timeout (independent of sensor, so an untouched tap still misses) ----
-        if (diffSec > 0.15f)
+        if (diffSec > NoteHelper.TAP_JUDGE_GOOD_AREA_MSEC / 1000f)
         {
             tap.JudgeGrade = JudgeGrade.Miss;
             tap.IsJudged = true;

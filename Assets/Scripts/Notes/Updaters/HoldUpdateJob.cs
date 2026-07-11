@@ -90,8 +90,8 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
         );
 
         // ---- hold on/off skin ----
-        if (hold.LastFor > 0.3f && // 忽略短hold
-            headTiming >= 0.1f &&  // 忽略头6帧
+        if (hold.LastFor > (NoteHelper.HOLD_HEAD_IGNORE_LENGTH_SEC + NoteHelper.HOLD_TAIL_IGNORE_LENGTH_SEC) && // 忽略短hold
+            headTiming >= NoteHelper.HOLD_HEAD_IGNORE_LENGTH_SEC &&  // 忽略头6帧
             !hold.isMine)          // 忽略mine
         {
             if (hold.isHolding)
@@ -242,8 +242,7 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
             case AutoPlayMode.Random:
                 if (!hold.isHeadJudged)
                 {
-                    // TODO:这谁写的random？
-                    var grade = (JudgeGrade)(new Random(114514).NextInt((int)JudgeGrade.FastGood, (int)JudgeGrade.Miss));
+                    var grade = (JudgeGrade)GlobalRandom.NextInt((int)JudgeGrade.FastGood, (int)JudgeGrade.Miss);
                     hold.judgeGrade = hold.isMine
                         ? (grade < JudgeGrade.FastPerfect3rd ? JudgeGrade.Miss : JudgeGrade.LateCritical)
                         : grade;
@@ -290,17 +289,17 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
         // ---- Head judgment ----
         if (!hold.isHeadJudged)
         {
-            if (hold.isMine && timing >= 0.016667f)
+            if (hold.isMine && timing >= NoteHelper.MINE_END_SEC)
             {
                 hold.judgeGrade = JudgeGrade.LateCritical;
                 hold.isHeadJudged = true;
                 return;
             }
-            if (!hold.isMine && timing > 0.15f)
+            if (!hold.isMine && timing > NoteHelper.TAP_JUDGE_GOOD_AREA_MSEC / 1000f)
             {
                 hold.judgeGrade = JudgeGrade.Miss;
                 hold.isHeadJudged = true;
-                hold.headDiff = 0.15f;
+                hold.headDiff = NoteHelper.TAP_JUDGE_GOOD_AREA_MSEC / 1000f;
                 // NOTE: DO NOT EndNote here. A missed head keeps tracking the body and
                 // can still be recovered to LateGood by the release-percent mapping below.
                 return;
@@ -339,7 +338,7 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
         var remainingTime = math.max(hold.LastFor - timing, 0);
         if (remainingTime <= 0)
         {
-            var realityHT = hold.LastFor - 0.3f - math.max(hold.headDiff, 0f);
+            var realityHT = hold.LastFor - (NoteHelper.HOLD_HEAD_IGNORE_LENGTH_SEC + NoteHelper.HOLD_TAIL_IGNORE_LENGTH_SEC) - math.max(hold.headDiff, 0f);
             var pct = math.clamp((realityHT - hold.playerIdleTime) / math.max(realityHT, 0.001f), 0f, 1f);
             hold.holdPercent = pct;
             if (!hold.isMine)
@@ -351,9 +350,25 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
         if (!TimeData.IsStart) return;
 
         var on = InputData.GetSensorState(hold.Key).Status || InputData.GetButtonState(hold.Key).Status;
-        hold.isHolding = on;
-        if (timing > 0.25f && remainingTime > 0.2f && !on)
-            hold.playerIdleTime += TimeData.deltaTime;
+        if (on)
+        {
+            hold.releaseTimeSec = 0f;
+            hold.isHolding = true;
+        }
+        else
+        {
+            if (hold.releaseTimeSec <= NoteHelper.DELUXE_HOLD_RELEASE_IGNORE_TIME_SEC)
+            {
+                hold.releaseTimeSec += TimeData.deltaTime;
+                hold.isHolding = true;
+            }
+            else
+            {
+                hold.isHolding = false;
+                if (timing > NoteHelper.TOUCH_HOLD_HEAD_IGNORE_LENGTH_SEC && remainingTime > NoteHelper.TOUCH_HOLD_TAIL_IGNORE_LENGTH_SEC)
+                    hold.playerIdleTime += TimeData.deltaTime;
+            }
+        }
     }
 
     private void EndNote(ref HoldData hold)

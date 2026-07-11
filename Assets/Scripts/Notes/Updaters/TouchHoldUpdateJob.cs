@@ -93,8 +93,8 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
         NoteHelper.SetTouchHoldSound(SfxRequests, th.isHolding);
 
         // ---- hold on/off skin ----
-        if (th.LastFor > 0.3f && // 忽略短hold
-            timing >= 0.1f &&    // 忽略头6帧
+        if (th.LastFor > (NoteHelper.HOLD_HEAD_IGNORE_LENGTH_SEC + NoteHelper.HOLD_TAIL_IGNORE_LENGTH_SEC) && // 忽略短hold
+            timing >= NoteHelper.HOLD_HEAD_IGNORE_LENGTH_SEC &&    // 忽略头6帧
             !th.isMine)          // 忽略mine
         {
             if (th.isHolding)
@@ -191,8 +191,7 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
             case AutoPlayMode.Random:
                 if (!th.isHeadJudged)
                 {
-                    // TODO:这谁写的random？
-                    var grade = (JudgeGrade)(new Random(114514).NextInt((int)JudgeGrade.FastGood, (int)JudgeGrade.Miss));
+                    var grade = (JudgeGrade)GlobalRandom.NextInt((int)JudgeGrade.FastGood, (int)JudgeGrade.Miss);
                     th.judgeGrade = th.isMine
                         ? (grade < JudgeGrade.FastPerfect3rd ? JudgeGrade.Miss : JudgeGrade.LateCritical)
                         : grade;
@@ -230,17 +229,17 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
 
         if (!th.isHeadJudged)
         {
-            if (th.isMine && timing >= 0.016667f)
+            if (th.isMine && timing >= NoteHelper.MINE_END_SEC)
             {
                 th.judgeGrade = JudgeGrade.LateCritical;
                 th.isHeadJudged = true;
                 return;
             }
-            if (!th.isMine && timing > 0.316667f)
+            if (!th.isMine && timing > NoteHelper.TOUCH_JUDGE_GOOD_AREA_MSEC / 1000f)
             {
                 th.judgeGrade = JudgeGrade.Miss;
                 th.isHeadJudged = true;
-                th.headDiff = 0.316667f;
+                th.headDiff = NoteHelper.TOUCH_JUDGE_GOOD_AREA_MSEC / 1000f;
                 return;
             }
 
@@ -258,17 +257,10 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
 
             if (!clicked) return;
             var diffMSec = timing * 1000;
-            if (diffMSec < -150) return;
+            if (diffMSec < -NoteHelper.TOUCH_JUDGE_SEG_1ST_PERFECT_MSEC) return;
             if (!InputData.CanJudgeSensor(th.sensor, th.sensorOrderIndex)) return;
 
-            th.judgeGrade = diffMSec < 0 ? JudgeGrade.FastCritical
-                : diffMSec <= 150 ? JudgeGrade.LateCritical
-                : diffMSec <= 175 ? JudgeGrade.LatePerfect2nd
-                : diffMSec <= 200 ? JudgeGrade.LatePerfect3rd
-                : diffMSec <= 216.6667f ? JudgeGrade.LateGreat1st
-                : diffMSec <= 233.3333f ? JudgeGrade.LateGreat2nd
-                : diffMSec <= 250 ? JudgeGrade.LateGreat3rd
-                : JudgeGrade.LateGood;
+            th.judgeGrade = NoteHelper.GetTouchJudge(timing);
             th.isHeadJudged = true;
             th.headDiff = timing;
             return;
@@ -277,7 +269,7 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
         var remainingTime = math.max(th.LastFor - timing, 0);
         if (remainingTime <= 0)
         {
-            var realityHT = th.LastFor - 0.45f - math.max(th.headDiff, 0f);
+            var realityHT = th.LastFor - (NoteHelper.TOUCH_HOLD_HEAD_IGNORE_LENGTH_SEC + NoteHelper.TOUCH_HOLD_TAIL_IGNORE_LENGTH_SEC) - math.max(th.headDiff, 0f);
             var pct = math.clamp((realityHT - th.playerIdleTime) / math.max(realityHT, 0.001f), 0f, 1f);
             th.holdPercent = pct;
             if (!th.isMine)
@@ -297,9 +289,25 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
             }
         }
 
-        th.isHolding = on;
-        if (timing > 0.25f && remainingTime > 0.2f && !on)
-            th.playerIdleTime += TimeData.deltaTime;
+        if (on)
+        {
+            th.releaseTimeSec = 0f;
+            th.isHolding = true;
+        }
+        else
+        {
+            if (th.releaseTimeSec <= NoteHelper.DELUXE_HOLD_RELEASE_IGNORE_TIME_SEC)
+            {
+                th.releaseTimeSec += TimeData.deltaTime;
+                th.isHolding = true;
+            }
+            else
+            {
+                th.isHolding = false;
+                if (timing > NoteHelper.TOUCH_HOLD_HEAD_IGNORE_LENGTH_SEC && remainingTime > NoteHelper.TOUCH_HOLD_TAIL_IGNORE_LENGTH_SEC)
+                    th.playerIdleTime += TimeData.deltaTime;
+            }
+        }
     }
 
     private void EndNote(ref TouchHoldData th)

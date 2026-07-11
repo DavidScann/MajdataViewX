@@ -51,6 +51,7 @@ public struct HoldData
     public float playerIdleTime;
     public float holdPercent;
     public bool isHolding;
+    public float releaseTimeSec;
 
     public void Init()
     {

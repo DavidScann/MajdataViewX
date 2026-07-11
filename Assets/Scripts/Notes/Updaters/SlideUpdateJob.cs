@@ -233,8 +233,10 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
 
                 if (slide.LastFor - timing <= 0)
                 {
-                    // TODO:这谁写的random？
-                    slide.judgeGrade = (JudgeGrade)(new Random(114514).NextInt((int)JudgeGrade.FastGood, (int)JudgeGrade.Miss));
+                    var grade = (JudgeGrade)GlobalRandom.NextInt((int)JudgeGrade.FastGood, (int)JudgeGrade.Miss);
+                    slide.judgeGrade = slide.isMine
+                        ? (grade < JudgeGrade.FastPerfect3rd ? JudgeGrade.Miss : JudgeGrade.LateCritical)
+                        : grade;
                     slide.isJudged = true;
                     CompleteSlide(ref slide);
                 }
@@ -262,7 +264,7 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
         if (slide.isEnd || slide.isJudged) return;
 
         var tapTiming = TimeData.NoteTime - slide.tapTime;
-        if (tapTiming < -0.1f) return; // 提前100ms接受判定
+        if (tapTiming < -NoteHelper.SLIDE_CHECK_AHEAD_TIME_MSEC / 1000f) return; // 提前100ms接受判定
 
         var timing = TimeData.NoteTime - slide.time;
         var remaining = slide.LastFor - timing;
@@ -275,9 +277,9 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
             stayTime = endPos - judgePos;
         }
         // 星星 miss 的时间点在结束后 +150ms
-        var forceJudge = timing - slide.LastFor - 0.15f;
+        var forceJudge = timing - slide.LastFor - NoteHelper.SLIDE_FORCE_MISS / 1000f;
 
-        bool timeout = slide.isMine ? (remaining <= -MajCtx.FRAME_LENGTH_SEC) : (forceJudge >= 0);
+        bool timeout = slide.isMine ? (remaining <= -NoteHelper.MINE_END_SEC) : (forceJudge >= 0);
 
         if (timeout)
         {
@@ -436,14 +438,14 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
         diff = math.abs(diff);
 
         if (diff <= pInterval)
-            return isFast? JudgeGrade.FastCritical : JudgeGrade.LateCritical;
+            return isFast ? JudgeGrade.FastCritical : JudgeGrade.LateCritical;
         if (diff <= gr1Interval)
-            return isFast? JudgeGrade.FastGreat1st : JudgeGrade.LateGreat1st;
+            return isFast ? JudgeGrade.FastGreat1st : JudgeGrade.LateGreat1st;
         if (diff <= gr2Interval)
-            return isFast? JudgeGrade.FastGreat2nd : JudgeGrade.LateGreat2nd;
+            return isFast ? JudgeGrade.FastGreat2nd : JudgeGrade.LateGreat2nd;
         if (diff <= gr3Interval)
-            return isFast? JudgeGrade.FastGreat3rd : JudgeGrade.LateGreat3rd;
-        return isFast? JudgeGrade.FastGood : JudgeGrade.LateGood;
+            return isFast ? JudgeGrade.FastGreat3rd : JudgeGrade.LateGreat3rd;
+        return isFast ? JudgeGrade.FastGood : JudgeGrade.LateGood;
     }
 
     private void CompleteSlide(ref SlideData slide)

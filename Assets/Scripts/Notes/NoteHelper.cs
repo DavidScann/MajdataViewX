@@ -31,6 +31,13 @@ public static unsafe class NoteHelper
     public const float TAP_JUDGE_SEG_3RD_GREAT_MSEC = 6 * FRAME_LENGTH_MSEC;
     public const float TAP_JUDGE_GOOD_AREA_MSEC = 9 * FRAME_LENGTH_MSEC;
 
+    public const float HOLD_HEAD_IGNORE_LENGTH_SEC = 6 * FRAME_LENGTH_SEC;
+    public const float HOLD_TAIL_IGNORE_LENGTH_SEC = 12 * FRAME_LENGTH_SEC;
+    public const float DELUXE_HOLD_RELEASE_IGNORE_TIME_SEC = 2 * FRAME_LENGTH_SEC;
+
+    public const float SLIDE_CHECK_AHEAD_TIME_MSEC = 6 * FRAME_LENGTH_MSEC;
+    public const float SLIDE_FORCE_MISS = 9 * FRAME_LENGTH_MSEC;
+
     public const float TOUCH_JUDGE_SEG_1ST_PERFECT_MSEC = 9 * FRAME_LENGTH_MSEC;
     public const float TOUCH_JUDGE_SEG_2ND_PERFECT_MSEC = 10.5f * FRAME_LENGTH_MSEC;
     public const float TOUCH_JUDGE_SEG_3RD_PERFECT_MSEC = 12 * FRAME_LENGTH_MSEC;
@@ -39,14 +46,13 @@ public static unsafe class NoteHelper
     public const float TOUCH_JUDGE_SEG_3RD_GREAT_MSEC = 15 * FRAME_LENGTH_MSEC;
     public const float TOUCH_JUDGE_GOOD_AREA_MSEC = 18 * FRAME_LENGTH_MSEC;
 
-    public const float TOUCH_DISPLAY_OFFSET_SEC = 0 * FRAME_LENGTH_SEC;
-    public const float TOUCH_HOLD_DISPLAY_OFFSET_SEC = 0 * FRAME_LENGTH_SEC;
-
-    public const float HOLD_HEAD_IGNORE_LENGTH_SEC = 6 * FRAME_LENGTH_SEC;
-    public const float HOLD_TAIL_IGNORE_LENGTH_SEC = 12 * FRAME_LENGTH_SEC;
     public const float TOUCH_HOLD_HEAD_IGNORE_LENGTH_SEC = 15 * FRAME_LENGTH_SEC;
     public const float TOUCH_HOLD_TAIL_IGNORE_LENGTH_SEC = 12 * FRAME_LENGTH_SEC;
-    public const float DELUXE_HOLD_RELEASE_IGNORE_TIME_SEC = 2 * FRAME_LENGTH_SEC;
+
+    public const float MINE_END_SEC = 3 * FRAME_LENGTH_SEC;
+
+
+
 
     // ============== Pure Math ==============
 
@@ -94,6 +100,21 @@ public static unsafe class NoteHelper
 
         if (isEx) result = isFast ? JudgeGrade.FastCritical : JudgeGrade.LateCritical;
         return result;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [BurstCompile]
+    public static JudgeGrade GetTouchJudge(float diffSec)
+    {
+        var diffMSec = diffSec * 1000;
+        return diffMSec < 0 ? JudgeGrade.FastCritical
+            : diffMSec <= TOUCH_JUDGE_SEG_1ST_PERFECT_MSEC ? JudgeGrade.LateCritical
+            : diffMSec <= TOUCH_JUDGE_SEG_2ND_PERFECT_MSEC ? JudgeGrade.LatePerfect2nd
+            : diffMSec <= TOUCH_JUDGE_SEG_3RD_PERFECT_MSEC ? JudgeGrade.LatePerfect3rd
+            : diffMSec <= TOUCH_JUDGE_SEG_1ST_GREAT_MSEC ? JudgeGrade.LateGreat1st
+            : diffMSec <= TOUCH_JUDGE_SEG_2ND_GREAT_MSEC ? JudgeGrade.LateGreat2nd
+            : diffMSec <= TOUCH_JUDGE_SEG_3RD_GREAT_MSEC ? JudgeGrade.LateGreat3rd
+            : JudgeGrade.LateGood;
     }
 
     /// <summary>
@@ -171,7 +192,7 @@ public static unsafe class NoteHelper
         }
 
         if (head is JudgeGrade.TooFast or JudgeGrade.Miss) return head;
-        
+
         return head <= JudgeGrade.FastCritical ? JudgeGrade.FastGood : JudgeGrade.LateGood;
     }
 

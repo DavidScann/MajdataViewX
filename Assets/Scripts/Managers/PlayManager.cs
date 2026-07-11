@@ -73,7 +73,8 @@ public class PlayManager : MonoBehaviour
         {
             TimeData = new(),
             InputData = new(),
-            MultTouchHandler = new()
+            MultTouchHandler = new(),
+            GlobalRandom = new((uint)"MajdataX".GetHashCode()),
         };
         //MajBurst.TimeData.Init();
         MajBurst.InputData.Init();

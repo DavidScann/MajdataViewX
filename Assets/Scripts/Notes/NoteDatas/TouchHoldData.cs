@@ -44,6 +44,7 @@ public struct TouchHoldData
     public float playerIdleTime;
     public float holdPercent;
     public bool isHolding;
+    public float releaseTimeSec;
 
     public int groupId;
     public int coverageId;
