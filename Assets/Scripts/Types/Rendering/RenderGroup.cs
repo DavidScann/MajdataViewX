@@ -8,12 +8,12 @@ using Unity.Jobs;
 
 public class RenderGroup<T> : IDisposable where T : unmanaged, ISortableRenderData
 {
-    const int TRIPLE_COUNT = 3;
-    const int MAX_INSTANCES = 65536;
+    const int MULTIPLE_COUNT = 3;
+    int _maxInstances;
 
-    GraphicsBuffer[] _buffers = new GraphicsBuffer[TRIPLE_COUNT];
-    GraphicsBuffer[] _argsBuffers = new GraphicsBuffer[TRIPLE_COUNT];
-    GraphicsBuffer.IndirectDrawIndexedArgs[][] _args = new GraphicsBuffer.IndirectDrawIndexedArgs[TRIPLE_COUNT][];
+    GraphicsBuffer[] _buffers = new GraphicsBuffer[MULTIPLE_COUNT];
+    GraphicsBuffer[] _argsBuffers = new GraphicsBuffer[MULTIPLE_COUNT];
+    GraphicsBuffer.IndirectDrawIndexedArgs[][] _args = new GraphicsBuffer.IndirectDrawIndexedArgs[MULTIPLE_COUNT][];
     NativeArray<int> _counts;
 
     MaterialPropertyBlock _mpb;
@@ -25,7 +25,7 @@ public class RenderGroup<T> : IDisposable where T : unmanaged, ISortableRenderDa
 
     NativeArray<T> _noteRenderDatasThisFrame;
 
-    public RenderGroup(Material mat, Mesh mesh, int priority)
+    public RenderGroup(Material mat, Mesh mesh, int priority, int maxInstances = 65536)
     {
         _mesh = mesh;
         _mpb = new();
@@ -36,14 +36,16 @@ public class RenderGroup<T> : IDisposable where T : unmanaged, ISortableRenderDa
             matProps = _mpb
         };
 
+        _maxInstances = maxInstances;
+
         uint quadIndexCount = mesh.GetIndexCount(0);
 
-        for (int i = 0; i < TRIPLE_COUNT; i++)
+        for (int i = 0; i < MULTIPLE_COUNT; i++)
         {
             _buffers[i] = new GraphicsBuffer(
                 GraphicsBuffer.Target.Structured,
                 GraphicsBuffer.UsageFlags.LockBufferForWrite,
-                MAX_INSTANCES,
+                _maxInstances,
                 UnsafeUtility.SizeOf<T>());
 
             _argsBuffers[i] = new GraphicsBuffer(
@@ -53,17 +55,17 @@ public class RenderGroup<T> : IDisposable where T : unmanaged, ISortableRenderDa
             _args[i][0].indexCountPerInstance = quadIndexCount;
         }
 
-        _counts = new NativeArray<int>(TRIPLE_COUNT, Allocator.Persistent);
+        _counts = new NativeArray<int>(MULTIPLE_COUNT, Allocator.Persistent);
     }
 
     public void AdvanceWrite()
     {
-        _writeIndex = (_writeIndex + 1) % TRIPLE_COUNT;
+        _writeIndex = (_writeIndex + 1) % MULTIPLE_COUNT;
     }
 
     public NativeArray<T> LockForWrite()
     {
-        _noteRenderDatasThisFrame = _buffers[_writeIndex].LockBufferForWrite<T>(0, MAX_INSTANCES);
+        _noteRenderDatasThisFrame = _buffers[_writeIndex].LockBufferForWrite<T>(0, _maxInstances);
         return _noteRenderDatasThisFrame;
     }
 
@@ -120,7 +122,7 @@ public class RenderGroup<T> : IDisposable where T : unmanaged, ISortableRenderDa
 
     public void Dispose()
     {
-        for (int i = 0; i < TRIPLE_COUNT; i++)
+        for (int i = 0; i < MULTIPLE_COUNT; i++)
         {
             _buffers[i]?.Dispose();
             _argsBuffers[i]?.Dispose();

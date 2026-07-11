@@ -57,7 +57,7 @@ public partial class NoteManager : MonoBehaviour
 
         _tapLineGroup = new RenderGroup<LineRenderData>(_matLine, lineMesh, 0);
         _eachLineGroup = new RenderGroup<LineRenderData>(_matLine, lineMesh, 1);
-        _slideGroup = new RenderGroup<SimpleRenderData>(_matSimple, QuadMesh, 2);
+        _slideGroup = new RenderGroup<SimpleRenderData>(_matSimple, QuadMesh, 2, 262144); //slide真的会爆，神了
         _notesGroup = new RenderGroup<NotesRenderData>(_matNotes, QuadMesh, 3);
         _thBorderGroup = new RenderGroup<MaskRenderData>(_matMask, QuadMesh, 4);
         _touchGroup = new RenderGroup<SimpleRenderData>(_matSimple, QuadMesh, 5);

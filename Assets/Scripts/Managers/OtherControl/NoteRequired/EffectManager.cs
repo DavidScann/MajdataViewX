@@ -291,7 +291,7 @@ public class EffectManager : MonoBehaviour
         float2 worldPos;
         if (pos is < 0 or > EFFECT_COUNT) return;
         else if (pos < BUTTON_COUNT) worldPos = MajPos.GetBtnPos(pos);
-        else worldPos = MajPos.GetBtnPos(pos - 8);
+        else worldPos = MajPos.GetAreaPos((SensorType)(pos - 8));
         fireworkEffect.transform.position = new float3(worldPos, 0);
         fireworkAnimator.SetTrigger(FireHash);
     }
