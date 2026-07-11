@@ -476,18 +476,19 @@ public class DataLoader : MonoBehaviour
         //each handle
         var eachNotes = timing.Notes.ToList().FindAll(o =>
             o.Type != SimaiNoteType.Touch && o.Type != SimaiNoteType.TouchHold);
-        if (eachNotes.Count > 1) //有多个非touch note
+        var eachNoteTime = (float)timing.Timing;
+        var eachNoteSpd = noteSpeed * timing.HSpeed;
+        for (var i = 0; i < eachNotes.Count - 1; i++)
         {
-            var startPos = eachNotes[0].StartPosition;
-            var endPos = eachNotes[1].StartPosition;
-            endPos = endPos - startPos;
-            if (endPos == 0) return;
+            var startPos = eachNotes[i].StartPosition;
+            var endPos = eachNotes[i + 1].StartPosition - startPos;
+            if (endPos == 0) continue;
 
             var line = Instantiate(eachLine, notes.transform);
             var lineDrop = line.GetComponent<EachLineDrop>();
 
-            lineDrop.time = (float)timing.Timing;
-            lineDrop.speed = noteSpeed * timing.HSpeed;
+            lineDrop.time = eachNoteTime;
+            lineDrop.speed = eachNoteSpd;
 
             endPos = endPos < 0 ? endPos + 8 : endPos;
             endPos = endPos > 8 ? endPos - 8 : endPos;
@@ -495,9 +496,8 @@ public class DataLoader : MonoBehaviour
 
             if (endPos > 4)
             {
-                startPos = eachNotes[1].StartPosition;
-                endPos = eachNotes[0].StartPosition;
-                endPos = endPos - startPos;
+                startPos = eachNotes[i + 1].StartPosition;
+                endPos = eachNotes[i].StartPosition - startPos;
                 endPos = endPos < 0 ? endPos + 8 : endPos;
                 endPos = endPos > 8 ? endPos - 8 : endPos;
                 endPos++;

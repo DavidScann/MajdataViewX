@@ -52,7 +52,9 @@ public class EachLineDrop : MonoBehaviour
         transform.rotation = Quaternion.Euler(0, 0, -45f * (startPosition - 1));
 
         if (fakeDestScale > 0.3f)
+        {
             spriteRenderer.forceRenderingOff = false;
+        }
         if (fakeDistance < 1.225f)
         {
             transform.localScale = new Vector3(1.225f / 4.8f, 1.225f / 4.8f, 1f);
