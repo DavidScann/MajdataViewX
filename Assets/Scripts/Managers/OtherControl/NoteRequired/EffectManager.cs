@@ -159,10 +159,10 @@ public class EffectManager : MonoBehaviour
                 break;
             case JudgeGrade.LateGreat3rd:
             case JudgeGrade.LateGreat2nd:
-            case JudgeGrade.LateGreat:
+            case JudgeGrade.LateGreat1st:
             case JudgeGrade.FastGreat3rd:
             case JudgeGrade.FastGreat2nd:
-            case JudgeGrade.FastGreat:
+            case JudgeGrade.FastGreat1st:
                 judgeRenderers[pos].sprite = _noteSkinManager.JudgeText[2];
                 if (isBreak)
                 {
@@ -191,7 +191,8 @@ public class EffectManager : MonoBehaviour
                     tapAnimators[pos].SetTrigger(PerfectHash);
                 }
                 break;
-            case JudgeGrade.Perfect:
+            case JudgeGrade.LateCritical:
+            case JudgeGrade.FastCritical:
                 judgeRenderers[pos].sprite = _noteSkinManager.JudgeText[4];
                 if (isBreak)
                 {
@@ -210,19 +211,19 @@ public class EffectManager : MonoBehaviour
         }
 
         // Judge Anim
-        if (isBreak && judge == JudgeGrade.Perfect)
+        if (isBreak && (judge is JudgeGrade.LateCritical or JudgeGrade.FastCritical))
             judgeAnimators[pos].SetTrigger(BPerfectHash);
         else
             judgeAnimators[pos].SetTrigger(PerfectHash);
 
         // Fast / Late
-        if (judge is JudgeGrade.Miss or JudgeGrade.Perfect)
+        if (judge is JudgeGrade.Miss or JudgeGrade.LateCritical or JudgeGrade.FastCritical)
         {
             fastLateRenderers[pos].sprite = null;
         }
         else
         {
-            var isFast = (int)judge > 7;
+            var isFast = judge <= JudgeGrade.FastCritical;
             if (isFast)
                 fastLateRenderers[pos].sprite = _noteSkinManager.FastText;
             else
@@ -242,10 +243,10 @@ public class EffectManager : MonoBehaviour
                 break;
             case JudgeGrade.LateGreat3rd:
             case JudgeGrade.LateGreat2nd:
-            case JudgeGrade.LateGreat:
+            case JudgeGrade.LateGreat1st:
             case JudgeGrade.FastGreat3rd:
             case JudgeGrade.FastGreat2nd:
-            case JudgeGrade.FastGreat:
+            case JudgeGrade.FastGreat1st:
                 judgeRenderers[pos].sprite = _noteSkinManager.JudgeText[2];
                 touchAnimators[pos].SetTrigger(GreatHash);
                 break;
@@ -256,7 +257,8 @@ public class EffectManager : MonoBehaviour
                 judgeRenderers[pos].sprite = _noteSkinManager.JudgeText[3];
                 touchAnimators[pos].SetTrigger(PerfectHash);
                 break;
-            case JudgeGrade.Perfect:
+            case JudgeGrade.LateCritical:
+            case JudgeGrade.FastCritical:
                 judgeRenderers[pos].sprite = _noteSkinManager.JudgeText[4];
                 touchAnimators[pos].SetTrigger(PerfectHash);
                 break;
@@ -266,19 +268,19 @@ public class EffectManager : MonoBehaviour
         }
 
         // Judge Anim
-        if (isBreak && judge == JudgeGrade.Perfect)
+        if (isBreak && (judge is JudgeGrade.LateCritical or JudgeGrade.FastCritical))
             judgeAnimators[pos].SetTrigger(BPerfectHash);
         else
             judgeAnimators[pos].SetTrigger(PerfectHash);
 
         // Fast / Late
-        if (judge is JudgeGrade.Miss or JudgeGrade.Perfect)
+        if (judge is JudgeGrade.Miss or JudgeGrade.LateCritical or JudgeGrade.FastCritical)
         {
             fastLateRenderers[pos].sprite = null;
         }
         else
         {
-            var isFast = (int)judge > 7;
+            var isFast = judge <= JudgeGrade.FastCritical;
             if (isFast)
                 fastLateRenderers[pos].sprite = _noteSkinManager.FastText;
             else

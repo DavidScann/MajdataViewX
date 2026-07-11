@@ -1,18 +1,19 @@
 public enum JudgeGrade
 {
-    Miss,
-    LateGood,
-    LateGreat3rd,
-    LateGreat2nd,
-    LateGreat,
-    LatePerfect3rd,
-    LatePerfect2nd,
-    Perfect,
-    FastPerfect2nd,
-    FastPerfect3rd,
-    FastGreat,
-    FastGreat2nd,
-    FastGreat3rd,
+    TooFast,
     FastGood,
-    TooFast
+    FastGreat3rd,
+    FastGreat2nd,
+    FastGreat1st,
+    FastPerfect3rd,
+    FastPerfect2nd,
+    FastCritical,
+    LateCritical,
+    LatePerfect2nd,
+    LatePerfect3rd,
+    LateGreat1st,
+    LateGreat2nd,
+    LateGreat3rd,
+    LateGood,
+    Miss
 }

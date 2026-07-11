@@ -216,7 +216,7 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
 
                 if (slide.LastFor - timing <= 0)
                 {
-                    slide.judgeGrade = JudgeGrade.Perfect;
+                    slide.judgeGrade = JudgeGrade.LateCritical;
                     slide.isJudged = true;
                     CompleteSlide(ref slide);
                 }
@@ -233,7 +233,8 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
 
                 if (slide.LastFor - timing <= 0)
                 {
-                    slide.judgeGrade = (JudgeGrade)new Random(114514).NextInt(1, 14);
+                    // TODO:这谁写的random？
+                    slide.judgeGrade = (JudgeGrade)(new Random(114514).NextInt((int)JudgeGrade.FastGood, (int)JudgeGrade.Miss));
                     slide.isJudged = true;
                     CompleteSlide(ref slide);
                 }
@@ -273,14 +274,15 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
             var judgePos = TimeData.GetPositionAtTime(slide.time + slide.LastFor * (1f - slide.Const));
             stayTime = endPos - judgePos;
         }
-        var forceJudge = timing - slide.LastFor - stayTime;
+        // 星星 miss 的时间点在结束后 +150ms
+        var forceJudge = timing - slide.LastFor - 0.15f;
 
         bool timeout = slide.isMine ? (remaining <= -MajCtx.FRAME_LENGTH_SEC) : (forceJudge >= 0);
 
         if (timeout)
         {
             slide.judgeGrade = slide.isMine
-                ? JudgeGrade.Perfect
+                ? JudgeGrade.LateCritical
                 : (GetRemainingAreaCount(slide) <= 1 ? JudgeGrade.LateGood : JudgeGrade.Miss);
             slide.isJudged = true;
             CompleteSlide(ref slide);
@@ -420,39 +422,28 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
 
         var triggerTime = slide.usingSV ? TimeData.FakeNoteTime : TimeData.NoteTime;
 
-        const float totalInterval = 1.2f; // 秒
-        const float nPInterval = 0.4666667f; // Perfect基础区间
+        const float totalInterval = 36f / 60; // 秒
+        const float nPInterval = 14f / 60; // Perfect基础区间
+        const float gr1Interval = 21f / 60;
+        const float gr2Interval = 25f / 60;
+        const float gr3Interval = 29f / 60;
 
-        float extInterval = math.min(stayTime / 4f, 0.733333f);           // Perfect额外区间
-        float pInterval = math.min(nPInterval + extInterval, totalInterval);// Perfect总区间
-        var ext = math.max(extInterval - 0.4f, 0f);
-        float grInterval = math.max(0.4f - extInterval, 0f);        // Great总区间
-        float gdInterval = math.max(0.3333334f - ext, 0f); // Good总区间
+        var extInterval = stayTime / 4f;           // Perfect额外区间
+        var pInterval = math.min(nPInterval + extInterval, totalInterval);// Perfect总区间
 
         var diff = judgeTiming - triggerTime;
-        bool isFast = diff > 0;
+        var isFast = diff > 0;
         diff = math.abs(diff);
 
-        var p = pInterval / 2f;
-        var gr = grInterval / 2f;
-        var gd = gdInterval / 2f;
-
-        if (gr == 0f)
-        {
-            if (diff >= p)
-                return isFast ? JudgeGrade.FastGood : JudgeGrade.LateGood;
-            else
-                return JudgeGrade.Perfect;
-        }
-        else
-        {
-            if (diff >= gr + p || diff >= totalInterval / 2f)
-                return isFast ? JudgeGrade.FastGood : JudgeGrade.LateGood;
-            else if (diff >= p)
-                return isFast ? JudgeGrade.FastGreat : JudgeGrade.LateGreat;
-            else
-                return JudgeGrade.Perfect;
-        }
+        if (diff <= pInterval)
+            return isFast? JudgeGrade.FastCritical : JudgeGrade.LateCritical;
+        if (diff <= gr1Interval)
+            return isFast? JudgeGrade.FastGreat1st : JudgeGrade.LateGreat1st;
+        if (diff <= gr2Interval)
+            return isFast? JudgeGrade.FastGreat2nd : JudgeGrade.LateGreat2nd;
+        if (diff <= gr3Interval)
+            return isFast? JudgeGrade.FastGreat3rd : JudgeGrade.LateGreat3rd;
+        return isFast? JudgeGrade.FastGood : JudgeGrade.LateGood;
     }
 
     private void CompleteSlide(ref SlideData slide)
@@ -497,10 +488,10 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
         };
         var off = slide.judgeGrade switch
         {
-            JudgeGrade.Perfect or JudgeGrade.LatePerfect2nd or JudgeGrade.FastPerfect2nd or JudgeGrade.LatePerfect3rd or JudgeGrade.FastPerfect3rd => 0,
-            JudgeGrade.FastGreat or JudgeGrade.FastGreat2nd or JudgeGrade.FastGreat3rd => 6,
+            >= JudgeGrade.FastPerfect3rd and <= JudgeGrade.LatePerfect3rd => 0,
+            JudgeGrade.FastGreat1st or JudgeGrade.FastGreat2nd or JudgeGrade.FastGreat3rd => 6,
             JudgeGrade.FastGood => 12,
-            JudgeGrade.LateGreat or JudgeGrade.LateGreat2nd or JudgeGrade.LateGreat3rd => 18,
+            JudgeGrade.LateGreat1st or JudgeGrade.LateGreat2nd or JudgeGrade.LateGreat3rd => 18,
             JudgeGrade.LateGood => 24,
             _ => 30,
         };

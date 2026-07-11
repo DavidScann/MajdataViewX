@@ -173,7 +173,7 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
             case AutoPlayMode.Enable:
                 if (!th.isHeadJudged)
                 {
-                    th.judgeGrade = th.isMine ? JudgeGrade.Miss : JudgeGrade.Perfect;
+                    th.judgeGrade = th.isMine ? JudgeGrade.Miss : JudgeGrade.LateCritical;
                     th.isHeadJudged = true;
                     th.isHolding = true;
                     th.headDiff = 0;
@@ -191,13 +191,14 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
             case AutoPlayMode.Random:
                 if (!th.isHeadJudged)
                 {
-                    var gradeIndex = new Random(114514).NextInt(1, 14);
+                    // TODO:这谁写的random？
+                    var grade = (JudgeGrade)(new Random(114514).NextInt((int)JudgeGrade.FastGood, (int)JudgeGrade.Miss));
                     th.judgeGrade = th.isMine
-                        ? (gradeIndex > 4 ? JudgeGrade.Miss : JudgeGrade.Perfect)
-                        : (JudgeGrade)gradeIndex;
+                        ? (grade < JudgeGrade.FastPerfect3rd ? JudgeGrade.Miss : JudgeGrade.LateCritical)
+                        : grade;
                     th.isHeadJudged = true;
                     th.isHolding = true;
-                    th.headDiff = gradeIndex > 7 ? 11.4514f : -11.4514f;
+                    th.headDiff = grade >= JudgeGrade.LateCritical ? 11.4514f : -11.4514f;
                 }
                 if (th.isHeadJudged)
                 {
@@ -231,7 +232,7 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
         {
             if (th.isMine && timing >= 0.016667f)
             {
-                th.judgeGrade = JudgeGrade.Perfect;
+                th.judgeGrade = JudgeGrade.LateCritical;
                 th.isHeadJudged = true;
                 return;
             }
@@ -256,13 +257,17 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
             th.SensorLastState = _on;
 
             if (!clicked) return;
-            var diffMSec = math.abs(timing * 1000);
-            if (diffMSec > 150f && timing < 0) return;
+            var diffMSec = timing * 1000;
+            if (diffMSec < -150) return;
             if (!InputData.CanJudgeSensor(th.sensor, th.sensorOrderIndex)) return;
 
-            th.judgeGrade = diffMSec <= 150 ? JudgeGrade.Perfect
-                : diffMSec <= 200 ? JudgeGrade.LatePerfect2nd
-                : diffMSec <= 250 ? JudgeGrade.LateGreat
+            th.judgeGrade = diffMSec < 0 ? JudgeGrade.FastCritical
+                : diffMSec <= 150 ? JudgeGrade.LateCritical
+                : diffMSec <= 175 ? JudgeGrade.LatePerfect2nd
+                : diffMSec <= 200 ? JudgeGrade.LatePerfect3rd
+                : diffMSec <= 216.6667f ? JudgeGrade.LateGreat1st
+                : diffMSec <= 233.3333f ? JudgeGrade.LateGreat2nd
+                : diffMSec <= 250 ? JudgeGrade.LateGreat3rd
                 : JudgeGrade.LateGood;
             th.isHeadJudged = true;
             th.headDiff = timing;

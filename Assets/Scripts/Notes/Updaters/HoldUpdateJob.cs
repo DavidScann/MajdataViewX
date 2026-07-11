@@ -221,7 +221,7 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
             case AutoPlayMode.Enable:
                 if (!hold.isHeadJudged)
                 {
-                    hold.judgeGrade = hold.isMine ? JudgeGrade.Miss : JudgeGrade.Perfect;
+                    hold.judgeGrade = hold.isMine ? JudgeGrade.Miss : JudgeGrade.LateCritical;
                     hold.isHeadJudged = true;
                     hold.isHolding = true;
                     hold.headDiff = 0;
@@ -242,13 +242,14 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
             case AutoPlayMode.Random:
                 if (!hold.isHeadJudged)
                 {
-                    var gradeIndex = new Random(114514).NextInt(1, 14);
+                    // TODO:这谁写的random？
+                    var grade = (JudgeGrade)(new Random(114514).NextInt((int)JudgeGrade.FastGood, (int)JudgeGrade.Miss));
                     hold.judgeGrade = hold.isMine
-                        ? (gradeIndex > 4 ? JudgeGrade.Miss : JudgeGrade.Perfect)
-                        : (JudgeGrade)gradeIndex;
+                        ? (grade < JudgeGrade.FastPerfect3rd ? JudgeGrade.Miss : JudgeGrade.LateCritical)
+                        : grade;
                     hold.isHeadJudged = true;
                     hold.isHolding = true;
-                    hold.headDiff = gradeIndex > 7 ? 11.4514f : -11.4514f;
+                    hold.headDiff = grade >= JudgeGrade.LateCritical ? 11.4514f : -11.4514f;
                     NoteHelper.PlayHoldSound(SfxRequests,
                         hold.judgeGrade,
                         hold.isBreak,
@@ -291,7 +292,7 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
         {
             if (hold.isMine && timing >= 0.016667f)
             {
-                hold.judgeGrade = JudgeGrade.Perfect;
+                hold.judgeGrade = JudgeGrade.LateCritical;
                 hold.isHeadJudged = true;
                 return;
             }
