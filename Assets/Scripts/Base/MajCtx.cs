@@ -28,6 +28,4 @@ public static class MajCtx
     public const int SENSOR_COUNT = 33;
 
     public const float DJAUTO_HAND_RADIUS = 0.39f;
-
-    public static Mesh QuadMesh = Resources.GetBuiltinResource<Mesh>("Quad.fbx");
 }

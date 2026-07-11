@@ -1,4 +1,4 @@
-﻿#pragma warning disable CS8500 // 这会获取托管类型的地址、获取其大小或声明指向它的指针
+#pragma warning disable CS8500 // 这会获取托管类型的地址、获取其大小或声明指向它的指针
 #region
 
 using System;
@@ -33,12 +33,12 @@ public class TimeProvider : MonoBehaviour
     private static NativeList<(float time, float sVeloc)> SVList = new(20, Allocator.Persistent);
     private static NativeArray<(float k, float b)> SVFuncArgs;
 
-    private float startRealtime; //the beginning of the program is 0
+    private double startRealtime; //the beginning of the program is 0
     private float startAt; //the beginning of the audio is 0
     private float offset;
     private float speed;
     //for pause and resume
-    private float accumulated;
+    private double accumulated;
 
 
     private string mmfAudioTimePath => Path.Combine(MajEnv.MajBase, "majdata_time.dat");
@@ -76,12 +76,32 @@ public class TimeProvider : MonoBehaviour
 
         if (IsRecord)
         {
-            AudioTime = startAt + accumulated + (Time.time - startRealtime);
+            AudioTime = (float)(startAt + accumulated + (Time.timeAsDouble - startRealtime));
             NoteTime = AudioTime - offset;
         }
         else
         {
-            AudioTime = startAt + accumulated + (Time.realtimeSinceStartup - startRealtime) * speed;
+            if (MajCtx._audioManager != null && MajCtx._audioManager.IsTrackPlaying)
+            {
+                double trackOffset = AudioManager.TRACK_ANSWER_PLAYBACK_OFFSET_SEC + MajCtx._audioManager.GlobalAudioOffset;
+                double targetAudioTime = MajCtx._audioManager.TrackCurrentSec + trackOffset;
+                
+                double currentExpected = startAt + accumulated + (Time.realtimeSinceStartupAsDouble - startRealtime) * speed;
+                double diff = targetAudioTime - currentExpected;
+                
+                // If the difference is large (e.g. paused/resumed or huge lag), snap it.
+                if (System.Math.Abs(diff) > 0.1)
+                {
+                    accumulated += diff;
+                }
+                else
+                {
+                    // Smoothly pull the system clock towards the audio hardware clock to fix "notes getting faster"
+                    accumulated += diff * Time.deltaTime * 5.0;
+                }
+            }
+
+            AudioTime = (float)(startAt + accumulated + (Time.realtimeSinceStartupAsDouble - startRealtime) * speed);
             NoteTime = AudioTime - offset;
         }
 
@@ -150,14 +170,14 @@ public class TimeProvider : MonoBehaviour
         {
             case PlaybackMode.Normal:
                 {
-                    startRealtime = Time.realtimeSinceStartup;
+                    startRealtime = Time.realtimeSinceStartupAsDouble;
                     speed = _speed;
                     Time.captureFramerate = 0;
                 }
                 break;
             case PlaybackMode.IncludeOp:
                 {
-                    startRealtime = Time.realtimeSinceStartup;
+                    startRealtime = Time.realtimeSinceStartupAsDouble;
                     startAt -= SONG_DETAIL_OFFSET;
                     speed = _speed;
                     Time.captureFramerate = 0;
@@ -166,7 +186,7 @@ public class TimeProvider : MonoBehaviour
             case PlaybackMode.Record:
                 {
                     IsRecord = true;
-                    startRealtime = Time.time;
+                    startRealtime = Time.timeAsDouble;
                     startAt -= SONG_DETAIL_OFFSET;
                     Time.timeScale = _speed;
                     Time.captureFramerate = fps;
@@ -183,7 +203,7 @@ public class TimeProvider : MonoBehaviour
     {
         if (!IsStart) return;
 
-        var now = IsRecord ? Time.time : Time.realtimeSinceStartup;
+        var now = IsRecord ? Time.timeAsDouble : Time.realtimeSinceStartupAsDouble;
         accumulated += IsRecord
             ? now - startRealtime
             : (now - startRealtime) * speed;
@@ -196,7 +216,7 @@ public class TimeProvider : MonoBehaviour
         if (_speed != null) speed = _speed.Value;
         if (IsStart) return;
 
-        startRealtime = IsRecord ? Time.time : Time.realtimeSinceStartup;
+        startRealtime = IsRecord ? Time.timeAsDouble : Time.realtimeSinceStartupAsDouble;
 
         IsStart = true;
     }

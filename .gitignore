@@ -56,3 +56,5 @@ majdata_time.dat
 
 # Plugins
 Assets/Plugins/UniTask/
+/Assets/Editor/CompilationNotifier.cs
+/Assets/Editor/CompilationNotifier.cs.meta

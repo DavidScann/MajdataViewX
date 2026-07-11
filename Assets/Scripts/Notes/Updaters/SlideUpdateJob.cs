@@ -206,6 +206,13 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
         {
             case AutoPlayMode.Enable:
                 slide.eaten = math.max((int)(slide.process * slide.slideArrowsCount - 2), 0);
+                if (!slide.isSoundPlayed)
+                {
+                    NoteHelper.PlaySlideSound(SfxRequests,
+                        slide.isBreak
+                    );
+                    slide.isSoundPlayed = true;
+                }
 
                 if (slide.LastFor - timing <= 0)
                 {
@@ -216,6 +223,13 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
                 break;
             case AutoPlayMode.Random:
                 slide.eaten = math.max((int)(slide.process * slide.slideArrowsCount - 2), 0);
+                if (!slide.isSoundPlayed)
+                {
+                    NoteHelper.PlaySlideSound(SfxRequests,
+                        slide.isBreak
+                    );
+                    slide.isSoundPlayed = true;
+                }
 
                 if (slide.LastFor - timing <= 0)
                 {

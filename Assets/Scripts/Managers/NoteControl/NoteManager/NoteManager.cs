@@ -48,6 +48,7 @@ public partial class NoteManager : MonoBehaviour
     void Start()
     {
         var lineMesh = MeshGenerator.CreateRingMesh(32, 0.5f, 0.3f);
+        var _quad = Resources.GetBuiltinResource<Mesh>("Quad.fbx");
 
         //REMEMBER TO FORCE INCLUDE
         _matLine = new Material(Shader.Find("Custom/NoteLine"));
@@ -57,10 +58,10 @@ public partial class NoteManager : MonoBehaviour
 
         _tapLineGroup = new RenderGroup<LineRenderData>(_matLine, lineMesh, 0);
         _eachLineGroup = new RenderGroup<LineRenderData>(_matLine, lineMesh, 1);
-        _slideGroup = new RenderGroup<SimpleRenderData>(_matSimple, QuadMesh, 2, 262144); //slide真的会爆，神了
-        _notesGroup = new RenderGroup<NotesRenderData>(_matNotes, QuadMesh, 3);
-        _thBorderGroup = new RenderGroup<MaskRenderData>(_matMask, QuadMesh, 4);
-        _touchGroup = new RenderGroup<SimpleRenderData>(_matSimple, QuadMesh, 5);
+        _slideGroup = new RenderGroup<SimpleRenderData>(_matSimple, _quad, 2, 262144); //slide真的会爆，神了
+        _notesGroup = new RenderGroup<NotesRenderData>(_matNotes, _quad, 3);
+        _thBorderGroup = new RenderGroup<MaskRenderData>(_matMask, _quad, 4);
+        _touchGroup = new RenderGroup<SimpleRenderData>(_matSimple, _quad, 5);
 
         _noteUvsBuffer = new(
             GraphicsBuffer.Target.Structured,

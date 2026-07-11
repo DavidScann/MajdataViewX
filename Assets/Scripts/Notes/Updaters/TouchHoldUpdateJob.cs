@@ -72,7 +72,7 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
         else if (-timing <= wholeDuration && -timing > moveDuration)
         {
             var fadeT = (-timing - moveDuration) / displayDuration;
-            th.fanAlpha = math.saturate(fadeT);
+            th.fanAlpha = math.saturate(1f - fadeT);
         }
         else if (-timing <= moveDuration)
         {
@@ -108,7 +108,7 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
         }
 
         var centerPos = th.centerPos;
-        var color = new float4(th.fanAlpha, th.fanAlpha, th.fanAlpha, 1);
+        var color = new float4(1, 1, 1, th.fanAlpha);
 
         var radius = 0.226f + fanDist;
         var c = math.SQRT2 / 2f;
@@ -211,8 +211,7 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
                 break;
             case AutoPlayMode.DJAutoButton:
             case AutoPlayMode.DJAutoSensor:
-                var timingForHold = TimeData.NoteTime - th.time;
-                if (!th.isHeadJudged || math.max(th.LastFor - timingForHold, 0) > 0)
+                if (!th.isHeadJudged || math.max(th.LastFor - timing, 0) > 0)
                 {
                     InputData.DJAutoAddGroupCoverage(touchHoldGroupCoverResults[th.coverageId]);
                 }

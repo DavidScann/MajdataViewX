@@ -225,6 +225,13 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
                     hold.isHeadJudged = true;
                     hold.isHolding = true;
                     hold.headDiff = 0;
+                    NoteHelper.PlayHoldSound(SfxRequests,
+                        hold.judgeGrade,
+                        hold.isBreak,
+                        hold.isEx,
+                        hold.isMine,
+                        hold.headDiff
+                    );
                 }
                 if (hold.isHeadJudged && math.max(hold.LastFor - timing, 0) <= 0)
                 {
@@ -242,6 +249,13 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
                     hold.isHeadJudged = true;
                     hold.isHolding = true;
                     hold.headDiff = gradeIndex > 7 ? 11.4514f : -11.4514f;
+                    NoteHelper.PlayHoldSound(SfxRequests,
+                        hold.judgeGrade,
+                        hold.isBreak,
+                        hold.isEx,
+                        hold.isMine,
+                        hold.headDiff
+                    );
                 }
                 if (hold.isHeadJudged && hold.LastFor - timing <= 0)
                 {
@@ -250,15 +264,15 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
                 }
                 break;
             case AutoPlayMode.DJAutoButton:
-                if (!hold.isHeadJudged)
+                if (!hold.isHeadJudged || math.max(hold.LastFor - timing, 0) > 0)
                 {
-                    InputData.DJAutoSetButtonOn(hold.Key, (int)(hold.LastFor / MajCtx.FRAME_LENGTH_SEC));
+                    InputData.DJAutoSetButtonOn(hold.Key);
                 }
                 break;
             case AutoPlayMode.DJAutoSensor:
-                if (!hold.isHeadJudged)
+                if (!hold.isHeadJudged || math.max(hold.LastFor - timing, 0) > 0)
                 {
-                    InputData.DJAutoSetSensorOn(hold.Key, (int)(hold.LastFor / MajCtx.FRAME_LENGTH_SEC));
+                    InputData.DJAutoSetSensorOn(hold.Key);
                 }
                 break;
         }

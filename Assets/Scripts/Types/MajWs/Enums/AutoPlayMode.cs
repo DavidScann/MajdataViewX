@@ -3,7 +3,6 @@
     Enable,
     DJAutoButton,
     DJAutoSensor,
-    MuriDX,
     Random,
     Disable
 }

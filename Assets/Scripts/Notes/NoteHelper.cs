@@ -19,7 +19,8 @@ public static unsafe class NoteHelper
         AutoPlayModeSS.Data;
 
     public static bool IsSimulated => AutoPlayMode is
-        AutoPlayMode.DJAutoSensor or AutoPlayMode.DJAutoButton or AutoPlayMode.MuriDX or AutoPlayMode.Disable;
+        AutoPlayMode.DJAutoSensor or AutoPlayMode.DJAutoButton or AutoPlayMode.Disable;
+    // Force burst recompile
 
     // ---- Judgment constants ----
     public const float TAP_JUDGE_SEG_1ST_PERFECT_MSEC = 1 * FRAME_LENGTH_MSEC;
@@ -303,7 +304,8 @@ public static unsafe class NoteHelper
         int key, JudgeGrade judge, bool isBreak, bool isHanabi)
     {
         JudgeEffectRequests[key].Effect = EffectType.Touch;
-        if (isHanabi) JudgeEffectRequests[key].Effect |= EffectType.Firework;
+        if (isHanabi && judge is not JudgeGrade.Miss or JudgeGrade.TooFast)
+            JudgeEffectRequests[key].Effect |= EffectType.Firework;
         JudgeEffectRequests[key].IsBreak = isBreak;
         JudgeEffectRequests[key].JudgeGrade = judge;
     }

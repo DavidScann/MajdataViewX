@@ -1,4 +1,4 @@
-﻿#region
+#region
 
 using System;
 using System.Collections;
@@ -28,6 +28,8 @@ public class AudioManager
     [CanBeNull] private float[] TrackSampleData;
     private float TrackSampleVolume;
     public bool IsTrackLoaded => TrackSample != null && TrackSampleData != null;
+    public bool IsTrackPlaying => TrackSample != null && TrackSample.IsPlaying;
+    public double TrackCurrentSec => TrackSample != null ? TrackSample.CurrentSec : 0;
 
     //answer SFX
     List<AnswerTimingPoint> answerTimingPoints = new();
@@ -53,7 +55,7 @@ public class AudioManager
     const int SAMPLERATE = 44100;
     const int CHANNELS = 2;
 
-    const float TRACK_ANSWER_PLAYBACK_OFFSET_SEC = (16.66666f * 1) / 1000;
+    public const float TRACK_ANSWER_PLAYBACK_OFFSET_SEC = (16.66666f * 1) / 1000;
 
     public const int TAP_PERFECT = 0;
     public const int TAP_GREAT = 1;
@@ -194,6 +196,12 @@ public class AudioManager
         for (var i = 0; i < SFX_COUNT; i++)
         {
             var isRequested = _sfxPtr[i];
+            
+            if (i != TOUCHHOLD && isRequested)
+            {
+                _sfxPtr[i] = false;
+            }
+
             switch (i)
             {
                 case TAP_PERFECT:
@@ -262,12 +270,6 @@ public class AudioManager
                     if (isRequested) NoteSfxs[ALL_PERFECT].PlayOneShot();
                     break;
             }
-        }
-        //clear
-        for (var i = 0; i < SFX_COUNT; i++)
-        {
-            if (i != TOUCHHOLD) //manual control
-                _sfxPtr[i] = false;
         }
     }
 

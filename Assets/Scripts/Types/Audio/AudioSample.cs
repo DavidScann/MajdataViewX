@@ -1,4 +1,4 @@
-﻿#region
+#region
 
 using System;
 using System.IO;
@@ -88,13 +88,13 @@ public class AudioSample : IDisposable
 
     public bool IsPlaying => State == PlaybackState.Playing;
 
-    public AudioSample(string file, AudioMode mode)
+    public AudioSample(string file, AudioMode mode, int max = 64)
     {
         Mode = mode;
 
         if (mode == AudioMode.Stream)
         {
-            _handle = Bass.CreateStream(file);
+            _handle = Bass.CreateStream(file, 0, 0, BassFlags.Prescan);
             Decode = _handle;
 
             _length = Bass.ChannelBytes2Seconds(
@@ -103,7 +103,7 @@ public class AudioSample : IDisposable
         }
         else
         {
-            _handle = Bass.SampleLoad(file, 0, 0, 1, BassFlags.SampleOverrideLongestPlaying);
+            _handle = Bass.SampleLoad(file, 0, 0, max, BassFlags.SampleOverrideLongestPlaying);
             Decode = Bass.SampleGetChannel(_handle);
         }
         _baseFrequency =

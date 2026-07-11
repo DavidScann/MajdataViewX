@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 
 #region
 
@@ -315,8 +315,8 @@ public struct EffectData
 [Flags]
 public enum EffectType
 {
-    None,
-    Tap,
-    Touch,
-    Firework
+    None = 0,
+    Tap = 1 << 0,
+    Touch = 1 << 1,
+    Firework = 1 << 2
 }
