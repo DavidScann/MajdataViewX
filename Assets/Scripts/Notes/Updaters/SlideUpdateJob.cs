@@ -349,7 +349,6 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
             
             var first = queue[cur];
             var hasSecond = cur + 1 < queueCount;
-            var isSecondLast = hasSecond && cur + 2 >= queueCount;
             
             // 先看当前第一个区
             if (currentOn <= SensorType.Invalid)  // 第一个区还没按
@@ -360,14 +359,14 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
                     changed = true;
                     if (!hasSecond) cur++;  // 最后一个区不需要松手
                 }
-                else if (first.SensorB != SensorType.Invalid && MajBurst.InputData.GetSensorState(first.SensorB).Status)
+                else if (first.SensorB >= SensorType.A1 && MajBurst.InputData.GetSensorState(first.SensorB).Status)
                 {
                     currentOn = first.SensorB;
                     changed = true;
                     if (!hasSecond) cur++;  // 最后一个区不需要松手
                 }
             }
-            else // 第一个区已经按过了
+            else // 第一个区已经按下了
             {
                 if (!MajBurst.InputData.GetSensorState(currentOn).Status)
                 {
@@ -377,10 +376,12 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
                 }
             }
             
-            // 然后看当前第二个区
-            if (!changed && hasSecond && cur != slide.unskippable1 && cur != slide.unskippable2)
+            // 然后看当前第二个区，注意当第一个区已经按下时一定可以跳区
+            var skippable = (cur != slide.unskippable1 && cur != slide.unskippable2 || currentOn >= SensorType.A1);
+            if (!changed && hasSecond && skippable)
             {
                 var second = queue[cur + 1];
+                var isSecondLast = cur + 2 >= queueCount;
                 if (MajBurst.InputData.GetSensorState(second.SensorA).Status)
                 {
                     currentOn = second.SensorA;
@@ -388,7 +389,7 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
                     cur++;
                     if (isSecondLast) cur++;  // 最后一个区不需要松手
                 }
-                else if (second.SensorB != SensorType.Invalid && MajBurst.InputData.GetSensorState(second.SensorB).Status)
+                else if (second.SensorB >= SensorType.A1 && MajBurst.InputData.GetSensorState(second.SensorB).Status)
                 {
                     currentOn = second.SensorB;
                     changed = true;
