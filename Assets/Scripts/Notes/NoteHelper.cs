@@ -83,16 +83,16 @@ public static unsafe class NoteHelper
         var diffMSec = math.abs(diffSec * 1000);
         var result = diffMSec switch
         {
-            <= TAP_JUDGE_SEG_1ST_PERFECT_MSEC => JudgeGrade.Perfect,
+            <= TAP_JUDGE_SEG_1ST_PERFECT_MSEC => isFast ? JudgeGrade.FastCritical : JudgeGrade.LateCritical,
             <= TAP_JUDGE_SEG_2ND_PERFECT_MSEC => isFast ? JudgeGrade.FastPerfect2nd : JudgeGrade.LatePerfect2nd,
             <= TAP_JUDGE_SEG_3RD_PERFECT_MSEC => isFast ? JudgeGrade.FastPerfect3rd : JudgeGrade.LatePerfect3rd,
-            <= TAP_JUDGE_SEG_1ST_GREAT_MSEC => isFast ? JudgeGrade.FastGreat : JudgeGrade.LateGreat,
+            <= TAP_JUDGE_SEG_1ST_GREAT_MSEC => isFast ? JudgeGrade.FastGreat1st : JudgeGrade.LateGreat1st,
             <= TAP_JUDGE_SEG_2ND_GREAT_MSEC => isFast ? JudgeGrade.FastGreat2nd : JudgeGrade.LateGreat2nd,
             <= TAP_JUDGE_SEG_3RD_GREAT_MSEC => isFast ? JudgeGrade.FastGreat3rd : JudgeGrade.LateGreat3rd,
             _ => isFast ? JudgeGrade.FastGood : JudgeGrade.LateGood
         };
 
-        if (isEx) result = JudgeGrade.Perfect;
+        if (isEx) result = isFast ? JudgeGrade.FastCritical : JudgeGrade.LateCritical;
         return result;
     }
 
@@ -108,33 +108,71 @@ public static unsafe class NoteHelper
     {
         if (realityHT <= 0f) return head;
 
-        var j = (int)head;
-        var isLate = j < 7; // Miss/Late side
-        var good = isLate ? JudgeGrade.LateGood : JudgeGrade.FastGood;
-        var great = isLate ? JudgeGrade.LateGreat : JudgeGrade.FastGreat;
-        var perfect2 = isLate ? JudgeGrade.LatePerfect2nd : JudgeGrade.FastPerfect2nd;
-
+        // 与官机不同，这里不会向上修正头判
         if (percent >= 1f)
         {
-            if (head == JudgeGrade.Miss) return JudgeGrade.LateGood;
-            if (math.abs(j - 7) == 6) return great; // head was a Good -> upgrade to Great
-            return head;
+            switch (head)   // 按满的情况下 good->great, miss->good
+            {
+                case JudgeGrade.TooFast:
+                    return JudgeGrade.FastGood;
+                case JudgeGrade.Miss:
+                    return JudgeGrade.LateGood;
+                case JudgeGrade.FastGood:
+                    return JudgeGrade.FastGreat3rd;
+                case JudgeGrade.LateGood:
+                    return JudgeGrade.LateGreat3rd;
+                default:
+                    return head;
+            }
         }
         if (percent >= 0.67f)
         {
-            if (head == JudgeGrade.Miss) return JudgeGrade.LateGood;
-            if (math.abs(j - 7) == 6) return great;
-            if (head == JudgeGrade.Perfect) return perfect2;
-            return head;
+            switch (head)   // 按 >=67% 的情况下 good->great, miss->good, cp->p
+            {
+                case JudgeGrade.TooFast:
+                    return JudgeGrade.FastGood;
+                case JudgeGrade.Miss:
+                    return JudgeGrade.LateGood;
+                case JudgeGrade.FastGood:
+                    return JudgeGrade.FastGreat3rd;
+                case JudgeGrade.LateGood:
+                    return JudgeGrade.LateGreat3rd;
+                case JudgeGrade.FastCritical:
+                    return JudgeGrade.FastPerfect2nd;
+                case JudgeGrade.LateCritical:
+                    return JudgeGrade.LatePerfect2nd;
+                default:
+                    return head;
+            }
         }
         if (percent >= 0.33f)
         {
-            if (math.abs(j - 7) >= 6) return good; // Miss or Good -> Good
-            return great;
+            switch (head)   // 按 >=33% 的情况下 miss->good, cp&p->great
+            {
+                case JudgeGrade.TooFast:
+                    return JudgeGrade.FastGood;
+                case JudgeGrade.Miss:
+                    return JudgeGrade.LateGood;
+                case JudgeGrade.FastCritical:
+                case JudgeGrade.FastPerfect2nd:
+                case JudgeGrade.FastPerfect3rd:
+                    return JudgeGrade.FastGreat1st;
+                case JudgeGrade.LateCritical:
+                case JudgeGrade.LatePerfect2nd:
+                case JudgeGrade.LatePerfect3rd:
+                    return JudgeGrade.LateGreat1st;
+                default:
+                    return head;
+            }
         }
-        if (percent >= 0.05f) return good;
-        if (head == JudgeGrade.Miss) return JudgeGrade.Miss;
-        return good;
+        if (percent >= 0.05f)
+        {
+            return head <= JudgeGrade.FastCritical ? JudgeGrade.FastGood : JudgeGrade.LateGood;
+        }
+
+        if (head is JudgeGrade.TooFast or JudgeGrade.Miss) return head;
+        
+        return head <= JudgeGrade.FastCritical ? JudgeGrade.FastGood : JudgeGrade.LateGood;
     }
 
 
@@ -159,19 +197,20 @@ public static unsafe class NoteHelper
             {
                 case JudgeGrade.LateGood:
                 case JudgeGrade.FastGood:
-                case JudgeGrade.LateGreat:
+                case JudgeGrade.LateGreat1st:
                 case JudgeGrade.LateGreat2nd:
                 case JudgeGrade.LateGreat3rd:
                 case JudgeGrade.FastGreat3rd:
                 case JudgeGrade.FastGreat2nd:
-                case JudgeGrade.FastGreat:
+                case JudgeGrade.FastGreat1st:
                 case JudgeGrade.LatePerfect3rd:
                 case JudgeGrade.FastPerfect3rd:
                 case JudgeGrade.LatePerfect2nd:
                 case JudgeGrade.FastPerfect2nd:
                     SfxRequests[AudioManager.BREAK_JUDGE] = true;
                     break;
-                case JudgeGrade.Perfect:
+                case JudgeGrade.LateCritical:
+                case JudgeGrade.FastCritical:
                     SfxRequests[AudioManager.BREAK_JUDGE] = true;
                     SfxRequests[AudioManager.BREAK_SFX] = true;
                     break;
@@ -191,19 +230,20 @@ public static unsafe class NoteHelper
             case JudgeGrade.FastGood:
                 SfxRequests[AudioManager.TAP_GOOD] = true;
                 break;
-            case JudgeGrade.LateGreat:
+            case JudgeGrade.LateGreat1st:
             case JudgeGrade.LateGreat2nd:
             case JudgeGrade.LateGreat3rd:
             case JudgeGrade.FastGreat3rd:
             case JudgeGrade.FastGreat2nd:
-            case JudgeGrade.FastGreat:
+            case JudgeGrade.FastGreat1st:
                 SfxRequests[AudioManager.TAP_GREAT] = true;
                 break;
             case JudgeGrade.LatePerfect3rd:
             case JudgeGrade.FastPerfect3rd:
             case JudgeGrade.LatePerfect2nd:
             case JudgeGrade.FastPerfect2nd:
-            case JudgeGrade.Perfect:
+            case JudgeGrade.LateCritical:
+            case JudgeGrade.FastCritical:
                 SfxRequests[AudioManager.TAP_PERFECT] = true;
                 break;
         }
@@ -304,7 +344,7 @@ public static unsafe class NoteHelper
         int key, JudgeGrade judge, bool isBreak, bool isHanabi)
     {
         JudgeEffectRequests[key].Effect = EffectType.Touch;
-        if (isHanabi && judge is not JudgeGrade.Miss or JudgeGrade.TooFast)
+        if (isHanabi && (judge is not JudgeGrade.Miss or JudgeGrade.TooFast))
             JudgeEffectRequests[key].Effect |= EffectType.Firework;
         JudgeEffectRequests[key].IsBreak = isBreak;
         JudgeEffectRequests[key].JudgeGrade = judge;
@@ -328,20 +368,21 @@ public static unsafe class NoteHelper
             case JudgeGrade.FastGood:
                 JudgeEffectRequests[key].HoldingColor = new Color(0.56f, 1f, 0.59f); // Green
                 break;
-            case JudgeGrade.LateGreat:
+            case JudgeGrade.LateGreat1st:
             case JudgeGrade.LateGreat2nd:
             case JudgeGrade.LateGreat3rd:
             case JudgeGrade.FastGreat3rd:
             case JudgeGrade.FastGreat2nd:
-            case JudgeGrade.FastGreat:
+            case JudgeGrade.FastGreat1st:
                 JudgeEffectRequests[key].HoldingColor = new Color(1f, 0.70f, 0.94f); // Pink
                 break;
             case JudgeGrade.LatePerfect3rd:
             case JudgeGrade.FastPerfect3rd:
             case JudgeGrade.LatePerfect2nd:
             case JudgeGrade.FastPerfect2nd:
-            case JudgeGrade.Perfect:
-                JudgeEffectRequests[key].HoldingColor = new Color(1f, 0.93f, 0.61f); // Green
+            case JudgeGrade.LateCritical:
+            case JudgeGrade.FastCritical:
+                JudgeEffectRequests[key].HoldingColor = new Color(1f, 0.93f, 0.61f); // Gold
                 break;
             case JudgeGrade.Miss:
             case JudgeGrade.TooFast:
