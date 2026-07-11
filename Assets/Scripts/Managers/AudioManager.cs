@@ -24,7 +24,7 @@ public class AudioManager
 {
     public const int SFX_COUNT = 16;
 
-    [CanBeNull] private AudioSample TrackSample;
+    [CanBeNull] public AudioSample TrackSample;
     [CanBeNull] private float[] TrackSampleData;
     private float TrackSampleVolume;
     public bool IsTrackLoaded => TrackSample != null && TrackSampleData != null;
@@ -84,11 +84,22 @@ public class AudioManager
         // Linux: load BASS plugins (Opus, etc.) before Init so they're available
         // for streaming. libbassopus.so must be next to libbass.so in the bundle.
 #if UNITY_STANDALONE_LINUX
-        Bass.PluginLoad("libbassopus");
+        // dlopen on Linux doesn't search the Plugins dir; use full path.
+        var pluginDir = System.IO.Path.Combine(Application.dataPath, "Plugins", "AnyCPU");
+        var opusPlugin = System.IO.Path.Combine(pluginDir, "libbassopus.so");
+        if (System.IO.File.Exists(opusPlugin))
+            Bass.PluginLoad(opusPlugin);
 #endif
-        Bass.Configure(Configuration.UpdatePeriod, 20);
-        Bass.Configure(Configuration.PlaybackBufferLength, 40);
-        Bass.Init(-1, 44100);
+        Bass.Configure(Configuration.UpdatePeriod, 10);
+        Bass.Configure(Configuration.PlaybackBufferLength, 20);
+        var initOk = Bass.Init(-1, 44100);
+        UnityEngine.Debug.Log($"[AudioManager] Bass.Init(-1) result={initOk} LastError={Bass.LastError}");
+        if (!initOk)
+        {
+            UnityEngine.Debug.Log("[AudioManager] Bass.Init(-1) failed, trying NoSoundDevice");
+            initOk = Bass.Init(Bass.NoSoundDevice, 44100);
+            UnityEngine.Debug.Log($"[AudioManager] Bass.Init(NoSound) result={initOk} LastError={Bass.LastError}");
+        }
 
         //Note SFX
         var sfxPath = MajEnv.GetPath("SFX");
@@ -287,12 +298,21 @@ public class AudioManager
 
     public void LoadTrack(string path)
     {
+        Debug.Log($"[AudioManager] LoadTrack: path='{path}', dataPath='{Application.dataPath}', PluginDir='{System.IO.Path.Combine(Application.dataPath, "Plugins", "AnyCPU")}'");
         TrackSample?.Dispose();
         TrackSample = new AudioSample(path, AudioSampleMode.Stream)
         {
             SampleType = SampleType.Track,
         };
+        if (TrackSample.Decode == 0)
+            Debug.LogError($"[AudioManager] LoadTrack: AudioSample.Decode=0 after construction! Bass.LastError={Bass.LastError}");
+        else
+            Debug.Log($"[AudioManager] LoadTrack: AudioSample created OK, decode={TrackSample.Decode}");
         TrackSampleData = GetSampleDataFromFile(path);
+        if (TrackSampleData.Length == 0)
+            Debug.LogError($"[AudioManager] LoadTrack: TrackSampleData is EMPTY");
+        else
+            Debug.Log($"[AudioManager] LoadTrack: TrackSampleData loaded, {TrackSampleData.Length} samples");
     }
 
     public void PlayTrack()
@@ -643,7 +663,12 @@ public class AudioManager
     private float[] GetSampleDataFromFile(string path)
     {
         var stream = Bass.CreateStream(path, 0, 0, BassFlags.Decode | BassFlags.Float);
-        if (stream == 0) return Array.Empty<float>();
+        if (stream == 0)
+        {
+            Debug.LogError($"[AudioManager] GetSampleDataFromFile: Bass.CreateStream failed for '{path}'. LastError={Bass.LastError}");
+            return Array.Empty<float>();
+        }
+        Debug.Log($"[AudioManager] GetSampleDataFromFile: Bass.CreateStream OK, handle={stream}");
 
         var info = Bass.ChannelGetInfo(stream);
         var lenBytes = Bass.ChannelGetLength(stream);
