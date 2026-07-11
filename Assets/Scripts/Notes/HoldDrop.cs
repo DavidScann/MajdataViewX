@@ -428,7 +428,7 @@ public class HoldDrop : NoteLongBase
                 result = (JudgeType)Random.Range(1, 14);
                 break;
             case AutoPlayMode.DJAuto:
-            case AutoPlayMode.Disable:
+                result = JudgeType.Perfect;
                 break;
         }
 
@@ -441,7 +441,7 @@ public class HoldDrop : NoteLongBase
         }
 
         _effectManager.PlayEffect(startPosition, isBreak, (JudgeGrade)result);
-        _effectManager.PlayFastLate(startPosition, (JudgeGrade)result);
+        _effectManager.PlayFastLate(startPosition, (JudgeGrade)result, transform.position);
         print($"Hold: {MathF.Round(percent * 100, 2)}%\nTotal Len : {MathF.Round(realityHT * 1000, 2)}ms");
 
         _objectCounter.ReportResult(SimaiNoteType.Hold, (JudgeGrade)result, isBreak);

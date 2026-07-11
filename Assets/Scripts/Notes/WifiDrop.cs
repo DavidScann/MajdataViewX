@@ -470,6 +470,9 @@ public class WifiDrop : NoteLongBase, ICanShine
                         judgeQueues.Clear();
                         return;
                     case AutoPlayMode.DJAuto:
+                        judgeResult = JudgeType.Perfect;
+                        isJudged = true;
+                        break;
                     case AutoPlayMode.Disable:
                         TooLateJudge();
                         break;
@@ -501,6 +504,9 @@ public class WifiDrop : NoteLongBase, ICanShine
                     PlaySFX();
                     break;
                 case AutoPlayMode.DJAuto:
+                    judgeResult = JudgeType.Perfect;
+                    isJudged = true;
+                    break;
                 case AutoPlayMode.Disable:
                     if (isMine)
                     {

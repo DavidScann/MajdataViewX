@@ -202,8 +202,11 @@ public class TouchHoldDrop : NoteLongBase
                     _audioManager.PlayTouchHoldSound(guid);
                     return;
                 case AutoPlayMode.DJAuto:
-                    if (!isMine)
-                        _inputManager.SetSensorOn(sensor, guid);
+                    if (isMine)
+                        judgeResult = JudgeType.Miss;
+                    else
+                        judgeResult = JudgeType.Perfect;
+                    isJudged = true;
                     break;
                 case AutoPlayMode.Random:
                     if (!isJudged)
@@ -392,6 +395,9 @@ public class TouchHoldDrop : NoteLongBase
                 result = (JudgeType)Random.Range(1, 14);
                 break;
             case AutoPlayMode.DJAuto:
+                result = JudgeType.Perfect;
+                isJudged = true;
+                break;
             case AutoPlayMode.Disable:
                 break;
         }

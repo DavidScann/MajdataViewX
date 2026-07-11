@@ -407,6 +407,9 @@ public class SlideDrop : NoteLongBase, ICanShine
                         judgeQueue.Clear();
                         return;
                     case AutoPlayMode.DJAuto:
+                        judgeResult = JudgeType.Perfect;
+                        isJudged = true;
+                        break;
                     case AutoPlayMode.Disable:
                         TooLateJudge();
                         break;
@@ -451,6 +454,9 @@ public class SlideDrop : NoteLongBase, ICanShine
                     PlaySFX();
                     break;
                 case AutoPlayMode.DJAuto:
+                    judgeResult = JudgeType.Perfect;
+                    isJudged = true;
+                    break;
                 case AutoPlayMode.Disable:
                     if (isMine)
                     {
