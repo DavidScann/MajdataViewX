@@ -80,6 +80,7 @@ public class PlayManager : MonoBehaviour
 
     public async UniTask LoadAsync(string audioPath, string bgPath, string? pvPath)
     {
+        Debug.Log($"[PlayManager] LoadAsync: START audioPath='{audioPath}' bgPath='{bgPath}' pvPath='{pvPath}'");
         while (_state is ViewStatus.Busy)
             await UniTask.Yield();
         _state = ViewStatus.Busy;
@@ -89,36 +90,46 @@ public class PlayManager : MonoBehaviour
             await UniTask.SwitchToMainThread();
 
             //audio
+            Debug.Log("[PlayManager] LoadAsync: loading audio...");
             _audioManager.LoadTrack(audioPath);
+            Debug.Log($"[PlayManager] LoadAsync: audio done, IsTrackLoaded={_audioManager.IsTrackLoaded}");
 
             //bg
             if (File.Exists(bgPath))
             {
                 BgManager.hasBg = true;
+                Debug.Log("[PlayManager] LoadAsync: loading BG...");
                 _bgManager.LoadBG(bgPath);
+                Debug.Log("[PlayManager] LoadAsync: BG done");
             }
             else
             {
                 BgManager.hasBg = false;
+                Debug.Log("[PlayManager] LoadAsync: no BG file");
             }
 
             //video
             if (pvPath is not null && File.Exists(pvPath))
             {
                 BgManager.hasVideo = true;
+                Debug.Log("[PlayManager] LoadAsync: loading video...");
                 _bgManager.LoadVideo(pvPath);
+                Debug.Log("[PlayManager] LoadAsync: video done");
             }
             else
             {
                 BgManager.hasVideo = false;
+                Debug.Log("[PlayManager] LoadAsync: no video");
             }
 
             _state = ViewStatus.Loaded;
+            Debug.Log($"[PlayManager] LoadAsync: COMPLETE, state={_state}");
         }
         catch (Exception ex)
         {
             _errMsg = ex.ToString();
             _state = ViewStatus.Error;
+            Debug.LogError($"[PlayManager] LoadAsync: EXCEPTION: {ex}");
             throw;
         }
     }

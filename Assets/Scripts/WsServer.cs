@@ -89,9 +89,11 @@ public class WsServer : MonoBehaviour
                 case MajWsRequestType.Load:
                     {
                         var payload = JsonConvert.DeserializeObject<MajWsRequestLoad>(payloadJson);
+                        Debug.Log($"[WsServer] Load: calling LoadAsync track='{payload.TrackPath}'");
                         await _playManager.LoadAsync(payload.TrackPath, payload.ImagePath, payload.VideoPath);
+                        Debug.Log($"[WsServer] Load: LoadAsync returned, sending LoadOk. State={PlayManager.Summary.State}");
                         Response(MajWsResponseType.LoadOk, PlayManager.Summary);
-                        Debug.Log("dequeued: Load");
+                        Debug.Log("[WsServer] Load: LoadOk response sent");
                     }
                     break;
                 case MajWsRequestType.Play:
