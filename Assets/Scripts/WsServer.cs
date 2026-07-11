@@ -35,11 +35,10 @@ public class WsServer : MonoBehaviour
     {
         SceneManager.LoadScene(1);
 
-        Application.targetFrameRate = -1;
+        Application.targetFrameRate = 60;
+        QualitySettings.vSyncCount = 1;
 
         webSocket = new WebSocketServer(System.Net.IPAddress.Loopback, 8083, false);
-        webSocket.AddWebSocketService<MajdataWsService>("/majdata");
-        webSocket.Start();
         webSocket.AddWebSocketService<MajdataWsService>("/majdata");
         webSocket.Start();
         ProcessQueue().Forget();
