@@ -233,6 +233,7 @@ public class EffectManager : MonoBehaviour
         }
 
         fastLateEffects[pos].SetActive(true);
+        fastLateEffects[pos].transform.position = fastLateRequests[pos].Position;
         var isFast = (int)judge > 7;
         if (isFast)
             fastLateEffects[pos].transform.GetChild(0).GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = _skinManager.FastText;
@@ -251,12 +252,13 @@ public class EffectManager : MonoBehaviour
         };
     }
 
-    public void PlayFastLate(int position, JudgeGrade judge)
+    public void PlayFastLate(int position, JudgeGrade judge, Vector3 worldPos)
     {
         fastLateRequests[position - 1] = new FastLateData
         {
             HasEffect = true,
             JudgeGrade = judge,
+            Position = worldPos,
         };
     }
 
@@ -280,4 +282,5 @@ public struct FastLateData
 {
     public bool HasEffect;
     public JudgeGrade JudgeGrade;
+    public Vector3 Position;
 }
