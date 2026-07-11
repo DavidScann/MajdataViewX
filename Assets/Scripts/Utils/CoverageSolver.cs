@@ -43,7 +43,7 @@ public static class CoverageSolver
 {
     internal struct BurstGroup
     {
-        public uint PointMask;
+        public ulong PointMask;
         public int RequiredCount;
     }
 
@@ -54,7 +54,7 @@ public static class CoverageSolver
     {
         int n = points.Count;
         if (n == 0) return new CoverResult { Mode = CoverMode.None };
-        if (n > 32) throw new ArgumentException("Points count must be < 33 to fit in uint mask.");
+        if (n > 64) throw new ArgumentException("Points count must be <= 64 to fit in ulong mask.");
 
         var nativePoints = new NativeArray<float2>(n, Allocator.TempJob);
         var nativeGroups = new NativeArray<BurstGroup>(groups.Count, Allocator.TempJob);
@@ -66,13 +66,13 @@ public static class CoverageSolver
 
             for (int i = 0; i < groups.Count; i++)
             {
-                uint mask = 0;
+                ulong mask = 0;
                 if (groups[i].PointIndices != null)
                 {
                     foreach (int idx in groups[i].PointIndices)
                     {
                         if (idx >= 0 && idx < n)
-                            mask |= (1u << idx);
+                            mask |= (1ul << idx);
                     }
                 }
                 int total = groups[i].PointIndices?.Length ?? 0;
@@ -114,57 +114,32 @@ public static class CoverageSolver
         public void Execute()
         {
             int n = Points.Length;
-            uint targetMask = n == 32 ? uint.MaxValue : (1u << n) - 1;
+            ulong targetMask = n == 64 ? ulong.MaxValue : (1ul << n) - 1;
 
-            Circle mec = MinimumEnclosingCircle(Points);
-            if (mec.Radius <= MaxRadius + 1e-4f)
-            {
-                Result[0] = new CoverResult
-                {
-                    Mode = CoverMode.SingleCircleDirect,
-                    Circle1 = mec
-                };
-                return;
-            }
+            var candidates = new NativeList<Circle>(57, Allocator.Temp);
 
-            int maxCandidates = n + n * (n - 1);
-            var candidates = new NativeList<Circle>(maxCandidates, Allocator.Temp);
+            // A1~A8
+            for (int i = 1; i <= 8; i++) candidates.Add(new Circle { Center = RingPos(4.1f, i, false), Radius = MaxRadius });
+            // B1~B8
+            for (int i = 1; i <= 8; i++) candidates.Add(new Circle { Center = RingPos(2.3f, i, false), Radius = MaxRadius });
+            // C
+            candidates.Add(new Circle { Center = float2.zero, Radius = MaxRadius });
+            // A-B Intersections
+            for (int i = 1; i <= 8; i++) candidates.Add(new Circle { Center = RingPos(3.2f, i, false), Radius = MaxRadius });
+            // B-B Intersections
+            for (int i = 1; i <= 8; i++) candidates.Add(new Circle { Center = RingPos(2.3f, i, true), Radius = MaxRadius });
+            // B-C Intersections
+            for (int i = 1; i <= 8; i++) candidates.Add(new Circle { Center = RingPos(1.15f, i, false), Radius = MaxRadius });
+            // D1~D8
+            for (int i = 1; i <= 8; i++) candidates.Add(new Circle { Center = RingPos(4.1f, i, true), Radius = MaxRadius });
+            // E1~E8
+            for (int i = 1; i <= 8; i++) candidates.Add(new Circle { Center = RingPos(3.0f, i, true), Radius = MaxRadius });
 
             float radiusSq = MaxRadius * MaxRadius;
+            int maxCandidates = 57;
 
-            for (int i = 0; i < n; i++)
-            {
-                candidates.Add(new Circle { Center = Points[i], Radius = MaxRadius });
-
-                for (int j = i + 1; j < n; j++)
-                {
-                    float2 p1 = Points[i];
-                    float2 p2 = Points[j];
-                    float distSq = math.distancesq(p1, p2);
-
-                    if (distSq <= (MaxRadius * 2) * (MaxRadius * 2) + 1e-4f)
-                    {
-                        float2 mid = (p1 + p2) * 0.5f;
-                        float dToMidSq = distSq * 0.25f;
-                        float hSq = math.max(0f, radiusSq - dToMidSq);
-                        float h = math.sqrt(hSq);
-
-                        float2 dir = p2 - p1;
-                        float dist = math.sqrt(distSq);
-                        if (dist > 1e-5f)
-                        {
-                            dir /= dist;
-                            float2 normal = new float2(-dir.y, dir.x);
-
-                            candidates.Add(new Circle { Center = mid + normal * h, Radius = MaxRadius });
-                            candidates.Add(new Circle { Center = mid - normal * h, Radius = MaxRadius });
-                        }
-                    }
-                }
-            }
-
-            var maskToCircle = new NativeHashMap<uint, Circle>(maxCandidates, Allocator.Temp);
-            var uniqueMasks = new NativeList<uint>(maxCandidates, Allocator.Temp);
+            var maskToCircle = new NativeHashMap<ulong, Circle>(maxCandidates, Allocator.Temp);
+            var uniqueMasks = new NativeList<ulong>(maxCandidates, Allocator.Temp);
 
             bool foundSingleGroup = false;
             Circle bestSingleGroupCircle = default;
@@ -172,7 +147,7 @@ public static class CoverageSolver
             for (int i = 0; i < candidates.Length; i++)
             {
                 Circle c = candidates[i];
-                uint mask = GetCoveredMask(c.Center, radiusSq, Points);
+                ulong mask = GetCoveredMask(c.Center, radiusSq, Points);
 
                 if (mask == targetMask)
                 {
@@ -188,7 +163,7 @@ public static class CoverageSolver
 
                     if (!foundSingleGroup)
                     {
-                        uint expanded = ExpandGroups(mask, Groups);
+                        ulong expanded = ExpandGroups(mask, Groups);
                         if (expanded == targetMask)
                         {
                             foundSingleGroup = true;
@@ -207,18 +182,18 @@ public static class CoverageSolver
 
             bool foundDoubleGroup = false;
             Circle bestD1 = default, bestD2 = default;
-            var checkedMasks = new NativeHashSet<uint>(4096, Allocator.Temp);
+            var checkedMasks = new NativeHashSet<ulong>(4096, Allocator.Temp);
 
             int numMasks = uniqueMasks.Length;
             for (int i = 0; i < numMasks; i++)
             {
-                uint m1 = uniqueMasks[i];
+                ulong m1 = uniqueMasks[i];
                 Circle c1 = maskToCircle[m1];
 
                 for (int j = i; j < numMasks; j++)
                 {
-                    uint m2 = uniqueMasks[j];
-                    uint combined = m1 | m2;
+                    ulong m2 = uniqueMasks[j];
+                    ulong combined = m1 | m2;
 
                     if (combined == targetMask)
                     {
@@ -237,7 +212,7 @@ public static class CoverageSolver
                     {
                         if (checkedMasks.Add(combined))
                         {
-                            uint expanded = ExpandGroups(combined, Groups);
+                            ulong expanded = ExpandGroups(combined, Groups);
                             if (expanded == targetMask)
                             {
                                 foundDoubleGroup = true;
@@ -266,14 +241,14 @@ public static class CoverageSolver
             Result[0] = new CoverResult { Mode = CoverMode.None };
         }
 
-        private void Cleanup(NativeList<Circle> c, NativeHashMap<uint, Circle> m, NativeList<uint> u)
+        private void Cleanup(NativeList<Circle> c, NativeHashMap<ulong, Circle> m, NativeList<ulong> u)
         {
             c.Dispose();
             m.Dispose();
             u.Dispose();
         }
 
-        private uint ExpandGroups(uint coveredMask, NativeArray<BurstGroup> groups)
+        private ulong ExpandGroups(ulong coveredMask, NativeArray<BurstGroup> groups)
         {
             bool changed = true;
             while (changed)
@@ -284,7 +259,7 @@ public static class CoverageSolver
                     BurstGroup g = groups[i];
                     if (g.PointMask != 0 && (coveredMask & g.PointMask) != g.PointMask)
                     {
-                        uint intersect = coveredMask & g.PointMask;
+                        ulong intersect = coveredMask & g.PointMask;
                         if (math.countbits(intersect) >= g.RequiredCount)
                         {
                             coveredMask |= g.PointMask;
@@ -296,97 +271,25 @@ public static class CoverageSolver
             return coveredMask;
         }
 
-        private uint GetCoveredMask(float2 center, float radiusSq, NativeArray<float2> points)
+        private ulong GetCoveredMask(float2 center, float radiusSq, NativeArray<float2> points)
         {
-            uint mask = 0;
+            ulong mask = 0;
             for (int i = 0; i < points.Length; i++)
             {
                 if (math.distancesq(center, points[i]) <= radiusSq + 1e-3f)
                 {
-                    mask |= (1u << i);
+                    mask |= (1ul << i);
                 }
             }
             return mask;
         }
 
-        private Circle MinimumEnclosingCircle(NativeArray<float2> points)
+        private float2 RingPos(float radius, int index1, bool altAngle)
         {
-            int n = points.Length;
-            if (n == 0) return new Circle { Center = float2.zero, Radius = 0f };
-            if (n == 1) return new Circle { Center = points[0], Radius = 0f };
-
-            Circle minCircle = new Circle { Center = float2.zero, Radius = float.MaxValue };
-            bool found = false;
-
-            for (int i = 0; i < n; i++)
-            {
-                for (int j = i + 1; j < n; j++)
-                {
-                    float2 p1 = points[i];
-                    float2 p2 = points[j];
-                    float2 center = (p1 + p2) * 0.5f;
-                    float rSq = math.distancesq(p1, p2) * 0.25f;
-                    float radius = math.sqrt(rSq);
-
-                    if (radius < minCircle.Radius && EnclosesAll(center, rSq, points))
-                    {
-                        minCircle = new Circle { Center = center, Radius = radius };
-                        found = true;
-                    }
-                }
-            }
-
-            for (int i = 0; i < n; i++)
-            {
-                for (int j = i + 1; j < n; j++)
-                {
-                    for (int k = j + 1; k < n; k++)
-                    {
-                        Circle c = Circumcircle(points[i], points[j], points[k]);
-                        if (c.Radius >= 0 && c.Radius < minCircle.Radius)
-                        {
-                            float rSq = c.Radius * c.Radius;
-                            if (EnclosesAll(c.Center, rSq, points))
-                            {
-                                minCircle = c;
-                                found = true;
-                            }
-                        }
-                    }
-                }
-            }
-            return found ? minCircle : new Circle { Center = float2.zero, Radius = 0f };
-        }
-
-        private bool EnclosesAll(float2 center, float radiusSq, NativeArray<float2> points)
-        {
-            float tolerance = 1e-4f;
-            for (int i = 0; i < points.Length; i++)
-            {
-                if (math.distancesq(center, points[i]) > radiusSq + tolerance)
-                    return false;
-            }
-            return true;
-        }
-
-        private Circle Circumcircle(float2 a, float2 b, float2 c)
-        {
-            float2 d = b - a;
-            float2 e = c - a;
-            float bl = math.lengthsq(d);
-            float cl = math.lengthsq(e);
-            float det = d.x * e.y - d.y * e.x;
-
-            if (math.abs(det) < 1e-5f)
-            {
-                return new Circle { Center = float2.zero, Radius = -1f };
-            }
-
-            float2 offset = new float2(
-                (e.y * bl - d.y * cl) / (2f * det),
-                (d.x * cl - e.x * bl) / (2f * det)
-            );
-            return new Circle { Center = a + offset, Radius = math.length(offset) };
+            float a = altAngle
+                ? (index1 * -2f + 6f) * 0.125f * math.PI
+                : (index1 * -2f + 5f) * 0.125f * math.PI;
+            return new float2(radius * math.cos(a), radius * math.sin(a));
         }
     }
 }

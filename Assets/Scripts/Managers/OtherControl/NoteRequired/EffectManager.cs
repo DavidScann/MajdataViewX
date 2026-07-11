@@ -2,6 +2,7 @@
 
 #region
 
+using System;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
@@ -21,6 +22,7 @@ public class EffectManager : MonoBehaviour
     private static readonly int BPerfectHash = Animator.StringToHash("bPerfect");
     private static readonly int BGreatHash = Animator.StringToHash("bGreat");
     private static readonly int BGoodHash = Animator.StringToHash("bGood");
+    private static readonly int FireHash = Animator.StringToHash("fire");
 
     [SerializeField]
     GameObject effectPrefab;
@@ -40,6 +42,9 @@ public class EffectManager : MonoBehaviour
     private readonly SpriteRenderer[] judgeRenderers = new SpriteRenderer[EFFECT_COUNT];
 
     private readonly SpriteRenderer[] fastLateRenderers = new SpriteRenderer[EFFECT_COUNT];
+
+    private GameObject fireworkEffect;
+    private Animator fireworkAnimator;
 
     private void Awake()
     {
@@ -89,6 +94,9 @@ public class EffectManager : MonoBehaviour
             judgeRenderers[i] = judgeEffect.transform.GetChild(0).GetChild(0).gameObject.GetComponent<SpriteRenderer>();
             judgeEffect.transform.GetChild(0).GetChild(1).gameObject.GetComponent<SpriteRenderer>().sprite = _noteSkinManager.JudgeText_BPerfect;
             fastLateRenderers[i] = judgeEffect.transform.GetChild(1).GetChild(0).GetComponent<SpriteRenderer>();
+
+            fireworkEffect = GameObject.Find("FireworkEffect");
+            fireworkAnimator = fireworkEffect.GetComponent<Animator>();
         }
     }
 
@@ -107,16 +115,17 @@ public class EffectManager : MonoBehaviour
         for (var i = 0; i < judgeEffectRequests.Length; i++)
         {
             var req = judgeEffectRequests[i];
-            switch (req.Effect)
+            if (req.Effect.HasFlag(EffectType.Tap))
             {
-                case EffectType.None:
-                    break;
-                case EffectType.Tap:
-                    PlayTapEffect(i, req.JudgeGrade, req.IsBreak);
-                    break;
-                case EffectType.Touch:
-                    PlayTouchEffect(i, req.JudgeGrade, req.IsBreak);
-                    break;
+                PlayTapEffect(i, req.JudgeGrade, req.IsBreak);
+            }
+            if (req.Effect.HasFlag(EffectType.Touch))
+            {
+                PlayTouchEffect(i, req.JudgeGrade, req.IsBreak);
+            }
+            if (req.Effect.HasFlag(EffectType.Firework))
+            {
+                PlayFireworkEffect(i);
             }
             holdEffects[i].SetActive(req.HasHolding);
             if (req.HasHolding)
@@ -277,6 +286,16 @@ public class EffectManager : MonoBehaviour
         }
     }
 
+    public void PlayFireworkEffect(int pos)
+    {
+        float2 worldPos;
+        if (pos is < 0 or > EFFECT_COUNT) return;
+        else if (pos < BUTTON_COUNT) worldPos = MajPos.GetBtnPos(pos);
+        else worldPos = MajPos.GetBtnPos(pos - 8);
+        fireworkEffect.transform.position = new float3(worldPos, 0);
+        fireworkAnimator.SetTrigger(FireHash);
+    }
+
     public void ResetState()
     {
         for (var i = 0; i < judgeEffectRequests.Length; i++)
@@ -293,9 +312,11 @@ public struct EffectData
     public Color HoldingColor;
 }
 
+[Flags]
 public enum EffectType
 {
     None,
     Tap,
-    Touch
+    Touch,
+    Firework
 }

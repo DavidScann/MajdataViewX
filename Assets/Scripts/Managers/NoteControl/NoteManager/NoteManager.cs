@@ -47,7 +47,7 @@ public partial class NoteManager : MonoBehaviour
     }
     void Start()
     {
-        var lineMesh = MeshGenerator.CreateRingMesh(16, 0.5f, 0.3f);
+        var lineMesh = MeshGenerator.CreateRingMesh(32, 0.5f, 0.3f);
 
         //REMEMBER TO FORCE INCLUDE
         _matLine = new Material(Shader.Find("Custom/NoteLine"));
@@ -248,6 +248,7 @@ public partial class NoteManager : MonoBehaviour
 
     void OnDestroy()
     {
+        _prevChain.Complete();
         _tapLineGroup?.Dispose();
         _eachLineGroup?.Dispose();
         _slideGroup?.Dispose();
@@ -274,6 +275,7 @@ public partial class NoteManager : MonoBehaviour
 
     public void ResetState()
     {
+        _prevChain.Complete();
         taps.Clear();
         eachLines.Clear();
         holds.Clear();

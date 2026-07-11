@@ -169,7 +169,7 @@ public struct SlideData
 
             //FOR WIFI STARS
             var endPosC = endPos;
-            var endPosL = endPosC + 1 > 8 ? 0 : endPosC + 1;
+            var endPosL = endPosC + 1 > 8 ? 1 : endPosC + 1;
             var endPosR = endPosC - 1 < 1 ? 8 : endPosC - 1;
 
             starPosStart = MajPos.GetBtnPos(startPos - 1);

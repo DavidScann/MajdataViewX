@@ -295,8 +295,8 @@ public unsafe struct InputDataB
         hitRender[idx] = new HitRenderData
         {
             pos = pos,
-            radius = DJAUTO_HAND_RADIUS,
-            color = new float4(1, 0, 0, 0.75f) // Exact hand position color
+            radius = radius,
+            color = new float4(1, 0, 0, 0.75f)
         };
     }
 

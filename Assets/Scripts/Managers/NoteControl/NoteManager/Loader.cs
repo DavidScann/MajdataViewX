@@ -271,10 +271,37 @@ public partial class NoteManager
     {
         if (count == 0) return;
 
-        bool[] visited = new bool[count];
-        var groups = new List<Group>();
-
+        List<int> uniqueIndices = new List<int>();
+        int[] originalToUnique = new int[count];
         for (int i = 0; i < count; i++)
+        {
+            int foundUnique = -1;
+            for (int j = 0; j < uniqueIndices.Count; j++)
+            {
+                if (touches[startIdx + i].sensor == touches[startIdx + uniqueIndices[j]].sensor)
+                {
+                    foundUnique = j;
+                    break;
+                }
+            }
+            if (foundUnique != -1)
+            {
+                originalToUnique[i] = foundUnique;
+            }
+            else
+            {
+                originalToUnique[i] = uniqueIndices.Count;
+                uniqueIndices.Add(i);
+            }
+        }
+
+        int uniqueCount = uniqueIndices.Count;
+        bool[] visited = new bool[uniqueCount];
+        var groups = new List<Group>();
+        var uniqueGroupIds = new int[uniqueCount];
+        for (int i = 0; i < uniqueCount; i++) uniqueGroupIds[i] = -1;
+
+        for (int i = 0; i < uniqueCount; i++)
         {
             if (visited[i]) continue;
 
@@ -289,12 +316,12 @@ public partial class NoteManager
                 int curr = queue.Dequeue();
                 component.Add(curr);
 
-                for (int j = 0; j < count; j++)
+                for (int j = 0; j < uniqueCount; j++)
                 {
                     if (visited[j]) continue;
 
-                    SensorType s1 = touches[startIdx + curr].sensor;
-                    SensorType s2 = touches[startIdx + j].sensor;
+                    SensorType s1 = touches[startIdx + uniqueIndices[curr]].sensor;
+                    SensorType s2 = touches[startIdx + uniqueIndices[j]].sensor;
 
                     if (TouchGroupManager.TOUCH_GROUPS.TryGetValue(s1, out var adj) && adj.Contains(s2))
                     {
@@ -307,30 +334,45 @@ public partial class NoteManager
             if (component.Count >= 5)
             {
                 int groupId = touchGroupTotalCounts.Length;
-                touchGroupTotalCounts.Add(component.Count);
+                int totalTouchesInGroup = 0;
+                for (int c = 0; c < count; c++)
+                {
+                    if (component.Contains(originalToUnique[c]))
+                        totalTouchesInGroup++;
+                }
+
+                touchGroupTotalCounts.Add(totalTouchesInGroup);
                 touchGroupJudgedCounts.Add(0);
 
                 var groupDef = new Group { PointIndices = new int[component.Count] };
 
                 for (int k = 0; k < component.Count; k++)
                 {
-                    int idx = startIdx + component[k];
-                    var t = touches[idx];
-                    t.groupId = groupId;
-                    touches[idx] = t;
-
-                    groupDef.PointIndices[k] = component[k];
+                    int uIdx = component[k];
+                    uniqueGroupIds[uIdx] = groupId;
+                    groupDef.PointIndices[k] = uIdx;
                 }
 
                 groups.Add(groupDef);
             }
         }
 
-        // Solve Coverage for ALL touches in this cluster
-        var points = new Unity.Mathematics.float2[count];
         for (int i = 0; i < count; i++)
         {
-            points[i] = touches[startIdx + i].centerPos;
+            int uIdx = originalToUnique[i];
+            if (uniqueGroupIds[uIdx] != -1)
+            {
+                var t = touches[startIdx + i];
+                t.groupId = uniqueGroupIds[uIdx];
+                touches[startIdx + i] = t;
+            }
+        }
+
+        // Solve Coverage for UNIQUE touches in this cluster
+        var points = new Unity.Mathematics.float2[uniqueCount];
+        for (int i = 0; i < uniqueCount; i++)
+        {
+            points[i] = touches[startIdx + uniqueIndices[i]].centerPos;
         }
 
         var solverResult = CoverageSolver.Solve(points, groups);
@@ -350,10 +392,37 @@ public partial class NoteManager
     {
         if (count == 0) return;
 
-        bool[] visited = new bool[count];
-        var groups = new List<Group>();
-
+        List<int> uniqueIndices = new List<int>();
+        int[] originalToUnique = new int[count];
         for (int i = 0; i < count; i++)
+        {
+            int foundUnique = -1;
+            for (int j = 0; j < uniqueIndices.Count; j++)
+            {
+                if (touchHolds[startIdx + i].sensor == touchHolds[startIdx + uniqueIndices[j]].sensor)
+                {
+                    foundUnique = j;
+                    break;
+                }
+            }
+            if (foundUnique != -1)
+            {
+                originalToUnique[i] = foundUnique;
+            }
+            else
+            {
+                originalToUnique[i] = uniqueIndices.Count;
+                uniqueIndices.Add(i);
+            }
+        }
+
+        int uniqueCount = uniqueIndices.Count;
+        bool[] visited = new bool[uniqueCount];
+        var groups = new List<Group>();
+        var uniqueGroupIds = new int[uniqueCount];
+        for (int i = 0; i < uniqueCount; i++) uniqueGroupIds[i] = -1;
+
+        for (int i = 0; i < uniqueCount; i++)
         {
             if (visited[i]) continue;
 
@@ -367,12 +436,12 @@ public partial class NoteManager
                 int curr = queue.Dequeue();
                 component.Add(curr);
 
-                for (int j = 0; j < count; j++)
+                for (int j = 0; j < uniqueCount; j++)
                 {
                     if (visited[j]) continue;
 
-                    SensorType s1 = touchHolds[startIdx + curr].sensor;
-                    SensorType s2 = touchHolds[startIdx + j].sensor;
+                    SensorType s1 = touchHolds[startIdx + uniqueIndices[curr]].sensor;
+                    SensorType s2 = touchHolds[startIdx + uniqueIndices[j]].sensor;
 
                     if (TouchGroupManager.TOUCH_GROUPS.TryGetValue(s1, out var adj) && adj.Contains(s2))
                     {
@@ -385,30 +454,45 @@ public partial class NoteManager
             if (component.Count >= 5)
             {
                 int groupId = touchHoldGroupTotalCounts.Length;
-                touchHoldGroupTotalCounts.Add(component.Count);
+                int totalTouchesInGroup = 0;
+                for (int c = 0; c < count; c++)
+                {
+                    if (component.Contains(originalToUnique[c]))
+                        totalTouchesInGroup++;
+                }
+
+                touchHoldGroupTotalCounts.Add(totalTouchesInGroup);
                 touchHoldGroupPressedCounts.Add(0);
 
                 var groupDef = new Group { PointIndices = new int[component.Count] };
 
                 for (int k = 0; k < component.Count; k++)
                 {
-                    int idx = startIdx + component[k];
-                    var t = touchHolds[idx];
-                    t.groupId = groupId;
-                    touchHolds[idx] = t;
-
-                    groupDef.PointIndices[k] = component[k];
+                    int uIdx = component[k];
+                    uniqueGroupIds[uIdx] = groupId;
+                    groupDef.PointIndices[k] = uIdx;
                 }
 
                 groups.Add(groupDef);
             }
         }
 
-        // Solve Coverage for ALL touch holds in this cluster
-        var points = new Unity.Mathematics.float2[count];
         for (int i = 0; i < count; i++)
         {
-            points[i] = touchHolds[startIdx + i].centerPos;
+            int uIdx = originalToUnique[i];
+            if (uniqueGroupIds[uIdx] != -1)
+            {
+                var t = touchHolds[startIdx + i];
+                t.groupId = uniqueGroupIds[uIdx];
+                touchHolds[startIdx + i] = t;
+            }
+        }
+
+        // Solve Coverage for UNIQUE touch holds in this cluster
+        var points = new Unity.Mathematics.float2[uniqueCount];
+        for (int i = 0; i < uniqueCount; i++)
+        {
+            points[i] = touchHolds[startIdx + uniqueIndices[i]].centerPos;
         }
 
         var solverResult = CoverageSolver.Solve(points, groups);

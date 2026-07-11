@@ -90,15 +90,23 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
     private void RenderArrows(ref SlideData slide, int index)
     {
         var cnt = slide.slideArrowsCount;
-        var eaten = slide.eaten;
 
         var color = new float4(1, 1, 1, slide.slideAlpha);
 
         var sortTime = (uint)math.clamp(slide.tapTime * 100f, 0f, 0xFFFFF);
         var timePart = slide.legacySlideLayer ? (0xFFFFFu - sortTime) : sortTime;
 
-        var startIdx = math.max(1, eaten + 1);
-        var endIdx = cnt - 1;
+        int startIdx, endIdx;
+        if (!slide.isWifi)
+        {
+            startIdx = slide.eaten + 1;
+            endIdx = cnt - 1;
+        }
+        else //wifi 不含路径起终点
+        {
+            startIdx = slide.eaten;
+            endIdx = cnt;
+        }
         var writeCount = math.max(0, endIdx - startIdx);
 
         if (writeCount <= 0) return;
@@ -226,8 +234,8 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
                 else
                 {
                     //划wifi时使用大手子
-                    InputData.HandleWorldPosition(slide.starPosL + slide.starPos / 2, 1.8f);
-                    InputData.HandleWorldPosition(slide.starPosR + slide.starPos / 2, 1.8f);
+                    InputData.HandleWorldPosition((slide.starPosL + slide.starPos) / 2, 1.8f);
+                    InputData.HandleWorldPosition((slide.starPosR + slide.starPos) / 2, 1.8f);
                 }
                 break;
         }

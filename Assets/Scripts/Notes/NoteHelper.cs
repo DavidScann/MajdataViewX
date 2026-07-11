@@ -300,9 +300,10 @@ public static unsafe class NoteHelper
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void PlayTouchEffect(
         EffectData* JudgeEffectRequests,
-        int key, JudgeGrade judge, bool isBreak)
+        int key, JudgeGrade judge, bool isBreak, bool isHanabi)
     {
         JudgeEffectRequests[key].Effect = EffectType.Touch;
+        if (isHanabi) JudgeEffectRequests[key].Effect |= EffectType.Firework;
         JudgeEffectRequests[key].IsBreak = isBreak;
         JudgeEffectRequests[key].JudgeGrade = judge;
     }

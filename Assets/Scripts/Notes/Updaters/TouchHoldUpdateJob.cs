@@ -319,7 +319,8 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
         NoteHelper.PlayTouchEffect(JudgeEffectRequests,
             (int)th.sensor + 8,
             th.judgeGrade,
-            th.isBreak
+            th.isBreak,
+            th.isHanabi
         );
         NoteHelper.ReportResult(ReportResults,
             th.judgeGrade,

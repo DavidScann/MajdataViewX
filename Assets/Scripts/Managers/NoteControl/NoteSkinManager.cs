@@ -426,7 +426,7 @@ public class NoteSkinManager : MonoBehaviour
         JudgeText[2] = LoadSprite(judgeTextPath + "/judge_text_great.png");
         JudgeText[3] = LoadSprite(judgeTextPath + "/judge_text_perfect.png");
         JudgeText[4] = LoadSprite(judgeTextPath + "/judge_text_cPerfect.png");
-        JudgeText_BPerfect = LoadSprite(judgeTextPath + "/judge_text_break.png");
+        JudgeText_BPerfect = LoadSprite(judgeTextPath + "/judge_text_cPerfect_break.png");
         FastText = LoadSprite(judgeTextPath + "/fast.png");
         LateText = LoadSprite(judgeTextPath + "/late.png");
 
