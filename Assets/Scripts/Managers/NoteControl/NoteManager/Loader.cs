@@ -3,16 +3,11 @@ using MajSimai;
 using Notes.SlideUtils;
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Drawing;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Text;
-using System.Threading.Tasks;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
-using WebSocketSharp;
 using static MajCtx;
 
 public partial class NoteManager
@@ -74,11 +69,6 @@ public partial class NoteManager
             slide.judgeQueueL = slideAreaPool + slide.judgeQueueLOffset;
             slide.judgeQueueR = slideAreaPool + slide.judgeQueueROffset;
             slide.slideArrows = slidePosePool + slide.slideArrowsOffset;
-            //init过了，无奈出此下策
-            if (slide.judgeQueueCount <= 3)
-            {
-                slide.judgeQueue[1].IsSkippable = false;
-            }
             slides[i] = slide;
         }
 
@@ -675,7 +665,7 @@ public partial class NoteManager
             var slide = new SlideData
             {
                 tapTime = (float)timing.Timing,
-                time = (float)note.SlideStartTime,
+                shootTime = (float)note.SlideStartTime,
                 startPos = noteContent[0] - '0',
                 endPos = noteContent[2] - '0',
                 LastFor = (float)note.SlideTime,
@@ -693,8 +683,11 @@ public partial class NoteManager
                 Const = metadata.SlideConst,
                 slideArrowsOffset = posePoolIndex,
                 slideArrowsCount = slideArrowsCount,
+                noLastArrow = metadata.ConditionalLastArrow,
                 okType = metadata.OkType,
                 okPose = metadata.OkPose,
+                unskippable1 = -1,
+                unskippable2 = -1,
 
                 isEach = isSlideEach,
                 isEx = note.IsEx,
@@ -713,8 +706,32 @@ public partial class NoteManager
         else
         {
             var slideMetaDatas = GetSlidesFromRawContent(noteContent, out var startPos, out var endPos);
-            var metadata = SlideTableNeo.MakeConnSlide(slideMetaDatas);
-
+            SlideMetadata metadata;
+            metadata = slideMetaDatas.Count == 1 ? slideMetaDatas[0] : SlideTableNeo.MakeConnSlide(slideMetaDatas);
+            
+            var unskippable1 = -1;
+            var unskippable2 = -1;
+            switch (metadata.Flag)
+            {
+                case SlideFlag.NormalV:
+                {
+                    unskippable1 = 1;
+                    break;
+                }
+                case SlideFlag.SpecialV:
+                {
+                    unskippable1 = 1;
+                    unskippable2 = 3;
+                    break;
+                }
+                default:
+                {
+                    if (metadata.JudgeAreaQueue.Length <= 3)
+                        unskippable1 = metadata.JudgeAreaQueue.Length - 2;
+                    break;
+                }
+            }
+            
             var judgeQueueCount = metadata.JudgeAreaQueue.Length;
             loadedSlideAreaArrays.Add(metadata.JudgeAreaQueue);
             var slideArrowsCount = metadata.ArrowPoses.Length;
@@ -746,7 +763,7 @@ public partial class NoteManager
             var slideData = new SlideData
             {
                 tapTime = (float)timing.Timing,
-                time = (float)note.SlideStartTime,
+                shootTime = (float)note.SlideStartTime,
                 startPos = startPos,
                 endPos = endPos,
                 LastFor = (float)note.SlideTime,
@@ -758,8 +775,11 @@ public partial class NoteManager
                 Const = metadata.SlideConst,
                 slideArrowsOffset = posePoolIndex,
                 slideArrowsCount = slideArrowsCount,
+                noLastArrow = metadata.ConditionalLastArrow,
                 okType = metadata.OkType,
                 okPose = metadata.OkPose,
+                unskippable1 = unskippable1,
+                unskippable2 = unskippable2,
 
                 isEach = isSlideEach,
                 isEx = note.IsEx,

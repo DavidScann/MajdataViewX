@@ -1,20 +1,14 @@
 #pragma warning disable CS8500
-using System.Threading;
-using MajSimai;
 using Unity.Burst;
-using Unity.Collections;
-using Unity.Collections.LowLevel.Unsafe;
-using Unity.Jobs;
 using Unity.Mathematics;
 using static NoteSkinManager;
-using static MajBurst;
 using Notes.SlideUtils;
 
 [BurstCompile]
 public struct SlideData
 {
     public float tapTime;
-    public float time;
+    public float shootTime;
 
     // FOR WIFI STARS CALCULATE ONLY
     public int startPos;
@@ -45,9 +39,17 @@ public struct SlideData
     public int judgeQueueRCount;
     public float Const;
     public int slideArrowsOffset;
+
+    public int unskippable1;
+    public int unskippable2;
+    public SensorType currentOn;    // Invalid就是没按，否则就是正在按的区
+    public SensorType currentOnL;
+    public SensorType currentOnR;
+    
     public unsafe SlidePose* slideArrows;
     // 注意第一个是起点最后一个是终点不需要画箭头
     public int slideArrowsCount;
+    public bool noLastArrow;
     public SlideOkType okType;
     public SlidePose okPose;
 
@@ -59,6 +61,7 @@ public struct SlideData
     public int eaten;
     //star
     public float process;
+    public int processIdx; // 标记现在引导星星走到哪儿了（引导星星之后的第一个箭头idx）
     public float starAlpha;
     public float starScale;
     public uint starSprite;
@@ -74,7 +77,8 @@ public struct SlideData
 
     public bool isJudged;
     public JudgeGrade judgeGrade;
-
+    
+    // MAYBE TODO: 咱就是说要不把这个类型给统一一下，要byte的话就所有和判定区数量相关的全都用byte
     public byte judgeCurrent; //SLide / Wifi Center
     public byte judgeL_Current; //Wifi Left
     public byte judgeR_Current; //Wifi Right
@@ -93,10 +97,15 @@ public struct SlideData
         starAlpha = 0;
         starScale = 0;
         process = 0;
+        processIdx = 1;
         slideAlpha = 0;
         slideOKAlpha = 1f;
         brightness = 1f;
         judgeTime = float.MinValue;
+        currentOn = SensorType.Invalid;
+        currentOnL = SensorType.Invalid;
+        currentOnR = SensorType.Invalid;
+        
 
         // 计算Slide淡入时机
         // 8.0速时应当提前300ms显示Slide

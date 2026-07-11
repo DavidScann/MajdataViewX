@@ -1,7 +1,6 @@
 
 
 using Unity.IL2CPP.CompilerServices;
-using UnityEngine;
 
 [Il2CppEagerStaticClassConstruction]
 public static class MajCtx
@@ -27,5 +26,6 @@ public static class MajCtx
     public const int BUTTON_COUNT = 8;
     public const int SENSOR_COUNT = 33;
 
-    public const float DJAUTO_HAND_RADIUS = 0.39f;
+    public const float DJAUTO_HAND_RADIUS = 0.45f;
+    public const float DJAUTO_WIFI_RADIUS = 1.80f;
 }
