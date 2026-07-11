@@ -33,6 +33,10 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
     public EffectData* JudgeEffectRequests;
     public NativeList<ReportResultEntry>.ParallelWriter ReportResults;
 
+    [ReadOnly] public NativeArray<int> touchHoldGroupTotalCounts;
+    [ReadOnly] public NativeArray<int> touchHoldGroupPressedCounts;
+    [ReadOnly] public NativeArray<CoverResult> touchHoldGroupCoverResults;
+
     public void Execute(int index)
     {
         ref var th = ref touchHolds.ElementRef(index);
@@ -207,9 +211,10 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
                 break;
             case AutoPlayMode.DJAutoButton:
             case AutoPlayMode.DJAutoSensor:
-                if (!th.isHeadJudged)
+                var timingForHold = TimeData.NoteTime - th.time;
+                if (!th.isHeadJudged || math.max(th.LastFor - timingForHold, 0) > 0)
                 {
-                    InputData.DJAutoSetSensorState(th.sensor, true);
+                    InputData.DJAutoAddGroupCoverage(touchHoldGroupCoverResults[th.coverageId]);
                 }
                 break;
         }
@@ -240,6 +245,14 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
             }
 
             var _on = InputData.GetSensorState(th.sensor).Status;
+            if (th.groupId != -1)
+            {
+                if (touchHoldGroupPressedCounts[th.groupId] * 2 > touchHoldGroupTotalCounts[th.groupId])
+                {
+                    _on = true;
+                }
+            }
+
             var clicked = _on && !th.SensorLastState;
             th.SensorLastState = _on;
 
@@ -272,6 +285,14 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
         if (!TimeData.IsStart) return;
 
         var on = InputData.GetSensorState(th.sensor).Status;
+        if (th.groupId != -1)
+        {
+            if (touchHoldGroupPressedCounts[th.groupId] * 2 > touchHoldGroupTotalCounts[th.groupId])
+            {
+                on = true;
+            }
+        }
+
         th.isHolding = on;
         if (timing > 0.25f && remainingTime > 0.2f && !on)
             th.playerIdleTime += TimeData.deltaTime;
@@ -279,11 +300,6 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
 
     private void EndNote(ref TouchHoldData th)
     {
-        if (NoteHelper.AutoPlayMode is AutoPlayMode.DJAutoButton)
-            InputData.DJAutoSetButtonState(th.sensor, false);
-        else if (NoteHelper.AutoPlayMode is AutoPlayMode.DJAutoSensor)
-            InputData.DJAutoSetSensorState(th.sensor, false);
-
         NoteHelper.SetTouchHoldSound(SfxRequests, false);
 
         if (th.isBreak)

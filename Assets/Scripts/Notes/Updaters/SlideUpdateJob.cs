@@ -97,13 +97,18 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
         var sortTime = (uint)math.clamp(slide.tapTime * 100f, 0f, 0xFFFFF);
         var timePart = slide.legacySlideLayer ? (0xFFFFFu - sortTime) : sortTime;
 
-        var writeCount = cnt - eaten;
+        var startIdx = math.max(1, eaten + 1);
+        var endIdx = cnt - 1;
+        var writeCount = math.max(0, endIdx - startIdx);
+
+        if (writeCount <= 0) return;
+
         var idx = Interlocked.Add(ref *SlidesWriteCountPtr, writeCount) - writeCount;
-        for (var i = eaten; i < cnt; i++)
+        for (var i = startIdx; i < endIdx; i++) //第一个是路径起点，最后一个是路径终点，忽略不画
         {
             ref readonly var p = ref slide.slideArrows[i];
 
-            slidesRender[idx + i - eaten] = new SimpleRenderData
+            slidesRender[idx + i - startIdx] = new SimpleRenderData
             {
                 pos = new float2(p.X, p.Y),
                 angRad = math.radians(p.RotZ),
@@ -124,7 +129,7 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
         var timePart = slide.legacySlideLayer ? (0xFFFFFu - sortTime) : sortTime;
         if (!slide.isWifi)
         {
-            var cnt = slide.slideArrowsCount;
+            var cnt = slide.slideArrowsCount; //这里借助路径起终点画star
 
             var idxF = slide.process * (cnt - 1);
             var idx0 = (int)idxF;
@@ -156,7 +161,7 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
         }
         else
         {
-            var starPos = stackalloc float2[3]; //C, L, R
+            var starPos = stackalloc float2[3]; //C, L, R   //这里不借助slideArrows，提供不了另两条的信息
             slide.starPos = starPos[0] = slide.starPosConstC * slide.process + slide.starPosStart;
             slide.starPosL = starPos[1] = slide.starPosConstL * slide.process + slide.starPosStart;
             slide.starPosR = starPos[2] = slide.starPosConstR * slide.process + slide.starPosStart;
@@ -192,7 +197,7 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
         switch (NoteHelper.AutoPlayMode)
         {
             case AutoPlayMode.Enable:
-                slide.eaten = math.max((int)(slide.process * slide.slideArrowsCount), 0);
+                slide.eaten = math.max((int)(slide.process * slide.slideArrowsCount - 2), 0);
 
                 if (slide.LastFor - timing <= 0)
                 {
@@ -202,7 +207,7 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
                 }
                 break;
             case AutoPlayMode.Random:
-                slide.eaten = math.max((int)(slide.process * slide.slideArrowsCount), 0);
+                slide.eaten = math.max((int)(slide.process * slide.slideArrowsCount - 2), 0);
 
                 if (slide.LastFor - timing <= 0)
                 {
@@ -213,11 +218,16 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
                 break;
             case AutoPlayMode.DJAutoButton:
             case AutoPlayMode.DJAutoSensor:
-                InputData.HandleWorldPosition(slide.starPos);
-                if (slide.isWifi)
+                if (!slide.isWifi)
                 {
-                    InputData.HandleWorldPosition(slide.starPosL);
-                    InputData.HandleWorldPosition(slide.starPosR);
+                    InputData.HandleWorldPosition(slide.starPos);
+
+                }
+                else
+                {
+                    //划wifi时使用大手子
+                    InputData.HandleWorldPosition(slide.starPosL + slide.starPos / 2, 1.8f);
+                    InputData.HandleWorldPosition(slide.starPosR + slide.starPos / 2, 1.8f);
                 }
                 break;
         }
@@ -228,9 +238,10 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
         if (NoteHelper.AutoPlayMode is AutoPlayMode.Enable or AutoPlayMode.Random) return;
         if (slide.isEnd || slide.isJudged) return;
 
-        var timing = TimeData.NoteTime - slide.time;
-        if (timing < -0.1f) return; // 提前100ms接受判定
+        var tapTiming = TimeData.NoteTime - slide.tapTime;
+        if (tapTiming < -0.1f) return; // 提前100ms接受判定
 
+        var timing = TimeData.NoteTime - slide.time;
         var remaining = slide.LastFor - timing;
 
         var stayTime = slide.LastFor * slide.Const;

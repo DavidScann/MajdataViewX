@@ -131,13 +131,13 @@ public unsafe struct TapUpdateJob : IJobParallelFor
             case AutoPlayMode.DJAutoButton:
                 if (!tap.IsJudged)
                 {
-                    InputData.DJAutoSetButtonState(tap.Key, true);
+                    InputData.DJAutoSetButtonOn(tap.Key);
                 }
                 break;
             case AutoPlayMode.DJAutoSensor:
                 if (!tap.IsJudged)
                 {
-                    InputData.DJAutoSetSensorState(tap.Key, true);
+                    InputData.DJAutoSetSensorOn(tap.Key);
                 }
                 break;
         }
@@ -205,11 +205,6 @@ public unsafe struct TapUpdateJob : IJobParallelFor
 
     private void EndNote(ref TapData tap)
     {
-        if (NoteHelper.AutoPlayMode is AutoPlayMode.DJAutoButton)
-            InputData.DJAutoSetButtonState(tap.Key, false);
-        else if (NoteHelper.AutoPlayMode is AutoPlayMode.DJAutoSensor)
-            InputData.DJAutoSetSensorState(tap.Key, false);
-
         NoteHelper.PlayTapSound(SfxRequests,
             tap.JudgeGrade,
             tap.IsBreak,

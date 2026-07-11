@@ -144,6 +144,10 @@ public unsafe struct InputDataB
     NativeArray<int> _nextButtonIndexNextFrame;
     NativeArray<int> _nextSensorIndexNextFrame;
 
+    public NativeArray<CoverResult> ActiveCoverages;
+    [NativeDisableUnsafePtrRestriction]
+    public int* ActiveCoveragesCountPtr;
+
     [NativeDisableUnsafePtrRestriction]
     public HitRenderData* hitRender;
     [NativeDisableUnsafePtrRestriction]
@@ -165,6 +169,9 @@ public unsafe struct InputDataB
             _buttonStates[i] = new();
         for (var i = 0; i < SENSOR_COUNT; i++)
             _sensorStates[i] = new();
+
+        ActiveCoverages = new(32, Allocator.Persistent);
+        ActiveCoveragesCountPtr = (int*)UnsafeUtility.Malloc(sizeof(int), 4, Allocator.Persistent);
     }
 
 
@@ -176,50 +183,86 @@ public unsafe struct InputDataB
     public readonly SensorState GetButtonState(SensorType type) => _buttonStates[(int)type];
     public readonly SensorState GetSensorState(SensorType type) => _sensorStates[(int)type];
 
-
-    public void DJAutoSetButtonState(SensorType type, bool status)
+    /// <summary>
+    /// DJAuto按键处理Tap/Hold
+    /// </summary>
+    /// <param name="holdFrames">持续帧数，注意始终有2帧抬手延迟</param>
+    public void DJAutoSetButtonOn(SensorType type, int holdFrames = 0)
     {
         ref var button = ref _buttonStates.ElementRef((int)type);
-        if (status)
-        {
-            button.TaskCount++;
-            button.HoldFrames = 2;
-        }
-        else
-        {
-            button.TaskCount = math.max(button.TaskCount - 1, 0);
-        }
+        Interlocked.Exchange(ref button.HoldFrames, math.max(button.HoldFrames, holdFrames + 2));
     }
-    public void DJAutoSetSensorState(SensorType type, bool status)
+    /// <summary>
+    /// DJAuto判定区处理Tap/Hold
+    /// </summary>
+    /// <param name="holdFrames">持续帧数，注意始终有2帧抬手延迟</param>
+    public void DJAutoSetSensorOn(SensorType type, int holdFrames = 0)
     {
         ref var sensor = ref _sensorStates.ElementRef((int)type);
-        if (status)
+        Interlocked.Exchange(ref sensor.HoldFrames, math.max(sensor.HoldFrames, holdFrames + 2));
+    }
+    /// <summary>
+    /// DJAuto处理Touch/TouchHold（寻找大手圆）
+    /// </summary>
+    /// <param name="cover"></param>
+    public void DJAutoAddGroupCoverage(CoverResult cover)
+    {
+        if (cover.Mode == CoverMode.None) return;
+
+        for (int i = 0; i < *ActiveCoveragesCountPtr; i++)
         {
-            sensor.TaskCount++;
-            sensor.HoldFrames = 2;
+            var existing = ActiveCoverages[i];
+            if (existing.Mode == cover.Mode && math.all(existing.Circle1.Center == cover.Circle1.Center))
+                return;
         }
-        else
+
+        var idx = Interlocked.Increment(ref *ActiveCoveragesCountPtr) - 1;
+        if (idx < ActiveCoverages.Length)
         {
-            sensor.TaskCount = math.max(sensor.TaskCount - 1, 0);
+            ActiveCoverages[idx] = cover;
+
+            // Intersect virtual hand circles with physical sensors to trigger them
+            for (int s = 0; s < SENSOR_COUNT; s++)
+            {
+                ref readonly var sp = ref SensorWorldPositions.ElementRef(s);
+                var sr = MajPos.GetSensorRadius((SensorType)s);
+
+                bool hits = false;
+
+                var r1 = cover.Circle1.Radius + sr;
+                if (math.distancesq(sp, cover.Circle1.Center) <= r1 * r1 + 1e-4f)
+                {
+                    hits = true;
+                }
+                else if (cover.Mode == CoverMode.DoubleCircleDirect || cover.Mode == CoverMode.DoubleCircleGroup)
+                {
+                    var r2 = cover.Circle2.Radius + sr;
+                    if (math.distancesq(sp, cover.Circle2.Center) <= r2 * r2 + 1e-4f)
+                    {
+                        hits = true;
+                    }
+                }
+
+                if (hits)
+                {
+                    DJAutoSetSensorOn((SensorType)s);
+                }
+            }
         }
     }
-
 
     public void BeginHandler()
     {
+        *ActiveCoveragesCountPtr = 0;
         for (int i = 0; i < BUTTON_COUNT; i++)
         {
             ref var button = ref _buttonStates.ElementRef(i);
-            if (button.TaskCount > 0) button.HoldFrames = 2;
-            else if (button.HoldFrames > 0) button.HoldFrames--;
-            button.PressCount = 0;
+            if (button.HoldFrames > 0) button.HoldFrames--;
         }
         for (int i = 0; i < SENSOR_COUNT; i++)
         {
             ref var sensor = ref _sensorStates.ElementRef(i);
-            if (sensor.TaskCount > 0) sensor.HoldFrames = 2;
-            else if (sensor.HoldFrames > 0) sensor.HoldFrames--;
-            sensor.PressCount = 0;
+            if (sensor.HoldFrames > 0) sensor.HoldFrames--;
         }
     }
     public void HandleButtonInput(SensorType type, bool status)
@@ -227,14 +270,14 @@ public unsafe struct InputDataB
         if (status)
         {
             ref var button = ref _buttonStates.ElementRef((int)type);
-            Interlocked.Increment(ref button.PressCount);
+            Interlocked.Exchange(ref button.HoldFrames, math.max(button.HoldFrames, 1));
         }
     }
-    public void HandleWorldPosition(in float2 pos)
+    public void HandleWorldPosition(in float2 pos, float radius = DJAUTO_HAND_RADIUS)
     {
         for (int i = 0; i < SensorWorldPositions.Length; i++)
         {
-            var combinedR = DJAUTO_HAND_RADIUS + MajPos.GetSensorRadius((SensorType)i);
+            var combinedR = radius + MajPos.GetSensorRadius((SensorType)i);
             var combinedSq = combinedR * combinedR;
             ref readonly var sp = ref SensorWorldPositions.ElementRef(i);
             var dx = pos.x - sp.x;
@@ -244,7 +287,7 @@ public unsafe struct InputDataB
             if (distSq <= combinedSq)
             {
                 ref var sensor = ref _sensorStates.ElementRef(i);
-                Interlocked.Increment(ref sensor.PressCount);
+                Interlocked.Exchange(ref sensor.HoldFrames, math.max(sensor.HoldFrames, 1));
             }
         }
 
@@ -253,7 +296,7 @@ public unsafe struct InputDataB
         {
             pos = pos,
             radius = DJAUTO_HAND_RADIUS,
-            color = new float4(1, 0, 0, 1) // Exact hand position color
+            color = new float4(1, 0, 0, 0.75f) // Exact hand position color
         };
     }
 
@@ -282,6 +325,29 @@ public unsafe struct InputDataB
                     pos = SensorWorldPositions[i],
                     radius = MajPos.GetSensorRadius((SensorType)i),
                     color = new float4(0, 1, 1, 0.5f) // Cyan responsive color
+                };
+            }
+        }
+
+        for (int i = 0; i < math.min(*ActiveCoveragesCountPtr, ActiveCoverages.Length); i++)
+        {
+            var cover = ActiveCoverages[i];
+            var idx1 = Interlocked.Increment(ref *HitWriteCountPtr) - 1;
+            hitRender[idx1] = new HitRenderData
+            {
+                pos = cover.Circle1.Center,
+                radius = cover.Circle1.Radius,
+                color = new float4(0.5f, 1f, 0.5f, 0.6f) // Light green
+            };
+
+            if (cover.Mode == CoverMode.DoubleCircleDirect || cover.Mode == CoverMode.DoubleCircleGroup)
+            {
+                var idx2 = Interlocked.Increment(ref *HitWriteCountPtr) - 1;
+                hitRender[idx2] = new HitRenderData
+                {
+                    pos = cover.Circle2.Center,
+                    radius = cover.Circle2.Radius,
+                    color = new float4(0.5f, 1f, 0.5f, 0.6f)
                 };
             }
         }
@@ -348,30 +414,14 @@ public unsafe struct InputDataB
         if (_buttonStates.IsCreated) _buttonStates.Dispose();
         if (_nextButtonIndex.IsCreated) _nextButtonIndex.Dispose();
         if (_nextButtonIndexNextFrame.IsCreated) _nextButtonIndexNextFrame.Dispose();
+
+        if (ActiveCoverages.IsCreated) ActiveCoverages.Dispose();
+        if (ActiveCoveragesCountPtr != null) UnsafeUtility.Free(ActiveCoveragesCountPtr, Allocator.Persistent);
     }
 }
 
 public struct SensorState
 {
-    public readonly bool Status => TaskCount > 0 || PressCount > 0 || HoldFrames > 0;
-    public int TaskCount;
-    public int PressCount;
+    public readonly bool Status => HoldFrames > 0;
     public int HoldFrames;
-}
-// for coming MuriDX
-public readonly struct HitInfo
-{
-    public readonly bool IsButton;
-    public readonly SensorType Type;
-    public readonly float Radius;
-    public readonly float Time;
-    public readonly float Duration;
-    public HitInfo(bool isButton, SensorType type, float radius, float duration)
-    {
-        IsButton = isButton;
-        Type = type;
-        Radius = radius;
-        Time = TimeData.NoteTime;
-        Duration = duration;
-    }
 }

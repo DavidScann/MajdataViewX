@@ -252,13 +252,13 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
             case AutoPlayMode.DJAutoButton:
                 if (!hold.isHeadJudged)
                 {
-                    InputData.DJAutoSetButtonState(hold.Key, true);
+                    InputData.DJAutoSetButtonOn(hold.Key, (int)(hold.LastFor / MajCtx.FRAME_LENGTH_SEC));
                 }
                 break;
             case AutoPlayMode.DJAutoSensor:
                 if (!hold.isHeadJudged)
                 {
-                    InputData.DJAutoSetSensorState(hold.Key, true);
+                    InputData.DJAutoSetSensorOn(hold.Key, (int)(hold.LastFor / MajCtx.FRAME_LENGTH_SEC));
                 }
                 break;
         }
@@ -343,11 +343,6 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
 
     private void EndNote(ref HoldData hold)
     {
-        if (NoteHelper.AutoPlayMode is AutoPlayMode.DJAutoButton)
-            InputData.DJAutoSetButtonState(hold.Key, false);
-        else if (NoteHelper.AutoPlayMode is AutoPlayMode.DJAutoSensor)
-            InputData.DJAutoSetSensorState(hold.Key, false);
-
         NoteHelper.PlayTapSound(SfxRequests,
             hold.judgeGrade,
             false,

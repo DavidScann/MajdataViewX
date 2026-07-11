@@ -17,6 +17,14 @@ public partial class NoteManager : MonoBehaviour
     NativeList<TouchData> touches = new(1024, Allocator.Persistent);
     NativeList<TouchHoldData> touchHolds = new(1024, Allocator.Persistent);
 
+    NativeList<int> touchGroupTotalCounts = new(256, Allocator.Persistent);
+    NativeList<int> touchGroupJudgedCounts = new(256, Allocator.Persistent);
+    NativeList<CoverResult> touchGroupCoverResults = new(256, Allocator.Persistent);
+
+    NativeList<int> touchHoldGroupTotalCounts = new(256, Allocator.Persistent);
+    NativeList<int> touchHoldGroupPressedCounts = new(256, Allocator.Persistent);
+    NativeList<CoverResult> touchHoldGroupCoverResults = new(256, Allocator.Persistent);
+
     RenderGroup<LineRenderData> _tapLineGroup;
     RenderGroup<LineRenderData> _eachLineGroup;
     RenderGroup<SimpleRenderData> _slideGroup;
@@ -102,6 +110,21 @@ public partial class NoteManager : MonoBehaviour
             _thBorderGroup.ResetCount();
             _touchGroup.ResetCount();
 
+            if (touchHoldGroupTotalCounts.Length > 0)
+            {
+                for (int i = 0; i < touchHoldGroupTotalCounts.Length; i++)
+                    touchHoldGroupPressedCounts[i] = 0;
+                for (int i = 0; i < touchHolds.Length; i++)
+                {
+                    var t = touchHolds[i];
+                    if (t.groupId != -1 && !t.isEnd)
+                    {
+                        if (MajBurst.InputData.GetSensorState(t.sensor).Status)
+                            touchHoldGroupPressedCounts[t.groupId]++;
+                    }
+                }
+            }
+
             JobHandle h = default;
 
             if (taps.Length > 0)
@@ -163,6 +186,9 @@ public partial class NoteManager : MonoBehaviour
                     SfxRequests = _audioManager.SfxRequestsPtr,
                     JudgeEffectRequests = _effectManager.JudgeEffectRequestsPtr,
                     ReportResults = _objectCounter.ReportRequestsWriter,
+                    touchHoldGroupTotalCounts = touchHoldGroupTotalCounts.AsArray(),
+                    touchHoldGroupPressedCounts = touchHoldGroupPressedCounts.AsArray(),
+                    touchHoldGroupCoverResults = touchHoldGroupCoverResults.AsArray(),
                 }.Schedule(touchHolds.Length, 32, h);
 
             if (touches.Length > 0)
@@ -174,6 +200,9 @@ public partial class NoteManager : MonoBehaviour
                     SfxRequests = _audioManager.SfxRequestsPtr,
                     JudgeEffectRequests = _effectManager.JudgeEffectRequestsPtr,
                     ReportResults = _objectCounter.ReportRequestsWriter,
+                    touchGroupTotalCounts = touchGroupTotalCounts.AsArray(),
+                    touchGroupJudgedCounts = touchGroupJudgedCounts.AsArray(),
+                    touchGroupCoverResults = touchGroupCoverResults.AsArray(),
                 }.Schedule(touches.Length, 32, h);
 
             _prevChain = h;
@@ -234,6 +263,13 @@ public partial class NoteManager : MonoBehaviour
         if (slides.IsCreated) slides.Dispose();
         if (touches.IsCreated) touches.Dispose();
         if (touchHolds.IsCreated) touchHolds.Dispose();
+
+        if (touchGroupTotalCounts.IsCreated) touchGroupTotalCounts.Dispose();
+        if (touchGroupJudgedCounts.IsCreated) touchGroupJudgedCounts.Dispose();
+        if (touchGroupCoverResults.IsCreated) touchGroupCoverResults.Dispose();
+        if (touchHoldGroupTotalCounts.IsCreated) touchHoldGroupTotalCounts.Dispose();
+        if (touchHoldGroupPressedCounts.IsCreated) touchHoldGroupPressedCounts.Dispose();
+        if (touchHoldGroupCoverResults.IsCreated) touchHoldGroupCoverResults.Dispose();
     }
 
     public void ResetState()
@@ -244,6 +280,13 @@ public partial class NoteManager : MonoBehaviour
         slides.Clear();
         touches.Clear();
         touchHolds.Clear();
+
+        touchGroupTotalCounts.Clear();
+        touchGroupJudgedCounts.Clear();
+        touchGroupCoverResults.Clear();
+        touchHoldGroupTotalCounts.Clear();
+        touchHoldGroupPressedCounts.Clear();
+        touchHoldGroupCoverResults.Clear();
         unsafe
         {
             if (slideAreaPool != null)

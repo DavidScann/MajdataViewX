@@ -202,6 +202,9 @@ public partial class NoteManager
 
     private unsafe void LoadTiming(in SimaiTimingPoint timing)
     {
+        int touchStartIdx = touches.Length;
+        int touchHoldStartIdx = touchHolds.Length;
+
         CalcEach(timing, out var isNoteEach, out var isSlideEach);
 
         var nonMineCount = 0;
@@ -249,6 +252,175 @@ public partial class NoteManager
                 var spd = NoteSpeed * timing.HSpeed;
                 CreateEachLine(s, startPositions[i], startPositions[i + 1], spd);
             }
+        }
+
+        int touchCount = touches.Length - touchStartIdx;
+        if (touchCount > 0)
+        {
+            ProcessTouchGroups(touchStartIdx, touchCount);
+        }
+
+        int thCount = touchHolds.Length - touchHoldStartIdx;
+        if (thCount > 0)
+        {
+            ProcessTouchHoldGroups(touchHoldStartIdx, thCount);
+        }
+    }
+
+    private void ProcessTouchGroups(int startIdx, int count)
+    {
+        if (count == 0) return;
+
+        bool[] visited = new bool[count];
+        var groups = new List<Group>();
+
+        for (int i = 0; i < count; i++)
+        {
+            if (visited[i]) continue;
+
+            // Find connected component
+            List<int> component = new List<int>();
+            Queue<int> queue = new Queue<int>();
+            queue.Enqueue(i);
+            visited[i] = true;
+
+            while (queue.Count > 0)
+            {
+                int curr = queue.Dequeue();
+                component.Add(curr);
+
+                for (int j = 0; j < count; j++)
+                {
+                    if (visited[j]) continue;
+
+                    SensorType s1 = touches[startIdx + curr].sensor;
+                    SensorType s2 = touches[startIdx + j].sensor;
+
+                    if (TouchGroupManager.TOUCH_GROUPS.TryGetValue(s1, out var adj) && adj.Contains(s2))
+                    {
+                        visited[j] = true;
+                        queue.Enqueue(j);
+                    }
+                }
+            }
+
+            if (component.Count >= 5)
+            {
+                int groupId = touchGroupTotalCounts.Length;
+                touchGroupTotalCounts.Add(component.Count);
+                touchGroupJudgedCounts.Add(0);
+
+                var groupDef = new Group { PointIndices = new int[component.Count] };
+
+                for (int k = 0; k < component.Count; k++)
+                {
+                    int idx = startIdx + component[k];
+                    var t = touches[idx];
+                    t.groupId = groupId;
+                    touches[idx] = t;
+
+                    groupDef.PointIndices[k] = component[k];
+                }
+
+                groups.Add(groupDef);
+            }
+        }
+
+        // Solve Coverage for ALL touches in this cluster
+        var points = new Unity.Mathematics.float2[count];
+        for (int i = 0; i < count; i++)
+        {
+            points[i] = touches[startIdx + i].centerPos;
+        }
+
+        var solverResult = CoverageSolver.Solve(points, groups);
+
+        int coverageId = touchGroupCoverResults.Length;
+        touchGroupCoverResults.Add(solverResult);
+
+        for (int i = 0; i < count; i++)
+        {
+            var t = touches[startIdx + i];
+            t.coverageId = coverageId;
+            touches[startIdx + i] = t;
+        }
+    }
+
+    private void ProcessTouchHoldGroups(int startIdx, int count)
+    {
+        if (count == 0) return;
+
+        bool[] visited = new bool[count];
+        var groups = new List<Group>();
+
+        for (int i = 0; i < count; i++)
+        {
+            if (visited[i]) continue;
+
+            List<int> component = new List<int>();
+            Queue<int> queue = new Queue<int>();
+            queue.Enqueue(i);
+            visited[i] = true;
+
+            while (queue.Count > 0)
+            {
+                int curr = queue.Dequeue();
+                component.Add(curr);
+
+                for (int j = 0; j < count; j++)
+                {
+                    if (visited[j]) continue;
+
+                    SensorType s1 = touchHolds[startIdx + curr].sensor;
+                    SensorType s2 = touchHolds[startIdx + j].sensor;
+
+                    if (TouchGroupManager.TOUCH_GROUPS.TryGetValue(s1, out var adj) && adj.Contains(s2))
+                    {
+                        visited[j] = true;
+                        queue.Enqueue(j);
+                    }
+                }
+            }
+
+            if (component.Count >= 5)
+            {
+                int groupId = touchHoldGroupTotalCounts.Length;
+                touchHoldGroupTotalCounts.Add(component.Count);
+                touchHoldGroupPressedCounts.Add(0);
+
+                var groupDef = new Group { PointIndices = new int[component.Count] };
+
+                for (int k = 0; k < component.Count; k++)
+                {
+                    int idx = startIdx + component[k];
+                    var t = touchHolds[idx];
+                    t.groupId = groupId;
+                    touchHolds[idx] = t;
+
+                    groupDef.PointIndices[k] = component[k];
+                }
+
+                groups.Add(groupDef);
+            }
+        }
+
+        // Solve Coverage for ALL touch holds in this cluster
+        var points = new Unity.Mathematics.float2[count];
+        for (int i = 0; i < count; i++)
+        {
+            points[i] = touchHolds[startIdx + i].centerPos;
+        }
+
+        var solverResult = CoverageSolver.Solve(points, groups);
+
+        int coverageId = touchHoldGroupCoverResults.Length;
+        touchHoldGroupCoverResults.Add(solverResult);
+
+        for (int i = 0; i < count; i++)
+        {
+            var t = touchHolds[startIdx + i];
+            t.coverageId = coverageId;
+            touchHolds[startIdx + i] = t;
         }
     }
 
@@ -457,13 +629,13 @@ public partial class NoteManager
         }
         else
         {
-            var slideMetaDatas = GetSlidesFromRawContent(noteContent);
+            var slideMetaDatas = GetSlidesFromRawContent(noteContent, out var startPos, out var endPos);
             var metadata = SlideTableNeo.MakeConnSlide(slideMetaDatas);
 
             var judgeQueueCount = metadata.JudgeAreaQueue.Length;
             loadedSlideAreaArrays.Add(metadata.JudgeAreaQueue);
-            var slideArrowsCount = metadata.ArrowPoses.Length - 2;
-            loadedSlidePoseArrays.Add(metadata.ArrowPoses[1..^1]);
+            var slideArrowsCount = metadata.ArrowPoses.Length;
+            loadedSlidePoseArrays.Add(metadata.ArrowPoses);
 
             if (!note.IsSlideNoHead)
             {
@@ -492,6 +664,8 @@ public partial class NoteManager
             {
                 tapTime = (float)timing.Timing,
                 time = (float)note.SlideStartTime,
+                startPos = startPos,
+                endPos = endPos,
                 LastFor = (float)note.SlideTime,
                 speed = NoteSpeed * timing.HSpeed,
                 sensorOrderIndex = _sensorOrderIndex[note.StartPosition - 1],
@@ -548,8 +722,10 @@ public partial class NoteManager
         return sb.ToString();
     }
 
-    private static IList<SlideMetadata> GetSlidesFromRawContent(ReadOnlySpan<char> rawContent)
+    private static IList<SlideMetadata> GetSlidesFromRawContent(ReadOnlySpan<char> rawContent,
+        out int startPos, out int endPos)
     {
+        startPos = endPos = rawContent[0] - '0';
         var slideMetadatas = new List<SlideMetadata>(rawContent.Length / 2);
 
         int lastKey = -1;
@@ -580,6 +756,7 @@ public partial class NoteManager
                         lastShape = string.Empty;
                     }
                     lastKey = curKey;
+                    endPos = curKey;
                     isSlideCode = false;
                 }
                 else if (lastShape.Length == 1 && lastShape[0] == 'V')
@@ -596,6 +773,7 @@ public partial class NoteManager
                         lastShape = string.Empty;
                     }
                     lastKey = curKey;
+                    endPos = curKey;
                 }
                 else
                 {

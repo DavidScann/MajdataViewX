@@ -1,7 +1,5 @@
 #pragma warning disable CS8500
 using MajSimai;
-using System.ComponentModel;
-using System.Runtime.InteropServices.ComTypes;
 using System.Threading;
 using Unity.Burst;
 using Unity.Collections;
@@ -9,7 +7,6 @@ using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
 using static MajBurst;
-using static NoteSkinManager;
 
 [BurstCompile]
 public unsafe struct TouchUpdateJob : IJobParallelFor
@@ -27,6 +24,10 @@ public unsafe struct TouchUpdateJob : IJobParallelFor
     [NativeDisableUnsafePtrRestriction]
     public EffectData* JudgeEffectRequests;
     public NativeList<ReportResultEntry>.ParallelWriter ReportResults;
+
+    [ReadOnly] public NativeArray<int> touchGroupTotalCounts;
+    [NativeDisableParallelForRestriction] public NativeArray<int> touchGroupJudgedCounts;
+    [ReadOnly] public NativeArray<CoverResult> touchGroupCoverResults;
 
     public void Execute(int index)
     {
@@ -183,7 +184,7 @@ public unsafe struct TouchUpdateJob : IJobParallelFor
             case AutoPlayMode.DJAutoSensor:
                 if (!touch.isJudged)
                 {
-                    InputData.DJAutoSetSensorState(touch.sensor, true);
+                    InputData.DJAutoAddGroupCoverage(touchGroupCoverResults[touch.coverageId]);
                 }
                 break;
         }
@@ -226,6 +227,15 @@ public unsafe struct TouchUpdateJob : IJobParallelFor
         }
 
         var stateOn = MajBurst.InputData.GetSensorState(touch.sensor).Status;
+
+        if (touch.groupId != -1)
+        {
+            if (touchGroupJudgedCounts[touch.groupId] * 2 > touchGroupTotalCounts[touch.groupId])
+            {
+                stateOn = true;
+            }
+        }
+
         if (!stateOn) return;
 
         var diffMSec = math.abs(diffSec * 1000);
@@ -243,9 +253,6 @@ public unsafe struct TouchUpdateJob : IJobParallelFor
 
     private void EndNote(ref TouchData touch)
     {
-        if (NoteHelper.AutoPlayMode is AutoPlayMode.DJAutoButton or AutoPlayMode.DJAutoSensor)
-            InputData.DJAutoSetSensorState(touch.sensor, false);
-
         if (touch.isBreak)
             NoteHelper.PlayTapSound(SfxRequests,
                 touch.judgeGrade,
@@ -278,6 +285,16 @@ public unsafe struct TouchUpdateJob : IJobParallelFor
             touch.isAppeared = false;
             MajBurst.MultTouchHandler.UnregisterActive(touch.sensor);
         }
+
+        if (touch.groupId != -1 && touch.judgeGrade != JudgeGrade.Miss)
+        {
+            unsafe
+            {
+                var ptr = (int*)touchGroupJudgedCounts.GetUnsafePtr();
+                Interlocked.Increment(ref ptr[touch.groupId]);
+            }
+        }
+
         touch.isEnd = true;
     }
 }

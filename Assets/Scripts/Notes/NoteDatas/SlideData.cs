@@ -46,6 +46,7 @@ public struct SlideData
     public float Const;
     public int slideArrowsOffset;
     public unsafe SlidePose* slideArrows;
+    // 注意第一个是起点最后一个是终点不需要画箭头
     public int slideArrowsCount;
     public SlideOkType okType;
     public SlidePose okPose;
@@ -63,9 +64,10 @@ public struct SlideData
     public uint starSprite;
     //FOR WIFI
     public float2 starPosStart;
-    public float2 starPosConstC;
+    public float2 starPosConstC; //for wifi only
     public float2 starPosConstL;
     public float2 starPosConstR;
+
     public float2 starPos;
     public float2 starPosL;
     public float2 starPosR;

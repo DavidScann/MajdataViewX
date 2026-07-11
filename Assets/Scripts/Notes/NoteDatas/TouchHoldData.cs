@@ -45,8 +45,13 @@ public struct TouchHoldData
     public float holdPercent;
     public bool isHolding;
 
+    public int groupId;
+    public int coverageId;
+
     public void Init()
     {
+        groupId = -1;
+        coverageId = -1;
         fanAlpha = 0;
         maskProgress = 0;
 
