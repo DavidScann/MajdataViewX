@@ -195,62 +195,61 @@ public partial class ObjectCounter : MonoBehaviour
         });
     }
 
-    public async UniTask CountIgnoreNoteCountAsync(IEnumerable<SimaiNote> notes)
+    public void CountIgnoreNoteCountAsync(IEnumerable<SimaiNote> notes)
     {
-        await UniTask.RunOnThreadPool(() =>
+        foreach (var note in notes)
         {
-            foreach (var note in notes)
+            if (!note.IsBreak)
             {
-                if (!note.IsBreak)
+                switch (note.Type)
                 {
-                    switch (note.Type)
-                    {
-                        case SimaiNoteType.Tap:
-                            TapFinishedCount++;
-                            break;
-                        case SimaiNoteType.Hold:
-                        case SimaiNoteType.TouchHold:
-                            HoldFinishedCount++;
-                            break;
-                        case SimaiNoteType.Slide:
-                            if (!note.IsSlideNoHead)
-                                TapFinishedCount++;
-                            if (note.IsSlideBreak)
-                                BreakFinishedCount++;
-                            else
-                                SlideFinishedCount++;
-                            break;
-                        case SimaiNoteType.Touch:
-                            TouchFinishedCount++;
-                            break;
-                    }
-                }
-                else
-                {
-                    if (note.Type == SimaiNoteType.Slide)
-                    {
+                    case SimaiNoteType.Tap:
+                        TapFinishedCount++;
+                        break;
+                    case SimaiNoteType.Hold:
+                    case SimaiNoteType.TouchHold:
+                        HoldFinishedCount++;
+                        break;
+                    case SimaiNoteType.Slide:
                         if (!note.IsSlideNoHead)
-                            BreakFinishedCount++;
+                            TapFinishedCount++;
                         if (note.IsSlideBreak)
                             BreakFinishedCount++;
                         else
                             SlideFinishedCount++;
-                    }
-                    else
-                    {
-                        BreakFinishedCount++;
-                    }
+                        break;
+                    case SimaiNoteType.Touch:
+                        TouchFinishedCount++;
+                        break;
                 }
             }
-        });
+            else
+            {
+                if (note.Type == SimaiNoteType.Slide)
+                {
+                    if (!note.IsSlideNoHead)
+                        BreakFinishedCount++;
+                    if (note.IsSlideBreak)
+                        BreakFinishedCount++;
+                    else
+                        SlideFinishedCount++;
+                }
+                else
+                {
+                    BreakFinishedCount++;
+                }
+            }
+        }
     }
 
     public void ProcessReportRequests()
     {
         if (reportRequests.Length == 0) return;
 
-        foreach (var entry in reportRequests.AsParallelReader())
+        var length = reportRequests.Length;
+        for (int i = 0; i < length; i++)
         {
+            var entry = reportRequests[i];
             ReportResult(entry.NoteType, entry.Grade, entry.IsBreak, updateAcc: false);
         }
         UpdateAccRate();

@@ -73,7 +73,7 @@ public class ScreenRecorder : MonoBehaviour
         var muxArgs =
             "-hide_banner -y " +
             $"-i \"{videoName}\" -i \"{wavName}\" " +
-            "-c:v copy -c:a aac -b:a 320k -shortest " +
+            "-c:v copy -c:a aac -b:a 320k " +
             $"\"{finalName}\"";
 
         // 2. vars
@@ -137,7 +137,7 @@ public class ScreenRecorder : MonoBehaviour
         }
 
         // 7. wav
-        _audioManager.ExportFinalWav(Path.Combine(maidataPath, wavName));
+        _audioManager.ExportFinalWav(Path.Combine(maidataPath, wavName), recordingElapsedTime);
 
         // 8. mux
         var muxCmd = $"cd \"{maidataPath}\" && ffmpeg {muxArgs}";

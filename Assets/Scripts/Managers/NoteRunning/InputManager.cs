@@ -13,8 +13,6 @@ using TouchPhase = UnityEngine.InputSystem.TouchPhase;
 
 public class InputManager : MonoBehaviour
 {
-    public AutoPlayMode Mode { get; set; }
-
     RenderGroup<HitRenderData> _hitGroup;
 
     private void Awake()
