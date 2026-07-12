@@ -41,13 +41,17 @@ public unsafe struct EachLineUpdateJob : IJobParallelFor
 
         el.scale = clampedDistance / 4.8f;
 
+        // sortTime (30 bits): [19 bits: time (87 mins wrap)] + [11 bits: index tie-breaker (2048 wrap)]
+        var timePart = ((uint)math.max(0f, el.time * 100f)) & 0x7FFFF;
+        var sortTime = ((timePart << 11) | (uint)(index & 0x7FF)) & 0x3FFFFFFF;
+
         var idx = Interlocked.Increment(ref *EachLinesWriteCountPtr) - 1;
         eachLinesRender[idx] = new LineRenderData
         {
             angRad = math.radians(el.ang),
             scale = el.scale,
             spriteId = el.lineSprite,
-            sort = (uint)math.clamp(el.time * 100f, 0f, 0xFFFFF),
+            sort = sortTime,
         };
     }
 }

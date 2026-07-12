@@ -93,8 +93,10 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
 
         var color = new float4(1, 1, 1, slide.slideAlpha);
 
-        var sortTime = (uint)math.clamp(slide.tapTime * 100f, 0f, 0xFFFFF);
-        var timePart = slide.legacySlideLayer ? (0xFFFFFu - sortTime) : sortTime;
+        // sortTime (30 bits): [19 bits: time (87 mins wrap)] + [11 bits: index tie-breaker (2048 wrap)]
+        var timeVal = ((uint)math.max(0f, slide.tapTime * 100f)) & 0x7FFFF;
+        var timePart = slide.legacySlideLayer ? (0x7FFFFu - timeVal) : timeVal;
+        var sortTime = ((timePart << 11) | (uint)(index & 0x7FF)) & 0x3FFFFFFF;
 
         // 现在 wifi 也含路径起终点了
         // 第一个是路径起点，最后一个是路径终点，忽略不画，倒数第二个要看情况
@@ -117,7 +119,8 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
                 spriteId = slide.isWifi ? slide.slideSprite + (uint)i - 1 : slide.slideSprite,
                 color = color,
                 brightness = slide.brightness,
-                sort = (timePart << 8) | (uint)i,
+                // sort (32 bits): [19 bits: time] + [5 bits: slide tie-breaker (32 wrap)] + [8 bits: arrow path i (256 wrap)]
+                sort = (timePart << 13) | ((uint)(index & 0x1F) << 8) | ((uint)i & 0xFF),
             };
         }
     }
@@ -126,8 +129,10 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
     {
         if (slide.starAlpha <= 0) return;
 
-        var sortTime = (uint)math.clamp(slide.tapTime * 100f, 0f, 0xFFFFF);
-        var timePart = slide.legacySlideLayer ? (0xFFFFFu - sortTime) : sortTime;
+        // sortTime (30 bits): [19 bits: time (87 mins wrap)] + [11 bits: index tie-breaker (2048 wrap)]
+        var timeVal = ((uint)math.max(0f, slide.tapTime * 100f)) & 0x7FFFF;
+        var timePart = slide.legacySlideLayer ? (0x7FFFFu - timeVal) : timeVal;
+        var sortTime = ((timePart << 11) | (uint)(index & 0x7FF)) & 0x3FFFFFFF;
         if (!slide.isWifi)
         {
             var idxLast = slide.slideArrowsCount - 1; //这里借助路径起终点画star
@@ -160,7 +165,7 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
                 exSprite = 0,
                 exColor = float4.zero,
                 sliceBorder = new float2(0, 0),
-                sort = 0x100000u + timePart,
+                sort = 0x40000000u | sortTime,
             };
         }
         else
@@ -185,7 +190,7 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
                     exSprite = 0,
                     exColor = float4.zero,
                     sliceBorder = new float2(0, 0),
-                    sort = 0x100000u + timePart,
+                    sort = 0x40000000u | sortTime,
                 };
             }
         }

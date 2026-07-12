@@ -63,7 +63,9 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
         // ---- Invisible ----
         if (destScale < 0f) return;
 
-        var sortTime = (uint)math.clamp(hold.time * 100f, 0f, 0xFFFFF);
+        // sortTime (30 bits): [19 bits: time (87 mins wrap)] + [11 bits: index tie-breaker (2048 wrap)]
+        var timePart = ((uint)math.max(0f, hold.time * 100f)) & 0x7FFFF;
+        var sortTime = ((timePart << 11) | (uint)(index & 0x7FF)) & 0x3FFFFFFF;
 
         // ---- shine ----
         if (hold.isBreak)           // break shine

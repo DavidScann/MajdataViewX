@@ -49,7 +49,9 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
     {
         if (th.isEnd) return;
 
-        var sortTime = (uint)math.clamp(th.time * 100f, 0f, 0xFFFFF);
+        // sortTime (30 bits): [19 bits: time (87 mins wrap)] + [11 bits: index tie-breaker (2048 wrap)]
+        var timePart = ((uint)math.max(0f, th.time * 100f)) & 0x7FFFF;
+        var sortTime = ((timePart << 11) | (uint)(index & 0x7FF)) & 0x3FFFFFFF;
 
         var timing = th.usingSV
             ? TimeData.FakeNoteTime - TimeData.GetPositionAtTime(th.time)
@@ -131,7 +133,7 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
                 spriteId = th.fanSprite + (uint)i,
                 color = color,
                 brightness = 1f,
-                sort = (sortTime << 4) | 0x3,
+                sort = (sortTime << 2) | 0x3,
             };
         }
 
@@ -144,7 +146,7 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
             spriteId = th.pointSprite,
             color = color,
             brightness = 1f,
-            sort = (sortTime << 4) | 0x2,
+            sort = (sortTime << 2) | 0x2,
         };
 
         var borderIdx = Interlocked.Increment(ref *MaskWriteCountPtr) - 1;

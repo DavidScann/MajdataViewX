@@ -41,7 +41,9 @@ public unsafe struct TouchUpdateJob : IJobParallelFor
     {
         if (touch.isEnd) return;
 
-        var sortTime = (uint)math.clamp(touch.time * 100f, 0f, 0xFFFFF);
+        // sortTime (30 bits): [19 bits: time (87 mins wrap)] + [11 bits: index tie-breaker (2048 wrap)]
+        var timePart = ((uint)math.max(0f, touch.time * 100f)) & 0x7FFFF;
+        var sortTime = ((timePart << 11) | (uint)(index & 0x7FF)) & 0x3FFFFFFF;
 
         var timing = touch.usingSV
             ? TimeData.FakeNoteTime - TimeData.GetPositionAtTime(touch.time)
@@ -90,7 +92,7 @@ public unsafe struct TouchUpdateJob : IJobParallelFor
                 spriteId = touch.fanSprite,
                 color = new float4(1, 1, 1, touch.fanAlpha),
                 brightness = 1f,
-                sort = (sortTime << 4) | 0x3,
+                sort = (sortTime << 2) | 0x3,
             };
         }
 
@@ -103,7 +105,7 @@ public unsafe struct TouchUpdateJob : IJobParallelFor
             spriteId = touch.pointSprite,
             color = new float4(1, 1, 1, touch.fanAlpha),
             brightness = 1f,
-            sort = (sortTime << 4) | 0x2,
+            sort = (sortTime << 2) | 0x2,
         };
 
         if (timing > -0.02f)
@@ -117,7 +119,7 @@ public unsafe struct TouchUpdateJob : IJobParallelFor
                 spriteId = touch.justSprite,
                 color = new float4(1),
                 brightness = 1f,
-                sort = (sortTime << 4) | 0x1,
+                sort = (sortTime << 2) | 0x1,
             };
         }
 
@@ -135,7 +137,7 @@ public unsafe struct TouchUpdateJob : IJobParallelFor
                     spriteId = (uint)sprite,
                     color = new float4(1, 1, 1, touch.fanAlpha),
                     brightness = 1f,
-                    sort = sortTime << 4,
+                    sort = sortTime << 2,
                 };
             }
             else
@@ -149,7 +151,7 @@ public unsafe struct TouchUpdateJob : IJobParallelFor
                     spriteId = (uint)sprite,
                     color = new float4(1, 1, 1, touch.fanAlpha),
                     brightness = 1f,
-                    sort = sortTime << 4,
+                    sort = sortTime << 2,
                 };
             }
         }
