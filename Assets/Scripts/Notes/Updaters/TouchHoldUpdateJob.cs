@@ -187,6 +187,7 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
                     {
                         th.holdPercent = 1f;
                         EndNote(ref th);
+                        return;
                     }
                 }
                 break;
@@ -208,6 +209,7 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
                     {
                         th.holdPercent = 1f;
                         EndNote(ref th);
+                        return;
                     }
                 }
                 break;

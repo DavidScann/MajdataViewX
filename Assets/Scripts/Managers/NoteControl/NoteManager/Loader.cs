@@ -125,7 +125,7 @@ public partial class NoteManager
             return;
         }
 
-        _objectCounter.CountIgnoreNoteCountAsync(timing.Notes).Forget();
+        _objectCounter.CountIgnoreNoteCountAsync(timing.Notes);
     }
 
     private void CalcEach(in SimaiTimingPoint timing, out bool isNoteEach, out bool isSlideEach)

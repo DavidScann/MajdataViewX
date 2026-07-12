@@ -1,9 +1,8 @@
 #region
 
+using ManagedBass;
 using System;
 using System.IO;
-using ManagedBass;
-using UnityEngine;
 
 #endregion
 
@@ -79,7 +78,6 @@ public class AudioSample : IDisposable
     {
         get
         {
-            EnsureStream(nameof(Length));
             return _length;
         }
     }
@@ -105,6 +103,10 @@ public class AudioSample : IDisposable
         {
             _handle = Bass.SampleLoad(file, 0, 0, max, BassFlags.SampleOverrideLongestPlaying);
             Decode = Bass.SampleGetChannel(_handle);
+
+            _length = Bass.ChannelBytes2Seconds(
+                Decode,
+                Bass.ChannelGetLength(Decode));
         }
         _baseFrequency =
             (float)Bass.ChannelGetAttribute(

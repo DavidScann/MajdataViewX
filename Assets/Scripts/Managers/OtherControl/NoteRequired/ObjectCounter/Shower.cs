@@ -104,7 +104,7 @@ public partial class ObjectCounter : MonoBehaviour
         }
         if (type is UIType.TrgUI)
         {
-            switch (_inputManager.Mode)
+            switch (NoteHelper.AutoPlayMode)
             {
                 case AutoPlayMode.Enable:
                     objAutoMode.text = "ENABLED\nNONE";
@@ -285,7 +285,15 @@ public partial class ObjectCounter : MonoBehaviour
                 TapFinishedCount, HoldFinishedCount, SlideFinishedCount, TouchFinishedCount, BreakFinishedCount,
                 TapSum, HoldSum, SlideSum, TouchSum, BreakSum,
                 NoteFinishedCount, NoteSum,
-                _inputManager.Mode
+                NoteHelper.AutoPlayMode switch
+                {
+                    AutoPlayMode.Enable => "Enable",
+                    AutoPlayMode.DJAutoButton => "DJAuto (Btn)",
+                    AutoPlayMode.DJAutoSensor => "DJAuto",
+                    AutoPlayMode.Random => "Random",
+                    AutoPlayMode.Disable => "Disable",
+                    _ => "INVALID"
+                }
             );
 
             objectRate.text = string.Format(

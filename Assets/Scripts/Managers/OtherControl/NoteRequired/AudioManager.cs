@@ -35,14 +35,14 @@ public class AudioManager
     List<AnswerTimingPoint> answerTimingPoints = new();
     private readonly object answerSfxLock = new();
     //note SFX
-    //DO NOT USE THIS IN THIS FILE, MAY CAUSE AtomicSafetyHandle Exception
+    //DO NOT USE THIS IN THIS FILE, MAY CAUSE AtomicSafetyHandle Exception, WE DONT CARE THIS
     public NativeArray<bool> noteSfxPlaybackRequests = new(SFX_COUNT, Allocator.Persistent);
     public unsafe bool* SfxRequestsPtr => (bool*)noteSfxPlaybackRequests.GetUnsafePtr();
     private unsafe bool* _sfxPtr;    // USE THIS INSTEAD
 
     List<AudioSample> NoteSfxs = new(SFX_COUNT);
 
-    //SFX for recording
+    //for recording
     private List<float[]> noteSfxSamplesData = new(SFX_COUNT);
     private float[] recordingBuffer;
     private float recordingInitialAudioTime;
@@ -429,7 +429,9 @@ public class AudioManager
         recordingSpeed = Math.Max(speed, 0.01f);
         var trackOffset = TRACK_ANSWER_PLAYBACK_OFFSET_SEC + (float)GlobalAudioOffset;
         var trackOutputStartTime = trackOffset - recordingInitialAudioTime;
-        var leadAndTail = Math.Max(TimeProvider.SONG_DETAIL_OFFSET + 8f, trackOutputStartTime + 8f);
+        var leadAndTail = trackOutputStartTime
+            + TimeProvider.SONG_DETAIL_OFFSET
+            + NoteSfxs[ALL_PERFECT].Length;
         var totalLen = TrackSample!.Length / recordingSpeed + leadAndTail; // 留给开头演出和结尾AP音效
         var size = (int)(totalLen * SAMPLERATE * CHANNELS);
         recordingBuffer = new float[size];
@@ -522,8 +524,46 @@ public class AudioManager
         }
     }
 
-    public void ExportFinalWav(string outputPath)
+    public void ExportFinalWav(string outputPath, float recordingElapsedTime)
     {
+        // Flush remaining playing SFXs and calculate max required time
+        float maxTime = recordingElapsedTime;
+
+        var bufferStartPos = (int)(recordingElapsedTime * SAMPLERATE) * CHANNELS;
+        for (var i = 0; i < sfxPlayPointers.Length; i++)
+        {
+            if (i == TRACK_START || sfxPlayPointers[i] == null) continue;
+            var pointers = sfxPlayPointers[i];
+            var sfxData = noteSfxSamplesData[i];
+            var vol = NoteSfxs[i].Volume;
+
+            for (var p = 0; p < pointers.Length; p++)
+            {
+                if (pointers[p] != -1)
+                {
+                    int remain = sfxData.Length - pointers[p];
+                    float endTime = recordingElapsedTime + ((float)remain / CHANNELS / SAMPLERATE);
+                    if (endTime > maxTime) maxTime = endTime;
+
+                    for (int j = 0; j < remain; j++)
+                    {
+                        var dstIdx = bufferStartPos + j;
+                        if (dstIdx >= 0 && dstIdx < recordingBuffer.Length)
+                        {
+                            var mixed = recordingBuffer[dstIdx] + sfxData[pointers[p] + j] * vol;
+                            recordingBuffer[dstIdx] = Math.Clamp(mixed, -1.0f, 1.0f);
+                        }
+                    }
+                    pointers[p] = -1;
+                }
+            }
+        }
+
+        int requiredSize = (int)(maxTime * SAMPLERATE) * CHANNELS;
+        requiredSize = (requiredSize / CHANNELS) * CHANNELS;
+        requiredSize = Math.Min(requiredSize, recordingBuffer.Length);
+        Array.Resize(ref recordingBuffer, requiredSize);
+
         // track start
         var trackStartSampleData = noteSfxSamplesData[TRACK_START];
         for (var i = 0; i < trackStartSampleData.Length; i++)
