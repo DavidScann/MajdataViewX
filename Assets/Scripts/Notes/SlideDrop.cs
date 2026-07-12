@@ -410,8 +410,8 @@ public class SlideDrop : NoteLongBase, ICanShine
                     case AutoPlayMode.Disable:
                         if (_inputManager.Mode == AutoPlayMode.DJAuto)
                         {
-                            judgeResult = JudgeType.Perfect;
-                            isJudged = true;
+                            judgeQueue.Clear();
+                            Judge();
                         }
                         else
                             TooLateJudge();
@@ -462,11 +462,6 @@ public class SlideDrop : NoteLongBase, ICanShine
                     {
                         judgeQueue = judgeQueue.Skip((int)(process * (judgeQueue.Count - 1))).ToList();
                         HideBar(areaStep[(int)(process * (areaStep.Count - 1))]);
-                    }
-                    else if (_inputManager.Mode == AutoPlayMode.DJAuto)
-                    {
-                        judgeResult = JudgeType.Perfect;
-                        isJudged = true;
                     }
                     break;
             }
