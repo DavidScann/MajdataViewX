@@ -90,7 +90,7 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
             th.judgeGrade,
             th.isHolding
         );
-        NoteHelper.SetTouchHoldSound(SfxRequests, th.isHolding);
+        // NoteHelper.SetTouchHoldSound(SfxRequests, th.isHolding);
 
         // ---- hold on/off skin ----
         if (th.LastFor > (NoteHelper.HOLD_HEAD_IGNORE_LENGTH_SEC + NoteHelper.HOLD_TAIL_IGNORE_LENGTH_SEC) && // 忽略短hold
@@ -312,7 +312,8 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
 
     private void EndNote(ref TouchHoldData th)
     {
-        NoteHelper.SetTouchHoldSound(SfxRequests, false);
+        // NoteHelper.SetTouchHoldSound(SfxRequests, false);
+        th.isHolding = false;
 
         if (th.isBreak)
             NoteHelper.PlayTapSound(SfxRequests,

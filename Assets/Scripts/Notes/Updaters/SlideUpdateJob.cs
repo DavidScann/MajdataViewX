@@ -201,26 +201,20 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
         switch (NoteHelper.AutoPlayMode)
         {
             case AutoPlayMode.Enable:
-                // TODO: 平滑slide动画 == False
-                slide.eaten = math.max((int)(slide.process * slide.slideArrowsCount - 2), 0);
-                if (!slide.isSoundPlayed)
-                {
-                    NoteHelper.PlaySlideSound(SfxRequests,
-                        slide.isBreak
-                    );
-                    slide.isSoundPlayed = true;
-                }
-
-                if (slide.LastFor - timing <= 0)
-                {
-                    slide.judgeGrade = JudgeGrade.LateCritical;
-                    slide.isJudged = true;
-                    CompleteSlide(ref slide);
-                }
-                break;
             case AutoPlayMode.Random:
-                // TODO: 平滑slide动画 == False
-                slide.eaten = math.max((int)(slide.process * slide.slideArrowsCount - 2), 0);
+                if (slide.smoothSlideAnime)
+                {
+                    slide.eaten = math.max((int)(slide.process * slide.slideArrowsCount - 2), 0);
+                }
+                else
+                {
+                    var idxF = slide.process * (slide.judgeQueueCount - 1);
+                    var idx = (int)idxF;
+                    slide.eaten = idxF - idx >= 0.5f
+                        ? slide.judgeQueue[idx].ArrowProgressFinish
+                        : slide.judgeQueue[idx].ArrowProgressPush;
+                }
+
                 if (!slide.isSoundPlayed)
                 {
                     NoteHelper.PlaySlideSound(SfxRequests,
@@ -231,10 +225,17 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
 
                 if (slide.LastFor - timing <= 0)
                 {
-                    var grade = (JudgeGrade)GlobalRandom.NextInt((int)JudgeGrade.FastGood, (int)JudgeGrade.Miss);
-                    slide.judgeGrade = slide.isMine
-                        ? (grade < JudgeGrade.FastPerfect3rd ? JudgeGrade.Miss : JudgeGrade.LateCritical)
-                        : grade;
+                    if (NoteHelper.AutoPlayMode is AutoPlayMode.Enable)
+                    {
+                        slide.judgeGrade = JudgeGrade.LateCritical;
+                    }
+                    else
+                    {
+                        var grade = (JudgeGrade)GlobalRandom.NextInt((int)JudgeGrade.FastGood, (int)JudgeGrade.Miss);
+                        slide.judgeGrade = slide.isMine
+                            ? (grade < JudgeGrade.FastPerfect3rd ? JudgeGrade.Miss : JudgeGrade.LateCritical)
+                            : grade;
+                    }
                     slide.isJudged = true;
                     CompleteSlide(ref slide);
                 }
@@ -244,7 +245,6 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
                 if (!slide.isWifi)
                 {
                     InputData.HandleWorldPosition(slide.starPos);
-
                 }
                 else
                 {

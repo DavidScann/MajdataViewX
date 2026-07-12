@@ -88,7 +88,7 @@ public class AudioSample : IDisposable
 
     public bool IsPlaying => State == PlaybackState.Playing;
 
-    public AudioSample(string file, AudioMode mode, int max = 64)
+    public AudioSample(string file, AudioMode mode, int max = 1)
     {
         Mode = mode;
 
@@ -120,23 +120,42 @@ public class AudioSample : IDisposable
         }
         else
         {
-            Decode = Bass.SampleGetChannel(_handle);
-            Bass.ChannelSetAttribute(
-                Decode,
-                ChannelAttribute.Volume,
-                _volume);
-            Bass.ChannelPlay(Decode, true);
+            var channels = Bass.SampleGetChannels(_handle);
+            if (channels != null && channels.Length > 0)
+            {
+                foreach (var ch in channels)
+                    Bass.ChannelPlay(ch, false);
+            }
+            else
+            {
+                PlayOneShot();
+            }
         }
     }
 
     public void Pause()
     {
-        Bass.ChannelPause(Decode);
+        if (Mode == AudioMode.Sample)
+        {
+            var channels = Bass.SampleGetChannels(_handle);
+            if (channels != null)
+            {
+                foreach (var ch in channels)
+                    Bass.ChannelPause(ch);
+            }
+        }
+        else
+        {
+            Bass.ChannelPause(Decode);
+        }
     }
 
     public void Stop()
     {
-        Bass.ChannelStop(Decode);
+        if (Mode == AudioMode.Sample)
+            Bass.SampleStop(_handle);
+        else
+            Bass.ChannelStop(Decode);
     }
 
     public void PlayOneShot()

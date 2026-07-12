@@ -241,6 +241,17 @@ public partial class NoteManager : MonoBehaviour
             _objectCounter.ProcessReportRequests();
             MajBurst.InputData.ApplyNextIndices();
 
+            // 思来想去在th内做加减确实不比在这里遍历一次快
+            // 去他妈的可读性 反正我ArrayBoundCheck off
+            {
+                int activeTouchHolds = 0;
+                for (int i = 0; i < touchHolds.Length; i++)
+                {
+                    if (touchHolds[i].isHolding) activeTouchHolds++;
+                }
+                _audioManager.ActiveTouchHoldCount = activeTouchHolds;
+            }
+
             _isJobScheduledThisFrame = false;
         }
 
