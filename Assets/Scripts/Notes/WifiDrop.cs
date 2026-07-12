@@ -471,7 +471,13 @@ public class WifiDrop : NoteLongBase, ICanShine
                         return;
                     case AutoPlayMode.DJAuto:
                     case AutoPlayMode.Disable:
-                        TooLateJudge();
+                        if (_inputManager.Mode == AutoPlayMode.DJAuto)
+                        {
+                            judgeResult = JudgeType.Perfect;
+                            isJudged = true;
+                        }
+                        else
+                            TooLateJudge();
                         break;
                 }
                 if (IsFinished && isJudged)
@@ -506,6 +512,11 @@ public class WifiDrop : NoteLongBase, ICanShine
                     {
                         judgeQueues.ForEach(queue => queue.Skip((int)(process * (queue.Count - 1))).ToList());
                         HideBar(areaStep[(int)(process * (areaStep.Count - 1))]);
+                    }
+                    else if (_inputManager.Mode == AutoPlayMode.DJAuto)
+                    {
+                        judgeResult = JudgeType.Perfect;
+                        isJudged = true;
                     }
                     break;
             }

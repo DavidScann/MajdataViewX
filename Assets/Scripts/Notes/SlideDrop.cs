@@ -408,7 +408,13 @@ public class SlideDrop : NoteLongBase, ICanShine
                         return;
                     case AutoPlayMode.DJAuto:
                     case AutoPlayMode.Disable:
-                        TooLateJudge();
+                        if (_inputManager.Mode == AutoPlayMode.DJAuto)
+                        {
+                            judgeResult = JudgeType.Perfect;
+                            isJudged = true;
+                        }
+                        else
+                            TooLateJudge();
                         break;
                 }
                 star_slide.transform.position = slidePositions.LastOrDefault();
@@ -456,6 +462,11 @@ public class SlideDrop : NoteLongBase, ICanShine
                     {
                         judgeQueue = judgeQueue.Skip((int)(process * (judgeQueue.Count - 1))).ToList();
                         HideBar(areaStep[(int)(process * (areaStep.Count - 1))]);
+                    }
+                    else if (_inputManager.Mode == AutoPlayMode.DJAuto)
+                    {
+                        judgeResult = JudgeType.Perfect;
+                        isJudged = true;
                     }
                     break;
             }
