@@ -244,7 +244,7 @@ public class TapBase : NoteBase
     {
         if (PlayManager.IsReloading) return;
         _effectManager.PlayEffect(startPosition, isBreak, (JudgeGrade)judgeResult);
-        _effectManager.PlayFastLate(startPosition, (JudgeGrade)judgeResult);
+        _effectManager.PlayFastLate(startPosition, (JudgeGrade)judgeResult, transform.position);
         _noteJudgeManager.NextNote(startPosition);
         _objectCounter.ReportResult(SimaiNoteType.Tap, (JudgeGrade)judgeResult, isBreak);
         _inputManager.UnbindArea(Check, sensor);
