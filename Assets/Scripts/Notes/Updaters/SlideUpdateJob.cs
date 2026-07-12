@@ -387,19 +387,24 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
             {
                 var second = queue[cur + 1];
                 var isSecondLast = cur + 2 >= queueCount;
-                if (InputData.GetSensorState(second.SensorA).Status)
+                var sensorState = InputData.GetSensorState(second.SensorA);
+                if (sensorState.Status || sensorState.IsPadUp)  // 计算跳区时本帧刚刚松开的区被认为依然按下
                 {
                     currentOn = second.SensorA;
                     changed = true;
                     cur++;
                     if (isSecondLast) cur++;  // 最后一个区不需要松手
                 }
-                else if (second.SensorB >= SensorType.A1 && InputData.GetSensorState(second.SensorB).Status)
+                else if (second.SensorB >= SensorType.A1)
                 {
-                    currentOn = second.SensorB;
-                    changed = true;
-                    cur++;
-                    if (isSecondLast) cur++;  // 最后一个区不需要松手
+                    sensorState = InputData.GetSensorState(second.SensorB);
+                    if (sensorState.Status || sensorState.IsPadUp)
+                    {
+                        currentOn = second.SensorB;
+                        changed = true;
+                        cur++;
+                        if (isSecondLast) cur++;  // 最后一个区不需要松手
+                    }
                 }
             }
 

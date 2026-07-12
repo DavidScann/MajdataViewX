@@ -7,6 +7,7 @@ using System.Linq;
 using System.Text;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
+using Unity.Mathematics;
 using UnityEngine;
 using static MajCtx;
 
@@ -540,7 +541,7 @@ public partial class NoteManager
 
             IsStar = note.IsForceStar,
             IsDouble = false,
-            RotateSpeed = note.IsFakeRotate ? -440f : 0,
+            RotateSpeed = note.IsFakeRotate ? -3f : 0,    // (117.8)1-5[4:1] 的旋转速度
 
             IsEach = isEach,
             IsEx = note.IsEx,
@@ -640,6 +641,12 @@ public partial class NoteManager
             var slideArrowsCount = metadata.ArrowPoses.Length;
             loadedSlidePoseArrays.Add(metadata.ArrowPoses);
 
+            // RotateSpeed = 1 时是每秒转 180 度
+            // 官机算法是 转速 = (同头星星总长 * 15) / (总时间 * pi)，长度单位像素，时间单位ms，转速单位度/帧，转速最大是18
+            // 这里 SlideLength 是 100ppu，SlideTime 是秒
+            // TODO:同头slide速度平均，IsDouble判定
+            var rotateSpeed = math.min(6f, metadata.SlideLength / ((float)note.SlideTime * 2 * math.PI));
+
             if (!note.IsSlideNoHead)
             {
                 var starTap = new TapData
@@ -651,7 +658,7 @@ public partial class NoteManager
                     SensorOrderIndex = _sensorOrderIndex[note.StartPosition - 1]++,
                     IsStar = true,
                     IsDouble = false,
-                    RotateSpeed = 0,
+                    RotateSpeed = rotateSpeed,
                     IsEach = isNoteEach,
                     IsEx = note.IsEx,
                     IsBreak = note.IsSlideBreak,
@@ -737,6 +744,12 @@ public partial class NoteManager
             var slideArrowsCount = metadata.ArrowPoses.Length;
             loadedSlidePoseArrays.Add(metadata.ArrowPoses);
 
+            // RotateSpeed = 1 时是每秒转 180 度
+            // 官机算法是 转速 = 同头星星总长 / (总时间 * 15 * pi)，长度单位像素，时间单位ms，转速单位度/帧，转速最大是18
+            // 这里 SlideLength 是 100ppu，SlideTime 是秒
+            // TODO:同头slide速度平均，IsDouble判定
+            var rotateSpeed = math.min(6f, metadata.SlideLength / ((float)note.SlideTime * 2 * math.PI));
+
             if (!note.IsSlideNoHead)
             {
                 var starTapD = new TapData
@@ -748,7 +761,7 @@ public partial class NoteManager
                     SensorOrderIndex = _sensorOrderIndex[note.StartPosition - 1]++,
                     IsStar = true,
                     IsDouble = false,
-                    RotateSpeed = 0,
+                    RotateSpeed = rotateSpeed,
                     IsEach = isNoteEach,
                     IsEx = note.IsEx,
                     IsBreak = note.IsBreak,
