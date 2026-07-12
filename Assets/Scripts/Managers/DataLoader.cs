@@ -314,44 +314,42 @@ public class DataLoader : MonoBehaviour
         touchMembers.Clear();
         foreach (var note in timing.Notes)
         {
-            // if (note.Type == SimaiNoteType.Tap)
-            // {
-            //     GameObject GOnote;
-            //     TapBase NDCompo;
+            if (note.Type == SimaiNoteType.Tap)
+            {
+                GameObject GOnote;
+                TapBase NDCompo;
 
-            //     if (note.IsForceStar)
-            //     {
-            //         GOnote = Instantiate(starPrefab, notes.transform);
-            //         var _NDCompo = GOnote.GetComponent<StarDrop>();
+                if (note.IsForceStar)
+                {
+                    GOnote = Instantiate(starPrefab, notes.transform);
+                    var _NDCompo = GOnote.GetComponent<StarDrop>();
 
-            //         _NDCompo.isFakeStarRotate = note.IsFakeRotate;
-            //         _NDCompo.isFakeStar = true;
-            //         NDCompo = _NDCompo;
-            //     }
-            //     else
-            //     {
-            //         GOnote = Instantiate(tapPrefab, notes.transform);
-            //         NDCompo = GOnote.GetComponent<TapDrop>();
-            //     }
+                    _NDCompo.isFakeStarRotate = note.IsFakeRotate;
+                    _NDCompo.isFakeStar = true;
+                    NDCompo = _NDCompo;
+                }
+                else
+                {
+                    GOnote = Instantiate(tapPrefab, notes.transform);
+                    NDCompo = GOnote.GetComponent<TapDrop>();
+                }
 
-            //     // note的图层顺序
-            //     NDCompo.noteSortOrder = noteSortOrder;
-            //     noteSortOrder -= NOTE_LAYER_COUNT[note.Type];
+                NDCompo.noteSortOrder = noteSortOrder;
+                noteSortOrder -= NOTE_LAYER_COUNT[note.Type];
 
-            //     if (timing.Notes.Length > 1) NDCompo.isEach = true;
-            //     NDCompo.isBreak = note.IsBreak;
-            //     NDCompo.isEx = note.IsEx;
-            //     NDCompo.isMine = note.IsMine;
-            //     NDCompo.usingSV = note.UsingSV;
-            //     NDCompo.tapLine = tapLine;
-            //     NDCompo.time = (float)timing.Timing;
-            //     NDCompo.startPosition = note.StartPosition;
-            //     NDCompo.speed = noteSpeed * timing.HSpeed;
+                if (timing.Notes.Length > 1) NDCompo.isEach = true;
+                NDCompo.isBreak = note.IsBreak;
+                NDCompo.isEx = note.IsEx;
+                NDCompo.isMine = note.IsMine;
+                NDCompo.usingSV = note.UsingSV;
+                NDCompo.tapLine = tapLine;
+                NDCompo.time = (float)timing.Timing;
+                NDCompo.startPosition = note.StartPosition;
+                NDCompo.speed = noteSpeed * timing.HSpeed;
 
-            //     _noteManager.AddNote(NDCompo, noteIndex[note.StartPosition]++);
-            // }
-            // else 
-            if (note.Type == SimaiNoteType.Hold)
+                _noteJudgeManager.AddNote(NDCompo, noteIndex[note.StartPosition]++);
+            }
+            else if (note.Type == SimaiNoteType.Hold)
             {
                 var GOnote = Instantiate(holdPrefab, notes.transform);
                 var NDCompo = GOnote.GetComponent<HoldDrop>();

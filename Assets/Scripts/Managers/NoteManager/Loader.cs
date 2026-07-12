@@ -22,32 +22,6 @@ public partial class NoteManager
             switch (note.Type)
             {
                 case SimaiNoteType.Tap:
-                    {
-                        var tapLine = new TapLineData();
-                        var tapEx = new TapExData();
-                        var tap = new TapData
-                        {
-                            time = (float)timing.Timing,
-                            key = (SensorType)(note.StartPosition - 1),
-                            speed = NoteSpeed * timing.HSpeed,
-
-                            tapLine = tapLine,
-                            tapEx = tapEx,
-
-                            isStar = note.IsForceStar,
-                            isDouble = false,
-                            rotateSpeed = note.IsFakeRotate ? -440f : 0,
-
-                            isEach = timing.Notes.Length > 1,
-                            isEx = note.IsEx,
-                            isBreak = note.IsBreak,
-                            isMine = note.IsMine,
-                            usingSV = note.UsingSV
-                        };
-                        tap.Init();
-
-                        taps.Add(tap);
-                    }
                     break;
             }
         }

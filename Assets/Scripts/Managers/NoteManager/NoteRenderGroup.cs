@@ -30,7 +30,7 @@ public class NoteRenderGroup : IDisposable
         _rp = new(mat)
         {
             worldBounds = new Bounds(new Vector3(0, 0, -0.1f * priority), Vector3.one * 10000),
-            //rendererPriority = rendererPriority,
+            rendererPriority = 1000,
             matProps = _mpb
         };
 
