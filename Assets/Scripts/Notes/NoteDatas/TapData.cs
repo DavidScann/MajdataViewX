@@ -28,7 +28,8 @@ public struct TapData
     // outs
     public float2 Pos { get; set; }
     public float Scale { get; set; }
-    public float Ang { get; set; }
+    public float AngleKey { get; set; }
+    public float AngleRot { get; set; }
     public float Brightness { get; set; }
 
     //sprite
@@ -48,7 +49,8 @@ public struct TapData
     {
         Pos = float2.zero;
         Scale = 1f;
-        Ang = -22.5f + -45f * (int)Key;
+        AngleKey = -22.5f + -45f * (int)Key;
+        AngleRot = AngleKey;
         Brightness = 1f;
 
         // Load Skin
