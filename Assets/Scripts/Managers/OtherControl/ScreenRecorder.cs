@@ -83,7 +83,7 @@ public class ScreenRecorder : MonoBehaviour
 
         IsRecording = true;
 
-        var isTouchHoldRising = false;
+        var activeTouchHoldCount = 0;
 
         var deltaTime = 1.0f / fps;
         var recordingElapsedTime = 0f;
@@ -108,7 +108,7 @@ public class ScreenRecorder : MonoBehaviour
             {
                 // 5. recording
                 await UniTask.WaitForEndOfFrame(this);
-                ProcessSfx(deltaTime, recordingElapsedTime, ref isTouchHoldRising);
+                ProcessSfx(deltaTime, recordingElapsedTime, ref activeTouchHoldCount);
                 RenderTexture.active = null;
                 cpuTex.ReadPixels(new Rect(0, 0, Screen.width, Screen.height), 0, 0);
                 var raw = cpuTex.GetRawTextureData();
@@ -159,7 +159,7 @@ public class ScreenRecorder : MonoBehaviour
         _bgManager.PauseVideo();
     }
 
-    private void ProcessSfx(float deltaTime, float recordingElapsedTime, ref bool isTouchHoldRising)
+    private void ProcessSfx(float deltaTime, float recordingElapsedTime, ref int prevTouchHoldCount)
     {
         if (_audioManager.IsShowingSongDetail)
             return;
@@ -167,34 +167,27 @@ public class ScreenRecorder : MonoBehaviour
         _audioManager.UpdateAnswerSfx();
         for (var i = 0; i < _audioManager.noteSfxPlaybackRequests.Length; i++)
         {
-            if (i == AudioManager.TRACK_START) continue;
+            if (i == AudioManager.TRACK_START || i == AudioManager.TOUCHHOLD) continue;
 
-            if (i == AudioManager.TOUCHHOLD)
-            {
-                var isRequested = _audioManager.noteSfxPlaybackRequests[i];
-                if (isRequested)
-                {
-                    if (!isTouchHoldRising)
-                    {
-                        isTouchHoldRising = true;
-                        _audioManager.TriggerSfxRecording(AudioManager.TOUCHHOLD);
-                    }
-                }
-                else
-                {
-                    if (isTouchHoldRising)
-                    {
-                        isTouchHoldRising = false;
-                        _audioManager.StopSfxRecording(AudioManager.TOUCHHOLD);
-                    }
-                }
-            }
-            else if (_audioManager.noteSfxPlaybackRequests[i])
+            if (_audioManager.noteSfxPlaybackRequests[i])
             {
                 _audioManager.TriggerSfxRecording(i);
                 _audioManager.noteSfxPlaybackRequests[i] = false;
             }
         }
+        
+        int currentCount = _audioManager.ActiveTouchHoldCount;
+        if (currentCount > prevTouchHoldCount)
+        {
+            int diff = currentCount - prevTouchHoldCount;
+            for (int i = 0; i < diff; i++) _audioManager.TriggerSfxRecording(AudioManager.TOUCHHOLD);
+        }
+        else if (currentCount == 0 && prevTouchHoldCount > 0)
+        {
+            _audioManager.StopSfxRecording(AudioManager.TOUCHHOLD);
+        }
+        prevTouchHoldCount = currentCount;
+
         _audioManager.UpdateSfxRecording(deltaTime, recordingElapsedTime);
     }
 

@@ -1,9 +1,12 @@
 public enum SampleType
 {
-    Answer,
     Track,
+    Answer,
     Tap,
     Slide,
     Break,
-    Touch
+    BreakSlide,
+    Ex,
+    Touch,
+    Hanabi
 }
