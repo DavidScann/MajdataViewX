@@ -3,11 +3,18 @@ using Unity.Mathematics;
 
 public static class MajPos
 {
-    public const float A_RADIUS = 0.987f;
-    public const float B_RADIUS = 0.673f;
-    public const float C_RADIUS = 1.215f;
-    public const float D_RADIUS = 0.974f;
-    public const float E_RADIUS = 0.515f;
+    // 从 muridx 抄的，但是加大了一圈
+    public const float A_RADIUS = 1.10f;
+    public const float B_RADIUS = 0.85f;
+    public const float C_RADIUS = 1.15f;
+    public const float D_RADIUS = 0.75f;
+    public const float E_RADIUS = 0.70f;
+    
+    // public const float A_RADIUS = 0.987f;
+    // public const float B_RADIUS = 0.673f;
+    // public const float C_RADIUS = 1.215f;
+    // public const float D_RADIUS = 0.974f;
+    // public const float E_RADIUS = 0.515f;
 
     [BurstCompile]
     public static float GetSensorRadius(SensorType sensor)
@@ -40,7 +47,7 @@ public static class MajPos
     }
 
     /// <summary>
-    /// 获取判定区的世界坐标
+    /// 获取判定区的世界坐标，这是 Touch 的位置
     /// </summary>
     /// <param name="sensor">判定区</param>
     /// <returns></returns>
@@ -51,17 +58,17 @@ public static class MajPos
         if (i >= 0 && i <= 7)
             return RingPos(4.1f, i + 1, false);
         if (i >= 8 && i <= 15)
-            return RingPos(2.3f, i - 7, false);
+            return RingPos(2.2f, i - 7, false);
         if (i == 16)
             return float2.zero;
         if (i >= 17 && i <= 24)
             return RingPos(4.1f, i - 16, true);
         if (i >= 25 && i <= 32)
-            return RingPos(3.0f, i - 24, true);
+            return RingPos(3.1f, i - 24, true);
         return float2.zero;
     }
     [BurstCompile]
-    private static float2 RingPos(float radius, int index1, bool altAngle)
+    public static float2 RingPos(float radius, int index1, bool altAngle)
     {
         var a = altAngle
             ? (index1 * -2f + 6f) * 0.125f * math.PI

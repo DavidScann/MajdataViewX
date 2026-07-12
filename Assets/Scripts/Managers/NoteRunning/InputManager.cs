@@ -1,6 +1,5 @@
 #nullable enable
 
-using System.Collections.Generic;
 using System.Threading;
 using Unity.Burst;
 using Unity.Collections;
@@ -8,7 +7,6 @@ using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.InputSystem;
-using Unity.Jobs;
 using static MajBurst;
 using static MajCtx;
 using TouchPhase = UnityEngine.InputSystem.TouchPhase;
@@ -30,7 +28,12 @@ public class InputManager : MonoBehaviour
         var sensors = GameObject.Find("SensorRects").transform;
         for (var i = 0; i < SENSOR_COUNT; i++)
         {
-            InputData.SensorWorldPositions[i] = (Vector2)sensors.GetChild(i).transform.position;
+            // 这里是抄的 muridx 的参数，其中除了 D 区以外，其他判定区恰好和 touch 坐标重合
+            if (i >= 17 && i <= 24)
+                // D 区用于计算触摸圆的坐标与其 touch 坐标不同
+                InputData.SensorWorldPositions[i] = MajPos.RingPos(4.4f, i - 16, true);
+            else
+                InputData.SensorWorldPositions[i] = MajPos.GetAreaPos((SensorType)i);
         }
 
         //REMEMBER TO FORCE INCLUDE
