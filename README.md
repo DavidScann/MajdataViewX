@@ -12,18 +12,8 @@
 
 # 注意 / ATTENTION
 
-- **该项目为个人维护修改版本() / Community-maintained fork**
+- **该项目fork自/ fork from:** [MajdataView&Edit](https://github.com/LingFeng-bbben/MajdataView)
 - **扩展包下载 / Extension Package**： [MajMuriDX Release](https://github.com/re-poem/MajdataViewX/releases/tag/MajMuriDX)
-- **更改包中的ThemeConfig.json来回退到旧的UI配色！ / Edit the ThemeConfig.json in the package to use the legacy UI !**
-```
-{
-  "LabelForeground": "#FFBDBDBD",
-  "ButtonForeground": "#FFFFFFFF",
-  "HelperForeground": "#FF569CD6",
-  "WindowBackground": "#FF5A6275",
-  "ButtonsBackground": "#99303030"
-}
-```
 - **如果下载了runtime仍无法使用，试试这个链接 / If you still can't use it after downloading the runtime, try this link**: [runtime download](https://dotnet.microsoft.com/zh-cn/download/dotnet/thank-you/runtime-6.0.36-windows-x64-installer)
 
 ## 下载 / Download
