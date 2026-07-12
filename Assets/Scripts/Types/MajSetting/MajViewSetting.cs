@@ -2,7 +2,7 @@
 {
     public float TapSpeed { get; set; } = 7.5f;
     public float TouchSpeed { get; set; } = 7.5f;
-    public bool SmoothSlideAnime { get; set; } = true;
+    public bool SmoothSlideAnime { get; set; } = false;
     public float BackgroundDim { get; set; } = 0.7f;
     public BgInfoDisplay ComboStatusType { get; set; } = BgInfoDisplay.Combo;
     public AutoPlayMode AutoMode { get; set; } = AutoPlayMode.Enable;

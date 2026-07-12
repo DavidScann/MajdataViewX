@@ -225,7 +225,7 @@ public class NoteSkinManager : MonoBehaviour
     public static readonly float4 Ex = new(1f, 0.7176471f, 0.9098039f, 1f);
     public static readonly float4 Ex_Each = new(1f, 0.9607843f, 0.3647059f, 1f);
     public static readonly float4 Ex_Star = new(0f, 0.8f, 1f, 1f);
-    public static readonly float4 Ex_Break = new(0f, 0.74509805f, 0.3137255f, 1f);
+    public static readonly float4 Ex_Break = new(1f, 0.74509805f, 0.3137255f, 1f);
 
     public const float HoldBaseWidth = 1.22f;              // legacy spriteRenderer.size.x
     public const float HoldCapAllowance = 1.4f;            // legacy total sprite height

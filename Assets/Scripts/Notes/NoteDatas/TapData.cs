@@ -61,7 +61,7 @@ public struct TapData
                 TapSprite = STAR_DOUBLE;
                 LineSprite = LINE_STAR;
                 ExSprite = STAR_EX_DOUBLE;
-                ExColor = Ex;
+                ExColor = Ex_Star;
                 if (IsEach)
                 {
                     TapSprite = STAR_EACH_DOUBLE;
@@ -88,7 +88,7 @@ public struct TapData
                 TapSprite = STAR;
                 LineSprite = LINE_STAR;
                 ExSprite = STAR_EX;
-                ExColor = Ex;
+                ExColor = Ex_Star;
                 if (IsEach)
                 {
                     TapSprite = STAR_EACH;

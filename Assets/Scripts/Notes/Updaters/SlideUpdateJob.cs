@@ -209,15 +209,31 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
             case AutoPlayMode.Random:
                 if (slide.smoothSlideAnime)
                 {
-                    slide.eaten = math.max((int)(slide.process * slide.slideArrowsCount - 2), 0);
+                    // 普通 slide 在先前 TransformUpdate 的时候计算过 processIdx 可以直接拿来用，wifi 没有这个
+                    slide.eaten = slide.isWifi ? math.max((int)(slide.process * slide.slideArrowsCount - 2), 0) : slide.processIdx;
                 }
-                else
+                else if (slide.isWifi)
                 {
+                    // wifi 没有 processIdx
                     var idxF = slide.process * (slide.judgeQueueCount - 1);
                     var idx = (int)idxF;
                     slide.eaten = idxF - idx >= 0.5f
                         ? slide.judgeQueue[idx].ArrowProgressFinish
                         : slide.judgeQueue[idx].ArrowProgressPush;
+                }
+                else
+                {
+                    // slide 各判定区长度差异很大（conn slide更严重）所以直接 lerp 不是很好看
+                    // 不过普通 slide 可以直接用 processIdx，这里借用一下 judgeCurrent 存储目前到哪个区了
+                    if (slide.processIdx > slide.judgeQueue[slide.judgeCurrent].ArrowProgressFinish)
+                    {
+                        slide.eaten = slide.judgeQueue[slide.judgeCurrent].ArrowProgressFinish;
+                        slide.judgeCurrent++;
+                    } 
+                    else if (slide.processIdx > slide.judgeQueue[slide.judgeCurrent].ArrowProgressPush)
+                    {
+                        slide.eaten = slide.judgeQueue[slide.judgeCurrent].ArrowProgressPush;
+                    }
                 }
 
                 if (!slide.isSoundPlayed)
