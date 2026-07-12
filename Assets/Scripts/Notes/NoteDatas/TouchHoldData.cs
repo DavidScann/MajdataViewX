@@ -37,7 +37,6 @@ public struct TouchHoldData
     public uint borderSprite;
     public uint _borderOnSpriteCache;
 
-    public bool SensorLastState { get; set; }
     public bool isHeadJudged;
     public JudgeGrade judgeGrade;
     public float headDiff;

@@ -202,7 +202,7 @@ public unsafe struct TouchUpdateJob : IJobParallelFor
 
         if (touch.isMine)
         {
-            var mineOn = MajBurst.InputData.GetSensorState(touch.sensor).Status;
+            var mineOn = InputData.GetSensorState(touch.sensor).Status;
             if (mineOn && diffSec >= -NoteHelper.TAP_JUDGE_GOOD_AREA_MSEC / 1000f)
             {
                 touch.judgeGrade = JudgeGrade.Miss;
@@ -228,21 +228,21 @@ public unsafe struct TouchUpdateJob : IJobParallelFor
             return;
         }
 
-        var stateOn = MajBurst.InputData.GetSensorState(touch.sensor).Status;
+        var clicked = InputData.GetSensorState(touch.sensor).IsPadDown;
 
         if (touch.groupId != -1)
         {
             if (touchGroupJudgedCounts[touch.groupId] * 2 > touchGroupTotalCounts[touch.groupId])
             {
-                stateOn = true;
+                clicked = true;
             }
         }
 
-        if (!stateOn) return;
+        if (!clicked) return;
 
         var diffMSec = diffSec * 1000;
         if (diffMSec < -NoteHelper.TOUCH_JUDGE_SEG_1ST_PERFECT_MSEC) return;
-        if (!MajBurst.InputData.CanJudgeSensor(touch.sensor, touch.sensorOrderIndex)) return;
+        if (!InputData.CanJudgeSensor(touch.sensor, touch.sensorOrderIndex)) return;
 
         touch.judgeGrade = NoteHelper.GetTouchJudge(diffSec);
         touch.isJudged = true;
@@ -278,7 +278,7 @@ public unsafe struct TouchUpdateJob : IJobParallelFor
             SimaiNoteType.Touch
         );
 
-        MajBurst.InputData.NextTouch(touch.sensor);
+        InputData.NextTouch(touch.sensor);
         MajBurst.MultTouchHandler.Unregister(touch.sensor);
         if (touch.isAppeared)
         {

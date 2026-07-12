@@ -215,7 +215,7 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
             case AutoPlayMode.DJAutoSensor:
                 if (!th.isHeadJudged || math.max(th.LastFor - timing, 0) > 0)
                 {
-                    InputData.DJAutoAddGroupCoverage(touchHoldGroupCoverResults[th.coverageId]);
+                    InputData.DJAutoAddGroupCoverage(touchHoldGroupCoverResults[th.coverageId], th.LastFor);
                 }
                 break;
         }
@@ -254,8 +254,7 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
                 }
             }
 
-            var clicked = _on && !th.SensorLastState;
-            th.SensorLastState = _on;
+            var clicked = InputData.GetSensorState(th.sensor).IsPadDown;
 
             if (!clicked) return;
             var diffMSec = timing * 1000;
@@ -343,7 +342,7 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
             SimaiNoteType.TouchHold
         );
 
-        MajBurst.InputData.NextTouch(th.sensor);
+        InputData.NextTouch(th.sensor);
         th.isEnd = true;
     }
 }

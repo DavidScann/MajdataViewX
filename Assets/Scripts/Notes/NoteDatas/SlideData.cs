@@ -45,7 +45,7 @@ public struct SlideData
     public SensorType currentOn;    // Invalid就是没按，否则就是正在按的区
     public SensorType currentOnL;
     public SensorType currentOnR;
-    
+
     public unsafe SlidePose* slideArrows;
     // 注意第一个是起点最后一个是终点不需要画箭头
     public int slideArrowsCount;
@@ -77,11 +77,10 @@ public struct SlideData
 
     public bool isJudged;
     public JudgeGrade judgeGrade;
-    
-    // MAYBE TODO: 咱就是说要不把这个类型给统一一下，要byte的话就所有和判定区数量相关的全都用byte
-    public byte judgeCurrent; //SLide / Wifi Center
-    public byte judgeL_Current; //Wifi Left
-    public byte judgeR_Current; //Wifi Right
+
+    public int judgeCurrent; //SLide / Wifi Center
+    public int judgeL_Current; //Wifi Left
+    public int judgeR_Current; //Wifi Right
 
     // Animation state
     public float fadeInStartTiming;
@@ -105,7 +104,7 @@ public struct SlideData
         currentOn = SensorType.Invalid;
         currentOnL = SensorType.Invalid;
         currentOnR = SensorType.Invalid;
-        
+
 
         // 计算Slide淡入时机
         // 8.0速时应当提前300ms显示Slide

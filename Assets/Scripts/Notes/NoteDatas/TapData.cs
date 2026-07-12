@@ -38,8 +38,6 @@ public struct TapData
     public float4 ExColor { get; set; }
 
     // state
-    public bool ButtonLastState { get; set; }
-    public bool SensorLastState { get; set; }
     public bool IsJudged { get; set; }
     public float Diff { get; set; }
     public JudgeGrade JudgeGrade { get; set; }

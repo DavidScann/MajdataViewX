@@ -183,32 +183,37 @@ public unsafe struct InputDataB
 
 
     // ==========button/sensor management==========
+
+    // 非handle部分，我们规定60fps下djauto抬手会黏在上面2帧
+    // 所以简单为其加上 2 * FRAME_LENGTH_SEC
+
+
     public readonly SensorState GetButtonState(SensorType type) => _buttonStates[(int)type];
     public readonly SensorState GetSensorState(SensorType type) => _sensorStates[(int)type];
 
     /// <summary>
     /// DJAuto按键处理Tap/Hold
     /// </summary>
-    /// <param name="holdFrames">持续帧数，注意始终有2帧抬手延迟</param>
-    public void DJAutoSetButtonOn(SensorType type, int holdFrames = 0)
+    /// <param name="holdDuration">持续时间，注意始终有2游戏帧抬手延迟</param>
+    public void DJAutoSetButtonOn(SensorType type, float holdDuration = 0f)
     {
         ref var button = ref _buttonStates.ElementRef((int)type);
-        Interlocked.Exchange(ref button.HoldFrames, math.max(button.HoldFrames, holdFrames + 2));
+        Interlocked.Exchange(ref button.HoldDuration, math.max(button.HoldDuration, holdDuration + 2 * FRAME_LENGTH_SEC));
     }
     /// <summary>
     /// DJAuto判定区处理Tap/Hold
     /// </summary>
-    /// <param name="holdFrames">持续帧数，注意始终有2帧抬手延迟</param>
-    public void DJAutoSetSensorOn(SensorType type, int holdFrames = 0)
+    /// <param name="holdDuration">持续时间，注意始终有2游戏帧抬手延迟</param>
+    public void DJAutoSetSensorOn(SensorType type, float holdDuration = 0f)
     {
         ref var sensor = ref _sensorStates.ElementRef((int)type);
-        Interlocked.Exchange(ref sensor.HoldFrames, math.max(sensor.HoldFrames, holdFrames + 2));
+        Interlocked.Exchange(ref sensor.HoldDuration, math.max(sensor.HoldDuration, holdDuration + 2 * FRAME_LENGTH_SEC));
     }
     /// <summary>
     /// DJAuto处理Touch/TouchHold（寻找大手圆）
     /// </summary>
     /// <param name="cover"></param>
-    public void DJAutoAddGroupCoverage(CoverResult cover)
+    public void DJAutoAddGroupCoverage(CoverResult cover, float holdDuration = 0f)
     {
         if (cover.Mode == CoverMode.None) return;
 
@@ -248,11 +253,17 @@ public unsafe struct InputDataB
 
                 if (hits)
                 {
-                    DJAutoSetSensorOn((SensorType)s);
+                    DJAutoSetSensorOn((SensorType)s, holdDuration);
                 }
             }
         }
     }
+
+    // handle 部分，下一帧可以直接获取信息，holdDuration意义不大，
+    // 如果这一帧有任何输入事件设为 0.001f，那么这一帧只能读到 On，
+    // 下一帧刷新减掉大于 0.001f 的 deltaTime，这一帧只能读到 Off，
+    // ->但如果这一帧有任何输入事件设为 0.001f，那么这一帧只能读到 On，
+    // 所以这个流程不管帧率多少都精确还原用户输入/slide update输入
 
     public void BeginHandler()
     {
@@ -260,12 +271,34 @@ public unsafe struct InputDataB
         for (int i = 0; i < BUTTON_COUNT; i++)
         {
             ref var button = ref _buttonStates.ElementRef(i);
-            if (button.HoldFrames > 0) button.HoldFrames--;
+            button.LastHoldDuration = button.HoldDuration;
+            if (button.HoldDuration > 0)
+            {
+                if (button.HoldDuration < TimeData.deltaTime)
+                {
+                    button.HoldDuration = 0;
+                }
+                else
+                {
+                    button.HoldDuration -= TimeData.deltaTime;
+                }
+            }
         }
         for (int i = 0; i < SENSOR_COUNT; i++)
         {
             ref var sensor = ref _sensorStates.ElementRef(i);
-            if (sensor.HoldFrames > 0) sensor.HoldFrames--;
+            sensor.LastHoldDuration = sensor.HoldDuration;
+            if (sensor.HoldDuration > 0)
+            {
+                if (sensor.HoldDuration < TimeData.deltaTime)
+                {
+                    sensor.HoldDuration = 0;
+                }
+                else
+                {
+                    sensor.HoldDuration -= TimeData.deltaTime;
+                }
+            }
         }
     }
     public void HandleButtonInput(SensorType type, bool status)
@@ -273,7 +306,7 @@ public unsafe struct InputDataB
         if (status)
         {
             ref var button = ref _buttonStates.ElementRef((int)type);
-            Interlocked.Exchange(ref button.HoldFrames, math.max(button.HoldFrames, 1));
+            Interlocked.Exchange(ref button.HoldDuration, math.max(button.HoldDuration, 0.001f));
         }
     }
     public void HandleWorldPosition(in float2 pos, float radius = DJAUTO_HAND_RADIUS)
@@ -290,7 +323,7 @@ public unsafe struct InputDataB
             if (distSq <= combinedSq)
             {
                 ref var sensor = ref _sensorStates.ElementRef(i);
-                Interlocked.Exchange(ref sensor.HoldFrames, math.max(sensor.HoldFrames, 1));
+                Interlocked.Exchange(ref sensor.HoldDuration, math.max(sensor.HoldDuration, 0.001f));
             }
         }
 
@@ -425,6 +458,10 @@ public unsafe struct InputDataB
 
 public struct SensorState
 {
-    public readonly bool Status => HoldFrames > 0;
-    public int HoldFrames;
+    public readonly bool Status => HoldDuration > 0;
+    public readonly bool IsPadDown => LastHoldDuration <= 0 && HoldDuration > 0;
+    public readonly bool IsPadUp => LastHoldDuration > 0 && HoldDuration <= 0;
+
+    public float HoldDuration;
+    public float LastHoldDuration;
 }

@@ -81,16 +81,16 @@ public class TimeProvider : MonoBehaviour
         }
         else
         {
-            if (MajCtx._audioManager != null && MajCtx._audioManager.IsTrackPlaying)
+            if (_audioManager != null && _audioManager.IsTrackPlaying)
             {
-                double trackOffset = AudioManager.TRACK_ANSWER_PLAYBACK_OFFSET_SEC + MajCtx._audioManager.GlobalAudioOffset;
-                double targetAudioTime = MajCtx._audioManager.TrackCurrentSec + trackOffset;
-                
+                double trackOffset = AudioManager.TRACK_ANSWER_PLAYBACK_OFFSET_SEC + _audioManager.GlobalAudioOffset;
+                double targetAudioTime = _audioManager.TrackCurrentSec + trackOffset;
+
                 double currentExpected = startAt + accumulated + (Time.realtimeSinceStartupAsDouble - startRealtime) * speed;
                 double diff = targetAudioTime - currentExpected;
-                
+
                 // If the difference is large (e.g. paused/resumed or huge lag), snap it.
-                if (System.Math.Abs(diff) > 0.1)
+                if (Math.Abs(diff) > 0.1)
                 {
                     accumulated += diff;
                 }

@@ -186,7 +186,7 @@ public partial class NoteManager
         }
         var errorMsg = sb.ToString();
         Debug.LogError(errorMsg);
-        _wsServer?.Error(errorMsg);
+        _wsServer.Error(errorMsg);
     }
 
     private unsafe void LoadTiming(in SimaiTimingPoint timing)
@@ -708,30 +708,30 @@ public partial class NoteManager
             var slideMetaDatas = GetSlidesFromRawContent(noteContent, out var startPos, out var endPos);
             SlideMetadata metadata;
             metadata = slideMetaDatas.Count == 1 ? slideMetaDatas[0] : SlideTableNeo.MakeConnSlide(slideMetaDatas);
-            
+
             var unskippable1 = -1;
             var unskippable2 = -1;
             switch (metadata.Flag)
             {
                 case SlideFlag.NormalV:
-                {
-                    unskippable1 = 1;
-                    break;
-                }
+                    {
+                        unskippable1 = 1;
+                        break;
+                    }
                 case SlideFlag.SpecialV:
-                {
-                    unskippable1 = 1;
-                    unskippable2 = 3;
-                    break;
-                }
+                    {
+                        unskippable1 = 1;
+                        unskippable2 = 3;
+                        break;
+                    }
                 default:
-                {
-                    if (metadata.JudgeAreaQueue.Length <= 3)
-                        unskippable1 = metadata.JudgeAreaQueue.Length - 2;
-                    break;
-                }
+                    {
+                        if (metadata.JudgeAreaQueue.Length <= 3)
+                            unskippable1 = metadata.JudgeAreaQueue.Length - 2;
+                        break;
+                    }
             }
-            
+
             var judgeQueueCount = metadata.JudgeAreaQueue.Length;
             loadedSlideAreaArrays.Add(metadata.JudgeAreaQueue);
             var slideArrowsCount = metadata.ArrowPoses.Length;

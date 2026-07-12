@@ -266,15 +266,15 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
                 }
                 break;
             case AutoPlayMode.DJAutoButton:
-                if (!hold.isHeadJudged || math.max(hold.LastFor - timing, 0) > 0)
+                if (!hold.isHeadJudged)
                 {
-                    InputData.DJAutoSetButtonOn(hold.Key);
+                    InputData.DJAutoSetButtonOn(hold.Key, hold.LastFor);
                 }
                 break;
             case AutoPlayMode.DJAutoSensor:
-                if (!hold.isHeadJudged || math.max(hold.LastFor - timing, 0) > 0)
+                if (!hold.isHeadJudged)
                 {
-                    InputData.DJAutoSetSensorOn(hold.Key);
+                    InputData.DJAutoSetSensorOn(hold.Key, hold.LastFor);
                 }
                 break;
         }
@@ -307,12 +307,8 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
                 return;
             }
 
-            var buttonOn = InputData.GetButtonState(hold.Key).Status;
-            var sensorOn = InputData.GetSensorState(hold.Key).Status;
-            var buttonClicked = buttonOn && !hold.ButtonLastState;
-            var sensorClicked = sensorOn && !hold.SensorLastState;
-            hold.ButtonLastState = buttonOn;
-            hold.SensorLastState = sensorOn;
+            var buttonClicked = InputData.GetButtonState(hold.Key).IsPadDown;
+            var sensorClicked = InputData.GetSensorState(hold.Key).IsPadDown;
 
             var clicked = sensorClicked || buttonClicked;
 
@@ -392,7 +388,7 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
             hold.isBreak,
             SimaiNoteType.Hold
         );
-        MajBurst.InputData.NextTapHold(
+        InputData.NextTapHold(
             hold.Key
         );
         hold.isEnd = true;

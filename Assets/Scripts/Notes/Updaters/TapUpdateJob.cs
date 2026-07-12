@@ -151,12 +151,8 @@ public unsafe struct TapUpdateJob : IJobParallelFor
 
         var diffSec = TimeData.NoteTime - tap.Time;
 
-        var buttonOn = InputData.GetButtonState(tap.Key).Status;
-        var sensorOn = InputData.GetSensorState(tap.Key).Status;
-        var buttonClicked = buttonOn && !tap.ButtonLastState;
-        var sensorClicked = sensorOn && !tap.SensorLastState;
-        tap.ButtonLastState = buttonOn;
-        tap.SensorLastState = sensorOn;
+        var buttonClicked = InputData.GetButtonState(tap.Key).IsPadDown;
+        var sensorClicked = InputData.GetSensorState(tap.Key).IsPadDown;
 
         var clicked = sensorClicked || buttonClicked;
 
@@ -223,7 +219,7 @@ public unsafe struct TapUpdateJob : IJobParallelFor
             tap.IsBreak,
             SimaiNoteType.Tap
         );
-        MajBurst.InputData.NextTapHold(
+        InputData.NextTapHold(
             tap.Key
         );
         tap.IsEnd = true;

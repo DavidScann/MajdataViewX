@@ -101,7 +101,7 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
         // 现在 wifi 也含路径起终点了
         // 第一个是路径起点，最后一个是路径终点，忽略不画，倒数第二个要看情况
         var startIdx = slide.eaten + 1;
-        var endIdx = slide.noLastArrow? cnt - 2 : cnt - 1;
+        var endIdx = slide.noLastArrow ? cnt - 2 : cnt - 1;
         var writeCount = math.max(0, endIdx - startIdx);
 
         if (writeCount <= 0) return;
@@ -343,28 +343,28 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
     }
 
     // 检查 area 队列，更新 sensor On/Off 状态并推进游标
-    private void ProcessAreas(ref SlideData slide, SlideArea* queue, int queueCount, ref byte cur, ref SensorType currentOn)
+    private void ProcessAreas(ref SlideData slide, SlideArea* queue, int queueCount, ref int cur, ref SensorType currentOn)
     {
         if (cur >= queueCount) return;
-        
+
         var changed = false;
         do
         {
             changed = false;
-            
+
             var first = queue[cur];
             var hasSecond = cur + 1 < queueCount;
-            
+
             // 先看当前第一个区
             if (currentOn <= SensorType.Invalid)  // 第一个区还没按
             {
-                if (MajBurst.InputData.GetSensorState(first.SensorA).Status)
+                if (InputData.GetSensorState(first.SensorA).Status)
                 {
                     currentOn = first.SensorA;
                     changed = true;
                     if (!hasSecond) cur++;  // 最后一个区不需要松手
                 }
-                else if (first.SensorB >= SensorType.A1 && MajBurst.InputData.GetSensorState(first.SensorB).Status)
+                else if (first.SensorB >= SensorType.A1 && InputData.GetSensorState(first.SensorB).Status)
                 {
                     currentOn = first.SensorB;
                     changed = true;
@@ -373,28 +373,28 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
             }
             else // 第一个区已经按下了
             {
-                if (!MajBurst.InputData.GetSensorState(currentOn).Status)
+                if (!InputData.GetSensorState(currentOn).Status)
                 {
                     currentOn = SensorType.Invalid;
                     changed = true;
                     cur++;
                 }
             }
-            
+
             // 然后看当前第二个区，注意当第一个区已经按下时一定可以跳区
             var skippable = (cur != slide.unskippable1 && cur != slide.unskippable2 || currentOn >= SensorType.A1);
             if (!changed && hasSecond && skippable)
             {
                 var second = queue[cur + 1];
                 var isSecondLast = cur + 2 >= queueCount;
-                if (MajBurst.InputData.GetSensorState(second.SensorA).Status)
+                if (InputData.GetSensorState(second.SensorA).Status)
                 {
                     currentOn = second.SensorA;
                     changed = true;
                     cur++;
                     if (isSecondLast) cur++;  // 最后一个区不需要松手
                 }
-                else if (second.SensorB >= SensorType.A1 && MajBurst.InputData.GetSensorState(second.SensorB).Status)
+                else if (second.SensorB >= SensorType.A1 && InputData.GetSensorState(second.SensorB).Status)
                 {
                     currentOn = second.SensorB;
                     changed = true;
