@@ -164,10 +164,9 @@ public class ScreenRecorder : MonoBehaviour
         if (_audioManager.IsShowingSongDetail)
             return;
 
-        _audioManager.UpdateAnswerSfx();
         for (var i = 0; i < _audioManager.noteSfxPlaybackRequests.Length; i++)
         {
-            if (i == AudioManager.TRACK_START || i == AudioManager.TOUCHHOLD) continue;
+            if (i == AudioManager.TRACK_START || i == AudioManager.TOUCHHOLD || i == AudioManager.ANSWER || i == AudioManager.ANSWER_CLOCK) continue;
 
             if (_audioManager.noteSfxPlaybackRequests[i])
             {
@@ -175,7 +174,7 @@ public class ScreenRecorder : MonoBehaviour
                 _audioManager.noteSfxPlaybackRequests[i] = false;
             }
         }
-        
+
         int currentCount = _audioManager.ActiveTouchHoldCount;
         if (currentCount > prevTouchHoldCount)
         {

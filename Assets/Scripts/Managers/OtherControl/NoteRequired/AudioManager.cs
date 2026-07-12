@@ -535,10 +535,36 @@ public class AudioManager
             }
         }
 
-
-        var trackOffset = TRACK_ANSWER_PLAYBACK_OFFSET_SEC +
-                            (float)GlobalAudioOffset;
+        var trackOffset = TRACK_ANSWER_PLAYBACK_OFFSET_SEC + (float)GlobalAudioOffset;
         var initialTrackSec = recordingInitialAudioTime - trackOffset;
+
+        // sample-accurate answers
+        var answerData = noteSfxSamplesData[ANSWER];
+        var answerClockData = noteSfxSamplesData[ANSWER_CLOCK];
+        var answerVol = NoteSfxs[ANSWER].Volume;
+        var answerClockVol = NoteSfxs[ANSWER_CLOCK].Volume;
+
+        foreach (var timing in answerTimingPoints)
+        {
+            float exactOutputSec = (timing.Timing - initialTrackSec) / recordingSpeed;
+            if (exactOutputSec < 0) continue;
+
+            int startSample = (int)(exactOutputSec * SAMPLERATE);
+            int startIdx = startSample * CHANNELS;
+
+            var sfxData = timing.IsClock ? answerClockData : answerData;
+            var vol = timing.IsClock ? answerClockVol : answerVol;
+
+            for (int i = 0; i < sfxData.Length; i++)
+            {
+                int dstIdx = startIdx + i;
+                if (dstIdx >= 0 && dstIdx < recordingBuffer.Length)
+                {
+                    var mixed = recordingBuffer[dstIdx] + sfxData[i] * vol;
+                    recordingBuffer[dstIdx] = Math.Clamp(mixed, -1.0f, 1.0f);
+                }
+            }
+        }
         var trackStartFrameCount = (int)((initialTrackSec + TimeProvider.SONG_DETAIL_OFFSET) * SAMPLERATE * recordingSpeed);
         var trackFrameCount = TrackSampleData.Length / CHANNELS;
         var recordingFrameCount = recordingBuffer.Length / CHANNELS;
