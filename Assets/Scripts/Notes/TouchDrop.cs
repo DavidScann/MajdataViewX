@@ -190,11 +190,11 @@ public class TouchDrop : NoteBase
                     isJudged = true;
                     break;
                 case AutoPlayMode.DJAuto:
-                    if (isMine)
-                        judgeResult = JudgeType.Miss;
-                    else
-                        judgeResult = JudgeType.Perfect;
-                    isJudged = true;
+                    if (isTriggered)
+                        return;
+                    if (!isMine) //mine buda
+                        _inputManager.ClickSensor(sensor);
+                    isTriggered = true;
                     break;
                 case AutoPlayMode.Disable:
                 default:

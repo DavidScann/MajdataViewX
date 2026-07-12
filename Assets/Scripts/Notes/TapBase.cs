@@ -81,11 +81,12 @@ public class TapBase : NoteBase
                     isJudged = true;
                     break;
                 case AutoPlayMode.DJAuto:
-                    if (isMine)
-                        judgeResult = JudgeType.Miss;
-                    else
-                        judgeResult = JudgeType.Perfect;
-                    isJudged = true;
+                    if (isTriggered)
+                        break;
+                    //mine就不打了
+                    if (!isMine)
+                        _inputManager.ClickArea(sensor);
+                    isTriggered = true;
                     break;
             }
         }
@@ -164,7 +165,7 @@ public class TapBase : NoteBase
             return;
         if (isJudged || !_noteJudgeManager.CanJudge(gameObject, startPosition))
             return;
-        if (_inputManager.Mode is AutoPlayMode.Enable or AutoPlayMode.Random or AutoPlayMode.DJAuto)
+        if (_inputManager.Mode is AutoPlayMode.Enable or AutoPlayMode.Random)
             return;
 
         if (arg.IsClick)
@@ -243,7 +244,7 @@ public class TapBase : NoteBase
     {
         if (PlayManager.IsReloading) return;
         _effectManager.PlayEffect(startPosition, isBreak, (JudgeGrade)judgeResult);
-        _effectManager.PlayFastLate(startPosition, (JudgeGrade)judgeResult, transform.position);
+        _effectManager.PlayFastLate(startPosition, (JudgeGrade)judgeResult);
         _noteJudgeManager.NextNote(startPosition);
         _objectCounter.ReportResult(SimaiNoteType.Tap, (JudgeGrade)judgeResult, isBreak);
         _inputManager.UnbindArea(Check, sensor);
