@@ -7,6 +7,7 @@ using System.Linq;
 using System.Text;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
+using Unity.Mathematics;
 using UnityEngine;
 using static MajCtx;
 
@@ -540,7 +541,7 @@ public partial class NoteManager
 
             IsStar = note.IsForceStar,
             IsDouble = false,
-            RotateSpeed = note.IsFakeRotate ? -440f : 0,
+            RotateSpeed = note.IsFakeRotate ? -3f : 0,    // (117.8)1-5[4:1] 的旋转速度
 
             IsEach = isEach,
             IsEx = note.IsEx,
@@ -627,6 +628,59 @@ public partial class NoteManager
     {
         var noteContent = note.RawContent;
 
+        if (!note.IsSlideNoHead)
+        {
+            // 统计与当前 slide 同头的所有 slide 的总长和总时间
+            var length = 0.0f;
+            var time = 0.0D;
+            var cnt = 0;
+            
+            // 有点丑陋，但能用
+            // 考虑到这个 method 本来就套在一层遍历里，总之是多了很多不必要的遍历
+            // TODO:使之不丑陋
+            foreach (var sn in timing.Notes)
+            {
+                if (sn.Type != SimaiNoteType.Slide) continue;
+                if (sn.IsMineSlide) continue;
+                if (sn.StartPosition != note.StartPosition) continue;
+
+                cnt++;
+                var ct = note.RawContent;
+                var meta = ct.Contains('w')
+                    ? SlideTableNeo.GetWifiSlide(ct[..3])
+                    : SlideTableNeo.MakeConnSlide(GetSlidesFromRawContent(ct, out _, out _));
+                length += meta.SlideLength;
+                time += sn.SlideTime;
+            }
+            // 注意上面的遍历也把当前正在处理的 slide 遍历到了
+            var isDouble = cnt >= 2;
+
+            // RotateSpeed = 1 时是每秒转 180 度
+            // 官机算法是 转速 = 同头星星总长 / (总时间 * 15 * pi)
+            // 长度单位像素，时间单位ms，转速单位度/帧，转速最大是 18
+            // 这里 SlideLength 是 100ppu，SlideTime 是秒
+            var rotateSpeed = math.min(6f, length / ((float)time * 2 * math.PI));
+            
+            var starTap = new TapData
+            {
+                Time = (float)timing.Timing,
+                Key = (SensorType)(note.StartPosition - 1),
+                Speed = NoteSpeed * timing.HSpeed,
+                ButtonOrderIndex = _buttonOrderIndex[note.StartPosition - 1]++,
+                SensorOrderIndex = _sensorOrderIndex[note.StartPosition - 1]++,
+                IsStar = true,
+                IsDouble = isDouble,
+                RotateSpeed = rotateSpeed,
+                IsEach = isNoteEach,
+                IsEx = note.IsEx,
+                IsBreak = note.IsBreak,
+                IsMine = note.IsMine,
+                UsingSV = note.UsingSV,
+            };
+            starTap.Init();
+            taps.Add(starTap);
+        }
+
         if (noteContent.Contains('w'))
         {
             var metadata = SlideTableNeo.GetWifiSlide(noteContent[0..3]);
@@ -639,28 +693,6 @@ public partial class NoteManager
             loadedSlideAreaArrays.Add(metadata.JudgeAreaQueueR);
             var slideArrowsCount = metadata.ArrowPoses.Length;
             loadedSlidePoseArrays.Add(metadata.ArrowPoses);
-
-            if (!note.IsSlideNoHead)
-            {
-                var starTap = new TapData
-                {
-                    Time = (float)timing.Timing,
-                    Key = (SensorType)(note.StartPosition - 1),
-                    Speed = NoteSpeed * timing.HSpeed,
-                    ButtonOrderIndex = _buttonOrderIndex[note.StartPosition - 1]++,
-                    SensorOrderIndex = _sensorOrderIndex[note.StartPosition - 1]++,
-                    IsStar = true,
-                    IsDouble = false,
-                    RotateSpeed = 0,
-                    IsEach = isNoteEach,
-                    IsEx = note.IsEx,
-                    IsBreak = note.IsSlideBreak,
-                    IsMine = note.IsMineSlide,
-                    UsingSV = note.UsingSV,
-                };
-                starTap.Init();
-                taps.Add(starTap);
-            }
 
             var slide = new SlideData
             {
@@ -690,9 +722,9 @@ public partial class NoteManager
                 unskippable2 = -1,
 
                 isEach = isSlideEach,
-                isEx = note.IsEx,
-                isBreak = note.IsBreak,
-                isMine = note.IsMine,
+                isEx = false,
+                isBreak = note.IsSlideBreak,
+                isMine = note.IsMineSlide,
                 usingSV = note.UsingSV,
                 smoothSlideAnime = SmoothSlideAnime,
                 legacySlideLayer = LegacySlideLayer,
@@ -706,8 +738,7 @@ public partial class NoteManager
         else
         {
             var slideMetaDatas = GetSlidesFromRawContent(noteContent, out var startPos, out var endPos);
-            SlideMetadata metadata;
-            metadata = slideMetaDatas.Count == 1 ? slideMetaDatas[0] : SlideTableNeo.MakeConnSlide(slideMetaDatas);
+            var metadata = slideMetaDatas.Count == 1 ? slideMetaDatas[0] : SlideTableNeo.MakeConnSlide(slideMetaDatas);
 
             var unskippable1 = -1;
             var unskippable2 = -1;
@@ -737,28 +768,6 @@ public partial class NoteManager
             var slideArrowsCount = metadata.ArrowPoses.Length;
             loadedSlidePoseArrays.Add(metadata.ArrowPoses);
 
-            if (!note.IsSlideNoHead)
-            {
-                var starTapD = new TapData
-                {
-                    Time = (float)timing.Timing,
-                    Key = (SensorType)(note.StartPosition - 1),
-                    Speed = NoteSpeed * timing.HSpeed,
-                    ButtonOrderIndex = _buttonOrderIndex[note.StartPosition - 1]++,
-                    SensorOrderIndex = _sensorOrderIndex[note.StartPosition - 1]++,
-                    IsStar = true,
-                    IsDouble = false,
-                    RotateSpeed = 0,
-                    IsEach = isNoteEach,
-                    IsEx = note.IsEx,
-                    IsBreak = note.IsBreak,
-                    IsMine = note.IsMine,
-                    UsingSV = note.UsingSV,
-                };
-                starTapD.Init();
-                taps.Add(starTapD);
-            }
-
             //ignore start/end pos
             var slideData = new SlideData
             {
@@ -782,7 +791,7 @@ public partial class NoteManager
                 unskippable2 = unskippable2,
 
                 isEach = isSlideEach,
-                isEx = note.IsEx,
+                isEx = false,
                 isBreak = note.IsSlideBreak,
                 isMine = note.IsMineSlide,
                 usingSV = note.UsingSV,

@@ -62,7 +62,7 @@ public unsafe struct TapUpdateJob : IJobParallelFor
             var lineIdx = Interlocked.Increment(ref *tapLinesWriteCountPtr) - 1;
             tapLinesRender[lineIdx] = new LineRenderData()
             {
-                angRad = math.radians(tap.Ang),
+                angRad = math.radians(tap.AngleKey),
                 scale = lineScale,
                 spriteId = tap.LineSprite,
                 sort = sortTime,
@@ -82,14 +82,14 @@ public unsafe struct TapUpdateJob : IJobParallelFor
         if (tap.IsStar && tap.RotateSpeed != 0)
         {
             var deltaRot = -180f * tap.RotateSpeed * TimeData.deltaTime;
-            tap.Ang += deltaRot;
+            tap.AngleRot += deltaRot;
         }
 
         var tapIdx = Interlocked.Increment(ref *notesWriteCountPtr) - 1;
         notesRender[tapIdx] = new NotesRenderData()
         {
             pos = tap.Pos,
-            angRad = math.radians(tap.Ang),
+            angRad = math.radians(tap.AngleRot),
             scale = tap.Scale,
             stretchY = 0,
             spriteId = tap.TapSprite,

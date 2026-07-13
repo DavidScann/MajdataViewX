@@ -27,5 +27,5 @@ public static class MajCtx
     public const int SENSOR_COUNT = 33;
 
     public const float DJAUTO_HAND_RADIUS = 0.45f;
-    public const float DJAUTO_WIFI_RADIUS = 1.80f;
+    public const float DJAUTO_WIFI_RADIUS = 1.00f;
 }

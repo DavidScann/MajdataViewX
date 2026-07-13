@@ -92,9 +92,10 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
         );
 
         // ---- hold on/off skin ----
-        if (hold.LastFor > (NoteHelper.HOLD_HEAD_IGNORE_LENGTH_SEC + NoteHelper.HOLD_TAIL_IGNORE_LENGTH_SEC) && // 忽略短hold
-            headTiming >= NoteHelper.HOLD_HEAD_IGNORE_LENGTH_SEC &&  // 忽略头6帧
-            !hold.isMine)          // 忽略mine
+        // if (hold.LastFor > (NoteHelper.HOLD_HEAD_IGNORE_LENGTH_SEC + NoteHelper.HOLD_TAIL_IGNORE_LENGTH_SEC) && // 忽略短hold
+        //     headTiming >= NoteHelper.HOLD_HEAD_IGNORE_LENGTH_SEC &&  // 忽略头6帧
+        //     !hold.isMine)          // 忽略mine
+        if (!hold.isMine && headTiming >= 0.01f)
         {
             if (hold.isHolding)
             {

@@ -209,15 +209,31 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
             case AutoPlayMode.Random:
                 if (slide.smoothSlideAnime)
                 {
-                    slide.eaten = math.max((int)(slide.process * slide.slideArrowsCount - 2), 0);
+                    // 普通 slide 在先前 TransformUpdate 的时候计算过 processIdx 可以直接拿来用，wifi 没有这个
+                    slide.eaten = slide.isWifi ? math.max((int)(slide.process * slide.slideArrowsCount - 2), 0) : slide.processIdx;
                 }
-                else
+                else if (slide.isWifi)
                 {
+                    // wifi 没有 processIdx
                     var idxF = slide.process * (slide.judgeQueueCount - 1);
                     var idx = (int)idxF;
                     slide.eaten = idxF - idx >= 0.5f
                         ? slide.judgeQueue[idx].ArrowProgressFinish
                         : slide.judgeQueue[idx].ArrowProgressPush;
+                }
+                else
+                {
+                    // slide 各判定区长度差异很大（conn slide更严重）所以直接 lerp 不是很好看
+                    // 不过普通 slide 可以直接用 processIdx，这里借用一下 judgeCurrent 存储目前到哪个区了
+                    if (slide.processIdx > slide.judgeQueue[slide.judgeCurrent].ArrowProgressFinish)
+                    {
+                        slide.eaten = slide.judgeQueue[slide.judgeCurrent].ArrowProgressFinish;
+                        slide.judgeCurrent++;
+                    } 
+                    else if (slide.processIdx > slide.judgeQueue[slide.judgeCurrent].ArrowProgressPush)
+                    {
+                        slide.eaten = slide.judgeQueue[slide.judgeCurrent].ArrowProgressPush;
+                    }
                 }
 
                 if (!slide.isSoundPlayed)
@@ -387,19 +403,24 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
             {
                 var second = queue[cur + 1];
                 var isSecondLast = cur + 2 >= queueCount;
-                if (InputData.GetSensorState(second.SensorA).Status)
+                var sensorState = InputData.GetSensorState(second.SensorA);
+                if (sensorState.Status || sensorState.IsPadUp)  // 计算跳区时本帧刚刚松开的区被认为依然按下
                 {
                     currentOn = second.SensorA;
                     changed = true;
                     cur++;
                     if (isSecondLast) cur++;  // 最后一个区不需要松手
                 }
-                else if (second.SensorB >= SensorType.A1 && InputData.GetSensorState(second.SensorB).Status)
+                else if (second.SensorB >= SensorType.A1)
                 {
-                    currentOn = second.SensorB;
-                    changed = true;
-                    cur++;
-                    if (isSecondLast) cur++;  // 最后一个区不需要松手
+                    sensorState = InputData.GetSensorState(second.SensorB);
+                    if (sensorState.Status || sensorState.IsPadUp)
+                    {
+                        currentOn = second.SensorB;
+                        changed = true;
+                        cur++;
+                        if (isSecondLast) cur++;  // 最后一个区不需要松手
+                    }
                 }
             }
 

@@ -17,7 +17,7 @@ public struct TapData
     // attrs
     public bool IsStar { get; init; }
     public bool IsDouble { get; init; }
-    public float RotateSpeed { get; init; }
+    public float RotateSpeed { get; init; }     // RotateSpeed = 1 时是每秒转 180 度
 
     public bool IsEach { get; init; }
     public bool IsEx { get; init; }
@@ -28,7 +28,8 @@ public struct TapData
     // outs
     public float2 Pos { get; set; }
     public float Scale { get; set; }
-    public float Ang { get; set; }
+    public float AngleKey { get; set; }
+    public float AngleRot { get; set; }
     public float Brightness { get; set; }
 
     //sprite
@@ -48,7 +49,8 @@ public struct TapData
     {
         Pos = float2.zero;
         Scale = 1f;
-        Ang = -22.5f + -45f * (int)Key;
+        AngleKey = -22.5f + -45f * (int)Key;
+        AngleRot = AngleKey;
         Brightness = 1f;
 
         // Load Skin
@@ -59,7 +61,7 @@ public struct TapData
                 TapSprite = STAR_DOUBLE;
                 LineSprite = LINE_STAR;
                 ExSprite = STAR_EX_DOUBLE;
-                ExColor = Ex;
+                ExColor = Ex_Star;
                 if (IsEach)
                 {
                     TapSprite = STAR_EACH_DOUBLE;
@@ -86,7 +88,7 @@ public struct TapData
                 TapSprite = STAR;
                 LineSprite = LINE_STAR;
                 ExSprite = STAR_EX;
-                ExColor = Ex;
+                ExColor = Ex_Star;
                 if (IsEach)
                 {
                     TapSprite = STAR_EACH;
