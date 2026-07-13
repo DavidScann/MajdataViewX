@@ -1,4 +1,3 @@
-#pragma warning disable CS8500
 
 using System.Runtime.CompilerServices;
 using System.Threading;

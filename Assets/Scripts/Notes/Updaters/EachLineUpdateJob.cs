@@ -1,4 +1,3 @@
-#pragma warning disable CS8500
 using System.Threading;
 using Unity.Burst;
 using Unity.Collections;

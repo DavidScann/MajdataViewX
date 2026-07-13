@@ -10,7 +10,7 @@ using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.IL2CPP.CompilerServices;
 using UnityEngine;
-using static NoteSkinManager;
+using static SkinManager;
 #nullable enable
 
 [BurstCompile]
@@ -81,7 +81,7 @@ public struct MultTouchHandler
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public readonly bool CanShowBorder(SensorType area, out bool isThree, out int sprite)
+    public readonly bool CanShowBorder(SensorType area, out bool isThree, out NoteSp sprite)
     {
         ref readonly var span = ref _spans.ElementRef((int)area);
         var diff = _activeCounts[(int)area];
@@ -104,28 +104,28 @@ public struct MultTouchHandler
             return true;
         }
 
-        static int GetSpriteId(in NoteRegister reg, bool isThree)
+        static NoteSp GetSpriteId(in NoteRegister reg, bool isThree)
         {
             if (reg.IsMine)
             {
                 if (reg.IsBreak)
                 {
-                    return !isThree ? TOUCH_BORDER_BREAK_MINE_0 : TOUCH_BORDER_BREAK_MINE_1;
+                    return !isThree ? NoteSp.TOUCH_BORDER_BREAK_MINE_0 : NoteSp.TOUCH_BORDER_BREAK_MINE_1;
                 }
                 else
                 {
-                    return !isThree ? TOUCH_BORDER_MINE_0 : TOUCH_BORDER_MINE_1;
+                    return !isThree ? NoteSp.TOUCH_BORDER_MINE_0 : NoteSp.TOUCH_BORDER_MINE_1;
                 }
             }
             if (reg.IsBreak)
             {
-                return !isThree ? TOUCH_BORDER_BREAK_0 : TOUCH_BORDER_BREAK_1;
+                return !isThree ? NoteSp.TOUCH_BORDER_BREAK_0 : NoteSp.TOUCH_BORDER_BREAK_1;
             }
             if (reg.IsEach)
             {
-                return !isThree ? TOUCH_BORDER_EACH_0 : TOUCH_BORDER_EACH_1;
+                return !isThree ? NoteSp.TOUCH_BORDER_EACH_0 : NoteSp.TOUCH_BORDER_EACH_1;
             }
-            return !isThree ? TOUCH_BORDER_0 : TOUCH_BORDER_1;
+            return !isThree ? NoteSp.TOUCH_BORDER_0 : NoteSp.TOUCH_BORDER_1;
         }
     }
 

@@ -1,4 +1,3 @@
-#pragma warning disable CS8500
 using System.Threading;
 using MajSimai;
 using Unity.Burst;
@@ -7,7 +6,7 @@ using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
 
-using static NoteSkinManager;
+using static SkinManager;
 using static MajBurst;
 
 [BurstCompile]
@@ -32,10 +31,10 @@ public struct TouchHoldData
     public float fanAlpha;
     public float maskProgress;
 
-    public uint fanSprite;
-    public uint pointSprite;
-    public uint borderSprite;
-    public uint _borderOnSpriteCache;
+    public NoteSp fanSprite;
+    public NoteSp pointSprite;
+    public NoteSp borderSprite;
+    public NoteSp _borderOnSpriteCache;
 
     public bool isHeadJudged;
     public JudgeGrade judgeGrade;
@@ -57,24 +56,24 @@ public struct TouchHoldData
 
         centerPos = MajPos.GetAreaPos(sensor);
 
-        fanSprite = TOUCH_HOLD_0;
-        pointSprite = TOUCH_POINT;
-        _borderOnSpriteCache = borderSprite = TOUCH_HOLD_BORDER;
+        fanSprite = NoteSp.TOUCH_HOLD_0;
+        pointSprite = NoteSp.TOUCH_POINT;
+        _borderOnSpriteCache = borderSprite = NoteSp.TOUCH_HOLD_BORDER;
 
         if (isBreak)
         {
-            fanSprite = TOUCH_HOLD_BREAK_0;
-            pointSprite = TOUCH_POINT_BREAK;
-            _borderOnSpriteCache = borderSprite = TOUCH_HOLD_BORDER_BREAK;
+            fanSprite = NoteSp.TOUCH_HOLD_BREAK_0;
+            pointSprite = NoteSp.TOUCH_POINT_BREAK;
+            _borderOnSpriteCache = borderSprite = NoteSp.TOUCH_HOLD_BORDER_BREAK;
         }
         if (isMine)
         {
-            fanSprite = TOUCH_HOLD_MINE_0;
-            pointSprite = TOUCH_POINT_MINE;
+            fanSprite = NoteSp.TOUCH_HOLD_MINE_0;
+            pointSprite = NoteSp.TOUCH_POINT_MINE;
             if (isBreak)
-                _borderOnSpriteCache = borderSprite = TOUCH_HOLD_BORDER_BREAK_MINE;
+                _borderOnSpriteCache = borderSprite = NoteSp.TOUCH_HOLD_BORDER_BREAK_MINE;
             else
-                _borderOnSpriteCache = borderSprite = TOUCH_HOLD_BORDER_MINE;
+                _borderOnSpriteCache = borderSprite = NoteSp.TOUCH_HOLD_BORDER_MINE;
         }
     }
 }

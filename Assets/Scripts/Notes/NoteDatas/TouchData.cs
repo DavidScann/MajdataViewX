@@ -1,4 +1,3 @@
-#pragma warning disable CS8500
 using System.Threading;
 using MajSimai;
 using Unity.Burst;
@@ -7,7 +6,7 @@ using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
 
-using static NoteSkinManager;
+using static SkinManager;
 using static MajBurst;
 
 [BurstCompile]
@@ -35,9 +34,9 @@ public struct TouchData
 
     public float fanAlpha;
 
-    public uint fanSprite;
-    public uint pointSprite;
-    public uint justSprite;
+    public NoteSp fanSprite;
+    public NoteSp pointSprite;
+    public NoteSp justSprite;
 
     public bool isJudged;
     public JudgeGrade judgeGrade;
@@ -58,31 +57,31 @@ public struct TouchData
         displayDuration = 0.2f * wholeDuration;
         moveDuration = 0.8f * wholeDuration;
 
-        fanSprite = TOUCH;
-        pointSprite = TOUCH_POINT;
-        justSprite = TOUCH_JUST;
+        fanSprite = NoteSp.TOUCH;
+        pointSprite = NoteSp.TOUCH_POINT;
+        justSprite = NoteSp.TOUCH_JUST;
 
         if (isEach)
         {
-            fanSprite = TOUCH_EACH;
-            pointSprite = TOUCH_POINT_EACH;
+            fanSprite = NoteSp.TOUCH_EACH;
+            pointSprite = NoteSp.TOUCH_POINT_EACH;
         }
         if (isBreak)
         {
-            fanSprite = TOUCH_BREAK;
-            pointSprite = TOUCH_POINT_BREAK;
+            fanSprite = NoteSp.TOUCH_BREAK;
+            pointSprite = NoteSp.TOUCH_POINT_BREAK;
         }
         if (isMine)
         {
             if (isBreak)
             {
-                fanSprite = TOUCH_BREAK_MINE;
-                pointSprite = TOUCH_POINT_BREAK_MINE;
+                fanSprite = NoteSp.TOUCH_BREAK_MINE;
+                pointSprite = NoteSp.TOUCH_POINT_BREAK_MINE;
             }
             else
             {
-                fanSprite = TOUCH_MINE;
-                pointSprite = TOUCH_POINT_MINE;
+                fanSprite = NoteSp.TOUCH_MINE;
+                pointSprite = NoteSp.TOUCH_POINT_MINE;
             }
         }
     }

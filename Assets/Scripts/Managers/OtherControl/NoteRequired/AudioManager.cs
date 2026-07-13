@@ -343,9 +343,10 @@ public class AudioManager
     {
         StopTrack();
         //StopTouchHoldSound();
-        _sfxPtr[TOUCHHOLD] = false;
+        //_sfxPtr[TOUCHHOLD] = false;
         ActiveTouchHoldCount = 0;
         _prevActiveTouchHoldCount = 0;
+        NoteSfxs[TOUCHHOLD].Stop();
 
         lock (answerSfxLock)
             answerTimingPoints.Clear();

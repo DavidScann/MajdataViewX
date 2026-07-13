@@ -1,14 +1,7 @@
-#pragma warning disable CS8500
-using System.Threading;
-using MajSimai;
 using Unity.Burst;
-using Unity.Collections;
-using Unity.Collections.LowLevel.Unsafe;
-using Unity.Jobs;
 using Unity.Mathematics;
 
-using static NoteSkinManager;
-using static MajBurst;
+using static SkinManager;
 
 [BurstCompile]
 public struct HoldData
@@ -34,10 +27,10 @@ public struct HoldData
     public float2 holdEndPos;
     public float holdEndScale;
 
-    public uint bodySprite;
-    public uint endSprite;
-    public uint lineSprite;
-    public uint exSprite;
+    public NoteSp bodySprite;
+    public NoteSp endSprite;
+    public NoteSp lineSprite;
+    public NoteSp exSprite;
     public float4 exColor;
 
     public float2 sliceBorder;
@@ -61,31 +54,31 @@ public struct HoldData
         holdEndScale = 0f;
         brightness = 1f;
 
-        bodySprite = HOLD;
-        endSprite = HOLD_END;
-        lineSprite = LINE;
-        exSprite = HOLD_EX;
+        bodySprite = NoteSp.HOLD;
+        endSprite = NoteSp.HOLD_END;
+        lineSprite = NoteSp.LINE;
+        exSprite = NoteSp.HOLD_EX;
         exColor = Ex;
         sliceBorder = HoldSliceBorder;
 
         if (isEach)
         {
-            bodySprite = HOLD_EACH;
-            endSprite = HOLD_END_EACH;
-            lineSprite = LINE_EACH;
+            bodySprite = NoteSp.HOLD_EACH;
+            endSprite = NoteSp.HOLD_END_EACH;
+            lineSprite = NoteSp.LINE_EACH;
             exColor = Ex_Each;
         }
         if (isBreak)
         {
-            bodySprite = HOLD_BREAK;
-            endSprite = HOLD_END_BREAK;
-            lineSprite = LINE_BREAK;
+            bodySprite = NoteSp.HOLD_BREAK;
+            endSprite = NoteSp.HOLD_END_BREAK;
+            lineSprite = NoteSp.LINE_BREAK;
             exColor = Ex_Break;
         }
         if (isMine)
         {
-            bodySprite = (uint)(isBreak ? HOLD_BREAK_MINE : HOLD_MINE);
-            lineSprite = LINE_MINE;
+            bodySprite = isBreak ? NoteSp.HOLD_BREAK_MINE : NoteSp.HOLD_MINE;
+            lineSprite = NoteSp.LINE_MINE;
         }
     }
 }

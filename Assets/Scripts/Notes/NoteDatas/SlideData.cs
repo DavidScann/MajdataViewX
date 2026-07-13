@@ -1,7 +1,6 @@
-#pragma warning disable CS8500
 using Unity.Burst;
 using Unity.Mathematics;
-using static NoteSkinManager;
+using static SkinManager;
 using Notes.SlideUtils;
 
 [BurstCompile]
@@ -60,14 +59,14 @@ public struct SlideData
     public bool isEnd;     // note是否完全结束（slideok消失后）
 
     //slide
-    public uint slideSprite;
+    public NoteSp slideSprite;
     public int eaten;
     //star
     public float process;
     public int processIdx; // 标记现在引导星星走到哪儿了（引导星星之后的第一个箭头idx）
     public float starAlpha;
     public float starScale;
-    public uint starSprite;
+    public NoteSp starSprite;
     //FOR WIFI
     public float2 starPosStart;
     public float2 starPosConstC; //for wifi only
@@ -121,57 +120,57 @@ public struct SlideData
         // Load Skin
         if (!isWifi)
         {
-            slideSprite = SLIDE;
-            starSprite = STAR;
+            slideSprite = NoteSp.SLIDE;
+            starSprite = NoteSp.STAR;
             if (isEach)
             {
-                slideSprite = SLIDE_EACH;
-                starSprite = STAR_EACH;
+                slideSprite = NoteSp.SLIDE_EACH;
+                starSprite = NoteSp.STAR_EACH;
             }
             if (isBreak)
             {
-                slideSprite = SLIDE_BREAK;
-                starSprite = STAR_BREAK;
+                slideSprite = NoteSp.SLIDE_BREAK;
+                starSprite = NoteSp.STAR_BREAK;
             }
             if (isMine)
             {
                 if (isBreak)
                 {
-                    slideSprite = SLIDE_BREAK_MINE;
-                    starSprite = STAR_BREAK_MINE;
+                    slideSprite = NoteSp.SLIDE_BREAK_MINE;
+                    starSprite = NoteSp.STAR_BREAK_MINE;
                 }
                 else
                 {
-                    slideSprite = SLIDE_MINE;
-                    starSprite = STAR_MINE;
+                    slideSprite = NoteSp.SLIDE_MINE;
+                    starSprite = NoteSp.STAR_MINE;
                 }
             }
         }
         else
         {
-            slideSprite = WIFI_0;
-            starSprite = STAR;
+            slideSprite = NoteSp.WIFI_0;
+            starSprite = NoteSp.STAR;
             if (isEach)
             {
-                slideSprite = WIFI_EACH_0;
-                starSprite = STAR_EACH;
+                slideSprite = NoteSp.WIFI_EACH_0;
+                starSprite = NoteSp.STAR_EACH;
             }
             if (isBreak)
             {
-                slideSprite = WIFI_BREAK_0;
-                starSprite = STAR_BREAK;
+                slideSprite = NoteSp.WIFI_BREAK_0;
+                starSprite = NoteSp.STAR_BREAK;
             }
             if (isMine)
             {
                 if (isBreak)
                 {
-                    slideSprite = WIFI_BREAK_MINE_0;
-                    starSprite = STAR_BREAK_MINE;
+                    slideSprite = NoteSp.WIFI_BREAK_MINE_0;
+                    starSprite = NoteSp.STAR_BREAK_MINE;
                 }
                 else
                 {
-                    slideSprite = WIFI_MINE_0;
-                    starSprite = STAR_MINE;
+                    slideSprite = NoteSp.WIFI_MINE_0;
+                    starSprite = NoteSp.STAR_MINE;
                 }
             }
 

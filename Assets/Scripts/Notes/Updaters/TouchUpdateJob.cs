@@ -1,4 +1,3 @@
-#pragma warning disable CS8500
 using MajSimai;
 using System.Threading;
 using Unity.Burst;
@@ -134,7 +133,7 @@ public unsafe struct TouchUpdateJob : IJobParallelFor
                     pos = centerPos,
                     angRad = 0,
                     scale = new float2(1, 1),
-                    spriteId = (uint)sprite,
+                    spriteId = sprite,
                     color = new float4(1, 1, 1, touch.fanAlpha),
                     brightness = 1f,
                     sort = sortTime << 2,
@@ -148,7 +147,7 @@ public unsafe struct TouchUpdateJob : IJobParallelFor
                     pos = centerPos,
                     angRad = 0,
                     scale = new float2(1, 1),
-                    spriteId = (uint)sprite,
+                    spriteId = sprite,
                     color = new float4(1, 1, 1, touch.fanAlpha),
                     brightness = 1f,
                     sort = sortTime << 2,

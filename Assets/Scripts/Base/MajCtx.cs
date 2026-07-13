@@ -1,5 +1,4 @@
-
-
+#pragma warning disable IDE1006 // 命名样式
 using Unity.IL2CPP.CompilerServices;
 
 [Il2CppEagerStaticClassConstruction]
@@ -12,7 +11,7 @@ public static class MajCtx
     public static EffectManager _effectManager { get; set; }
     public static InputManager _inputManager { get; set; }
     public static NoteManager _noteManager { get; set; }
-    public static NoteSkinManager _noteSkinManager { get; set; }
+    public static SkinManager _noteSkinManager { get; set; }
     public static ObjectCounter _objectCounter { get; set; }
     public static PlayManager _playManager { get; set; }
     public static ScreenRecorder _screenRecorder { get; set; }

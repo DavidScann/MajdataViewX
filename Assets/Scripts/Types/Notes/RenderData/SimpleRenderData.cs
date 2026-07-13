@@ -1,12 +1,13 @@
 using System;
 using Unity.Mathematics;
+using static SkinManager;
 
 public struct SimpleRenderData : ISortableRenderData
 {
     public float2 pos;
     public float angRad;
     public float2 scale;
-    public uint spriteId;
+    public NoteSp spriteId;
     public float4 color;
     public float brightness;
     public uint sort;

@@ -1,8 +1,7 @@
-#pragma warning disable CS8500
 using Unity.Burst;
 using Unity.Mathematics;
 
-using static NoteSkinManager;
+using static SkinManager;
 
 [BurstCompile]
 public struct TapData
@@ -33,9 +32,9 @@ public struct TapData
     public float Brightness { get; set; }
 
     //sprite
-    public uint TapSprite { get; set; }
-    public uint LineSprite { get; set; }
-    public uint ExSprite { get; set; }
+    public NoteSp TapSprite { get; set; }
+    public NoteSp LineSprite { get; set; }
+    public NoteSp ExSprite { get; set; }
     public float4 ExColor { get; set; }
 
     // state
@@ -58,84 +57,84 @@ public struct TapData
         {
             if (IsDouble)
             {
-                TapSprite = STAR_DOUBLE;
-                LineSprite = LINE_STAR;
-                ExSprite = STAR_EX_DOUBLE;
+                TapSprite = NoteSp.STAR_DOUBLE;
+                LineSprite = NoteSp.LINE_STAR;
+                ExSprite = NoteSp.STAR_EX_DOUBLE;
                 ExColor = Ex_Star;
                 if (IsEach)
                 {
-                    TapSprite = STAR_EACH_DOUBLE;
-                    LineSprite = LINE_EACH;
+                    TapSprite = NoteSp.STAR_EACH_DOUBLE;
+                    LineSprite = NoteSp.LINE_EACH;
                     ExColor = Ex_Each;
                 }
                 if (IsBreak)
                 {
-                    TapSprite = STAR_BREAK_DOUBLE;
-                    LineSprite = LINE_BREAK;
+                    TapSprite = NoteSp.STAR_BREAK_DOUBLE;
+                    LineSprite = NoteSp.LINE_BREAK;
                     ExColor = Ex_Break;
                 }
                 if (IsMine)
                 {
                     if (IsBreak)
-                        TapSprite = STAR_BREAK_DOUBLE_MINE;
+                        TapSprite = NoteSp.STAR_BREAK_DOUBLE_MINE;
                     else
-                        TapSprite = STAR_MINE_DOUBLE;
-                    LineSprite = LINE_MINE;
+                        TapSprite = NoteSp.STAR_MINE_DOUBLE;
+                    LineSprite = NoteSp.LINE_MINE;
                 }
             }
             else
             {
-                TapSprite = STAR;
-                LineSprite = LINE_STAR;
-                ExSprite = STAR_EX;
+                TapSprite = NoteSp.STAR;
+                LineSprite = NoteSp.LINE_STAR;
+                ExSprite = NoteSp.STAR_EX;
                 ExColor = Ex_Star;
                 if (IsEach)
                 {
-                    TapSprite = STAR_EACH;
-                    LineSprite = LINE_EACH;
+                    TapSprite = NoteSp.STAR_EACH;
+                    LineSprite = NoteSp.LINE_EACH;
                     ExColor = Ex_Each;
                 }
                 if (IsBreak)
                 {
-                    TapSprite = STAR_BREAK;
-                    LineSprite = LINE_BREAK;
+                    TapSprite = NoteSp.STAR_BREAK;
+                    LineSprite = NoteSp.LINE_BREAK;
                     ExColor = Ex_Break;
                 }
                 if (IsMine)
                 {
                     if (IsBreak)
-                        TapSprite = STAR_BREAK_MINE;
+                        TapSprite = NoteSp.STAR_BREAK_MINE;
                     else
-                        TapSprite = STAR_MINE;
-                    LineSprite = LINE_MINE;
+                        TapSprite = NoteSp.STAR_MINE;
+                    LineSprite = NoteSp.LINE_MINE;
                 }
             }
         }
         else
         {
-            TapSprite = TAP;
-            LineSprite = LINE;
-            ExSprite = TAP_EX;
+            TapSprite = NoteSp.TAP;
+            LineSprite = NoteSp.LINE;
+            ExSprite = NoteSp.TAP_EX;
             ExColor = Ex;
             if (IsEach)
             {
-                TapSprite = TAP_EACH;
-                LineSprite = LINE_EACH;
+                TapSprite = NoteSp.TAP_EACH;
+                LineSprite = NoteSp.LINE_EACH;
                 ExColor = Ex_Each;
             }
             if (IsBreak)
             {
-                TapSprite = TAP_BREAK;
-                LineSprite = LINE_BREAK;
+                TapSprite = NoteSp.TAP_BREAK;
+                LineSprite = NoteSp.LINE_BREAK;
                 ExColor = Ex_Break;
             }
             if (IsMine)
             {
                 if (IsBreak)
-                    TapSprite = TAP_BREAK_MINE;
+                    TapSprite = NoteSp.TAP_BREAK_MINE;
                 else
-                    TapSprite = TAP_MINE;
-                LineSprite = LINE_MINE;
+                    TapSprite = NoteSp.TAP_MINE;
+                LineSprite = NoteSp.LINE_MINE;
             }
         }
     }

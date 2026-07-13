@@ -1,13 +1,14 @@
-using System.Threading;
 using MajSimai;
+using Notes.SlideUtils;
+using System.Threading;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
-using static NoteSkinManager;
+using UnityEngine;
 using static MajBurst;
-using Notes.SlideUtils;
+using static SkinManager;
 
 [BurstCompile]
 public unsafe struct SlideUpdateJob : IJobParallelFor
@@ -120,7 +121,7 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
                 pos = new float2(p.X, p.Y),
                 angRad = math.radians(p.RotZ),
                 scale = new float2(1, 1),
-                spriteId = slide.isWifi ? slide.slideSprite + (uint)i - 1 : slide.slideSprite,
+                spriteId = slide.isWifi ? slide.slideSprite.Offset(i - 1) : slide.slideSprite,
                 color = color,
                 brightness = slide.brightness,
                 // sort (32 bits): [19 bits: time] + [5 bits: slide tie-breaker (32 wrap)] + [8 bits: arrow path i (256 wrap)]
@@ -566,13 +567,13 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
 
         var baseJ = slide.okType switch
         {
-            SlideOkType.StraightL => JUST_STR_L,
-            SlideOkType.StraightR => JUST_STR_R,
-            SlideOkType.CircleL => JUST_CURV_L,
-            SlideOkType.CircleR => JUST_CURV_R,
-            SlideOkType.WifiU => JUST_WIFI_U,
-            SlideOkType.WifiD => JUST_WIFI_D,
-            _ => JUST_STR_L,
+            SlideOkType.StraightL => NoteSp.JUST_STR_L,
+            SlideOkType.StraightR => NoteSp.JUST_STR_R,
+            SlideOkType.CircleL => NoteSp.JUST_CURV_L,
+            SlideOkType.CircleR => NoteSp.JUST_CURV_R,
+            SlideOkType.WifiU => NoteSp.JUST_WIFI_U,
+            SlideOkType.WifiD => NoteSp.JUST_WIFI_D,
+            _ => NoteSp.JUST_STR_L,
         };
         var off = slide.judgeGrade switch
         {
@@ -600,15 +601,21 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
         if (timing > 25 * MajCtx.FRAME_LENGTH_SEC)
             EndNote(ref slide);
 
+        if (slide.isBreak && off == 0) // break perfect
+        {
+            bool flag = ((int)(timing / MajCtx.FRAME_LENGTH_SEC) / 2) % 2 == 0;
+            if (flag) off = 36; // 偏移到Break Skin
+        }
+
         var idx = Interlocked.Increment(ref *SlidesWriteCountPtr) - 1;
         slidesRender[idx] = new SimpleRenderData
         {
             pos = new float2(ok.X, ok.Y),
             angRad = math.radians(ok.RotZ),
             scale = new float2(1, 1),
-            spriteId = (uint)(baseJ + off),
+            spriteId = baseJ.Offset(off),
             color = new float4(1, 1, 1, slide.slideOKAlpha),
-            brightness = slide.brightness,  // TODO: shine
+            brightness = slide.brightness,
             sort = 0u,
         };
     }

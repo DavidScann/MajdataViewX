@@ -1,4 +1,3 @@
-#pragma warning disable CS8500
 using System.Threading;
 using MajSimai;
 using Unity.Burst;
@@ -7,7 +6,7 @@ using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
 
-using static NoteSkinManager;
+using static SkinManager;
 using static MajBurst;
 
 [BurstCompile]
@@ -105,7 +104,7 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
             }
             else
             {
-                th.borderSprite = TOUCH_HOLD_BORDER_MISS;
+                th.borderSprite = NoteSp.TOUCH_HOLD_BORDER_MISS;
             }
         }
 

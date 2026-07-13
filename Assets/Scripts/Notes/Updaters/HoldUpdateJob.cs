@@ -7,7 +7,7 @@ using Unity.Jobs;
 using Unity.Mathematics;
 using UnityEngine.UIElements;
 using static MajBurst;
-using static NoteSkinManager;
+using static SkinManager;
 
 [BurstCompile]
 public unsafe struct HoldUpdateJob : IJobParallelFor
@@ -101,27 +101,27 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
             {
                 if (hold.isBreak)
                 {
-                    hold.bodySprite = HOLD_BREAK_ON;
+                    hold.bodySprite = NoteSp.HOLD_BREAK_ON;
                 }
                 else if (hold.isEach)
                 {
-                    hold.bodySprite = HOLD_EACH_ON;
+                    hold.bodySprite = NoteSp.HOLD_EACH_ON;
                 }
                 else if (hold.isMine)
                 {
                     if (hold.isBreak)
-                        hold.bodySprite = HOLD_BREAK_MINE_ON;
+                        hold.bodySprite = NoteSp.HOLD_BREAK_MINE_ON;
                     else
-                        hold.bodySprite = HOLD_MINE_ON;
+                        hold.bodySprite = NoteSp.HOLD_MINE_ON;
                 }
                 else
                 {
-                    hold.bodySprite = HOLD_ON;
+                    hold.bodySprite = NoteSp.HOLD_ON;
                 }
             }
             else
             {
-                hold.bodySprite = HOLD_OFF;
+                hold.bodySprite = NoteSp.HOLD_OFF;
             }
         }
 
