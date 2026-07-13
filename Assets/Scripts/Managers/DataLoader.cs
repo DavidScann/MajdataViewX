@@ -37,8 +37,8 @@ public class DataLoader : MonoBehaviour
         int diff,
         float noteSpeed,
         float touchSpeed,
-        bool legacySlideLayer,
-        bool smoothSlideAnime)
+        bool smoothSlideAnime,
+        bool legacySlideLayer)
     {
         titleText.text = title;
         artistText.text = artist;
@@ -54,8 +54,8 @@ public class DataLoader : MonoBehaviour
 
         _noteManager.NoteSpeed = noteSpeed;
         _noteManager.TouchSpeed = touchSpeed;
-        _noteManager.LegacySlideLayer = legacySlideLayer;
         _noteManager.SmoothSlideAnime = smoothSlideAnime;
+        _noteManager.LegacySlideLayer = legacySlideLayer;
         _noteManager.Ignore = ignoreOffset;
         _noteManager.Load(chart);
 

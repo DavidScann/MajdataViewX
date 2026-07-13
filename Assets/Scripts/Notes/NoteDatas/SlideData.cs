@@ -53,8 +53,11 @@ public struct SlideData
     public SlideOkType okType;
     public SlidePose okPose;
 
-    public bool isEnd;
     public bool isSoundPlayed;
+    public bool isJudged;  // 是否实际上已被判定
+    public JudgeGrade judgeGrade;
+    public bool isSlideEnd;// 是否表现为已判定（显示slideok和报告判定结果）
+    public bool isEnd;     // note是否完全结束（slideok消失后）
 
     //slide
     public uint slideSprite;
@@ -74,9 +77,6 @@ public struct SlideData
     public float2 starPos;
     public float2 starPosL;
     public float2 starPosR;
-
-    public bool isJudged;
-    public JudgeGrade judgeGrade;
 
     public int judgeCurrent; //SLide / Wifi Center
     public int judgeL_Current; //Wifi Left

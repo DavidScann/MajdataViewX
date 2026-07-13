@@ -39,10 +39,12 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
         CheckUpdate(ref slide);
     }
 
+    // 注意：RenderXXX都是需要每帧调用的
     private void TransformUpdate(ref SlideData slide, int index)
     {
         if (slide.isEnd) return;
-        if (slide.isJudged)
+
+        if (slide.isSlideEnd)
         {
             RenderSlideOK(ref slide);
             return;
@@ -57,6 +59,25 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
             : TimeData.NoteTime - slide.shootTime;
         slide.process = math.saturate(timing / math.max(slide.LastFor, 0.001f));
 
+        // 模拟模式下，实际已判定仍然要更新process，等待表现已判定，此时star仍需渲染
+        // 非模拟模式下，isJudged和isSlideEnd是同步进行的
+        if (slide.isJudged)
+        {
+            RenderStar(ref slide, index, timing, tapTiming);
+            if (slide.process >= 1)
+            {
+                EndSlide(ref slide);
+            }
+            return;
+        }
+
+        RenderArrows(ref slide, index, tapTiming);
+        RenderStar(ref slide, index, timing, tapTiming);
+    }
+
+    private void RenderArrows(ref SlideData slide, int index, float tapTiming)
+    {
+        // =====Arrows样式逻辑=====
         if (tapTiming <= 0)
         {
             slide.slideAlpha = math.clamp((tapTiming - slide.fadeInStartTiming) / slide.fadeInDuration, 0f, 1f);
@@ -72,25 +93,9 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
             slide.brightness = 0.95f + extra;
         }
 
-        if (timing <= 0)
-        {
-            slide.starAlpha = math.saturate(tapTiming / (slide.shootTime - slide.tapTime));
-            slide.starScale = slide.starAlpha + 0.5f;
-        }
-        else
-        {
-            slide.starAlpha = 1f;
-            slide.starScale = 1.5f;
-        }
-
-        RenderArrows(ref slide, index);
-        RenderStar(ref slide, index);
-    }
-
-    private void RenderArrows(ref SlideData slide, int index)
-    {
+        if (slide.slideAlpha <= 0) return;
+        // =====渲染逻辑=====
         var cnt = slide.slideArrowsCount;
-
         var color = new float4(1, 1, 1, slide.slideAlpha);
 
         // sortTime (30 bits): [19 bits: time (87 mins wrap)] + [11 bits: index tie-breaker (2048 wrap)]
@@ -98,7 +103,6 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
         var timePart = slide.legacySlideLayer ? (0x7FFFFu - timeVal) : timeVal;
         var sortTime = ((timePart << 11) | (uint)(index & 0x7FF)) & 0x3FFFFFFF;
 
-        // 现在 wifi 也含路径起终点了
         // 第一个是路径起点，最后一个是路径终点，忽略不画，倒数第二个要看情况
         var startIdx = slide.eaten + 1;
         var endIdx = slide.noLastArrow ? cnt - 2 : cnt - 1;
@@ -125,10 +129,22 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
         }
     }
 
-    private void RenderStar(ref SlideData slide, int index)
+    private void RenderStar(ref SlideData slide, int index, float timing, float tapTiming)
     {
-        if (slide.starAlpha <= 0) return;
+        // =====Star样式逻辑=====
+        if (timing <= 0)
+        {
+            slide.starAlpha = math.saturate(tapTiming / (slide.shootTime - slide.tapTime));
+            slide.starScale = slide.starAlpha + 0.5f;
+        }
+        else
+        {
+            slide.starAlpha = 1f;
+            slide.starScale = 1.5f;
+        }
 
+        if (slide.starAlpha <= 0) return;
+        // =====渲染逻辑=====
         // sortTime (30 bits): [19 bits: time (87 mins wrap)] + [11 bits: index tie-breaker (2048 wrap)]
         var timeVal = ((uint)math.max(0f, slide.tapTime * 100f)) & 0x7FFFF;
         var timePart = slide.legacySlideLayer ? (0x7FFFFu - timeVal) : timeVal;
@@ -199,40 +215,46 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
     private void AutoplayUpdate(ref SlideData slide)
     {
         if (NoteHelper.AutoPlayMode is AutoPlayMode.Disable) return;
-        if (slide.isEnd || slide.isJudged) return;
+        if (slide.isEnd || slide.isSlideEnd || slide.isJudged) return;
         var timing = TimeData.NoteTime - slide.shootTime;
         if (timing < -0.01f) return;
 
         switch (NoteHelper.AutoPlayMode)
         {
+            // 非模拟模式下星星可以正常走到尾再显示slideok并销毁
             case AutoPlayMode.Enable:
             case AutoPlayMode.Random:
                 if (slide.smoothSlideAnime)
                 {
-                    // 普通 slide 在先前 TransformUpdate 的时候计算过 processIdx 可以直接拿来用，wifi 没有这个
-                    slide.eaten = slide.isWifi ? math.max((int)(slide.process * slide.slideArrowsCount - 2), 0) : slide.processIdx;
-                }
-                else if (slide.isWifi)
-                {
-                    // wifi 没有 processIdx
-                    var idxF = slide.process * (slide.judgeQueueCount - 1);
-                    var idx = (int)idxF;
-                    slide.eaten = idxF - idx >= 0.5f
-                        ? slide.judgeQueue[idx].ArrowProgressFinish
-                        : slide.judgeQueue[idx].ArrowProgressPush;
+                    // 普通 slide 在先前 RenderStar 的时候计算过 processIdx 可以直接拿来用，wifi 没有这个
+                    slide.eaten = slide.isWifi
+                        ? math.max((int)(slide.process * slide.slideArrowsCount - 2), 0)
+                        : slide.processIdx;
                 }
                 else
                 {
-                    // slide 各判定区长度差异很大（conn slide更严重）所以直接 lerp 不是很好看
-                    // 不过普通 slide 可以直接用 processIdx，这里借用一下 judgeCurrent 存储目前到哪个区了
-                    if (slide.processIdx > slide.judgeQueue[slide.judgeCurrent].ArrowProgressFinish)
+                    if (slide.isWifi)
                     {
-                        slide.eaten = slide.judgeQueue[slide.judgeCurrent].ArrowProgressFinish;
-                        slide.judgeCurrent++;
-                    } 
-                    else if (slide.processIdx > slide.judgeQueue[slide.judgeCurrent].ArrowProgressPush)
+                        // wifi 没有 processIdx
+                        var idxF = slide.process * (slide.judgeQueueCount - 1);
+                        var idx = (int)idxF;
+                        slide.eaten = idxF - idx >= 0.5f
+                            ? slide.judgeQueue[idx].ArrowProgressFinish
+                            : slide.judgeQueue[idx].ArrowProgressPush;
+                    }
+                    else
                     {
-                        slide.eaten = slide.judgeQueue[slide.judgeCurrent].ArrowProgressPush;
+                        // slide 各判定区长度差异很大（conn slide更严重）所以直接 lerp 不是很好看
+                        // 不过普通 slide 可以直接用 processIdx，这里借用一下 judgeCurrent 存储目前到哪个区了
+                        if (slide.processIdx > slide.judgeQueue[slide.judgeCurrent].ArrowProgressFinish)
+                        {
+                            slide.eaten = slide.judgeQueue[slide.judgeCurrent].ArrowProgressFinish;
+                            slide.judgeCurrent++;
+                        }
+                        else if (slide.processIdx > slide.judgeQueue[slide.judgeCurrent].ArrowProgressPush)
+                        {
+                            slide.eaten = slide.judgeQueue[slide.judgeCurrent].ArrowProgressPush;
+                        }
                     }
                 }
 
@@ -244,7 +266,7 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
                     slide.isSoundPlayed = true;
                 }
 
-                if (slide.LastFor - timing <= 0)
+                if (slide.process >= 1)
                 {
                     if (NoteHelper.AutoPlayMode is AutoPlayMode.Enable)
                     {
@@ -259,8 +281,10 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
                     }
                     slide.isJudged = true;
                     CompleteSlide(ref slide);
+                    EndSlide(ref slide);
                 }
                 break;
+            // 模拟模式下需要等待星星完全结束（isSlideEnd），但因为isJudged所以并不会把手黏在这里
             case AutoPlayMode.DJAutoButton:
             case AutoPlayMode.DJAutoSensor:
                 if (!slide.isWifi)
@@ -280,7 +304,7 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
     private void CheckUpdate(ref SlideData slide)
     {
         if (NoteHelper.AutoPlayMode is AutoPlayMode.Enable or AutoPlayMode.Random) return;
-        if (slide.isEnd || slide.isJudged) return;
+        if (slide.isEnd || slide.isSlideEnd || slide.isJudged) return;
 
         var tapTiming = TimeData.NoteTime - slide.tapTime;
         if (tapTiming < -NoteHelper.SLIDE_CHECK_AHEAD_TIME_MSEC / 1000f) return; // 提前100ms接受判定
@@ -323,16 +347,23 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
 
         if (!slide.isWifi)
         {
-            if (slide.judgeCurrent >= slide.judgeQueueCount)
+            if (slide.judgeCurrent >= slide.judgeQueueCount) //按完了
             {
                 slide.judgeGrade = CalcSlideJudgeGrade(ref slide);
                 CompleteSlide(ref slide);
                 return;
             }
-
-            slide.eaten = (slide.currentOn >= SensorType.A1) ? slide.judgeQueue[slide.judgeCurrent].ArrowProgressPush
-                : (slide.judgeCurrent > 0) ? slide.judgeQueue[slide.judgeCurrent - 1].ArrowProgressFinish
-                : 0;
+            if (slide.currentOn >= SensorType.A1) //有按下
+            {
+                slide.eaten = slide.judgeQueue[slide.judgeCurrent].ArrowProgressPush;
+                return;
+            }
+            if (slide.judgeCurrent > 0) //有完成
+            {
+                slide.eaten = slide.judgeQueue[slide.judgeCurrent - 1].ArrowProgressFinish;
+                return;
+            }
+            slide.eaten = 0; //啥也没
         }
         else
         {
@@ -345,15 +376,21 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
                 return;
             }
 
-            var eatenC = (slide.currentOn >= SensorType.A1) ? slide.judgeQueue[slide.judgeCurrent].ArrowProgressPush
-                : (slide.judgeCurrent > 0) ? slide.judgeQueue[slide.judgeCurrent - 1].ArrowProgressFinish
-                : 0;
-            var eatenL = (slide.currentOnL >= SensorType.A1) ? slide.judgeQueueL[slide.judgeL_Current].ArrowProgressPush
-                : (slide.judgeL_Current > 0) ? slide.judgeQueueL[slide.judgeL_Current - 1].ArrowProgressFinish
-                : 0;
-            var eatenR = (slide.currentOnR >= SensorType.A1) ? slide.judgeQueueR[slide.judgeR_Current].ArrowProgressPush
-                : (slide.judgeR_Current > 0) ? slide.judgeQueueR[slide.judgeR_Current - 1].ArrowProgressFinish
-                : 0;
+            var eatenC = (slide.currentOn >= SensorType.A1)
+                ? slide.judgeQueue[slide.judgeCurrent].ArrowProgressPush
+                : (slide.judgeCurrent > 0)
+                    ? slide.judgeQueue[slide.judgeCurrent - 1].ArrowProgressFinish
+                    : 0;
+            var eatenL = (slide.currentOnL >= SensorType.A1)
+                ? slide.judgeQueueL[slide.judgeL_Current].ArrowProgressPush
+                : (slide.judgeL_Current > 0)
+                    ? slide.judgeQueueL[slide.judgeL_Current - 1].ArrowProgressFinish
+                    : 0;
+            var eatenR = (slide.currentOnR >= SensorType.A1)
+                ? slide.judgeQueueR[slide.judgeR_Current].ArrowProgressPush
+                : (slide.judgeR_Current > 0)
+                    ? slide.judgeQueueR[slide.judgeR_Current - 1].ArrowProgressFinish
+                    : 0;
             slide.eaten = math.min(eatenC, math.min(eatenL, eatenR));
         }
     }
@@ -439,6 +476,19 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
             cur = (byte)queueCount;
         }
     }
+    private int GetRemainingAreaCount(SlideData slide)
+    {
+        if (!slide.isWifi)
+        {
+            return slide.judgeQueueCount - slide.judgeCurrent;
+        }
+        else
+        {
+            return slide.judgeQueueCount - slide.judgeCurrent +
+                    slide.judgeQueueLCount - slide.judgeL_Current +
+                    slide.judgeQueueRCount - slide.judgeR_Current;
+        }
+    }
 
     private JudgeGrade CalcSlideJudgeGrade(ref SlideData slide)
     {
@@ -483,30 +533,31 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
         return isFast ? JudgeGrade.FastGood : JudgeGrade.LateGood;
     }
 
+    /// <summary>
+    /// 星星实际上已判定
+    /// </summary>
     private void CompleteSlide(ref SlideData slide)
     {
         slide.judgeTime = TimeData.NoteTime;
         slide.isJudged = true;
+    }
+    /// <summary>
+    /// 星星表现为已判定
+    /// </summary>
+    /// <remarks>非模拟模式下，CompleteSlide在完全结束时才调用，因此EndSlide紧随CompleteSlide之后</remarks>
+    private void EndSlide(ref SlideData slide)
+    {
+        slide.isSlideEnd = true;
         NoteHelper.PlaySlideEndSound(SfxRequests,
             slide.judgeGrade,
             slide.isMine,
             slide.isBreak
         );
-        NoteHelper.ReportResult(ReportResults, slide.judgeGrade, slide.isBreak, SimaiNoteType.Slide);
-    }
-
-    private int GetRemainingAreaCount(SlideData slide)
-    {
-        if (!slide.isWifi)
-        {
-            return slide.judgeQueueCount - slide.judgeCurrent;
-        }
-        else
-        {
-            return slide.judgeQueueCount - slide.judgeCurrent +
-                    slide.judgeQueueLCount - slide.judgeL_Current +
-                    slide.judgeQueueRCount - slide.judgeR_Current;
-        }
+        NoteHelper.ReportResult(ReportResults,
+            slide.judgeGrade,
+            slide.isBreak,
+            SimaiNoteType.Slide
+        );
     }
 
     private void RenderSlideOK(ref SlideData slide)
@@ -534,19 +585,19 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
         };
 
         // SlideOK fade-out animation (Just_curv animator equivalent):
-        // Record judge time on first render, then fade out from 1→0 over SlideOKFadeOutDuration
-        var elapsedFromJudge = TimeData.NoteTime - slide.judgeTime;
+        // fade out from 1→0 over SlideOKFadeOutDuration
+        var timing = TimeData.NoteTime - (slide.shootTime + slide.LastFor);
 
-        slide.slideOKAlpha = elapsedFromJudge switch
+        slide.slideOKAlpha = timing switch
         {
             < 0 => 0f,
-            < 2 * MajCtx.FRAME_LENGTH_SEC => math.saturate(elapsedFromJudge / (2 * MajCtx.FRAME_LENGTH_SEC)),
+            < 2 * MajCtx.FRAME_LENGTH_SEC => math.saturate(timing / (2 * MajCtx.FRAME_LENGTH_SEC)),
             < 17 * MajCtx.FRAME_LENGTH_SEC => 1f,
-            < 25 * MajCtx.FRAME_LENGTH_SEC => math.saturate(1f - (elapsedFromJudge - 17 * MajCtx.FRAME_LENGTH_SEC) / (8 * MajCtx.FRAME_LENGTH_SEC)),
+            < 25 * MajCtx.FRAME_LENGTH_SEC => math.saturate(1f - (timing - 17 * MajCtx.FRAME_LENGTH_SEC) / (8 * MajCtx.FRAME_LENGTH_SEC)),
             _ => 0f,
         };
 
-        if (elapsedFromJudge > 25 * MajCtx.FRAME_LENGTH_SEC)
+        if (timing > 25 * MajCtx.FRAME_LENGTH_SEC)
             EndNote(ref slide);
 
         var idx = Interlocked.Increment(ref *SlidesWriteCountPtr) - 1;
@@ -562,6 +613,9 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
         };
     }
 
+    /// <summary>
+    /// 星星彻底结束
+    /// </summary>
     private void EndNote(ref SlideData slide)
     {
         slide.isEnd = true;
