@@ -1,3 +1,4 @@
+using System;
 using Unity.Burst;
 using Unity.Mathematics;
 
@@ -18,6 +19,8 @@ public struct HoldData
     public bool isBreak;
     public bool isMine;
     public bool usingSV;
+
+    public bool isFolded;
 
     public bool isEnd;
     public float2 pos;
@@ -81,4 +84,16 @@ public struct HoldData
             lineSprite = NoteSp.LINE_MINE;
         }
     }
+
+    public readonly bool IsFoldable(HoldData other) =>
+        time == other.time &&
+        Key == other.Key &&
+        speed == other.speed &&
+        LastFor == other.LastFor &&
+
+        isEach == other.isEach &&
+        isEx == other.isEx &&
+        isBreak == other.isBreak &&
+        isMine == other.isMine &&
+        usingSV == other.usingSV;
 }

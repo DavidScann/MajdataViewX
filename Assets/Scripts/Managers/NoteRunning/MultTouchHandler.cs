@@ -5,6 +5,7 @@ using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices.ComTypes;
+using System.Threading;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
@@ -65,19 +66,19 @@ public struct MultTouchHandler
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void RegisterActive(SensorType area)
     {
-        System.Threading.Interlocked.Increment(ref _activeCounts.ElementRef((int)area));
+        Interlocked.Increment(ref _activeCounts.ElementRef((int)area));
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void UnregisterActive(SensorType area)
     {
-        System.Threading.Interlocked.Decrement(ref _activeCounts.ElementRef((int)area));
+        Interlocked.Decrement(ref _activeCounts.ElementRef((int)area));
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Unregister(SensorType area)
     {
-        System.Threading.Interlocked.Increment(ref _spans.ElementRef((int)area).Current);
+        Interlocked.Increment(ref _spans.ElementRef((int)area).Current);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

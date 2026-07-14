@@ -1,13 +1,13 @@
-using System.Threading;
 using MajSimai;
+using System.Threading;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
-
-using static SkinManager;
+using UnityEngine.InputSystem;
 using static MajBurst;
+using static SkinManager;
 
 [BurstCompile]
 public struct TouchData
@@ -23,6 +23,8 @@ public struct TouchData
     public bool isBreak;
     public bool isMine;
     public bool usingSV;
+
+    public bool isFolded;
 
     public bool isAppeared;
     public bool isEnd;
@@ -53,7 +55,7 @@ public struct TouchData
 
         centerPos = MajPos.GetAreaPos(sensor);
 
-        wholeDuration = 3.209385682f * math.pow(speed, -0.9549621752f);
+        wholeDuration = 3.209385682f * math.pow(math.abs(speed), -0.9549621752f);
         displayDuration = 0.2f * wholeDuration;
         moveDuration = 0.8f * wholeDuration;
 
@@ -85,4 +87,16 @@ public struct TouchData
             }
         }
     }
+
+    public readonly bool IsFoldable(TouchData other) =>
+        time == other.time &&
+        sensor == other.sensor &&
+        speed == other.speed &&
+
+        isHanabi == other.isHanabi &&
+        isEach == other.isEach &&
+        isEx == other.isEx &&
+        isBreak == other.isBreak &&
+        isMine == other.isMine &&
+        usingSV == other.usingSV;
 }

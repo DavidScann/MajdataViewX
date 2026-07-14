@@ -38,6 +38,7 @@ public unsafe struct TapUpdateJob : IJobParallelFor
 
     private void TransformUpdate(ref TapData tap, int index)
     {
+        if (tap.IsFolded) return;
         if (tap.IsEnd) return;
 
         var timing = tap.UsingSV

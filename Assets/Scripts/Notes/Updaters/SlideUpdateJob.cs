@@ -43,13 +43,9 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
     // 注意：RenderXXX都是需要每帧调用的
     private void TransformUpdate(ref SlideData slide, int index)
     {
+        //if (slide.isFolded) return;
+        //slide的判TransformUpdate和生命周期有点耦合，把folded移到各个render去比较好
         if (slide.isEnd) return;
-
-        if (slide.isSlideEnd)
-        {
-            RenderSlideOK(ref slide);
-            return;
-        }
 
         var tapTiming = slide.usingSV
             ? TimeData.FakeNoteTime - TimeData.GetPositionAtTime(slide.tapTime)
@@ -59,6 +55,15 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
             ? TimeData.FakeNoteTime - TimeData.GetPositionAtTime(slide.shootTime)
             : TimeData.NoteTime - slide.shootTime;
         slide.process = math.saturate(timing / math.max(slide.LastFor, 0.001f));
+
+        if (slide.isSlideEnd)
+        {
+            //正常需要等待slideok显示完才可以死
+            //folded不需要显示直接死
+            if (slide.isFolded) EndNote(ref slide);
+            else RenderSlideOK(ref slide);
+            return;
+        }
 
         // 模拟模式下，实际已判定仍然要更新process，等待表现已判定，此时star仍需渲染
         // 非模拟模式下，isJudged和isSlideEnd是同步进行的
@@ -78,6 +83,8 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
 
     private void RenderArrows(ref SlideData slide, int index, float tapTiming)
     {
+        if (slide.isFolded) return;
+
         // =====Arrows样式逻辑=====
         if (tapTiming <= 0)
         {
@@ -132,6 +139,8 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
 
     private void RenderStar(ref SlideData slide, int index, float timing, float tapTiming)
     {
+        if (slide.isFolded) return;
+
         // =====Star样式逻辑=====
         if (timing <= 0)
         {
@@ -283,6 +292,7 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
                     slide.isJudged = true;
                     CompleteSlide(ref slide);
                     EndSlide(ref slide);
+                    if (slide.isFolded) EndNote(ref slide);
                 }
                 break;
             // 模拟模式下需要等待星星完全结束（isSlideEnd），但因为isJudged所以并不会把手黏在这里

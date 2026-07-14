@@ -199,6 +199,8 @@ public partial class NoteManager
 
         var nonMineCount = 0;
         var startPositions = stackalloc int[timing.Notes.Length];
+        bool eachLineUsingSV = false;
+        string lastSlideContent = string.Empty;
         foreach (var note in timing.Notes)
         {
             try
@@ -208,12 +210,18 @@ public partial class NoteManager
                     case SimaiNoteType.Tap:
                         LoadTap(timing, note, isNoteEach);
                         if (!note.IsMine)
+                        {
+                            eachLineUsingSV |= note.UsingSV;
                             startPositions[nonMineCount++] = note.StartPosition;
+                        }
                         break;
                     case SimaiNoteType.Hold:
                         LoadHold(timing, note, isNoteEach);
                         if (!note.IsMine)
+                        {
+                            eachLineUsingSV |= note.UsingSV;
                             startPositions[nonMineCount++] = note.StartPosition;
+                        }
                         break;
                     case SimaiNoteType.Touch:
                         LoadTouch(timing, note, isNoteEach);
@@ -222,7 +230,7 @@ public partial class NoteManager
                         LoadTouchHold(timing, note, isNoteEach);
                         break;
                     case SimaiNoteType.Slide:
-                        LoadSlideChain(timing, note, isNoteEach, isSlideEach);
+                        lastSlideContent = LoadSlideChain(timing, note, isNoteEach, isSlideEach, lastSlideContent);
                         if (!note.IsMine && !note.IsSlideNoHead)
                             startPositions[nonMineCount++] = note.StartPosition;
                         break;
@@ -240,7 +248,7 @@ public partial class NoteManager
             {
                 var s = (float)timing.Timing;
                 var spd = NoteSpeed * timing.HSpeed;
-                CreateEachLine(s, startPositions[i], startPositions[i + 1], spd);
+                CreateEachLine(s, startPositions[i], startPositions[i + 1], spd, eachLineUsingSV);
             }
         }
 
@@ -359,7 +367,7 @@ public partial class NoteManager
         }
 
         // Solve Coverage for UNIQUE touches in this cluster
-        var points = new Unity.Mathematics.float2[uniqueCount];
+        var points = new float2[uniqueCount];
         for (int i = 0; i < uniqueCount; i++)
         {
             points[i] = touches[startIdx + uniqueIndices[i]].centerPos;
@@ -479,7 +487,7 @@ public partial class NoteManager
         }
 
         // Solve Coverage for UNIQUE touch holds in this cluster
-        var points = new Unity.Mathematics.float2[uniqueCount];
+        var points = new float2[uniqueCount];
         for (int i = 0; i < uniqueCount; i++)
         {
             points[i] = touchHolds[startIdx + uniqueIndices[i]].centerPos;
@@ -498,7 +506,7 @@ public partial class NoteManager
         }
     }
 
-    private void CreateEachLine(float time, int startPosA, int startPosB, float speed)
+    private void CreateEachLine(float time, int startPosA, int startPosB, float speed, bool usingSV)
     {
         var startPos = startPosA;
         var endPos = startPosB;
@@ -523,7 +531,12 @@ public partial class NoteManager
             key = startPos - 1,
             curvLength = endPos - 1,
             speed = speed,
+            usingSV = usingSV
         };
+        if (eachLines.Length > 0 && eachLines[^1].IsFoldable(el))
+        {
+            return;
+        }
         el.Init();
         eachLines.Add(el);
     }
@@ -549,6 +562,10 @@ public partial class NoteManager
             IsMine = note.IsMine,
             UsingSV = note.UsingSV
         };
+        if (taps.Length > 0 && taps[^1].IsFoldable(tap))
+        {
+            taps.ElementRef(taps.Length - 1).IsFolded = true;
+        }
         tap.Init();
         taps.Add(tap);
     }
@@ -571,6 +588,10 @@ public partial class NoteManager
             isMine = note.IsMine,
             usingSV = note.UsingSV
         };
+        if (holds.Length > 0 && holds[^1].IsFoldable(hold))
+        {
+            holds.ElementRef(holds.Length - 1).isFolded = true;
+        }
         hold.Init();
         holds.Add(hold);
     }
@@ -592,6 +613,10 @@ public partial class NoteManager
             isMine = note.IsMine,
             usingSV = note.UsingSV
         };
+        if (touches.Length > 0 && touches[^1].IsFoldable(touch))
+        {
+            touches.ElementRef(touches.Length - 1).isFolded = true;
+        }
         touch.Init();
         touches.Add(touch);
         loadedTouches[(int)sensor].Add(new()
@@ -620,11 +645,15 @@ public partial class NoteManager
             isMine = note.IsMine,
             usingSV = note.UsingSV
         };
+        if (touchHolds.Length > 0 && touchHolds[^1].IsFoldable(th))
+        {
+            touchHolds.ElementRef(touchHolds.Length - 1).isFolded = true;
+        }
         th.Init();
         touchHolds.Add(th);
     }
 
-    private void LoadSlideChain(in SimaiTimingPoint timing, in SimaiNote note, bool isNoteEach, bool isSlideEach)
+    private string LoadSlideChain(in SimaiTimingPoint timing, in SimaiNote note, bool isNoteEach, bool isSlideEach, string lastContent)
     {
         var noteContent = note.RawContent;
 
@@ -634,7 +663,7 @@ public partial class NoteManager
             var length = 0.0f;
             var time = 0.0D;
             var cnt = 0;
-            
+
             // 有点丑陋，但能用
             // 考虑到这个 method 本来就套在一层遍历里，总之是多了很多不必要的遍历
             // TODO:使之不丑陋
@@ -660,7 +689,7 @@ public partial class NoteManager
             // 长度单位像素，时间单位ms，转速单位度/帧，转速最大是 18
             // 这里 SlideLength 是 100ppu，SlideTime 是秒
             var rotateSpeed = math.min(6f, length / ((float)time * 2 * math.PI));
-            
+
             var starTap = new TapData
             {
                 Time = (float)timing.Timing,
@@ -677,6 +706,10 @@ public partial class NoteManager
                 IsMine = note.IsMine,
                 UsingSV = note.UsingSV,
             };
+            if (taps.Length > 0 && taps[^1].IsFoldable(starTap))
+            {
+                taps.ElementRef(taps.Length - 1).IsFolded = true;
+            }
             starTap.Init();
             taps.Add(starTap);
         }
@@ -729,6 +762,10 @@ public partial class NoteManager
                 smoothSlideAnime = SmoothSlideAnime,
                 legacySlideLayer = LegacySlideLayer,
             };
+            if (lastContent == noteContent && slides.Length > 0 && slides[^1].IsFoldablePropOnly(slide))
+            {
+                slides.ElementRef(slides.Length - 1).isFolded = true;
+            }
             slide.Init();
             slides.Add(slide);
 
@@ -804,6 +841,7 @@ public partial class NoteManager
             areaPoolIndex += judgeQueueCount;
             posePoolIndex += slideArrowsCount;
         }
+        return noteContent;
     }
 
     // ============== Slide shape detection ==============

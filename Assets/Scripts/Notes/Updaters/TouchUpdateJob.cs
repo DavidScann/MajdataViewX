@@ -38,6 +38,7 @@ public unsafe struct TouchUpdateJob : IJobParallelFor
 
     private void TransformUpdate(ref TouchData touch, int index)
     {
+        if (touch.isFolded) return;
         if (touch.isEnd) return;
 
         // sortTime (30 bits): [19 bits: time (87 mins wrap)] + [11 bits: index tie-breaker (2048 wrap)]

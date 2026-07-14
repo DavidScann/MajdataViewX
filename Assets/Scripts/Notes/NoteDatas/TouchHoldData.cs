@@ -15,8 +15,8 @@ public struct TouchHoldData
     public float time;
     public SensorType sensor;
     public float speed;
-    public int sensorOrderIndex;
     public float LastFor;
+    public int sensorOrderIndex;
 
     public bool isHanabi;
     public bool isEach;
@@ -24,6 +24,8 @@ public struct TouchHoldData
     public bool isBreak;
     public bool isMine;
     public bool usingSV;
+
+    public bool isFolded;
 
     public bool isEnd;
     public float2 centerPos;
@@ -76,4 +78,17 @@ public struct TouchHoldData
                 _borderOnSpriteCache = borderSprite = NoteSp.TOUCH_HOLD_BORDER_MINE;
         }
     }
+
+    public readonly bool IsFoldable(TouchHoldData other) =>
+        time == other.time &&
+        sensor == other.sensor &&
+        speed == other.speed &&
+        LastFor == other.LastFor &&
+
+        isEach == other.isEach &&
+        isEx == other.isEx &&
+        isBreak == other.isBreak &&
+        isMine == other.isMine &&
+        usingSV == other.usingSV;
+
 }

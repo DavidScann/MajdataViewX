@@ -40,6 +40,7 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
 
     private void TransformUpdate(ref HoldData hold, int index)
     {
+        if (hold.isFolded) return;
         if (hold.isEnd) return;
 
         var noteTime = TimeData.NoteTime;

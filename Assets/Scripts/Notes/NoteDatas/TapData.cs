@@ -1,6 +1,8 @@
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Runtime.InteropServices.ComTypes;
 using Unity.Burst;
 using Unity.Mathematics;
-
 using static SkinManager;
 
 [BurstCompile]
@@ -23,6 +25,8 @@ public struct TapData
     public bool IsBreak { get; init; }
     public bool IsMine { get; init; }
     public bool UsingSV { get; init; }
+
+    public bool IsFolded { get; set; }
 
     // outs
     public float2 Pos { get; set; }
@@ -138,4 +142,19 @@ public struct TapData
             }
         }
     }
+
+    public readonly bool IsFoldable(TapData other) =>
+        Time == other.Time &&
+        Key == other.Key &&
+        Speed == other.Speed &&
+
+        IsStar == other.IsStar &&
+        IsDouble == other.IsDouble &&
+        RotateSpeed == other.RotateSpeed &&
+
+        IsEach == other.IsEach &&
+        IsEx == other.IsEx &&
+        IsBreak == other.IsBreak &&
+        IsMine == other.IsMine &&
+        UsingSV == other.UsingSV;
 }
