@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Note架构.md",
+                "file": "综述.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Note架构"
+              "title": "综述"
             }
           }
         ]
@@ -185,6 +185,9 @@
   },
   "active": "3d574d0ca6df4f72",
   "lastOpenFiles": [
-    "Note架构.md"
+    "2026-07-14.md",
+    "未命名.canvas",
+    "未命名.base",
+    "综述.md"
   ]
 }

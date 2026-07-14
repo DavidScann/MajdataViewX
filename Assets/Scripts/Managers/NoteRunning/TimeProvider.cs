@@ -49,6 +49,7 @@ public class TimeProvider : MonoBehaviour
     private void Awake()
     {
         _timeProvider = this;
+        ResetState();
 
         var mmfAudioTimeFileStream = new FileStream(
             mmfAudioTimePath,
@@ -69,8 +70,10 @@ public class TimeProvider : MonoBehaviour
         mmvAudioTime = mmfAudioTime.CreateViewAccessor();
     }
 
-    private unsafe void Update()
+    private void Update()
     {
+        TimeData.IsStart = IsStart;
+        TimeData.deltaTime = Time.deltaTime;
         if (!IsStart) return;
 
         if (IsRecord)
@@ -106,9 +109,7 @@ public class TimeProvider : MonoBehaviour
 
         mmvAudioTime.Write(0, AudioTime);
 
-        TimeData.IsStart = IsStart;
         TimeData.NoteTime = NoteTime;
-        TimeData.deltaTime = Time.deltaTime;
     }
 
     public unsafe void LoadSV(ReadOnlySpan<SimaiTimingPoint> commaTimings)

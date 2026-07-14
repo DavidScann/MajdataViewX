@@ -1,13 +1,6 @@
 using Notes.SlideUtils;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Runtime.InteropServices.ComTypes;
 using Unity.Burst;
 using Unity.Mathematics;
-using UnityEditor.Experimental.GraphView;
-using UnityEngine;
-using UnityEngine.InputSystem;
-using UnityEngine.Profiling.Memory.Experimental;
 using static SkinManager;
 
 [BurstCompile]
