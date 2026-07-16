@@ -26,6 +26,8 @@ public struct SlideData
     public bool isWifi;
 
     public bool isFolded;
+    public bool hasSlideGuide;
+    public bool hasTapGuide;
 
     public bool smoothSlideAnime;
     public bool legacySlideLayer;

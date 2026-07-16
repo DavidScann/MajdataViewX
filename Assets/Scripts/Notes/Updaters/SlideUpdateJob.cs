@@ -227,8 +227,11 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
         if (NoteHelper.AutoPlayMode is AutoPlayMode.Disable) return;
         if (slide.isEnd || slide.isSlideEnd || slide.isJudged) return;
         var timing = TimeData.NoteTime - slide.shootTime;
-        if (timing < -0.01f) return;
-
+        var guideDelay = NoteHelper.AutoPlayMode == AutoPlayMode.DJAutoButton && slide.hasTapGuide
+            ? NoteHelper.DJAUTO_SLIDE_TAP_GUIDE_DELAY_SEC
+            : 0f;
+        var autoplayStart = guideDelay > 0 ? guideDelay : slide.hasSlideGuide ? 0f : -0.01f;
+        if (timing < autoplayStart) return;
         switch (NoteHelper.AutoPlayMode)
         {
             // 非模拟模式下星星可以正常走到尾再显示slideok并销毁
@@ -298,20 +301,44 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
             // 模拟模式下需要等待星星完全结束（isSlideEnd），但因为isJudged所以并不会把手黏在这里
             case AutoPlayMode.DJAutoButton:
             case AutoPlayMode.DJAutoSensor:
+                var inputProcess = guideDelay > 0
+                    ? math.saturate((timing - guideDelay) / math.max(slide.LastFor, 0.001f))
+                    : slide.process;
                 if (!slide.isWifi)
                 {
-                    InputData.HandleWorldPosition(slide.starPos);
+                    var inputPos = guideDelay > 0
+                        ? GetStarPositionAtProcess(ref slide, inputProcess)
+                        : slide.starPos;
+                    InputData.DJAutoHandleWorldPosition(inputPos);
                 }
                 else
                 {
                     //划wifi时使用大手子
-                    InputData.HandleWorldPosition((slide.starPosL + slide.starPos) / 2, MajCtx.DJAUTO_WIFI_RADIUS);
-                    InputData.HandleWorldPosition((slide.starPosR + slide.starPos) / 2, MajCtx.DJAUTO_WIFI_RADIUS);
+                    var center = slide.starPosConstC * inputProcess + slide.starPosStart;
+                    var left = slide.starPosConstL * inputProcess + slide.starPosStart;
+                    var right = slide.starPosConstR * inputProcess + slide.starPosStart;
+                    InputData.DJAutoHandleWifiWorldPosition(
+                        (left + center) / 2,
+                        (right + center) / 2);
                 }
-                break;
-        }
+                break;        }
     }
 
+    private static float2 GetStarPositionAtProcess(ref SlideData slide, float process)
+    {
+        var lastIndex = slide.slideArrowsCount - 1;
+        var distance = process * slide.slideArrows[lastIndex].L;
+        var nextIndex = 1;
+        while (nextIndex < lastIndex && slide.slideArrows[nextIndex].L < distance)
+            nextIndex++;
+
+        var previous = slide.slideArrows[nextIndex - 1];
+        var next = slide.slideArrows[nextIndex];
+        var progress = math.unlerp(previous.L, next.L, distance);
+        return new float2(
+            math.lerp(previous.X, next.X, progress),
+            math.lerp(previous.Y, next.Y, progress));
+    }
     private void CheckUpdate(ref SlideData slide)
     {
         if (NoteHelper.AutoPlayMode is AutoPlayMode.Enable or AutoPlayMode.Random) return;

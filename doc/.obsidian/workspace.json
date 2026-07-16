@@ -8,17 +8,13 @@
         "type": "tabs",
         "children": [
           {
-            "id": "3d574d0ca6df4f72",
+            "id": "63b2a59667ce02d4",
             "type": "leaf",
             "state": {
-              "type": "markdown",
-              "state": {
-                "file": "综述.md",
-                "mode": "source",
-                "source": false
-              },
+              "type": "empty",
+              "state": {},
               "icon": "lucide-file",
-              "title": "综述"
+              "title": "新标签页"
             }
           }
         ]
@@ -183,11 +179,12 @@
       "bases:新建数据库": false
     }
   },
-  "active": "3d574d0ca6df4f72",
+  "active": "402da196b370c915",
   "lastOpenFiles": [
+    "InputManager.md",
+    "综述.md",
     "2026-07-14.md",
     "未命名.canvas",
-    "未命名.base",
-    "综述.md"
+    "未命名.base"
   ]
 }

@@ -439,27 +439,27 @@ public class SkinManager : MonoBehaviour
         Add(sources, NoteSp.HOLD_END_BREAK, noteGuidePath + "/Hold_Break_End.png");
 
         // Load judge sprites separately for EffectManager (atlas textures get destroyed)
-        JudgeText[0] = LoadSprite(judgeTextPath + "/judge_text_miss.png");
-        JudgeText[1] = LoadSprite(judgeTextPath + "/judge_text_good.png");
-        JudgeText[2] = LoadSprite(judgeTextPath + "/judge_text_great.png");
-        JudgeText[3] = LoadSprite(judgeTextPath + "/judge_text_perfect.png");
-        JudgeText[4] = LoadSprite(judgeTextPath + "/judge_text_cPerfect.png");
-        JudgeText_BPerfect = LoadSprite(judgeTextPath + "/judge_text_cPerfect_break.png");
-        FastText = LoadSprite(judgeTextPath + "/fast.png");
-        LateText = LoadSprite(judgeTextPath + "/late.png");
+        JudgeText[0] = TexLoader.LoadSprite(judgeTextPath + "/judge_text_miss.png");
+        JudgeText[1] = TexLoader.LoadSprite(judgeTextPath + "/judge_text_good.png");
+        JudgeText[2] = TexLoader.LoadSprite(judgeTextPath + "/judge_text_great.png");
+        JudgeText[3] = TexLoader.LoadSprite(judgeTextPath + "/judge_text_perfect.png");
+        JudgeText[4] = TexLoader.LoadSprite(judgeTextPath + "/judge_text_cPerfect.png");
+        JudgeText_BPerfect = TexLoader.LoadSprite(judgeTextPath + "/judge_text_cPerfect_break.png");
+        FastText = TexLoader.LoadSprite(judgeTextPath + "/fast.png");
+        LateText = TexLoader.LoadSprite(judgeTextPath + "/late.png");
 
-        TouchBorder_Normal[0] = LoadSprite(touchPath + "/TouchSkins/touch_border_2.png");
-        TouchBorder_Normal[1] = LoadSprite(touchPath + "/TouchSkins/touch_border_3.png");
-        TouchBorder_Each[0] = LoadSprite(touchPath + "/TouchSkins/touch_border_2_each.png");
-        TouchBorder_Each[1] = LoadSprite(touchPath + "/TouchSkins/touch_border_3_each.png");
-        TouchBorder_Break[0] = LoadSprite(touchPath + "/TouchSkins/touch_break_border_2.png");
-        TouchBorder_Break[1] = LoadSprite(touchPath + "/TouchSkins/touch_break_border_3.png");
-        TouchBorder_Mine[0] = LoadSprite(touchPath + "/TouchSkins/touch_mine_border_2.png");
-        TouchBorder_Mine[1] = LoadSprite(touchPath + "/TouchSkins/touch_mine_border_3_mine.png");
-        TouchBorder_Break_Mine[0] = LoadSprite(touchPath + "/TouchSkins/touch_break_mine_border_2.png");
-        TouchBorder_Break_Mine[1] = LoadSprite(touchPath + "/TouchSkins/touch_break_mine_border_3.png");
+        TouchBorder_Normal[0] = TexLoader.LoadSprite(touchPath + "/TouchSkins/touch_border_2.png");
+        TouchBorder_Normal[1] = TexLoader.LoadSprite(touchPath + "/TouchSkins/touch_border_3.png");
+        TouchBorder_Each[0] = TexLoader.LoadSprite(touchPath + "/TouchSkins/touch_border_2_each.png");
+        TouchBorder_Each[1] = TexLoader.LoadSprite(touchPath + "/TouchSkins/touch_border_3_each.png");
+        TouchBorder_Break[0] = TexLoader.LoadSprite(touchPath + "/TouchSkins/touch_break_border_2.png");
+        TouchBorder_Break[1] = TexLoader.LoadSprite(touchPath + "/TouchSkins/touch_break_border_3.png");
+        TouchBorder_Mine[0] = TexLoader.LoadSprite(touchPath + "/TouchSkins/touch_mine_border_2.png");
+        TouchBorder_Mine[1] = TexLoader.LoadSprite(touchPath + "/TouchSkins/touch_mine_border_3_mine.png");
+        TouchBorder_Break_Mine[0] = TexLoader.LoadSprite(touchPath + "/TouchSkins/touch_break_mine_border_2.png");
+        TouchBorder_Break_Mine[1] = TexLoader.LoadSprite(touchPath + "/TouchSkins/touch_break_mine_border_3.png");
 
-        Outline = LoadSprite(Path.Combine(skinPath, "outline.png"));
+        Outline = TexLoader.LoadSprite(Path.Combine(skinPath, "outline.png"));
 
         BuildAtlas(sources);
     }
@@ -471,25 +471,11 @@ public class SkinManager : MonoBehaviour
 
     private void Add(List<(string path, int index, Texture2D tex)> list, NoteSp index, string path)
     {
-        var tex = LoadTextureFromFile(path);
+        var tex = TexLoader.LoadTexture(path);
         list.Add((path, (int)index, tex));
     }
 
-    private static Texture2D LoadTextureFromFile(string path)
-    {
-        var tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
-        if (!File.Exists(path))
-            return tex;
-        var bytes = File.ReadAllBytes(path);
-        tex.LoadImage(bytes);
-        return tex;
-    }
 
-    private static Sprite LoadSprite(string path)
-    {
-        var tex = LoadTextureFromFile(path);
-        return Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
-    }
 
     private void BuildAtlas(List<(string path, int index, Texture2D tex)> sources)
     {

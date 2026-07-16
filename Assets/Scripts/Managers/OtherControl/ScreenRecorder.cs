@@ -1,11 +1,13 @@
 #region
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using Cysharp.Threading.Tasks;
 using JetBrains.Annotations;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.Rendering;
 
 using static MajCtx;
 
@@ -13,6 +15,8 @@ using static MajCtx;
 
 public class ScreenRecorder : MonoBehaviour
 {
+
+    private const int MaxPendingReadbacks = 4;
 
     Text errText;
 
@@ -48,146 +52,130 @@ public class ScreenRecorder : MonoBehaviour
     private async UniTask CaptureScreen(string maidataPath,
         int fps, bool resizeBg, [CanBeNull] Action onStart = null)
     {
+        if (fps <= 0)
+        {
+            errText.text = "Output frame rate must be greater than zero.";
+            return;
+        }
+
         if (Screen.width % 2 != 0 || Screen.height % 2 != 0)
         {
             errText.text = $"无法渲染：分辨率 {Screen.width}x{Screen.height} 不是偶数。";
             return;
         }
 
-        // 1. args
-        const string wavName = "temp.wav";
-        const string videoName = "temp.mp4";
         const string finalName = "out.mp4";
 
-        const string videoCodecArgs = "-c:v libx264 -preset veryfast -crf 18 -pix_fmt yuv420p -movflags +faststart ";
-        const string vfArgs = "-vf vflip ";
-
-        var outArgs =
-            "-hide_banner -y -report " +
-            $"-f rawvideo -pix_fmt rgba -s {Screen.width}x{Screen.height} -r {fps} " +
-            "-i - " +
-            vfArgs +
-            videoCodecArgs +
-            $"\"{videoName}\"";
-
-        var muxArgs =
-            "-hide_banner -y " +
-            $"-i \"{videoName}\" -i \"{wavName}\" " +
-            "-c:v copy -c:a aac -b:a 320k " +
-            $"\"{finalName}\"";
-
-        // 2. vars
-        var rt = new RenderTexture(Screen.width, Screen.height, 24, RenderTextureFormat.ARGB32);
+        var rt = new RenderTexture(Screen.width, Screen.height, 0, RenderTextureFormat.ARGB32);
         rt.Create();
-        var cpuTex = new Texture2D(Screen.width, Screen.height, TextureFormat.RGBA32, false);
 
         IsRecording = true;
-
-        var activeTouchHoldCount = 0;
-
-        var deltaTime = 1.0f / fps;
-        var recordingElapsedTime = 0f;
-        var videoEncodeSucceeded = false;
+        var frameDuration = 1.0 / fps;
+        var recordingElapsedTime = 0.0;
+        var outputSucceeded = false;
+        var pendingReadbacks = new Queue<AsyncGPUReadbackRequest>(MaxPendingReadbacks);
 
         try
         {
-            // 3. launch ffmpeg pipe
-            var cmd = $"cd \"{maidataPath}\" && ffmpeg {outArgs}";
-            var proc = FFmpegPipe.Spawn(cmd);
-            if (!proc.IsValid)
-            {
-                errText.text = "无法启动 FFmpeg";
-                return;
-            }
+            var outPath = Path.Combine(maidataPath, finalName);
+            if (File.Exists(outPath)) File.Delete(outPath);
 
-            // 4. prepare
+            FFmpegMediaEncoder.Initialize(outPath, Screen.width, Screen.height, fps,
+                _audioManager.SampleRate, _audioManager.Channels);
+
             onStart?.Invoke();
-            _audioManager.PrepareRecordingBuffer(_timeProvider.AudioTime, _timeProvider.CurrentSpeed);
+            _audioManager.BeginRecordingAudio(_timeProvider.AudioTime, _timeProvider.CurrentSpeed);
 
             while (IsRecording)
             {
-                // 5. recording
                 await UniTask.WaitForEndOfFrame(this);
-                ProcessSfx(deltaTime, recordingElapsedTime, ref activeTouchHoldCount);
-                RenderTexture.active = null;
-                cpuTex.ReadPixels(new Rect(0, 0, Screen.width, Screen.height), 0, 0);
-                var raw = cpuTex.GetRawTextureData();
-                if (FFmpegPipe.Write(proc, raw, raw.Length) < 0)
-                    break;
-                recordingElapsedTime += deltaTime;
+                var frameEndTime = recordingElapsedTime + frameDuration;
+                _audioManager.UpdateRecordingAudioFrame(recordingElapsedTime, frameEndTime);
+
+                ScreenCapture.CaptureScreenshotIntoRenderTexture(rt);
+                pendingReadbacks.Enqueue(
+                    AsyncGPUReadback.Request(rt, 0, TextureFormat.RGBA32));
+                DrainReadyVideoFrames(pendingReadbacks);
+                if (pendingReadbacks.Count >= MaxPendingReadbacks)
+                    EncodeOldestVideoFrame(pendingReadbacks, true);
+
+                recordingElapsedTime = frameEndTime;
             }
 
-            // 6. clean up
-            FFmpegPipe.ClosePipe(proc);
-            var exitCode = FFmpegPipe.Wait(proc);
-            videoEncodeSucceeded = exitCode == 0;
+            _audioManager.EndRecordingAudio((float)recordingElapsedTime);
+
+            while (pendingReadbacks.Count > 0)
+                EncodeOldestVideoFrame(pendingReadbacks, true);
+
+            FFmpegMediaEncoder.Dispose();
+            outputSucceeded = true;
+        }
+        catch (Exception e)
+        {
+            Debug.LogException(e);
+            errText.text = $"Encoding failed: {e.Message}";
         }
         finally
         {
+            IsRecording = false;
+            try
+            {
+                if (FFmpegMediaEncoder.IsInitialized)
+                    FFmpegMediaEncoder.Dispose();
+            }
+            catch (Exception ex)
+            {
+                outputSucceeded = false;
+                Debug.LogException(ex);
+                errText.text = $"Finalizing the recording failed: {ex.Message}";
+            }
+
+            // Do not release the render target while the GPU still owns it.
+            while (pendingReadbacks.Count > 0)
+            {
+                var request = pendingReadbacks.Dequeue();
+                if (!request.done) request.WaitForCompletion();
+            }
+
+            _audioManager.ReleaseRecordingAudio();
+            var resultPath = Path.Combine(maidataPath, finalName);
+            if (outputSucceeded && File.Exists(resultPath))
+                OpenFileLocation(resultPath);
+
             RenderTexture.active = null;
             rt.Release();
             Destroy(rt);
-            Destroy(cpuTex);
         }
-
-        if (!videoEncodeSucceeded)
-        {
-            errText.text = "video encode failed";
-            return;
-        }
-
-        // 7. wav
-        _audioManager.ExportFinalWav(Path.Combine(maidataPath, wavName), recordingElapsedTime);
-
-        // 8. mux
-        var muxCmd = $"cd \"{maidataPath}\" && ffmpeg {muxArgs}";
-        var muxProc = FFmpegPipe.SpawnSimple(muxCmd);
-        if (!muxProc.IsValid)
-        {
-            errText.text = "无法启动 Muxing 进程";
-            return;
-        }
-        FFmpegPipe.Wait(muxProc);
-
-        var outPath = Path.Combine(maidataPath, finalName);
-        if (File.Exists(outPath))
-        {
-            OpenFileLocation(outPath);
-        }
-
-        _timeProvider.Pause();
-        _bgManager.PauseVideo();
     }
 
-    private void ProcessSfx(float deltaTime, float recordingElapsedTime, ref int prevTouchHoldCount)
+    private static void DrainReadyVideoFrames(Queue<AsyncGPUReadbackRequest> requests)
     {
-        if (_audioManager.IsShowingSongDetail)
-            return;
-
-        for (var i = 0; i < _audioManager.noteSfxPlaybackRequests.Length; i++)
+        while (EncodeOldestVideoFrame(requests, false))
         {
-            if (i == AudioManager.TRACK_START || i == AudioManager.TOUCHHOLD || i == AudioManager.ANSWER || i == AudioManager.ANSWER_CLOCK) continue;
+        }
+    }
 
-            if (_audioManager.noteSfxPlaybackRequests[i])
-            {
-                _audioManager.TriggerSfxRecording(i);
-                _audioManager.noteSfxPlaybackRequests[i] = false;
-            }
+    private static bool EncodeOldestVideoFrame(
+        Queue<AsyncGPUReadbackRequest> requests,
+        bool waitForCompletion)
+    {
+        if (requests.Count == 0)
+            return false;
+
+        var request = requests.Peek();
+        if (!request.done)
+        {
+            if (!waitForCompletion)
+                return false;
+            request.WaitForCompletion();
         }
 
-        int currentCount = _audioManager.ActiveTouchHoldCount;
-        if (currentCount > prevTouchHoldCount)
-        {
-            int diff = currentCount - prevTouchHoldCount;
-            for (int i = 0; i < diff; i++) _audioManager.TriggerSfxRecording(AudioManager.TOUCHHOLD);
-        }
-        else if (currentCount == 0 && prevTouchHoldCount > 0)
-        {
-            _audioManager.StopSfxRecording(AudioManager.TOUCHHOLD);
-        }
-        prevTouchHoldCount = currentCount;
+        requests.Dequeue();
+        if (request.hasError)
+            throw new InvalidOperationException("Async GPU readback failed while recording a video frame.");
 
-        _audioManager.UpdateSfxRecording(deltaTime, recordingElapsedTime);
+        FFmpegMediaEncoder.WriteVideoFrame(request.GetData<byte>());
+        return true;
     }
 
     private static void OpenFileLocation(string filePath)

@@ -86,7 +86,7 @@ public class BgManager : MonoBehaviour
 
     public void LoadBG(string path)
     {
-        Bg = SpriteLoader.Load(path);
+        Bg = TexLoader.LoadSprite(path);
     }
 
     public void ShowBG()

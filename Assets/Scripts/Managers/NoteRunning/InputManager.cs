@@ -145,6 +145,9 @@ public unsafe struct InputDataB
     NativeArray<int> _nextButtonIndexNextFrame;
     NativeArray<int> _nextSensorIndexNextFrame;
 
+    const int DJAUTO_MAX_CONCURRENT_INPUTS = 2;
+    int _djAutoInputCount;
+
     public NativeArray<CoverResult> ActiveCoverages;
     [NativeDisableUnsafePtrRestriction]
     public int* ActiveCoveragesCountPtr;
@@ -182,38 +185,44 @@ public unsafe struct InputDataB
 
     // ==========button/sensor management==========
 
-    // 非handle部分，我们规定60fps下djauto抬手会黏在上面2帧
-    // 所以简单为其加上 2 * FRAME_LENGTH_SEC
-
-
     public readonly SensorState GetButtonState(SensorType type) => _buttonStates[(int)type];
     public readonly SensorState GetSensorState(SensorType type) => _sensorStates[(int)type];
 
     /// <summary>
     /// DJAuto按键处理Tap/Hold
     /// </summary>
-    /// <param name="holdDuration">持续时间，注意始终有2游戏帧抬手延迟</param>
-    public void DJAutoSetButtonOn(SensorType type, float holdDuration = 0f)
+    public void DJAutoSetButtonOn(SensorType type)
     {
-        ref var button = ref _buttonStates.ElementRef((int)type);
-        Interlocked.Exchange(ref button.HoldDuration, math.max(button.HoldDuration, holdDuration + 2 * FRAME_LENGTH_SEC));
+        if (!TryAcquireDJAutoInputs(1)) return;
+
+        SetButtonOn(type);
     }
     /// <summary>
     /// DJAuto判定区处理Tap/Hold
     /// </summary>
-    /// <param name="holdDuration">持续时间，注意始终有2游戏帧抬手延迟</param>
-    public void DJAutoSetSensorOn(SensorType type, float holdDuration = 0f)
+    public void DJAutoSetSensorOn(SensorType type)
     {
-        ref var sensor = ref _sensorStates.ElementRef((int)type);
-        Interlocked.Exchange(ref sensor.HoldDuration, math.max(sensor.HoldDuration, holdDuration + 2 * FRAME_LENGTH_SEC));
+        if (!TryAcquireDJAutoInputs(1)) return;
+
+        SetSensorOn(type);
     }
     /// <summary>
     /// DJAuto处理Touch/TouchHold（寻找大手圆）
     /// </summary>
-    /// <param name="cover"></param>
-    public void DJAutoAddGroupCoverage(CoverResult cover, float holdDuration = 0f)
+    public void DJAutoAddGroupCoverage(CoverResult cover, float timing = 0f)
     {
         if (cover.Mode == CoverMode.None) return;
+
+        if (cover.Mode == CoverMode.DoubleCircleSlide)
+        {
+            // 从 -2 帧提前起手落下两指，再用后半段 Perfect 窗口（12 帧，即 0.2 秒）完成滑动。
+            // 这也是全屏扫动可接受的速度上限。
+            float slideStart = NoteHelper.DJAUTO_TOUCH_DOUBLE_CIRCLE_SLIDE_START_SEC;
+            float slideDuration = NoteHelper.TOUCH_JUDGE_SEG_3RD_PERFECT_MSEC / 1000f;
+            float progress = math.saturate((timing - slideStart) / slideDuration);
+            cover.Circle1.Center = math.lerp(cover.Circle1.Center, cover.Circle1End, progress);
+            cover.Circle2.Center = math.lerp(cover.Circle2.Center, cover.Circle2End, progress);
+        }
 
         for (int i = 0; i < *ActiveCoveragesCountPtr; i++)
         {
@@ -221,6 +230,9 @@ public unsafe struct InputDataB
             if (existing.Mode == cover.Mode && math.all(existing.Circle1.Center == cover.Circle1.Center))
                 return;
         }
+
+        var requiredInputs = cover.Mode is CoverMode.DoubleCircleDirect or CoverMode.DoubleCircleGroup or CoverMode.DoubleCircleSlide ? 2 : 1;
+        if (!TryAcquireDJAutoInputs(requiredInputs)) return;
 
         var idx = Interlocked.Increment(ref *ActiveCoveragesCountPtr) - 1;
         if (idx < ActiveCoverages.Length)
@@ -240,7 +252,7 @@ public unsafe struct InputDataB
                 {
                     hits = true;
                 }
-                else if (cover.Mode == CoverMode.DoubleCircleDirect || cover.Mode == CoverMode.DoubleCircleGroup)
+                else if (cover.Mode == CoverMode.DoubleCircleDirect || cover.Mode == CoverMode.DoubleCircleGroup || cover.Mode == CoverMode.DoubleCircleSlide)
                 {
                     var r2 = cover.Circle2.Radius + sr;
                     if (math.distancesq(sp, cover.Circle2.Center) <= r2 * r2 + 1e-4f)
@@ -251,62 +263,70 @@ public unsafe struct InputDataB
 
                 if (hits)
                 {
-                    DJAutoSetSensorOn((SensorType)s, holdDuration);
+                    SetSensorOn((SensorType)s);
                 }
             }
         }
     }
+    /// <summary>
+    /// DJAuto处理星星
+    /// </summary>
+    public void DJAutoHandleWorldPosition(in float2 pos, float radius = DJAUTO_HAND_RADIUS)
+    {
+        if (!TryAcquireDJAutoInputs(1)) return;
 
-    // handle 部分，下一帧可以直接获取信息，holdDuration意义不大，
-    // 如果这一帧有任何输入事件设为 0.001f，那么这一帧只能读到 On，
-    // 下一帧刷新减掉大于 0.001f 的 deltaTime，这一帧只能读到 Off，
-    // ->但如果这一帧有任何输入事件设为 0.001f，那么这一帧只能读到 On，
-    // 所以这个流程不管帧率多少都精确还原用户输入/slide update输入
+        HandleWorldPosition(pos, radius);
+    }
 
+    public void DJAutoHandleWifiWorldPosition(in float2 leftPos, in float2 rightPos)
+    {
+        if (!TryAcquireDJAutoInputs(2)) return;
+
+        HandleWorldPosition(leftPos, DJAUTO_WIFI_RADIUS);
+        HandleWorldPosition(rightPos, DJAUTO_WIFI_RADIUS);
+    }
+
+    private bool TryAcquireDJAutoInputs(int requiredInputs)
+    {
+        while (true)
+        {
+            var currentCount = Interlocked.CompareExchange(ref _djAutoInputCount, 0, 0);
+            if (currentCount + requiredInputs > DJAUTO_MAX_CONCURRENT_INPUTS)
+                return false;
+
+            if (Interlocked.CompareExchange(ref _djAutoInputCount, currentCount + requiredInputs, currentCount) == currentCount)
+                return true;
+        }
+    }
+
+    // 每帧重新收集所有输入引用；上一帧引用仅用于生成 Down/Up 边沿。
     public void BeginHandler()
     {
+        _djAutoInputCount = 0;
         *ActiveCoveragesCountPtr = 0;
+
         for (int i = 0; i < BUTTON_COUNT; i++)
         {
             ref var button = ref _buttonStates.ElementRef(i);
-            button.LastHoldDuration = button.HoldDuration;
-            if (button.HoldDuration > 0)
-            {
-                if (button.HoldDuration < TimeData.deltaTime)
-                {
-                    button.HoldDuration = 0;
-                }
-                else
-                {
-                    button.HoldDuration -= TimeData.deltaTime;
-                }
-            }
+            button.LastActiveDown = button.ActiveDown;
+            button.ActiveDown = 0;
         }
         for (int i = 0; i < SENSOR_COUNT; i++)
         {
             ref var sensor = ref _sensorStates.ElementRef(i);
-            sensor.LastHoldDuration = sensor.HoldDuration;
-            if (sensor.HoldDuration > 0)
-            {
-                if (sensor.HoldDuration < TimeData.deltaTime)
-                {
-                    sensor.HoldDuration = 0;
-                }
-                else
-                {
-                    sensor.HoldDuration -= TimeData.deltaTime;
-                }
-            }
+            sensor.LastActiveDown = sensor.ActiveDown;
+            sensor.ActiveDown = 0;
         }
     }
+
     public void HandleButtonInput(SensorType type, bool status)
     {
-        if (status)
-        {
-            ref var button = ref _buttonStates.ElementRef((int)type);
-            Interlocked.Exchange(ref button.HoldDuration, math.max(button.HoldDuration, 0.001f));
-        }
+        if (!status) return;
+
+        ref var button = ref _buttonStates.ElementRef((int)type);
+        Interlocked.Increment(ref button.ActiveDown);
     }
+
     public void HandleWorldPosition(in float2 pos, float radius = DJAUTO_HAND_RADIUS)
     {
         for (int i = 0; i < SensorWorldPositions.Length; i++)
@@ -321,7 +341,7 @@ public unsafe struct InputDataB
             if (distSq <= combinedSq)
             {
                 ref var sensor = ref _sensorStates.ElementRef(i);
-                Interlocked.Exchange(ref sensor.HoldDuration, math.max(sensor.HoldDuration, 0.001f));
+                Interlocked.Increment(ref sensor.ActiveDown);
             }
         }
 
@@ -374,7 +394,7 @@ public unsafe struct InputDataB
                 color = new float4(0.5f, 1f, 0.5f, 0.6f) // Light green
             };
 
-            if (cover.Mode == CoverMode.DoubleCircleDirect || cover.Mode == CoverMode.DoubleCircleGroup)
+            if (cover.Mode == CoverMode.DoubleCircleDirect || cover.Mode == CoverMode.DoubleCircleGroup || cover.Mode == CoverMode.DoubleCircleSlide)
             {
                 var idx2 = Interlocked.Increment(ref *HitWriteCountPtr) - 1;
                 hitRender[idx2] = new HitRenderData
@@ -387,7 +407,17 @@ public unsafe struct InputDataB
         }
     }
 
+    private void SetButtonOn(SensorType type)
+    {
+        ref var button = ref _buttonStates.ElementRef((int)type);
+        Interlocked.Increment(ref button.ActiveDown);
+    }
 
+    private void SetSensorOn(SensorType type)
+    {
+        ref var sensor = ref _sensorStates.ElementRef((int)type);
+        Interlocked.Increment(ref sensor.ActiveDown);
+    }
 
 
     // ==========judge management==========
@@ -425,6 +455,8 @@ public unsafe struct InputDataB
 
     public void ResetState()
     {
+        _djAutoInputCount = 0;
+
         for (var i = 0; i < BUTTON_COUNT; i++)
         {
             _buttonStates[i] = default;
@@ -456,10 +488,10 @@ public unsafe struct InputDataB
 
 public struct SensorState
 {
-    public readonly bool Status => HoldDuration > 0;
-    public readonly bool IsPadDown => LastHoldDuration <= 0 && HoldDuration > 0;
-    public readonly bool IsPadUp => LastHoldDuration > 0 && HoldDuration <= 0;
+    public readonly bool Status => ActiveDown > 0;
+    public readonly bool IsPadDown => LastActiveDown <= 0 && ActiveDown > 0;
+    public readonly bool IsPadUp => LastActiveDown > 0 && ActiveDown <= 0;
 
-    public float HoldDuration;
-    public float LastHoldDuration;
+    public int ActiveDown;
+    public int LastActiveDown;
 }

@@ -268,15 +268,15 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
                 }
                 break;
             case AutoPlayMode.DJAutoButton:
-                if (!hold.isHeadJudged)
+                if (!hold.isHeadJudged || math.max(hold.LastFor - timing, 0) > 0)
                 {
-                    InputData.DJAutoSetButtonOn(hold.Key, hold.LastFor);
+                    InputData.DJAutoSetButtonOn(hold.Key);
                 }
                 break;
             case AutoPlayMode.DJAutoSensor:
-                if (!hold.isHeadJudged)
+                if (!hold.isHeadJudged || math.max(hold.LastFor - timing, 0) > 0)
                 {
-                    InputData.DJAutoSetSensorOn(hold.Key, hold.LastFor);
+                    InputData.DJAutoSetSensorOn(hold.Key);
                 }
                 break;
         }

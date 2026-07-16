@@ -44,9 +44,13 @@ public class AudioManager
 
     //for recording
     private List<float[]> noteSfxSamplesData = new(SFX_COUNT);
-    private float[] recordingBuffer;
+    private NativeArray<float> recordingBuffer;
+    private int recordingSampleCount;
+    private int recordingCommittedSampleCount;
+    private int recordingPreviousTouchHoldCount;
     private float recordingInitialAudioTime;
     private float recordingSpeed = 1f;
+    private float recordingInitialNoteTime;
     private int[][] sfxPlayPointers = new int[SFX_COUNT][]; //-1 is not playing
 
     public double GlobalAudioOffset { get; private set; }
@@ -278,6 +282,7 @@ public class AudioManager
     public void OnDestroy()
     {
         noteSfxPlaybackRequests.Dispose();
+        ReleaseRecordingAudio();
         Bass.Stop();
         Bass.Free();
     }
@@ -424,19 +429,23 @@ public class AudioManager
 
     //recording control
 
-    public void PrepareRecordingBuffer(float initialAudioTime, float speed)
+    public void BeginRecordingAudio(float initialAudioTime, float speed)
     {
         recordingInitialAudioTime = initialAudioTime;
         recordingSpeed = Math.Max(speed, 0.01f);
+        recordingInitialNoteTime = _timeProvider.NoteTime;
         var trackOffset = TRACK_ANSWER_PLAYBACK_OFFSET_SEC + (float)GlobalAudioOffset;
         var trackOutputStartTime = trackOffset - recordingInitialAudioTime;
         var leadAndTail = trackOutputStartTime
             + TimeProvider.SONG_DETAIL_OFFSET
             + NoteSfxs[ALL_PERFECT].Length;
         var totalLen = TrackSample!.Length / recordingSpeed + leadAndTail; // 留给开头演出和结尾AP音效
-        var size = (int)(totalLen * SAMPLERATE * CHANNELS);
-        recordingBuffer = new float[size];
-        Array.Clear(recordingBuffer, 0, recordingBuffer.Length);
+        var size = (int)Math.Ceiling(Math.Max(0.1, totalLen) * SAMPLERATE) * CHANNELS;
+        if (recordingBuffer.IsCreated) recordingBuffer.Dispose();
+        recordingBuffer = new NativeArray<float>(size, Allocator.Persistent, NativeArrayOptions.ClearMemory);
+        recordingSampleCount = size;
+        recordingCommittedSampleCount = 0;
+        recordingPreviousTouchHoldCount = 0;
         for (var i = 0; i < sfxPlayPointers.Length; i++)
         {
             if (sfxPlayPointers[i] != null)
@@ -445,9 +454,87 @@ public class AudioManager
                     sfxPlayPointers[i][j] = -1; // 初始化指针
             }
         }
+        // Mix sources whose timing is known before recording begins. During capture,
+        // only the current dynamic-SFX interval remains mutable, so older intervals
+        // can be encoded without retaining the whole song.
+        MixStaticRecordingAudio();
     }
 
-    public void TriggerSfxRecording(int index)
+    public unsafe void UpdateRecordingAudioFrame(double frameStartTime, double frameEndTime)
+    {
+        if (!recordingBuffer.IsCreated)
+            throw new InvalidOperationException("Recording audio has not been initialized.");
+        if (frameEndTime < frameStartTime)
+            throw new ArgumentOutOfRangeException(nameof(frameEndTime));
+
+        if (!IsShowingSongDetail)
+        {
+            for (var i = 0; i < SFX_COUNT; i++)
+            {
+                if (i == TRACK_START || i == TOUCHHOLD || i == ANSWER || i == ANSWER_CLOCK)
+                    continue;
+
+                if (_sfxPtr[i])
+                {
+                    TriggerSfxRecording(i);
+                    _sfxPtr[i] = false;
+                }
+            }
+
+            var currentTouchHoldCount = ActiveTouchHoldCount;
+            if (currentTouchHoldCount > recordingPreviousTouchHoldCount)
+            {
+                var newVoices = currentTouchHoldCount - recordingPreviousTouchHoldCount;
+                for (var i = 0; i < newVoices; i++)
+                    TriggerSfxRecording(TOUCHHOLD);
+            }
+            else if (currentTouchHoldCount == 0 && recordingPreviousTouchHoldCount > 0)
+            {
+                StopSfxRecording(TOUCHHOLD);
+            }
+
+            recordingPreviousTouchHoldCount = currentTouchHoldCount;
+            UpdateSfxRecording(
+                (float)(frameEndTime - frameStartTime),
+                (float)frameStartTime);
+        }
+
+        // Static audio was mixed up front and the dynamic part for this frame is
+        // now complete. Everything before frameEndTime is immutable and writable.
+        CommitRecordingAudioThrough(frameEndTime);
+    }
+
+    public void EndRecordingAudio(float recordingElapsedTime)
+    {
+        var finalSampleCount = FinalizeRecordingBuffer(recordingElapsedTime);
+        CommitRecordingSamples(finalSampleCount);
+    }
+
+    private void CommitRecordingAudioThrough(double recordingEndTime)
+    {
+        var targetSampleCount = Math.Min(
+            (int)(recordingEndTime * SAMPLERATE) * CHANNELS,
+            recordingBuffer.Length);
+        CommitRecordingSamples(targetSampleCount);
+    }
+
+    private void CommitRecordingSamples(int targetSampleCount)
+    {
+        targetSampleCount = Math.Clamp(targetSampleCount, 0, recordingBuffer.Length);
+        targetSampleCount -= targetSampleCount % CHANNELS;
+        if (targetSampleCount <= recordingCommittedSampleCount)
+            return;
+
+        // Buffer ownership stays here. ScreenRecorder supplies only timestamps;
+        // AudioManager submits the immutable NativeArray range to the encoder.
+        FFmpegMediaEncoder.WriteAudioSamples(
+            recordingBuffer,
+            recordingCommittedSampleCount,
+            targetSampleCount - recordingCommittedSampleCount);
+        recordingCommittedSampleCount = targetSampleCount;
+    }
+
+    private void TriggerSfxRecording(int index)
     {
         if (index < 0 || index >= noteSfxSamplesData.Count) return;
         var pointers = sfxPlayPointers[index];
@@ -470,7 +557,7 @@ public class AudioManager
         }
         pointers[bestIdx] = 0;
     }
-    public void StopSfxRecording(int index)
+    private void StopSfxRecording(int index)
     {
         if (index < 0 || index >= noteSfxSamplesData.Count) return;
         var pointers = sfxPlayPointers[index];
@@ -481,12 +568,15 @@ public class AudioManager
         }
     }
 
-    public void UpdateSfxRecording(float deltaTime, float recordingElapsedTime)
+    private void UpdateSfxRecording(float deltaTime, float recordingElapsedTime)
     {
         // 计算当前帧在 buffer 中的起始采样位置
         var bufferStartPos = (int)(recordingElapsedTime * SAMPLERATE) * CHANNELS;
         // 这一帧应该写入的采样长度
-        var samplesToCopy = (int)(deltaTime * SAMPLERATE) * CHANNELS;
+        // Absolute frame boundaries avoid cumulative rounding gaps at FPS values
+        // such as 59, where sampleRate / fps is fractional.
+        var bufferEndPos = (int)((recordingElapsedTime + deltaTime) * SAMPLERATE) * CHANNELS;
+        var samplesToCopy = Math.Max(0, bufferEndPos - bufferStartPos);
 
         for (var i = 0; i < sfxPlayPointers.Length; i++)
         {
@@ -525,7 +615,7 @@ public class AudioManager
         }
     }
 
-    public void ExportFinalWav(string outputPath, float recordingElapsedTime)
+    private int FinalizeRecordingBuffer(float recordingElapsedTime)
     {
         // Flush remaining playing SFXs and calculate max required time
         float maxTime = recordingElapsedTime;
@@ -560,11 +650,15 @@ public class AudioManager
             }
         }
 
-        int requiredSize = (int)(maxTime * SAMPLERATE) * CHANNELS;
-        requiredSize = (requiredSize / CHANNELS) * CHANNELS;
-        requiredSize = Math.Min(requiredSize, recordingBuffer.Length);
-        Array.Resize(ref recordingBuffer, requiredSize);
+        recordingSampleCount = Math.Min(
+            (int)Math.Ceiling(maxTime * SAMPLERATE) * CHANNELS,
+            recordingBuffer.Length);
+        recordingSampleCount -= recordingSampleCount % CHANNELS;
+        return recordingSampleCount;
+    }
 
+    private void MixStaticRecordingAudio()
+    {
         // track start
         var trackStartSampleData = noteSfxSamplesData[TRACK_START];
         for (var i = 0; i < trackStartSampleData.Length; i++)
@@ -587,7 +681,10 @@ public class AudioManager
 
         foreach (var timing in answerTimingPoints)
         {
-            float exactOutputSec = (timing.Timing - initialTrackSec) / recordingSpeed;
+            // Mirror the real-time trigger at Update():
+            // NoteTime > timing + TRACK_ANSWER_PLAYBACK_OFFSET_SEC.
+            var triggerNoteTime = timing.Timing + TRACK_ANSWER_PLAYBACK_OFFSET_SEC;
+            float exactOutputSec = (triggerNoteTime - recordingInitialNoteTime) / recordingSpeed;
             if (exactOutputSec < 0) continue;
 
             int startSample = (int)(exactOutputSec * SAMPLERATE);
@@ -606,7 +703,7 @@ public class AudioManager
                 }
             }
         }
-        var trackStartFrameCount = (int)((initialTrackSec + TimeProvider.SONG_DETAIL_OFFSET) * SAMPLERATE * recordingSpeed);
+        var trackStartFrameCount = (int)((initialTrackSec + TimeProvider.SONG_DETAIL_OFFSET) * SAMPLERATE);
         var trackFrameCount = TrackSampleData.Length / CHANNELS;
         var recordingFrameCount = recordingBuffer.Length / CHANNELS;
 
@@ -630,8 +727,18 @@ public class AudioManager
             }
         }
 
-        WavFileWriter.WriteFile(outputPath, SAMPLERATE, CHANNELS, recordingBuffer);
     }
+
+    public void ReleaseRecordingAudio()
+    {
+        if (recordingBuffer.IsCreated) recordingBuffer.Dispose();
+        recordingSampleCount = 0;
+        recordingCommittedSampleCount = 0;
+        recordingPreviousTouchHoldCount = 0;
+    }
+
+    public int SampleRate => SAMPLERATE;
+    public int Channels => CHANNELS;
 
 
 

@@ -217,7 +217,7 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
             case AutoPlayMode.DJAutoSensor:
                 if (!th.isHeadJudged || math.max(th.LastFor - timing, 0) > 0)
                 {
-                    InputData.DJAutoAddGroupCoverage(touchHoldGroupCoverResults[th.coverageId], th.LastFor);
+                    InputData.DJAutoAddGroupCoverage(touchHoldGroupCoverResults[th.coverageId]);
                 }
                 break;
         }

@@ -111,8 +111,9 @@ public unsafe struct TapUpdateJob : IJobParallelFor
         if (NoteHelper.AutoPlayMode is AutoPlayMode.Disable) return;
 
         var timing = TimeData.NoteTime - tap.Time;
-        if (timing < -0.01f) return;
-
+        var isDJAutoGuide = tap.IsSlideGuide && NoteHelper.AutoPlayMode is
+            AutoPlayMode.DJAutoButton or AutoPlayMode.DJAutoSensor;
+        if (timing < (isDJAutoGuide ? 0f : -0.01f)) return;
         switch (NoteHelper.AutoPlayMode)
         {
             case AutoPlayMode.Enable:
@@ -139,8 +140,17 @@ public unsafe struct TapUpdateJob : IJobParallelFor
             case AutoPlayMode.DJAutoSensor:
                 if (!tap.IsJudged)
                 {
-                    InputData.DJAutoSetSensorOn(tap.Key);
-                }
+                    if (tap.IsSlideGuide)
+                    {
+                        tap.JudgeGrade = NoteHelper.GetTapJudge(0, tap.IsEx);
+                        tap.IsJudged = true;
+                        tap.Diff = 0;
+                        EndNote(ref tap);
+                    }
+                    else
+                    {
+                        InputData.DJAutoSetSensorOn(tap.Key);
+                    }                }
                 break;
         }
     }

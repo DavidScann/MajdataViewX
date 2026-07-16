@@ -56,6 +56,8 @@ public partial class NoteManager
                 LoadTiming(timing);
         }
 
+        MarkSlideGuideNotes();
+
         slideAreaPool = (SlideArea*)UnsafeUtility.Malloc(
             areaPoolIndex * sizeof(SlideArea),
             16, Allocator.Persistent);
@@ -105,6 +107,70 @@ public partial class NoteManager
         MajBurst.MultTouchHandler.Load(loadedTouches);
     }
 
+    private static int GetSlideGuideTimeKey(float timing) =>
+        (int)math.round(timing * 1000f);
+
+    private void MarkSlideGuideNotes()
+    {
+        var tapLookup = new Dictionary<(int Time, SensorType Sensor), List<int>>();
+        var touchLookup = new Dictionary<(int Time, SensorType Sensor), List<int>>();
+
+        for (int i = 0; i < taps.Length; i++)
+        {
+            var tap = taps[i];
+            if (tap.IsMine) continue;
+
+            var key = (GetSlideGuideTimeKey(tap.Time), tap.Key);
+            if (!tapLookup.TryGetValue(key, out var indices))
+                tapLookup.Add(key, indices = new List<int>());
+            indices.Add(i);
+        }
+
+        for (int i = 0; i < touches.Length; i++)
+        {
+            var touch = touches[i];
+            if (touch.isMine) continue;
+
+            var key = (GetSlideGuideTimeKey(touch.time), touch.sensor);
+            if (!touchLookup.TryGetValue(key, out var indices))
+                touchLookup.Add(key, indices = new List<int>());
+            indices.Add(i);
+        }
+
+        for (int i = 0; i < slides.Length; i++)
+        {
+            var slide = slides[i];
+            if (slide.isMine || slide.startPos is < 1 or > 8) continue;
+
+            var sensor = (SensorType)(slide.startPos - 1);
+            var key = (GetSlideGuideTimeKey(slide.shootTime), sensor);
+
+            if (tapLookup.TryGetValue(key, out var tapIndices))
+            {
+                slide.hasSlideGuide = true;
+                slide.hasTapGuide = true;
+                foreach (var tapIndex in tapIndices)
+                {
+                    var tap = taps[tapIndex];
+                    tap.IsSlideGuide = true;
+                    taps[tapIndex] = tap;
+                }
+            }
+
+            if (touchLookup.TryGetValue(key, out var touchIndices))
+            {
+                slide.hasSlideGuide = true;
+                foreach (var touchIndex in touchIndices)
+                {
+                    var touch = touches[touchIndex];
+                    touch.isSlideGuide = true;
+                    touches[touchIndex] = touch;
+                }
+            }
+
+            slides[i] = slide;
+        }
+    }
     private void LoadIgnore(in SimaiTimingPoint timing)
     {
         var holdLength = 0d;
@@ -373,7 +439,7 @@ public partial class NoteManager
             points[i] = touches[startIdx + uniqueIndices[i]].centerPos;
         }
 
-        var solverResult = CoverageSolver.Solve(points, groups);
+        var solverResult = CoverageSolver.Solve(points, groups, allowSlide: true);
 
         int coverageId = touchGroupCoverResults.Length;
         touchGroupCoverResults.Add(solverResult);
