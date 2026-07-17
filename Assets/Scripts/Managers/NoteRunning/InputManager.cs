@@ -11,19 +11,19 @@ using static MajBurst;
 using static MajCtx;
 using TouchPhase = UnityEngine.InputSystem.TouchPhase;
 
-public class InputManager : MonoBehaviour
+public class InputManager
 {
+    public bool ShowHand
+    {
+        get => InputData.ShowHand;
+        set => InputData.ShowHand = value;
+    }
     RenderGroup<HitRenderData> _hitGroup;
 
-    private void Awake()
+    public InputManager()
     {
         _inputManager = this;
-    }
-
-    private void Start()
-    {
         //get sensor positions
-        var sensors = GameObject.Find("SensorRects").transform;
         for (var i = 0; i < SENSOR_COUNT; i++)
         {
             // 这里是抄的 muridx 的参数，其中除了 D 区以外，其他判定区恰好和 touch 坐标重合
@@ -33,23 +33,28 @@ public class InputManager : MonoBehaviour
             else
                 InputData.SensorWorldPositions[i] = MajPos.GetAreaPos((SensorType)i);
         }
-
         //REMEMBER TO FORCE INCLUDE
-        var matHit = new Material(Shader.Find("Custom/Hit"));
-        var hitMesh = MeshGenerator.CreateCircleMesh(8, 1f, true);
-        _hitGroup = new(matHit, hitMesh, 6); // larger than notes
+        if (ShowHand)
+        {
+            var matHit = new Material(Shader.Find("Custom/Hit"));
+            var hitMesh = MeshGenerator.CreateCircleMesh(8, 1f, true);
+            _hitGroup = new(matHit, hitMesh, 6); // priority larger than notes
+        }
     }
 
-    private unsafe void Update()
+    public unsafe void BeginHandler()
     {
         // UPDATE MUST BE EARLIER THAN NoteManager's UPDATE!!
         // (set in Script Execution Order)
-        _hitGroup.AdvanceWrite();
-        var hitRender = _hitGroup.LockForWrite();
-        _hitGroup.ResetCount();
+        if (ShowHand)
+        {
+            _hitGroup.AdvanceWrite();
+            var hitRender = _hitGroup.LockForWrite();
+            _hitGroup.ResetCount();
 
-        InputData.hitRender = (HitRenderData*)hitRender.GetUnsafePtr();
-        InputData.HitWriteCountPtr = _hitGroup.WriteCountPtr;
+            InputData.hitRender = (HitRenderData*)hitRender.GetUnsafePtr();
+            InputData.HitWriteCountPtr = _hitGroup.WriteCountPtr;
+        }
         InputData.BeginHandler();
 
         var keyboard = Keyboard.current;
@@ -63,7 +68,7 @@ public class InputManager : MonoBehaviour
         {
             if (mouse.leftButton.isPressed)
             {
-                WriteWorldPosition(mouse.position.ReadValue());
+                CheckScreenPos(mouse.position.ReadValue());
             }
         }
 
@@ -75,17 +80,21 @@ public class InputManager : MonoBehaviour
                 var phase = touch.phase.ReadValue();
                 if (phase == TouchPhase.None) continue;
                 if (phase is TouchPhase.Began or TouchPhase.Moved or TouchPhase.Stationary)
-                    WriteWorldPosition(touch.position.ReadValue());
+                    CheckScreenPos(touch.position.ReadValue());
             }
         }
     }
 
-    public void RenderHit() // in NoteManager, wait for slide
+    // wait for slide and other notes finish update
+    public void EndHandler()
     {
         InputData.EndHandler();
-        _hitGroup.UnlockWrite();
-        _hitGroup.Render();
-        _hitGroup.Swap();
+        if (ShowHand)
+        {
+            _hitGroup.UnlockWrite();
+            _hitGroup.Render();
+            _hitGroup.Swap();
+        }
     }
 
     private void CheckButton(Keyboard keyboard)
@@ -99,33 +108,21 @@ public class InputManager : MonoBehaviour
         InputData.HandleButtonInput(SensorType.A7, keyboard[Key.A].isPressed);
         InputData.HandleButtonInput(SensorType.A8, keyboard[Key.Q].isPressed);
     }
-
-    private void WriteWorldPosition(Vector2 screenPos)
+    private void CheckScreenPos(Vector2 screenPos)
     {
         var mainCamera = Camera.main;
         var pos = (Vector2)mainCamera.ScreenToWorldPoint(new Vector3(screenPos.x, screenPos.y, 10f));
 
-        InputData.HandleWorldPosition(pos);
+        InputData.HandleWorldPosInput(pos);
     }
 
-    public static SensorType GetSensor(char areaPos, int startPos)
-    {
-        return areaPos switch
-        {
-            'A' => (SensorType)(startPos - 1),
-            'B' => (SensorType)(startPos + 7),
-            'C' => SensorType.C,
-            'D' => (SensorType)(startPos + 16),
-            'E' => (SensorType)(startPos + 24),
-            _ => SensorType.A1,
-        };
-    }
+
 
     public void ResetState()
     {
     }
 
-    private void OnDestroy()
+    public void OnDestroy()
     {
         _hitGroup?.Dispose();
     }
@@ -140,6 +137,8 @@ public unsafe struct InputDataB
 
     NativeArray<SensorState> _buttonStates;
     NativeArray<SensorState> _sensorStates;
+    NativeArray<int> _buttonActiveDownNextFrame;
+    NativeArray<int> _sensorActiveDownNextFrame;
     NativeArray<int> _nextButtonIndex;
     NativeArray<int> _nextSensorIndex;
     NativeArray<int> _nextButtonIndexNextFrame;
@@ -152,11 +151,16 @@ public unsafe struct InputDataB
     [NativeDisableUnsafePtrRestriction]
     public int* ActiveCoveragesCountPtr;
 
+    NativeArray<CoverResult> _activeCoveragesNextFrame;
+    int _activeCoveragesNextFrameCount;
+
+    NativeArray<HitRenderData> _worldPosHitsNextFrame;
+    int _worldPosHitsNextFrameCount;
+
     [NativeDisableUnsafePtrRestriction]
     public HitRenderData* hitRender;
     [NativeDisableUnsafePtrRestriction]
     public int* HitWriteCountPtr;
-    public const float BUTTON_HIT_RENDER_RADIUS = 0.4f;
 
     public void Init()
     {
@@ -164,6 +168,8 @@ public unsafe struct InputDataB
 
         _buttonStates = new(BUTTON_COUNT, Allocator.Persistent);
         _sensorStates = new(SENSOR_COUNT, Allocator.Persistent);
+        _buttonActiveDownNextFrame = new(BUTTON_COUNT, Allocator.Persistent);
+        _sensorActiveDownNextFrame = new(SENSOR_COUNT, Allocator.Persistent);
         _nextButtonIndex = new(BUTTON_COUNT, Allocator.Persistent);
         _nextSensorIndex = new(SENSOR_COUNT, Allocator.Persistent);
         _nextButtonIndexNextFrame = new(BUTTON_COUNT, Allocator.Persistent);
@@ -175,7 +181,10 @@ public unsafe struct InputDataB
             _sensorStates[i] = new();
 
         ActiveCoverages = new(32, Allocator.Persistent);
+        _activeCoveragesNextFrame = new(32, Allocator.Persistent);
+        _worldPosHitsNextFrame = new(32, Allocator.Persistent);
         ActiveCoveragesCountPtr = (int*)UnsafeUtility.Malloc(sizeof(int), 4, Allocator.Persistent);
+        *ActiveCoveragesCountPtr = 0;
     }
 
 
@@ -184,9 +193,15 @@ public unsafe struct InputDataB
 
 
     // ==========button/sensor management==========
+    // 上帧 DJAuto 缓冲 -> 本帧状态 -> 叠加用户输入 -> 判定 -> DJAuto 写入下帧缓冲
 
     public readonly SensorState GetButtonState(SensorType type) => _buttonStates[(int)type];
     public readonly SensorState GetSensorState(SensorType type) => _sensorStates[(int)type];
+
+
+    // ======DJAuto Part======
+    // DJAuto部分的state写入都会被移到下一帧开头
+    // 避免因为update顺序导致的读取问题
 
     /// <summary>
     /// DJAuto按键处理Tap/Hold
@@ -195,7 +210,7 @@ public unsafe struct InputDataB
     {
         if (!TryAcquireDJAutoInputs(1)) return;
 
-        SetButtonOn(type);
+        SetNextFrameButtonOn(type);
     }
     /// <summary>
     /// DJAuto判定区处理Tap/Hold
@@ -204,7 +219,7 @@ public unsafe struct InputDataB
     {
         if (!TryAcquireDJAutoInputs(1)) return;
 
-        SetSensorOn(type);
+        SetNextFrameSensorOn(type);
     }
     /// <summary>
     /// DJAuto处理Touch/TouchHold（寻找大手圆）
@@ -224,9 +239,9 @@ public unsafe struct InputDataB
             cover.Circle2.Center = math.lerp(cover.Circle2.Center, cover.Circle2End, progress);
         }
 
-        for (int i = 0; i < *ActiveCoveragesCountPtr; i++)
+        for (int i = 0; i < _activeCoveragesNextFrameCount; i++)
         {
-            var existing = ActiveCoverages[i];
+            var existing = _activeCoveragesNextFrame[i];
             if (existing.Mode == cover.Mode && math.all(existing.Circle1.Center == cover.Circle1.Center))
                 return;
         }
@@ -234,10 +249,10 @@ public unsafe struct InputDataB
         var requiredInputs = cover.Mode is CoverMode.DoubleCircleDirect or CoverMode.DoubleCircleGroup or CoverMode.DoubleCircleSlide ? 2 : 1;
         if (!TryAcquireDJAutoInputs(requiredInputs)) return;
 
-        var idx = Interlocked.Increment(ref *ActiveCoveragesCountPtr) - 1;
-        if (idx < ActiveCoverages.Length)
+        var idx = Interlocked.Increment(ref _activeCoveragesNextFrameCount) - 1;
+        if (idx < _activeCoveragesNextFrame.Length)
         {
-            ActiveCoverages[idx] = cover;
+            _activeCoveragesNextFrame[idx] = cover;
 
             // Intersect virtual hand circles with physical sensors to trigger them
             for (int s = 0; s < SENSOR_COUNT; s++)
@@ -263,7 +278,7 @@ public unsafe struct InputDataB
 
                 if (hits)
                 {
-                    SetSensorOn((SensorType)s);
+                    SetNextFrameSensorOn((SensorType)s);
                 }
             }
         }
@@ -275,17 +290,22 @@ public unsafe struct InputDataB
     {
         if (!TryAcquireDJAutoInputs(1)) return;
 
-        HandleWorldPosition(pos, radius);
+        HandleWorldPosInput(pos, radius, true);
     }
-
+    /// <summary>
+    /// DJAuto处理wifi星星
+    /// </summary>
     public void DJAutoHandleWifiWorldPosition(in float2 leftPos, in float2 rightPos)
     {
         if (!TryAcquireDJAutoInputs(2)) return;
 
-        HandleWorldPosition(leftPos, DJAUTO_WIFI_RADIUS);
-        HandleWorldPosition(rightPos, DJAUTO_WIFI_RADIUS);
+        HandleWorldPosInput(leftPos, DJAUTO_WIFI_RADIUS, true);
+        HandleWorldPosInput(rightPos, DJAUTO_WIFI_RADIUS, true);
     }
-
+    /// <summary>
+    /// 申请手
+    /// </summary>
+    /// <param name="requiredInputs">申请几只手</param>
     private bool TryAcquireDJAutoInputs(int requiredInputs)
     {
         while (true)
@@ -299,35 +319,70 @@ public unsafe struct InputDataB
         }
     }
 
-    // 每帧重新收集所有输入引用；上一帧引用仅用于生成 Down/Up 边沿。
+
+
+    // ======User Input Part======
+
     public void BeginHandler()
     {
         _djAutoInputCount = 0;
-        *ActiveCoveragesCountPtr = 0;
 
+        // DJAuto 的判定状态和手部显示使用同一份 next-frame 数据，避免画面领先一帧。
+        var coverageCount = math.min(
+            Interlocked.Exchange(ref _activeCoveragesNextFrameCount, 0),
+            ActiveCoverages.Length);
+        *ActiveCoveragesCountPtr = coverageCount;
+        for (int i = 0; i < coverageCount; i++)
+            ActiveCoverages[i] = _activeCoveragesNextFrame[i];
+
+        var hitCount = math.min(
+            Interlocked.Exchange(ref _worldPosHitsNextFrameCount, 0),
+            _worldPosHitsNextFrame.Length);
+        if (ShowHand)
+        {
+            for (int i = 0; i < hitCount; i++)
+            {
+                var hitIndex = Interlocked.Increment(ref *HitWriteCountPtr) - 1;
+                hitRender[hitIndex] = _worldPosHitsNextFrame[i];
+            }
+        }
+
+        // 先保留上一帧的合计引用数，再消费 DJAuto 在上一帧排入的输入。
+        // 随后用户输入会继续加到 ActiveDown 上，两种来源自然遵循同一套边沿判断。
         for (int i = 0; i < BUTTON_COUNT; i++)
         {
             ref var button = ref _buttonStates.ElementRef(i);
             button.LastActiveDown = button.ActiveDown;
-            button.ActiveDown = 0;
+            button.ActiveDown = Interlocked.Exchange(
+                ref _buttonActiveDownNextFrame.ElementRef(i), 0);
         }
         for (int i = 0; i < SENSOR_COUNT; i++)
         {
             ref var sensor = ref _sensorStates.ElementRef(i);
             sensor.LastActiveDown = sensor.ActiveDown;
-            sensor.ActiveDown = 0;
+            sensor.ActiveDown = Interlocked.Exchange(
+                ref _sensorActiveDownNextFrame.ElementRef(i), 0);
         }
     }
 
-    public void HandleButtonInput(SensorType type, bool status)
+    /// <summary>
+    /// 处理按键输入
+    /// </summary>
+    /// <param name="nextFrame">是否应用到下一帧（DJAuto）</param>
+    public void HandleButtonInput(SensorType type, bool status, bool nextFrame = false)
     {
         if (!status) return;
 
-        ref var button = ref _buttonStates.ElementRef((int)type);
-        Interlocked.Increment(ref button.ActiveDown);
+        if (nextFrame)
+            SetNextFrameButtonOn(type);
+        else
+            SetThisFrameButtonOn(type);
     }
-
-    public void HandleWorldPosition(in float2 pos, float radius = DJAUTO_HAND_RADIUS)
+    /// <summary>
+    /// 处理世界坐标（手）输入
+    /// </summary>
+    /// <param name="nextFrame">是否应用到下一帧（DJAuto）</param>
+    public void HandleWorldPosInput(in float2 pos, float radius = DJAUTO_HAND_RADIUS, bool nextFrame = false)
     {
         for (int i = 0; i < SensorWorldPositions.Length; i++)
         {
@@ -340,106 +395,121 @@ public unsafe struct InputDataB
 
             if (distSq <= combinedSq)
             {
-                ref var sensor = ref _sensorStates.ElementRef(i);
-                Interlocked.Increment(ref sensor.ActiveDown);
+                if (nextFrame)
+                    SetNextFrameSensorOn((SensorType)i);
+                else
+                    SetThisFrameSensorOn((SensorType)i);
             }
         }
 
-        var idx = Interlocked.Increment(ref *HitWriteCountPtr) - 1;
-        hitRender[idx] = new HitRenderData
+        if (ShowHand) // show hand为false时指针都不会传，注意一下避免异常
         {
-            pos = pos,
-            radius = radius,
-            color = new float4(1, 0, 0, 0.75f)
-        };
-    }
-
-    public void EndHandler()
-    {
-        for (int i = 0; i < BUTTON_COUNT; i++)
-        {
-            if (_buttonStates[i].Status)
+            var hit = new HitRenderData
             {
-                var idx = Interlocked.Increment(ref *HitWriteCountPtr) - 1;
-                hitRender[idx] = new HitRenderData
-                {
-                    pos = MajPos.GetBtnPos(i),
-                    radius = BUTTON_HIT_RENDER_RADIUS,
-                    color = new float4(0, 1, 1, 0.5f) // Cyan responsive color
-                };
-            }
-        }
-        for (int i = 0; i < SENSOR_COUNT; i++)
-        {
-            if (_sensorStates[i].Status)
-            {
-                var idx = Interlocked.Increment(ref *HitWriteCountPtr) - 1;
-                hitRender[idx] = new HitRenderData
-                {
-                    pos = SensorWorldPositions[i],
-                    radius = MajPos.GetSensorRadius((SensorType)i),
-                    color = new float4(0, 1, 1, 0.5f) // Cyan responsive color
-                };
-            }
-        }
-
-        for (int i = 0; i < math.min(*ActiveCoveragesCountPtr, ActiveCoverages.Length); i++)
-        {
-            var cover = ActiveCoverages[i];
-            var idx1 = Interlocked.Increment(ref *HitWriteCountPtr) - 1;
-            hitRender[idx1] = new HitRenderData
-            {
-                pos = cover.Circle1.Center,
-                radius = cover.Circle1.Radius,
-                color = new float4(0.5f, 1f, 0.5f, 0.6f) // Light green
+                pos = pos,
+                radius = radius,
+                color = new float4(1, 0, 0, 0.75f)
             };
 
-            if (cover.Mode == CoverMode.DoubleCircleDirect || cover.Mode == CoverMode.DoubleCircleGroup || cover.Mode == CoverMode.DoubleCircleSlide)
+            if (nextFrame)
             {
-                var idx2 = Interlocked.Increment(ref *HitWriteCountPtr) - 1;
-                hitRender[idx2] = new HitRenderData
-                {
-                    pos = cover.Circle2.Center,
-                    radius = cover.Circle2.Radius,
-                    color = new float4(0.5f, 1f, 0.5f, 0.6f)
-                };
+                var idx = Interlocked.Increment(ref _worldPosHitsNextFrameCount) - 1;
+                if (idx < _worldPosHitsNextFrame.Length)
+                    _worldPosHitsNextFrame[idx] = hit;
+            }
+            else
+            {
+                var idx = Interlocked.Increment(ref *HitWriteCountPtr) - 1;
+                hitRender[idx] = hit;
             }
         }
     }
 
-    private void SetButtonOn(SensorType type)
+    private void SetThisFrameButtonOn(SensorType type)
     {
         ref var button = ref _buttonStates.ElementRef((int)type);
         Interlocked.Increment(ref button.ActiveDown);
     }
-
-    private void SetSensorOn(SensorType type)
+    private void SetThisFrameSensorOn(SensorType type)
     {
         ref var sensor = ref _sensorStates.ElementRef((int)type);
         Interlocked.Increment(ref sensor.ActiveDown);
     }
+    private void SetNextFrameButtonOn(SensorType type)
+    {
+        Interlocked.Increment(ref _buttonActiveDownNextFrame.ElementRef((int)type));
+    }
+    private void SetNextFrameSensorOn(SensorType type)
+    {
+        Interlocked.Increment(ref _sensorActiveDownNextFrame.ElementRef((int)type));
+    }
+
+    public void EndHandler()
+    {
+        if (ShowHand)
+        {
+            for (int i = 0; i < BUTTON_COUNT; i++)
+            {
+                if (_buttonStates[i].Status)
+                {
+                    var idx = Interlocked.Increment(ref *HitWriteCountPtr) - 1;
+                    hitRender[idx] = new HitRenderData
+                    {
+                        pos = MajPos.GetBtnPos(i),
+                        radius = BUTTON_HIT_RENDER_RADIUS,
+                        color = new float4(0, 1, 1, 0.5f) // Cyan responsive color
+                    };
+                }
+            }
+            for (int i = 0; i < SENSOR_COUNT; i++)
+            {
+                if (_sensorStates[i].Status)
+                {
+                    var idx = Interlocked.Increment(ref *HitWriteCountPtr) - 1;
+                    hitRender[idx] = new HitRenderData
+                    {
+                        pos = SensorWorldPositions[i],
+                        radius = MajPos.GetSensorRadius((SensorType)i),
+                        color = new float4(0, 1, 1, 0.5f) // Cyan responsive color
+                    };
+                }
+            }
+
+            for (int i = 0; i < math.min(*ActiveCoveragesCountPtr, ActiveCoverages.Length); i++)
+            {
+                var cover = ActiveCoverages[i];
+                var idx1 = Interlocked.Increment(ref *HitWriteCountPtr) - 1;
+                hitRender[idx1] = new HitRenderData
+                {
+                    pos = cover.Circle1.Center,
+                    radius = cover.Circle1.Radius,
+                    color = new float4(0.5f, 1f, 0.5f, 0.6f) // Light green
+                };
+
+                if (cover.Mode == CoverMode.DoubleCircleDirect || cover.Mode == CoverMode.DoubleCircleGroup || cover.Mode == CoverMode.DoubleCircleSlide)
+                {
+                    var idx2 = Interlocked.Increment(ref *HitWriteCountPtr) - 1;
+                    hitRender[idx2] = new HitRenderData
+                    {
+                        pos = cover.Circle2.Center,
+                        radius = cover.Circle2.Radius,
+                        color = new float4(0.5f, 1f, 0.5f, 0.6f)
+                    };
+                }
+            }
+        }
+    }
 
 
     // ==========judge management==========
-    public void NextTapHold(SensorType pos)
+    public readonly void NextTapHold(SensorType pos)
     {
         Interlocked.Increment(ref _nextButtonIndexNextFrame.ElementRef((int)pos));
         Interlocked.Increment(ref _nextSensorIndexNextFrame.ElementRef((int)pos));
     }
-    public void NextTouch(SensorType pos)
+    public readonly void NextTouch(SensorType pos)
     {
         Interlocked.Increment(ref _nextSensorIndexNextFrame.ElementRef((int)pos));
-    }
-    public void ApplyNextIndices()
-    {
-        for (int i = 0; i < BUTTON_COUNT; i++)
-        {
-            _nextButtonIndex[i] = _nextButtonIndexNextFrame[i];
-        }
-        for (int i = 0; i < SENSOR_COUNT; i++)
-        {
-            _nextSensorIndex[i] = _nextSensorIndexNextFrame[i];
-        }
     }
     public readonly bool CanJudgeButton(SensorType pos, int order)
     {
@@ -451,21 +521,38 @@ public unsafe struct InputDataB
     }
 
 
+    public readonly void ApplyNextIndices()
+    {
+        for (int i = 0; i < BUTTON_COUNT; i++)
+        {
+            _nextButtonIndex.ElementRef(i) = _nextButtonIndexNextFrame[i];
+        }
+        for (int i = 0; i < SENSOR_COUNT; i++)
+        {
+            _nextSensorIndex.ElementRef(i) = _nextSensorIndexNextFrame[i];
+        }
+    }
+
 
 
     public void ResetState()
     {
         _djAutoInputCount = 0;
+        *ActiveCoveragesCountPtr = 0;
+        _activeCoveragesNextFrameCount = 0;
+        _worldPosHitsNextFrameCount = 0;
 
         for (var i = 0; i < BUTTON_COUNT; i++)
         {
             _buttonStates[i] = default;
+            _buttonActiveDownNextFrame[i] = 0;
             _nextButtonIndex[i] = 0;
             _nextButtonIndexNextFrame[i] = 0;
         }
         for (var i = 0; i < SENSOR_COUNT; i++)
         {
             _sensorStates[i] = default;
+            _sensorActiveDownNextFrame[i] = 0;
             _nextSensorIndex[i] = 0;
             _nextSensorIndexNextFrame[i] = 0;
         }
@@ -475,13 +562,17 @@ public unsafe struct InputDataB
     {
         if (SensorWorldPositions.IsCreated) SensorWorldPositions.Dispose();
         if (_sensorStates.IsCreated) _sensorStates.Dispose();
+        if (_sensorActiveDownNextFrame.IsCreated) _sensorActiveDownNextFrame.Dispose();
         if (_nextSensorIndex.IsCreated) _nextSensorIndex.Dispose();
         if (_nextSensorIndexNextFrame.IsCreated) _nextSensorIndexNextFrame.Dispose();
         if (_buttonStates.IsCreated) _buttonStates.Dispose();
+        if (_buttonActiveDownNextFrame.IsCreated) _buttonActiveDownNextFrame.Dispose();
         if (_nextButtonIndex.IsCreated) _nextButtonIndex.Dispose();
         if (_nextButtonIndexNextFrame.IsCreated) _nextButtonIndexNextFrame.Dispose();
 
         if (ActiveCoverages.IsCreated) ActiveCoverages.Dispose();
+        if (_activeCoveragesNextFrame.IsCreated) _activeCoveragesNextFrame.Dispose();
+        if (_worldPosHitsNextFrame.IsCreated) _worldPosHitsNextFrame.Dispose();
         if (ActiveCoveragesCountPtr != null) UnsafeUtility.Free(ActiveCoveragesCountPtr, Allocator.Persistent);
     }
 }

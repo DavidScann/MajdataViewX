@@ -1,4 +1,5 @@
 #pragma warning disable IDE1006 // 命名样式
+using Unity.Burst;
 using Unity.IL2CPP.CompilerServices;
 
 [Il2CppEagerStaticClassConstruction]
@@ -27,4 +28,19 @@ public static class MajCtx
 
     public const float DJAUTO_HAND_RADIUS = 0.45f;
     public const float DJAUTO_WIFI_RADIUS = 1.00f;
+    public const float BUTTON_HIT_RENDER_RADIUS = 0.4f;
+
+    [BurstCompile]
+    public static SensorType GetSensor(char areaPos, int startPos)
+    {
+        return areaPos switch
+        {
+            'A' => (SensorType)(startPos - 1),
+            'B' => (SensorType)(startPos + 7),
+            'C' => SensorType.C,
+            'D' => (SensorType)(startPos + 16),
+            'E' => (SensorType)(startPos + 24),
+            _ => SensorType.A1,
+        };
+    }
 }

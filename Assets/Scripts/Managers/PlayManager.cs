@@ -53,11 +53,11 @@ public class PlayManager : MonoBehaviour
     private void Start()
     {
         IsReloading = false;
-        _ = new AudioManager();
 
         bgCover = GameObject.Find("BackgroundCover").GetComponent<SpriteRenderer>();
         canvasButtons = GameObject.Find("CanvasButtons");
 
+        _ = new AudioManager();
         _audioManagerThread = new Thread(() =>
         {
             while (true)
@@ -67,7 +67,6 @@ public class PlayManager : MonoBehaviour
             }
         });
         _audioManagerThread.Start();
-
 
         MajBurst.__DataSS.Data = new MajBurstData
         {
@@ -79,6 +78,8 @@ public class PlayManager : MonoBehaviour
         //MajBurst.TimeData.Init();
         MajBurst.InputData.Init();
         MajBurst.MultTouchHandler.Init();
+
+        _ = new InputManager();
 
 
         SlideTableNeo.InitializeStandardSlideTable();
@@ -166,7 +167,7 @@ public class PlayManager : MonoBehaviour
             _objectCounter.StartOutput(_setting.ComboStatusType, _setting.UIType);
             //simulate
             NoteHelper.AutoPlayModeSS.Data = _setting.AutoMode;
-            MajBurst.InputData.ShowHand = _setting.ShowHand;
+            _inputManager.ShowHand = _setting.ShowHand;
             //bg
             bgCover.color = new Color(0f, 0f, 0f, _setting.BackgroundDim);
             _bgManager.ShowBG();
@@ -187,7 +188,7 @@ public class PlayManager : MonoBehaviour
                         _chart, ignoreOffset,
                         title, artist, difficulty,
                         noteSpeed, touchSpeed,
-                        _setting.SmoothSlideAnime, 
+                        _setting.SmoothSlideAnime,
                         _setting.LegacySlideLayer);
 
                     _allPerfectManager.enabled = false;
@@ -199,7 +200,7 @@ public class PlayManager : MonoBehaviour
                         _chart, ignoreOffset,
                         title, artist, difficulty,
                         noteSpeed, touchSpeed,
-                        _setting.SmoothSlideAnime, 
+                        _setting.SmoothSlideAnime,
                         _setting.LegacySlideLayer);
 
                     _bgManager.PlaySongDetail();
@@ -220,7 +221,7 @@ public class PlayManager : MonoBehaviour
                         _chart, ignoreOffset,
                         title, artist, difficulty,
                         noteSpeed, touchSpeed,
-                        _setting.SmoothSlideAnime, 
+                        _setting.SmoothSlideAnime,
                         _setting.LegacySlideLayer);
 
                     _bgManager.PlaySongDetail();
@@ -363,6 +364,7 @@ public class PlayManager : MonoBehaviour
     {
         _audioManager.OnDestroy();
         _audioManagerThread?.Abort();
+        _inputManager.OnDestroy();
         MajBurst.InputData.Dispose();
     }
 }

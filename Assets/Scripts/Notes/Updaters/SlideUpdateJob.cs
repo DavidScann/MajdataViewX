@@ -227,10 +227,9 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
         if (NoteHelper.AutoPlayMode is AutoPlayMode.Disable) return;
         if (slide.isEnd || slide.isSlideEnd || slide.isJudged) return;
         var timing = TimeData.NoteTime - slide.shootTime;
-        var guideDelay = NoteHelper.AutoPlayMode == AutoPlayMode.DJAutoButton && slide.hasTapGuide
-            ? NoteHelper.DJAUTO_SLIDE_TAP_GUIDE_DELAY_SEC
-            : 0f;
-        var autoplayStart = guideDelay > 0 ? guideDelay : slide.hasSlideGuide ? 0f : -0.01f;
+        var autoplayStart = NoteHelper.AutoPlayMode == AutoPlayMode.DJAutoButton && slide.hasTapGuide
+            ? NoteHelper.DJAUTO_SLIDE_TAP_GUIDE_DELAY_SEC // 外键的DJAuto拍划🤝
+            : NoteHelper.DJAUTO_AUTOPLAY_START_SEC;
         if (timing < autoplayStart) return;
         switch (NoteHelper.AutoPlayMode)
         {
@@ -301,12 +300,12 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
             // 模拟模式下需要等待星星完全结束（isSlideEnd），但因为isJudged所以并不会把手黏在这里
             case AutoPlayMode.DJAutoButton:
             case AutoPlayMode.DJAutoSensor:
-                var inputProcess = guideDelay > 0
-                    ? math.saturate((timing - guideDelay) / math.max(slide.LastFor, 0.001f))
+                var inputProcess = autoplayStart > 0
+                    ? math.saturate((timing - autoplayStart) / math.max(slide.LastFor, 0.001f))
                     : slide.process;
                 if (!slide.isWifi)
                 {
-                    var inputPos = guideDelay > 0
+                    var inputPos = autoplayStart > 0
                         ? GetStarPositionAtProcess(ref slide, inputProcess)
                         : slide.starPos;
                     InputData.DJAutoHandleWorldPosition(inputPos);
@@ -321,7 +320,8 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
                         (left + center) / 2,
                         (right + center) / 2);
                 }
-                break;        }
+                break;
+        }
     }
 
     private static float2 GetStarPositionAtProcess(ref SlideData slide, float process)

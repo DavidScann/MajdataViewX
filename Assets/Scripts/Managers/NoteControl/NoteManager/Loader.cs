@@ -140,7 +140,7 @@ public partial class NoteManager
         for (int i = 0; i < slides.Length; i++)
         {
             var slide = slides[i];
-            if (slide.isMine || slide.startPos is < 1 or > 8) continue;
+            if (slide.isMine) continue;
 
             var sensor = (SensorType)(slide.startPos - 1);
             var key = (GetSlideGuideTimeKey(slide.shootTime), sensor);
@@ -664,7 +664,7 @@ public partial class NoteManager
 
     private void LoadTouch(in SimaiTimingPoint timing, in SimaiNote note, bool isEach)
     {
-        var sensor = InputManager.GetSensor(note.TouchArea, note.StartPosition);
+        var sensor = GetSensor(note.TouchArea, note.StartPosition);
         var touch = new TouchData
         {
             time = (float)timing.Timing,
@@ -695,7 +695,7 @@ public partial class NoteManager
 
     private void LoadTouchHold(in SimaiTimingPoint timing, in SimaiNote note, bool isEach)
     {
-        var sensor = InputManager.GetSensor(note.TouchArea, note.StartPosition);
+        var sensor = GetSensor(note.TouchArea, note.StartPosition);
         var th = new TouchHoldData
         {
             time = (float)timing.Timing,

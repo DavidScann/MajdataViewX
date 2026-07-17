@@ -85,6 +85,7 @@ public partial class NoteManager : MonoBehaviour
     void Update()
     {
         _prevChain.Complete();
+        _inputManager.BeginHandler(); // 这里牵扯到用户输入，需要一直调用
 
         if (taps.Length + eachLines.Length + holds.Length + slides.Length + touches.Length + touchHolds.Length == 0) return;
 
@@ -128,29 +129,7 @@ public partial class NoteManager : MonoBehaviour
 
             JobHandle h = default;
 
-            if (taps.Length > 0)
-                h = new TapUpdateJob
-                {
-                    taps = taps.AsArray(),
-
-                    tapLinesRender = tapLinesRender,
-                    notesRender = notesRender,
-
-                    tapLinesWriteCountPtr = _tapLineGroup.WriteCountPtr,
-                    notesWriteCountPtr = _notesGroup.WriteCountPtr,
-                    SfxRequests = _audioManager.SfxRequestsPtr,
-                    JudgeEffectRequests = _effectManager.JudgeEffectRequestsPtr,
-                    ReportResults = _objectCounter.ReportRequestsWriter,
-                }.Schedule(taps.Length, 32, h);
-
-            if (eachLines.Length > 0)
-                h = new EachLineUpdateJob
-                {
-                    eachLines = eachLines.AsArray(),
-                    eachLinesRender = eachLinesRender,
-                    EachLinesWriteCountPtr = _eachLineGroup.WriteCountPtr,
-                }.Schedule(eachLines.Length, 32, h);
-
+            // DJAuto持续输入必须先续占下一帧的手，Tap/Touch 只能使用剩余额度，因此hold/slide类note先update
             if (holds.Length > 0)
                 h = new HoldUpdateJob
                 {
@@ -191,6 +170,29 @@ public partial class NoteManager : MonoBehaviour
                     touchHoldGroupPressedCounts = touchHoldGroupPressedCounts.AsArray(),
                     touchHoldGroupCoverResults = touchHoldGroupCoverResults.AsArray(),
                 }.Schedule(touchHolds.Length, 32, h);
+
+            if (taps.Length > 0)
+                h = new TapUpdateJob
+                {
+                    taps = taps.AsArray(),
+
+                    tapLinesRender = tapLinesRender,
+                    notesRender = notesRender,
+
+                    tapLinesWriteCountPtr = _tapLineGroup.WriteCountPtr,
+                    notesWriteCountPtr = _notesGroup.WriteCountPtr,
+                    SfxRequests = _audioManager.SfxRequestsPtr,
+                    JudgeEffectRequests = _effectManager.JudgeEffectRequestsPtr,
+                    ReportResults = _objectCounter.ReportRequestsWriter,
+                }.Schedule(taps.Length, 32, h);
+
+            if (eachLines.Length > 0)
+                h = new EachLineUpdateJob
+                {
+                    eachLines = eachLines.AsArray(),
+                    eachLinesRender = eachLinesRender,
+                    EachLinesWriteCountPtr = _eachLineGroup.WriteCountPtr,
+                }.Schedule(eachLines.Length, 32, h);
 
             if (touches.Length > 0)
                 h = new TouchUpdateJob
@@ -242,7 +244,7 @@ public partial class NoteManager : MonoBehaviour
             MajBurst.InputData.ApplyNextIndices();
 
             // 思来想去在th内做加减确实不比在这里遍历一次快
-            // 去他妈的可读性 反正我ArrayBoundCheck off
+            // 去他妈的可读性
             {
                 int activeTouchHolds = 0;
                 for (int i = 0; i < touchHolds.Length; i++)
@@ -255,7 +257,7 @@ public partial class NoteManager : MonoBehaviour
             _isJobScheduledThisFrame = false;
         }
 
-        _inputManager.RenderHit();
+        _inputManager.EndHandler();
     }
 
     void OnDestroy()

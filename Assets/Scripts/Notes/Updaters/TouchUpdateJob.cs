@@ -164,14 +164,12 @@ public unsafe struct TouchUpdateJob : IJobParallelFor
 
         var timing = TimeData.NoteTime - touch.time;
         var cover = touchGroupCoverResults[touch.coverageId];
-        var isDJAutoGuide = touch.isSlideGuide && NoteHelper.AutoPlayMode is
-            AutoPlayMode.DJAutoButton or AutoPlayMode.DJAutoSensor;
-        var autoplayStart = isDJAutoGuide
-            ? 0f
-            : NoteHelper.AutoPlayMode is AutoPlayMode.DJAutoButton or AutoPlayMode.DJAutoSensor &&
-              cover.Mode == CoverMode.DoubleCircleSlide
+        var autoplayStart = NoteHelper.AutoPlayMode is AutoPlayMode.DJAutoButton or AutoPlayMode.DJAutoSensor &&
+                            cover.Mode == CoverMode.DoubleCircleSlide
                 ? NoteHelper.DJAUTO_TOUCH_DOUBLE_CIRCLE_SLIDE_START_SEC
-                : -0.01f;        if (timing < autoplayStart) return;
+                : NoteHelper.DJAUTO_AUTOPLAY_START_SEC;
+
+        if (timing < autoplayStart) return;
 
         switch (NoteHelper.AutoPlayMode)
         {
@@ -192,17 +190,14 @@ public unsafe struct TouchUpdateJob : IJobParallelFor
                 break;
             case AutoPlayMode.DJAutoButton:
             case AutoPlayMode.DJAutoSensor:
-                if (touch.isSlideGuide)
+                if (!touch.isJudged)
                 {
-                    touch.judgeGrade = NoteHelper.GetTouchJudge(0);
-                    touch.isJudged = true;
-                    touch.diff = 0;
-                    EndNote(ref touch);
+                    if (!touch.isSlideGuide)
+                    {
+                        InputData.DJAutoAddGroupCoverage(cover, timing);
+                    }
                 }
-                else if (!touch.isJudged)
-                {
-                    InputData.DJAutoAddGroupCoverage(cover, timing);
-                }                break;
+                break;
         }
     }
 
