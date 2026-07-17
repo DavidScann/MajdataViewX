@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Runtime.InteropServices;
 using Cysharp.Threading.Tasks;
 using JetBrains.Annotations;
 using UnityEngine;
@@ -15,6 +16,22 @@ using static MajCtx;
 
 public class ScreenRecorder : MonoBehaviour
 {
+#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+    private static extern IntPtr ShellExecuteW(
+        IntPtr window,
+        string operation,
+        string file,
+        string parameters,
+        string directory,
+        int showCommand);
+#elif UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX
+    [DllImport("libSystem.dylib", EntryPoint = "system")]
+    private static extern int RunSystemCommand(string command);
+#elif UNITY_EDITOR_LINUX || UNITY_STANDALONE_LINUX
+    [DllImport("libc", EntryPoint = "system")]
+    private static extern int RunSystemCommand(string command);
+#endif
 
     private const int MaxPendingReadbacks = 4;
 
@@ -180,16 +197,33 @@ public class ScreenRecorder : MonoBehaviour
 
     private static void OpenFileLocation(string filePath)
     {
-#if UNITY_EDITOR_WIN
-        System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{filePath}\"");
-#elif UNITY_EDITOR_OSX
-        System.Diagnostics.Process.Start("open", $"-R \"{filePath}\"");
-#elif UNITY_STANDALONE_WIN
-        FFmpegPipe.SpawnSimple($"explorer /select,\"{filePath}\"");
-#elif UNITY_STANDALONE_OSX
-        FFmpegPipe.SpawnSimple($"open -R \"{filePath}\"");
-#elif UNITY_STANDALONE_LINUX
-        FFmpegPipe.SpawnSimple($"xdg-open \"{Path.GetDirectoryName(filePath)}\"");
+        var fullPath = Path.GetFullPath(filePath);
+
+#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
+        var result = ShellExecuteW(
+            IntPtr.Zero,
+            "open",
+            "explorer.exe",
+            $"/select,\"{fullPath}\"",
+            string.Empty,
+            1);
+        if (result.ToInt64() > 32) return;
+#elif UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX
+        if (RunSystemCommand($"open -R {QuoteShellArgument(fullPath)}") == 0) return;
+#elif UNITY_EDITOR_LINUX || UNITY_STANDALONE_LINUX
+        var linuxDirectory = Path.GetDirectoryName(fullPath);
+        if (linuxDirectory is not null &&
+            RunSystemCommand($"xdg-open {QuoteShellArgument(linuxDirectory)} >/dev/null 2>&1 &") == 0)
+            return;
 #endif
+
+        var directoryPath = Path.GetDirectoryName(fullPath);
+        if (directoryPath is not null)
+            Application.OpenURL(new Uri(directoryPath + Path.DirectorySeparatorChar).AbsoluteUri);
     }
+
+#if UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX || UNITY_EDITOR_LINUX || UNITY_STANDALONE_LINUX
+    private static string QuoteShellArgument(string value) =>
+        $"'{value.Replace("'", "'\"'\"'")}'";
+#endif
 }
