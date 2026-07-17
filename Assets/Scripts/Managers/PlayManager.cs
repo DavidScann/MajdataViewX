@@ -163,11 +163,11 @@ public class PlayManager : MonoBehaviour
             var noteSpeed = (float)(107.25 / (71.4184491 * Mathf.Pow(_setting.TapSpeed + 0.9975f, -0.985558604f)));
             var touchSpeed = _setting.TouchSpeed;
             var ignoreOffset = startAt - offset;
-            //UI
-            _objectCounter.StartOutput(_setting.ComboStatusType, _setting.UIType);
             //simulate
             NoteHelper.AutoPlayModeSS.Data = _setting.AutoMode;
             _inputManager.ShowHand = _setting.ShowHand;
+            //UI
+            _objectCounter.StartOutput(_setting.ComboStatusType, _setting.UIType);
             //bg
             bgCover.color = new Color(0f, 0f, 0f, _setting.BackgroundDim);
             _bgManager.ShowBG();

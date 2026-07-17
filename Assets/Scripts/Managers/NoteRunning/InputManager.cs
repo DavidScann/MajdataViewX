@@ -19,6 +19,7 @@ public class InputManager
         set => InputData.ShowHand = value;
     }
     RenderGroup<HitRenderData> _hitGroup;
+    bool _isHitGroupLocked;
 
     public InputManager()
     {
@@ -34,19 +35,17 @@ public class InputManager
                 InputData.SensorWorldPositions[i] = MajPos.GetAreaPos((SensorType)i);
         }
         //REMEMBER TO FORCE INCLUDE
-        if (ShowHand)
-        {
-            var matHit = new Material(Shader.Find("Custom/Hit"));
-            var hitMesh = MeshGenerator.CreateCircleMesh(8, 1f, true);
-            _hitGroup = new(matHit, hitMesh, 6); // priority larger than notes
-        }
+        var matHit = new Material(Shader.Find("Custom/Hit"));
+        var hitMesh = MeshGenerator.CreateCircleMesh(8, 1f, true);
+        _hitGroup = new(matHit, hitMesh, 6); // priority larger than notes
     }
 
     public unsafe void BeginHandler()
     {
         // UPDATE MUST BE EARLIER THAN NoteManager's UPDATE!!
         // (set in Script Execution Order)
-        if (ShowHand)
+        _isHitGroupLocked = ShowHand;
+        if (_isHitGroupLocked)
         {
             _hitGroup.AdvanceWrite();
             var hitRender = _hitGroup.LockForWrite();
@@ -55,7 +54,7 @@ public class InputManager
             InputData.hitRender = (HitRenderData*)hitRender.GetUnsafePtr();
             InputData.HitWriteCountPtr = _hitGroup.WriteCountPtr;
         }
-        InputData.BeginHandler();
+        InputData.BeginHandler(_isHitGroupLocked);
 
         var keyboard = Keyboard.current;
         if (keyboard != null)
@@ -89,11 +88,12 @@ public class InputManager
     public void EndHandler()
     {
         InputData.EndHandler();
-        if (ShowHand)
+        if (_isHitGroupLocked)
         {
             _hitGroup.UnlockWrite();
             _hitGroup.Render();
             _hitGroup.Swap();
+            _isHitGroupLocked = false;
         }
     }
 
@@ -132,6 +132,7 @@ public class InputManager
 public unsafe struct InputDataB
 {
     public bool ShowHand;
+    bool _showHandThisFrame;
 
     public NativeArray<float2> SensorWorldPositions;
 
@@ -323,8 +324,9 @@ public unsafe struct InputDataB
 
     // ======User Input Part======
 
-    public void BeginHandler()
+    public void BeginHandler(bool showHandThisFrame)
     {
+        _showHandThisFrame = showHandThisFrame;
         _djAutoInputCount = 0;
 
         // DJAuto 的判定状态和手部显示使用同一份 next-frame 数据，避免画面领先一帧。
@@ -338,7 +340,7 @@ public unsafe struct InputDataB
         var hitCount = math.min(
             Interlocked.Exchange(ref _worldPosHitsNextFrameCount, 0),
             _worldPosHitsNextFrame.Length);
-        if (ShowHand)
+        if (_showHandThisFrame)
         {
             for (int i = 0; i < hitCount; i++)
             {
@@ -402,7 +404,7 @@ public unsafe struct InputDataB
             }
         }
 
-        if (ShowHand) // show hand为false时指针都不会传，注意一下避免异常
+        if (_showHandThisFrame) // 本帧没有锁定渲染缓冲时不能写入指针
         {
             var hit = new HitRenderData
             {
@@ -446,7 +448,7 @@ public unsafe struct InputDataB
 
     public void EndHandler()
     {
-        if (ShowHand)
+        if (_showHandThisFrame)
         {
             for (int i = 0; i < BUTTON_COUNT; i++)
             {
