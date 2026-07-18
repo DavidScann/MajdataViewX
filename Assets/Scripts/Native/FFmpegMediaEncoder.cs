@@ -1,6 +1,9 @@
 using System;
+using System.Collections.Concurrent;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Runtime.ExceptionServices;
+using System.Threading;
 using FFmpeg.AutoGen;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
@@ -8,6 +11,63 @@ using UnityEngine;
 
 public static unsafe class FFmpegMediaEncoder
 {
+    private const int MaxPendingWorkItems = 16;
+
+    private enum EncoderWorkKind
+    {
+        Video,
+        Audio
+    }
+
+    private readonly struct EncoderWorkItem
+    {
+        public readonly EncoderWorkKind Kind;
+        public readonly NativeArray<byte> VideoData;
+        public readonly NativeArray<float> AudioData;
+        public readonly int AudioOffset;
+        public readonly int AudioCount;
+        public readonly ManualResetEventSlim VideoCompletion;
+
+        private EncoderWorkItem(
+            EncoderWorkKind kind,
+            NativeArray<byte> videoData,
+            NativeArray<float> audioData,
+            int audioOffset,
+            int audioCount,
+            ManualResetEventSlim videoCompletion)
+        {
+            Kind = kind;
+            VideoData = videoData;
+            AudioData = audioData;
+            AudioOffset = audioOffset;
+            AudioCount = audioCount;
+            VideoCompletion = videoCompletion;
+        }
+
+        public static EncoderWorkItem Video(
+            NativeArray<byte> data,
+            ManualResetEventSlim completion) =>
+            new(
+                EncoderWorkKind.Video,
+                data,
+                default,
+                0,
+                0,
+                completion);
+
+        public static EncoderWorkItem Audio(
+            NativeArray<float> data,
+            int offset,
+            int count) =>
+            new(
+                EncoderWorkKind.Audio,
+                default,
+                data,
+                offset,
+                count,
+                null);
+    }
+
 #if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
     private static IntPtr _winPthreadHandle;
 
@@ -34,6 +94,9 @@ public static unsafe class FFmpegMediaEncoder
     private static long _audioFramesEncoded;
     private static float[] _audioBuffer;
     private static bool _headerWritten;
+    private static BlockingCollection<EncoderWorkItem> _workQueue;
+    private static Thread _workerThread;
+    private static ExceptionDispatchInfo _workerFailure;
 
     public static bool IsInitialized => _formatContext != null;
     public static long VideoFrameCount => _videoFrameCount;
@@ -99,9 +162,12 @@ public static unsafe class FFmpegMediaEncoder
             Debug.Log(
                 $"[FFmpeg] Recording {_width}x{_height}, {framesPerSecond} fps, " +
                 $"{sampleRate} Hz, {channels} channels.");
+
+            StartWorker();
         }
         catch
         {
+            StopWorker();
             FreeResources();
             throw;
         }
@@ -228,14 +294,35 @@ public static unsafe class FFmpegMediaEncoder
         Check(ffmpeg.av_frame_get_buffer(_audioFrame, 0), "allocate audio frame buffer");
     }
 
-    public static void WriteVideoFrame(NativeArray<byte> rgbaData)
+    public static void QueueVideoFrame(
+        NativeArray<byte> rgbaData,
+        ManualResetEventSlim completion)
     {
         EnsureInitialized();
+        ThrowIfEncodingFailed();
         var requiredBytes = checked(_width * _height * 4);
         if (!rgbaData.IsCreated || rgbaData.Length != requiredBytes)
             throw new ArgumentException(
                 $"Expected exactly {requiredBytes} RGBA bytes, got {rgbaData.Length}.",
                 nameof(rgbaData));
+        if (completion == null)
+            throw new ArgumentNullException(nameof(completion));
+
+        completion.Reset();
+        try
+        {
+            QueueWork(EncoderWorkItem.Video(rgbaData, completion));
+        }
+        catch
+        {
+            completion.Set();
+            throw;
+        }
+    }
+
+    private static void WriteVideoFrameCore(NativeArray<byte> rgbaData)
+    {
+        EnsureInitialized();
 
         Check(ffmpeg.av_frame_make_writable(_videoFrame), "make video frame writable");
 
@@ -278,12 +365,24 @@ public static unsafe class FFmpegMediaEncoder
         int sampleCount)
     {
         EnsureInitialized();
+        ThrowIfEncodingFailed();
         if (!samples.IsCreated)
             throw new ArgumentException("The audio NativeArray has not been created.", nameof(samples));
         if (sourceOffset < 0 || sampleCount < 0 || sourceOffset > samples.Length - sampleCount)
             throw new ArgumentOutOfRangeException(nameof(sampleCount));
         if ((sourceOffset % _channels) != 0 || (sampleCount % _channels) != 0)
             throw new ArgumentException("Audio ranges must contain complete interleaved sample frames.");
+
+        if (sampleCount > 0)
+            QueueWork(EncoderWorkItem.Audio(samples, sourceOffset, sampleCount));
+    }
+
+    private static void WriteAudioSamplesCore(
+        NativeArray<float> samples,
+        int sourceOffset,
+        int sampleCount)
+    {
+        EnsureInitialized();
 
         var source = (float*)NativeArrayUnsafeUtility.GetUnsafeReadOnlyPtr(samples) + sourceOffset;
         var consumed = 0;
@@ -304,6 +403,132 @@ public static unsafe class FFmpegMediaEncoder
                 _audioBufferPosition = 0;
             }
         }
+    }
+
+    public static void ThrowIfEncodingFailed()
+    {
+        var failure = Volatile.Read(ref _workerFailure);
+        failure?.Throw();
+    }
+
+    private static void QueueWork(EncoderWorkItem item)
+    {
+        var queue = _workQueue;
+        if (queue == null)
+            throw new InvalidOperationException("The FFmpeg encoding worker is not running.");
+
+        while (true)
+        {
+            ThrowIfEncodingFailed();
+            try
+            {
+                if (queue.TryAdd(item, 50))
+                    return;
+            }
+            catch (InvalidOperationException)
+            {
+                ThrowIfEncodingFailed();
+                throw new InvalidOperationException("The FFmpeg encoding worker has stopped.");
+            }
+        }
+    }
+
+    private static void StartWorker()
+    {
+        _workerFailure = null;
+        _workQueue = new BlockingCollection<EncoderWorkItem>(MaxPendingWorkItems);
+        _workerThread = new Thread(EncodingWorkerMain)
+        {
+            IsBackground = true,
+            Name = "FFmpeg encoding worker"
+        };
+        try
+        {
+            _workerThread.Start();
+        }
+        catch
+        {
+            _workerThread = null;
+            _workQueue.Dispose();
+            _workQueue = null;
+            throw;
+        }
+    }
+
+    private static void EncodingWorkerMain()
+    {
+        try
+        {
+            foreach (var item in _workQueue.GetConsumingEnumerable())
+            {
+                try
+                {
+                    switch (item.Kind)
+                    {
+                        case EncoderWorkKind.Video:
+                            WriteVideoFrameCore(item.VideoData);
+                            break;
+                        case EncoderWorkKind.Audio:
+                            WriteAudioSamplesCore(
+                                item.AudioData,
+                                item.AudioOffset,
+                                item.AudioCount);
+                            break;
+                        default:
+                            throw new ArgumentOutOfRangeException();
+                    }
+                }
+                catch (Exception exception)
+                {
+                    Interlocked.CompareExchange(
+                        ref _workerFailure,
+                        ExceptionDispatchInfo.Capture(exception),
+                        null);
+                    throw;
+                }
+                finally
+                {
+                    if (item.Kind == EncoderWorkKind.Video)
+                        item.VideoCompletion.Set();
+                }
+            }
+        }
+        catch (Exception exception)
+        {
+            Interlocked.CompareExchange(
+                ref _workerFailure,
+                ExceptionDispatchInfo.Capture(exception),
+                null);
+            try
+            {
+                _workQueue.CompleteAdding();
+            }
+            catch (InvalidOperationException)
+            {
+            }
+        }
+        finally
+        {
+            while (_workQueue.TryTake(out var item))
+            {
+                if (item.Kind == EncoderWorkKind.Video)
+                    item.VideoCompletion.Set();
+            }
+        }
+    }
+
+    private static void StopWorker()
+    {
+        var queue = _workQueue;
+        var worker = _workerThread;
+
+        if (queue != null && !queue.IsAddingCompleted)
+            queue.CompleteAdding();
+        worker?.Join();
+
+        _workerThread = null;
+        _workQueue = null;
+        queue?.Dispose();
     }
 
     private static void EncodeAudioFrame()
@@ -370,9 +595,12 @@ public static unsafe class FFmpegMediaEncoder
         if (!IsInitialized)
             return;
 
-        Exception failure = null;
+        ExceptionDispatchInfo failure = null;
         try
         {
+            StopWorker();
+            ThrowIfEncodingFailed();
+
             if (_headerWritten)
             {
                 if (_audioBufferPosition > 0)
@@ -392,15 +620,24 @@ public static unsafe class FFmpegMediaEncoder
         }
         catch (Exception exception)
         {
-            failure = exception;
+            failure = ExceptionDispatchInfo.Capture(exception);
         }
         finally
         {
+            try
+            {
+                StopWorker();
+            }
+            catch (Exception exception)
+            {
+                failure ??= ExceptionDispatchInfo.Capture(exception);
+            }
+
             FreeResources();
+            _workerFailure = null;
         }
 
-        if (failure != null)
-            throw failure;
+        failure?.Throw();
     }
 
     private static void FlushEncoder(
@@ -553,4 +790,3 @@ public static unsafe class FFmpegMediaEncoder
             $"FFmpeg could not {operation}: {message ?? "unknown error"} ({result}).");
     }
 }
-
