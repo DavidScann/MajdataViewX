@@ -80,6 +80,7 @@ public class EffectManager : MonoBehaviour
 
             var tapEffect = effect.transform.GetChild(0).gameObject;
             tapAnimators[i] = tapEffect.GetComponent<Animator>();
+            if (i > 7) tapEffect.SetActive(false); // touch 部分的不要了 
 
             holdEffects[i] = effect.transform.GetChild(1).gameObject;
             holdMaterials[i] = holdEffects[i].GetComponent<ParticleSystemRenderer>().material;
@@ -88,6 +89,7 @@ public class EffectManager : MonoBehaviour
             touchEffects[i] = effect.transform.GetChild(2).gameObject;
             touchEffects[i].transform.localEulerAngles = new Vector3(0, 0, -ang); // 回正
             touchAnimators[i] = touchEffects[i].GetComponent<Animator>();
+            if (i <= 7) touchEffects[i].SetActive(false); // tap 部分的不要了 
 
             var judgeEffect = effect.transform.GetChild(3).gameObject;
             judgeAnimators[i] = judgeEffect.GetComponent<Animator>();

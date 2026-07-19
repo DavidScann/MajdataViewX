@@ -115,7 +115,7 @@ public unsafe struct TapUpdateJob : IJobParallelFor
         switch (NoteHelper.AutoPlayMode)
         {
             case AutoPlayMode.Enable:
-                tap.JudgeGrade = tap.IsMine ? JudgeGrade.Miss : JudgeGrade.LateCritical;
+                tap.JudgeGrade = JudgeGrade.LateCritical;
                 tap.IsJudged = true;
                 tap.Diff = 0;
                 EndNote(ref tap);
@@ -130,12 +130,14 @@ public unsafe struct TapUpdateJob : IJobParallelFor
                 EndNote(ref tap);
                 break;
             case AutoPlayMode.DJAutoButton:
+                if (tap.IsMine) break;
                 if (!tap.IsJudged)
                 {
                     InputData.DJAutoSetButtonOn(tap.Key);
                 }
                 break;
             case AutoPlayMode.DJAutoSensor:
+                if (tap.IsMine) break;
                 if (!tap.IsJudged)
                 {
                     if (!tap.IsSlideGuide)

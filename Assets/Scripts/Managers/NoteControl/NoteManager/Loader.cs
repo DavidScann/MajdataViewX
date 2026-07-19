@@ -827,6 +827,7 @@ public partial class NoteManager
                 usingSV = note.UsingSV,
                 smoothSlideAnime = SmoothSlideAnime,
                 legacySlideLayer = LegacySlideLayer,
+                mineAutoSlide = note.IsMineSlide,
             };
             if (lastContent == noteContent && slides.Length > 0 && slides[^1].IsFoldablePropOnly(slide))
             {
@@ -900,6 +901,7 @@ public partial class NoteManager
                 usingSV = note.UsingSV,
                 smoothSlideAnime = SmoothSlideAnime,
                 legacySlideLayer = LegacySlideLayer,
+                mineAutoSlide = note.IsMineSlide,
             };
             slideData.Init();
             slides.Add(slideData);

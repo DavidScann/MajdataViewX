@@ -31,6 +31,7 @@ public struct SlideData
 
     public bool smoothSlideAnime;
     public bool legacySlideLayer;
+    public bool mineAutoSlide;
 
     public int judgeQueueOffset;
     public unsafe SlideArea* judgeQueue;
@@ -210,5 +211,6 @@ public struct SlideData
         isEx == other.isEx &&
         isBreak == other.isBreak &&
         isMine == other.isMine &&
-        usingSV == other.usingSV;
+        usingSV == other.usingSV &&
+        mineAutoSlide == other.mineAutoSlide;
 }

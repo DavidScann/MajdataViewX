@@ -225,7 +225,7 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
             case AutoPlayMode.Enable:
                 if (!hold.isHeadJudged)
                 {
-                    hold.judgeGrade = hold.isMine ? JudgeGrade.Miss : JudgeGrade.LateCritical;
+                    hold.judgeGrade = JudgeGrade.LateCritical;
                     hold.isHeadJudged = true;
                     hold.isHolding = true;
                     hold.headDiff = 0;
@@ -268,12 +268,14 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
                 }
                 break;
             case AutoPlayMode.DJAutoButton:
+                if (hold.isMine) break;
                 if (!hold.isHeadJudged || math.max(hold.LastFor - timing, 0) > 0)
                 {
                     InputData.DJAutoSetButtonOn(hold.Key);
                 }
                 break;
             case AutoPlayMode.DJAutoSensor:
+                if (hold.isMine) break;
                 if (!hold.isHeadJudged || math.max(hold.LastFor - timing, 0) > 0)
                 {
                     InputData.DJAutoSetSensorOn(hold.Key);

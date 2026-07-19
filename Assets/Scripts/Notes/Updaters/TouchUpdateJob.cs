@@ -174,7 +174,7 @@ public unsafe struct TouchUpdateJob : IJobParallelFor
         switch (NoteHelper.AutoPlayMode)
         {
             case AutoPlayMode.Enable:
-                touch.judgeGrade = touch.isMine ? JudgeGrade.Miss : JudgeGrade.LateCritical;
+                touch.judgeGrade = JudgeGrade.LateCritical;
                 touch.isJudged = true;
                 touch.diff = 0;
                 EndNote(ref touch);
@@ -190,6 +190,7 @@ public unsafe struct TouchUpdateJob : IJobParallelFor
                 break;
             case AutoPlayMode.DJAutoButton:
             case AutoPlayMode.DJAutoSensor:
+                if (touch.isMine) break;
                 if (!touch.isJudged)
                 {
                     if (!touch.isSlideGuide)

@@ -36,6 +36,11 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
     {
         ref var slide = ref slides.ElementRef(index);
         TransformUpdate(ref slide, index);
+        if (slide.isMine && slide.mineAutoSlide)
+        {
+            MineAutoSlideUpdate(ref slide);
+            return;
+        }
         AutoplayUpdate(ref slide);
         CheckUpdate(ref slide);
     }
@@ -300,6 +305,7 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
             // 模拟模式下需要等待星星完全结束（isSlideEnd），但因为isJudged所以并不会把手黏在这里
             case AutoPlayMode.DJAutoButton:
             case AutoPlayMode.DJAutoSensor:
+                if (slide.isMine) break;
                 var inputProcess = autoplayStart > 0
                     ? math.saturate((timing - autoplayStart) / math.max(slide.LastFor, 0.001f))
                     : slide.process;
@@ -321,6 +327,117 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
                         (right + center) / 2);
                 }
                 break;
+        }
+    }
+
+    private void MineAutoSlideUpdate(ref SlideData slide)
+    {
+        if (slide.isEnd || slide.isSlideEnd || slide.isJudged) return;
+
+        var timing = TimeData.NoteTime - slide.shootTime;
+        var autoStarted = timing >= NoteHelper.DJAUTO_AUTOPLAY_START_SEC;
+        if (autoStarted)
+        {
+            UpdateMineAutoSlideVisual(ref slide);
+            if (!slide.isSoundPlayed)
+            {
+                NoteHelper.PlaySlideSound(SfxRequests,
+                    slide.isBreak
+                );
+                slide.isSoundPlayed = true;
+            }
+        }
+
+        var tapTiming = TimeData.NoteTime - slide.tapTime;
+        if (tapTiming < -NoteHelper.SLIDE_CHECK_AHEAD_TIME_MSEC / 1000f) return;
+
+        // 自动 queue 先跟上视觉进度，但把最后一区留给本帧用户输入。
+        if (autoStarted) AdvanceMineAutoSlideQueue(ref slide, false);
+
+        if (!slide.isWifi)
+        {
+            ProcessAreas(ref slide, slide.judgeQueue, slide.judgeQueueCount, ref slide.judgeCurrent, ref slide.currentOn);
+        }
+        else
+        {
+            ProcessAreas(ref slide, slide.judgeQueue, slide.judgeQueueCount, ref slide.judgeCurrent, ref slide.currentOn);
+            ProcessAreas(ref slide, slide.judgeQueueL, slide.judgeQueueLCount, ref slide.judgeL_Current, ref slide.currentOnL);
+            ProcessAreas(ref slide, slide.judgeQueueR, slide.judgeQueueRCount, ref slide.judgeR_Current, ref slide.currentOnR);
+        }
+
+        if (IsMineAutoSlideQueueComplete(ref slide))
+        {
+            slide.judgeGrade = JudgeGrade.Miss;
+            CompleteSlide(ref slide);
+            return;
+        }
+
+        if (autoStarted)
+        {
+            AdvanceMineAutoSlideQueue(ref slide, true);
+            if (IsMineAutoSlideQueueComplete(ref slide))
+            {
+                slide.judgeGrade = JudgeGrade.LateCritical;
+                CompleteSlide(ref slide);
+                return;
+            }
+        }
+
+        if (slide.LastFor - timing <= -NoteHelper.MINE_END_SEC)
+        {
+            slide.judgeGrade = JudgeGrade.LateCritical;
+            CompleteSlide(ref slide);
+        }
+    }
+
+    private static void UpdateMineAutoSlideVisual(ref SlideData slide)
+    {
+        if (slide.smoothSlideAnime)
+        {
+            // 普通 slide 在先前 RenderStar 时已计算 processIdx，wifi 没有这个。
+            slide.eaten = slide.isWifi
+                ? math.max((int)(slide.process * slide.slideArrowsCount - 2), 0)
+                : slide.processIdx;
+            return;
+        }
+
+        if (slide.judgeQueueCount <= 0)
+        {
+            slide.eaten = 0;
+            return;
+        }
+
+        if (slide.isWifi)
+        {
+            var idxF = slide.process * (slide.judgeQueueCount - 1);
+            var idx = (int)idxF;
+            slide.eaten = idxF - idx >= 0.5f
+                ? slide.judgeQueue[idx].ArrowProgressFinish
+                : slide.judgeQueue[idx].ArrowProgressPush;
+            return;
+        }
+
+        // 视觉进度先独立计算，便于之后区分 queue 的完成来自用户还是自动推进。
+        var visualCurrent = 0;
+        while (visualCurrent < slide.judgeQueueCount &&
+               slide.processIdx > slide.judgeQueue[visualCurrent].ArrowProgressFinish)
+        {
+            visualCurrent++;
+        }
+
+        if (visualCurrent >= slide.judgeQueueCount)
+        {
+            slide.eaten = slide.judgeQueue[slide.judgeQueueCount - 1].ArrowProgressFinish;
+        }
+        else if (slide.processIdx > slide.judgeQueue[visualCurrent].ArrowProgressPush)
+        {
+            slide.eaten = slide.judgeQueue[visualCurrent].ArrowProgressPush;
+        }
+        else
+        {
+            slide.eaten = visualCurrent > 0
+                ? slide.judgeQueue[visualCurrent - 1].ArrowProgressFinish
+                : 0;
         }
     }
 
@@ -431,6 +548,78 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
                     : 0;
             slide.eaten = math.min(eatenC, math.min(eatenL, eatenR));
         }
+    }
+
+    private static bool IsMineAutoSlideQueueComplete(ref SlideData slide)
+    {
+        if (!slide.isWifi)
+        {
+            return slide.judgeCurrent >= slide.judgeQueueCount;
+        }
+
+        return slide.judgeCurrent >= slide.judgeQueueCount &&
+               slide.judgeL_Current >= slide.judgeQueueLCount &&
+               slide.judgeR_Current >= slide.judgeQueueRCount;
+    }
+
+    private static void AdvanceMineAutoSlideQueue(ref SlideData slide, bool allowComplete)
+    {
+        var eaten = slide.eaten;
+        var reachedEnd = slide.process >= 1;
+        AdvanceMineAutoSlideQueueLane(
+            slide.judgeQueue,
+            slide.judgeQueueCount,
+            eaten,
+            reachedEnd,
+            allowComplete,
+            ref slide.judgeCurrent,
+            ref slide.currentOn);
+
+        if (!slide.isWifi) return;
+
+        AdvanceMineAutoSlideQueueLane(
+            slide.judgeQueueL,
+            slide.judgeQueueLCount,
+            eaten,
+            reachedEnd,
+            allowComplete,
+            ref slide.judgeL_Current,
+            ref slide.currentOnL);
+        AdvanceMineAutoSlideQueueLane(
+            slide.judgeQueueR,
+            slide.judgeQueueRCount,
+            eaten,
+            reachedEnd,
+            allowComplete,
+            ref slide.judgeR_Current,
+            ref slide.currentOnR);
+    }
+
+    private static void AdvanceMineAutoSlideQueueLane(
+        SlideArea* queue,
+        int queueCount,
+        int eaten,
+        bool reachedEnd,
+        bool allowComplete,
+        ref int current,
+        ref SensorType currentOn)
+    {
+        if (current >= queueCount) return;
+
+        var autoCurrent = 0;
+        while (autoCurrent < queueCount &&
+               eaten >= queue[autoCurrent].ArrowProgressFinish)
+        {
+            autoCurrent++;
+        }
+
+        // 最后一区的 ArrowProgressFinish 可能超过实际箭头数，终点时强制推完。
+        if (reachedEnd) autoCurrent = queueCount;
+        if (!allowComplete) autoCurrent = math.min(autoCurrent, queueCount - 1);
+
+        if (autoCurrent <= current) return;
+        current = autoCurrent;
+        currentOn = SensorType.Invalid;
     }
 
     // 检查 area 队列，更新 sensor On/Off 状态并推进游标

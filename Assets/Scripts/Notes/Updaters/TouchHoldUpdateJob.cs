@@ -175,7 +175,7 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
             case AutoPlayMode.Enable:
                 if (!th.isHeadJudged)
                 {
-                    th.judgeGrade = th.isMine ? JudgeGrade.Miss : JudgeGrade.LateCritical;
+                    th.judgeGrade = JudgeGrade.LateCritical;
                     th.isHeadJudged = true;
                     th.isHolding = true;
                     th.headDiff = 0;
@@ -215,6 +215,7 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
                 break;
             case AutoPlayMode.DJAutoButton:
             case AutoPlayMode.DJAutoSensor:
+                if (th.isMine) break;
                 if (!th.isHeadJudged || math.max(th.LastFor - timing, 0) > 0)
                 {
                     InputData.DJAutoAddGroupCoverage(touchHoldGroupCoverResults[th.coverageId]);
