@@ -504,6 +504,32 @@ public class DataLoader : MonoBehaviour
             lineDrop.startPosition = startPos;
             lineDrop.curvLength = endPos - 1;
         }
+
+        if (eachNotes.Count > 2)
+        {
+            var startPos = eachNotes[eachNotes.Count - 1].StartPosition;
+            var endPos = eachNotes[0].StartPosition - startPos;
+            if (endPos != 0)
+            {
+                var line = Instantiate(eachLine, notes.transform);
+                var lineDrop = line.GetComponent<EachLineDrop>();
+                lineDrop.time = eachNoteTime;
+                lineDrop.speed = eachNoteSpd;
+                endPos = endPos < 0 ? endPos + 8 : endPos;
+                endPos = endPos > 8 ? endPos - 8 : endPos;
+                endPos++;
+                if (endPos > 4)
+                {
+                    startPos = eachNotes[0].StartPosition;
+                    endPos = eachNotes[eachNotes.Count - 1].StartPosition - startPos;
+                    endPos = endPos < 0 ? endPos + 8 : endPos;
+                    endPos = endPos > 8 ? endPos - 8 : endPos;
+                    endPos++;
+                }
+                lineDrop.startPosition = startPos;
+                lineDrop.curvLength = endPos - 1;
+            }
+        }
     }
 
 
@@ -624,6 +650,7 @@ public class DataLoader : MonoBehaviour
             o.UsingSV = note.UsingSV;
             o.IsSlideNoHead = true;
         });
+        if (subSlide.Count == 0) return;
         subSlide[0].IsSlideNoHead = note.IsSlideNoHead;
 
         // 如果到结束还是1 那说明没有一个指定了时长 报错
@@ -634,6 +661,7 @@ public class DataLoader : MonoBehaviour
         }
         // 此时 flag为2表示每条指定语法 为3表示整体指定语法
 
+        if (sumBarCount == 0) return;
         var tempBarCount = 0;
         for (var i = 0; i < subSlide.Count; i++)
         {
@@ -650,7 +678,7 @@ public class DataLoader : MonoBehaviour
             bool isConn = subSlide.Count != 1;
             bool isGroupHead = i == 0;
             bool isGroupEnd = i == subSlide.Count - 1;
-            if (note.RawContent.Contains('w')) //wifi
+            if (subSlide[i].RawContent.Contains('w')) //wifi
             {
                 if (isConn)
                 {
@@ -744,6 +772,7 @@ public class DataLoader : MonoBehaviour
             isMirror = true;
             slideShape = slideShape.Substring(1);
         }
+        if (!SLIDE_PREFAB_MAP.ContainsKey(slideShape)) return null;
         var slideIndex = SLIDE_PREFAB_MAP[slideShape];
 
         var slide = Instantiate(slidePrefab[slideIndex], notes.transform);

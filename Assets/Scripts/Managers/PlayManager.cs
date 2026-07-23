@@ -335,7 +335,7 @@ public class PlayManager : MonoBehaviour
     {
         _screenRecorder.ResetState();
         _objectCounter.ResetState();
-        UniTask.WhenAll(_noteJudgeManager.ResetState());
+        UniTask.WhenAll(_noteJudgeManager.ResetState()).Forget();
         _noteManager.ResetState();
         _multTouchHandler.ResetState();
         _timeProvider.ResetState();
