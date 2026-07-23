@@ -238,6 +238,8 @@ public class TouchDrop : NoteBase
         else
             result = JudgeType.Miss;
 
+        if (result != JudgeType.Miss && isFast)
+            result = (JudgeType)(14 - (int)result);
         judgeResult = result;
         isJudged = true;
     }

@@ -126,7 +126,7 @@ public class TimeProvider : MonoBehaviour
             pos += lastSpeed * (time - lastTime);
 
             //PositionFunctions.Add((t) => pos + lastSpeed * (t - lastTime));
-            SVFuncArgs[i + 1] = (lastSpeed, pos - lastSpeed * lastTime);
+            SVFuncArgs[i + 1] = (sveloc, pos - sveloc * time);
 
             lastTime = time;
             lastSpeed = sveloc;

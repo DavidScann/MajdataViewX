@@ -39,6 +39,8 @@ public class PlayManager : MonoBehaviour
 
     private static MajViewSetting _setting = new();
 
+    private static Thread _audioThread;
+
     private SpriteRenderer bgCover;
     private GameObject canvasButtons;
 
@@ -56,14 +58,18 @@ public class PlayManager : MonoBehaviour
         bgCover = GameObject.Find("BackgroundCover").GetComponent<SpriteRenderer>();
         canvasButtons = GameObject.Find("CanvasButtons");
 
-        new Thread(() =>
-        {
-            while (true)
+        _audioThread = new Thread(() => 
+        {  
+            while (_audioManager != null)
             {
-                _audioManager.OnUpdate();
+                try { _audioManager.OnUpdate(); } catch { break; }
                 Thread.Sleep(1);
             }
-        }).Start();
+        })
+        {
+            IsBackground = true
+        };
+        _audioThread.Start();
 
         _state = CheckIsLoaded() ? ViewStatus.Loaded : ViewStatus.Idle;
     }
@@ -347,6 +353,9 @@ public class PlayManager : MonoBehaviour
 
     private void OnDestroy()
     {
+        if (_audioThread != null && _audioThread.IsAlive)
+            _audioThread.Join(1000);
         _audioManager.OnDestroy();
+        _audioThread = null;
     }
 }

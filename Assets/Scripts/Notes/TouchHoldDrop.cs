@@ -155,6 +155,8 @@ public class TouchHoldDrop : NoteLongBase
             result = JudgeType.LateGood;
         else
             result = JudgeType.Miss;
+        if (result != JudgeType.Miss && isFast)
+            result = (JudgeType)(14 - (int)result);
         if (isFast)
             judgeDiff = 0;
         else

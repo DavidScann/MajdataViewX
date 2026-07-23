@@ -97,6 +97,7 @@ public class AudioManager
         if (!initOk)
         {
             UnityEngine.Debug.Log("[AudioManager] Bass.Init(-1) failed, trying NoSoundDevice");
+            Bass.Free();
             initOk = Bass.Init(Bass.NoSoundDevice, 44100);
             UnityEngine.Debug.Log($"[AudioManager] Bass.Init(NoSound) result={initOk} LastError={Bass.LastError}");
         }

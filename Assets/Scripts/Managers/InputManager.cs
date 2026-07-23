@@ -107,14 +107,14 @@ public class InputManager : MonoBehaviour
             case >= SensorType.A1 and <= SensorType.A8:
                 return Buttons[index];
             case >= SensorType.B1 and <= SensorType.B8:
-                return Buttons[index - 7];
+                return Buttons[index - 8];
             case SensorType.C:
             default:
                 return Buttons[0];
             case >= SensorType.D1 and <= SensorType.D8:
-                return Buttons[index - 16];
+                return Buttons[index - 17];
             case >= SensorType.E1 and <= SensorType.E8:
-                return Buttons[index - 24];
+                return Buttons[index - 25];
         }
     }
 
