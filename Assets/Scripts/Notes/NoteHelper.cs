@@ -17,8 +17,6 @@ public static unsafe class NoteHelper
     public static AutoPlayMode AutoPlayMode =>
         AutoPlayModeSS.Data;
 
-    public static bool IsDJAuto => AutoPlayMode is
-        AutoPlayMode.DJAutoSensor or AutoPlayMode.DJAutoButton;
     public static bool IsSimulated => AutoPlayMode is
         AutoPlayMode.DJAutoSensor or AutoPlayMode.DJAutoButton or AutoPlayMode.Disable;
     // Force burst recompile

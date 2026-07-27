@@ -73,7 +73,7 @@ public class TimeProvider : MonoBehaviour
     private void Update()
     {
         TimeData.IsStart = IsStart;
-        TimeData.deltaTime = Time.deltaTime;
+        TimeData.deltaTime = IsRecord ? FRAME_LENGTH_SEC : Time.deltaTime;
         if (!IsStart) return;
 
         if (IsRecord)
@@ -254,6 +254,9 @@ public struct TimeDataB
     public float NoteTime;
     public readonly float FakeNoteTime => GetPositionAtTime(NoteTime);
 
+    /// <summary>
+    /// 录制模式时恒为FRAME_LENGTH_SEC，因此无法与Time.xxx配合使用！！！
+    /// </summary>
     public float deltaTime;
 
     // public NativeList<(float time, float sVeloc)> SVList;

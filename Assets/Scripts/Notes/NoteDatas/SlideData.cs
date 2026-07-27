@@ -2,12 +2,27 @@ using Notes.SlideUtils;
 using Unity.Burst;
 using Unity.Mathematics;
 using static SkinManager;
+using static MajBurst;
 
 [BurstCompile]
 public struct SlideData
 {
     public float tapTime;
     public float shootTime;
+
+    /// <summary>
+    /// 在最后一个区停留的时间
+    /// </summary>
+    /// <remarks>在isJudged（实际上已判定）后，递减以用于延迟slideok显示</remarks>
+    public float lastStayTime;
+    /// <summary>
+    /// 正解帧
+    /// </summary>
+    public float judgeTiming;
+    /// <summary>
+    /// 实际被判定的时间
+    /// </summary>
+    public float finishJudgeTiming;
 
     // FOR WIFI STARS CALCULATE ONLY
     public int startPos;
@@ -189,6 +204,16 @@ public struct SlideData
             starPosConstC = MajPos.GetBtnPos(endPosC - 1) - starPosStart;
             starPosConstL = MajPos.GetBtnPos(endPosL - 1) - starPosStart;
             starPosConstR = MajPos.GetBtnPos(endPosR - 1) - starPosStart;
+        }
+
+        lastStayTime = LastFor * Const;
+        judgeTiming = shootTime + LastFor * (1f - Const);
+
+        if (usingSV) // 此时已LoadSV，可以直接用
+        {
+            var endPos = TimeData.GetPositionAtTime(shootTime + LastFor);
+            judgeTiming = TimeData.GetPositionAtTime(judgeTiming);
+            lastStayTime = endPos - judgeTiming;
         }
     }
 
