@@ -6,9 +6,11 @@ Shader "Custom/Hit"
     }
     SubShader
     {
-        Tags { "Queue"="Transparent" "RenderType"="Transparent" }
+        Tags { "Queue"="Transparent" "RenderType"="Transparent" "RenderPipeline"="UniversalPipeline" }
         Pass
         {
+            Name "SRPDefaultUnlit"
+            Tags { "LightMode"="SRPDefaultUnlit" }
             Blend One OneMinusSrcAlpha
             ZWrite Off
             ZTest Always
@@ -17,7 +19,7 @@ Shader "Custom/Hit"
             #pragma target 4.5
             #pragma vertex vert
             #pragma fragment frag
-            #include "UnityCG.cginc"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
             struct HitRenderData
             {
@@ -49,7 +51,7 @@ Shader "Custom/Hit"
                 float2 p = v.vertex.xy * hit.radius;
                 p += hit.pos;
                 
-                o.pos = UnityObjectToClipPos(float4(p, 0, 1));
+                o.pos = TransformObjectToHClip(float3(p, 0));
                 o.uv = v.uv;
                 o.color = hit.color;
                 

@@ -2,17 +2,21 @@ Shader "Custom/NoteRich"
 {
     SubShader
     {
-        Tags { "Queue"="Transparent" "RenderType"="Transparent" }
+        Tags { "Queue"="Transparent" "RenderType"="Transparent" "RenderPipeline"="UniversalPipeline" }
         Pass
         {
+            Name "SRPDefaultUnlit"
+            Tags { "LightMode"="SRPDefaultUnlit" }
             Blend One OneMinusSrcAlpha
             ZWrite Off
             Cull Off
             HLSLPROGRAM
+            #pragma target 4.5
             #pragma vertex vert
             #pragma fragment frag
-            #include "UnityCG.cginc"
-            sampler2D _MainTex;
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            TEXTURE2D(_MainTex);
+            SAMPLER(sampler_MainTex);
 
             struct NotesRenderData
             {
@@ -59,7 +63,7 @@ Shader "Custom/NoteRich"
                 float s = sin(note.angRad); float c = cos(note.angRad);
                 float2 r = float2(p.x*c - p.y*s, p.x*s + p.y*c);
                 r += note.pos;
-                o.pos = UnityObjectToClipPos(float4(r, 0, 1));
+                o.pos = TransformObjectToHClip(float3(r, 0));
                 o.uv = v.uv;
                 o.rect = rect;
                 
@@ -138,7 +142,7 @@ Shader "Custom/NoteRich"
                     lerp(i.rect.y, i.rect.w, spriteUV.y)
                 );
 
-                float4 col = tex2D(_MainTex, uv);
+                float4 col = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uv);
 
                 // ---- EX overlay (uses same 3-slice UV) ----
                 if (i.exColor.a > 0.0)
@@ -148,7 +152,7 @@ Shader "Custom/NoteRich"
                         lerp(i.exRect.y, i.exRect.w, spriteUV.y)
                     );
 
-                    float4 frame = tex2D(_MainTex, uvFrame);
+                    float4 frame = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uvFrame);
 
                     frame.rgb *= i.exColor.rgb;
                     frame.a   *= i.exColor.a;
