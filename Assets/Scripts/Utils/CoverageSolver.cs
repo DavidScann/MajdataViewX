@@ -59,21 +59,29 @@ public static class CoverageSolver
 
     public static CoverResult Solve(
         IReadOnlyList<float2> points,
+        IReadOnlyList<float> pointRadii,
         IReadOnlyList<Group> groups,
-        float maxRadius = 1.8f,
+        float maxRadius = MajCtx.DJAUTO_HAND_MAX_RADIUS,
         bool allowSlide = false)
     {
         int n = points.Count;
         if (n == 0) return new CoverResult { Mode = CoverMode.None };
         if (n > 64) throw new ArgumentException("Points count must be <= 64 to fit in ulong mask.");
+        if (pointRadii == null || pointRadii.Count != n)
+            throw new ArgumentException("Point radii count must match points count.", nameof(pointRadii));
 
         var nativePoints = new NativeArray<float2>(n, Allocator.TempJob);
+        var nativePointRadii = new NativeArray<float>(n, Allocator.TempJob);
         var nativeGroups = new NativeArray<BurstGroup>(groups.Count, Allocator.TempJob);
         var resultArr = new NativeArray<CoverResult>(1, Allocator.TempJob);
 
         try
         {
-            for (int i = 0; i < n; i++) nativePoints[i] = points[i];
+            for (int i = 0; i < n; i++)
+            {
+                nativePoints[i] = points[i];
+                nativePointRadii[i] = pointRadii[i];
+            }
 
             for (int i = 0; i < groups.Count; i++)
             {
@@ -97,6 +105,7 @@ public static class CoverageSolver
             var job = new SolveJob
             {
                 Points = nativePoints,
+                PointRadii = nativePointRadii,
                 Groups = nativeGroups,
                 MaxRadius = maxRadius,
                 AllowSlide = allowSlide,
@@ -109,6 +118,7 @@ public static class CoverageSolver
         finally
         {
             nativePoints.Dispose();
+            nativePointRadii.Dispose();
             nativeGroups.Dispose();
             resultArr.Dispose();
         }
@@ -118,6 +128,7 @@ public static class CoverageSolver
     private struct SolveJob : IJob
     {
         [ReadOnly] public NativeArray<float2> Points;
+        [ReadOnly] public NativeArray<float> PointRadii;
         [ReadOnly] public NativeArray<BurstGroup> Groups;
         public float MaxRadius;
         public bool AllowSlide;
@@ -148,23 +159,16 @@ public static class CoverageSolver
             // E1~E8
             for (int i = 1; i <= 8; i++) candidates.Add(new Circle { Center = MajPos.RingPos(3.0f, i, true), Radius = MaxRadius });
 
-            float radiusSq = MaxRadius * MaxRadius;
-            int maxCandidates = 57;
+            int maxCandidates = candidates.Length * (Points.Length + 1);
 
             var maskToCircle = new NativeHashMap<ulong, Circle>(maxCandidates, Allocator.Temp);
             var uniqueMasks = new NativeList<ulong>(maxCandidates, Allocator.Temp);
 
-            // 不同圆心可能覆盖完全相同的传感器，只保留每种覆盖结果的一个代表，
-            // 避免后面的组合搜索重复计算等价方案。
+            // 对每个圆心枚举从普通指尖到最大手掌之间所有会改变覆盖结果的半径。
+            // 这样单个 TouchHold 不再无条件占用 1.8 的大圆。
             for (int i = 0; i < candidates.Length; i++)
             {
-                Circle c = candidates[i];
-                ulong mask = GetCoveredMask(c.Center, radiusSq, Points);
-                if (maskToCircle.ContainsKey(mask))
-                    continue;
-
-                maskToCircle.Add(mask, c);
-                uniqueMasks.Add(mask);
+                AddRadiusVariants(candidates[i].Center, maskToCircle, uniqueMasks);
             }
 
             // 按操作复杂度依次尝试：单圆、双圆、双圆滑动。
@@ -173,10 +177,12 @@ public static class CoverageSolver
             bool found = TrySolveSingleCircle(maskToCircle, uniqueMasks, targetMask, out result) ||
                          TrySolveDoubleCircle(maskToCircle, uniqueMasks, targetMask, out result);
             if (!found && AllowSlide)
-                found = TrySolveDoubleCircleSlide(candidates, radiusSq, targetMask, out result);
+                found = TrySolveDoubleCircleSlide(candidates, targetMask, out result);
 
             Result[0] = found ? result : new CoverResult { Mode = CoverMode.None };
-            Cleanup(candidates, maskToCircle, uniqueMasks);
+            candidates.Dispose();
+            maskToCircle.Dispose();
+            uniqueMasks.Dispose();
         }
 
         private bool TrySolveSingleCircle(
@@ -196,22 +202,26 @@ public static class CoverageSolver
                 return true;
             }
 
+            bool found = false;
+            Circle bestCircle = default;
             for (int i = 0; i < uniqueMasks.Length; i++)
             {
                 ulong mask = uniqueMasks[i];
                 if (ExpandGroups(mask, Groups) != targetMask)
                     continue;
 
-                result = new CoverResult
+                Circle candidate = maskToCircle[mask];
+                if (!found || IsBetterCircle(candidate, bestCircle))
                 {
-                    Mode = CoverMode.SingleCircleGroup,
-                    Circle1 = maskToCircle[mask]
-                };
-                return true;
+                    found = true;
+                    bestCircle = candidate;
+                }
             }
 
-            result = default;
-            return false;
+            result = found
+                ? new CoverResult { Mode = CoverMode.SingleCircleGroup, Circle1 = bestCircle }
+                : default;
+            return found;
         }
 
         private bool TrySolveDoubleCircle(
@@ -220,9 +230,10 @@ public static class CoverageSolver
             ulong targetMask,
             out CoverResult result)
         {
+            bool foundDirect = false;
             bool foundGroup = false;
+            CoverResult directResult = default;
             CoverResult groupResult = default;
-            var checkedMasks = new NativeHashSet<ulong>(4096, Allocator.Temp);
 
             for (int i = 0; i < uniqueMasks.Length; i++)
             {
@@ -236,40 +247,45 @@ public static class CoverageSolver
 
                     if (combined == targetMask)
                     {
-                        result = new CoverResult
+                        var candidate = new CoverResult
                         {
                             Mode = CoverMode.DoubleCircleDirect,
                             Circle1 = circle1,
                             Circle2 = maskToCircle[mask2]
                         };
-                        checkedMasks.Dispose();
-                        return true;
+                        if (!foundDirect || IsBetterPair(candidate, directResult))
+                        {
+                            directResult = candidate;
+                            foundDirect = true;
+                        }
+                        continue;
                     }
 
-                    // 多组圆对可能产生同一个合并掩码，每种掩码只做一次 Group 展开。
-                    // 找到 Group 后先记住，但仍继续搜索，保证更严格的 Direct 方案优先。
-                    if (foundGroup || !checkedMasks.Add(combined) ||
-                        ExpandGroups(combined, Groups) != targetMask)
+                    // 同一个合并掩码也可能来自不同圆心，必须全部比较，
+                    // 才能选到实际压住传感区最少的圆对。
+                    if (ExpandGroups(combined, Groups) != targetMask)
                         continue;
 
-                    groupResult = new CoverResult
+                    var groupCandidate = new CoverResult
                     {
                         Mode = CoverMode.DoubleCircleGroup,
                         Circle1 = circle1,
                         Circle2 = maskToCircle[mask2]
                     };
-                    foundGroup = true;
+                    if (!foundGroup || IsBetterPair(groupCandidate, groupResult))
+                    {
+                        groupResult = groupCandidate;
+                        foundGroup = true;
+                    }
                 }
             }
 
-            checkedMasks.Dispose();
-            result = groupResult;
-            return foundGroup;
+            result = foundDirect ? directResult : groupResult;
+            return foundDirect || foundGroup;
         }
 
         private bool TrySolveDoubleCircleSlide(
             NativeList<Circle> candidates,
-            float radiusSq,
             ulong targetMask,
             out CoverResult result)
         {
@@ -291,7 +307,7 @@ public static class CoverageSolver
                     for (int sample = 0; sample < sampleCount; sample++)
                     {
                         float t = sample / (float)(sampleCount - 1);
-                        mask |= GetCoveredMask(math.lerp(start.Center, end, t), radiusSq, Points);
+                        mask |= GetCoveredMask(math.lerp(start.Center, end, t), MaxRadius);
                     }
 
                     if (mask == 0) continue;
@@ -356,13 +372,6 @@ public static class CoverageSolver
             return found;
         }
 
-        private void Cleanup(NativeList<Circle> c, NativeHashMap<ulong, Circle> m, NativeList<ulong> u)
-        {
-            c.Dispose();
-            m.Dispose();
-            u.Dispose();
-        }
-
         private ulong ExpandGroups(ulong coveredMask, NativeArray<BurstGroup> groups)
         {
             bool changed = true;
@@ -386,12 +395,99 @@ public static class CoverageSolver
             return coveredMask;
         }
 
-        private ulong GetCoveredMask(float2 center, float radiusSq, NativeArray<float2> points)
+        private void AddRadiusVariants(
+            float2 center,
+            NativeHashMap<ulong, Circle> maskToCircle,
+            NativeList<ulong> uniqueMasks)
+        {
+            float radius = math.min(MajCtx.DJAUTO_TOUCH_COVER_MIN_RADIUS, MaxRadius);
+            ulong previousMask = ulong.MaxValue;
+
+            for (int step = 0; step <= Points.Length; step++)
+            {
+                ulong mask = GetCoveredMask(center, radius);
+                if (mask != previousMask)
+                {
+                    var candidate = new Circle { Center = center, Radius = radius };
+                    if (maskToCircle.TryGetValue(mask, out Circle existing))
+                    {
+                        if (IsBetterCircle(candidate, existing))
+                            maskToCircle[mask] = candidate;
+                    }
+                    else
+                    {
+                        maskToCircle.Add(mask, candidate);
+                        uniqueMasks.Add(mask);
+                    }
+                    previousMask = mask;
+                }
+
+                float nextRadius = float.MaxValue;
+                for (int pointIndex = 0; pointIndex < Points.Length; pointIndex++)
+                {
+                    if ((mask & (1ul << pointIndex)) != 0) continue;
+
+                    float requiredRadius = math.max(0f,
+                        math.distance(center, Points[pointIndex]) - PointRadii[pointIndex]);
+                    if (requiredRadius <= MaxRadius + 1e-4f)
+                        nextRadius = math.min(nextRadius, requiredRadius);
+                }
+
+                if (nextRadius == float.MaxValue) break;
+                radius = math.min(MaxRadius, math.max(radius + 1e-4f, nextRadius));
+            }
+        }
+
+        private bool IsBetterCircle(Circle candidate, Circle existing)
+        {
+            int candidateCount = math.countbits(GetAllSensorMask(candidate));
+            int existingCount = math.countbits(GetAllSensorMask(existing));
+            if (candidateCount != existingCount)
+                return candidateCount < existingCount;
+            return candidate.Radius < existing.Radius;
+        }
+
+        private bool IsBetterPair(CoverResult candidate, CoverResult existing)
+        {
+            ulong candidateMask = GetAllSensorMask(candidate.Circle1) | GetAllSensorMask(candidate.Circle2);
+            ulong existingMask = GetAllSensorMask(existing.Circle1) | GetAllSensorMask(existing.Circle2);
+            int candidateCount = math.countbits(candidateMask);
+            int existingCount = math.countbits(existingMask);
+            if (candidateCount != existingCount)
+                return candidateCount < existingCount;
+
+            float candidateMaxRadius = math.max(candidate.Circle1.Radius, candidate.Circle2.Radius);
+            float existingMaxRadius = math.max(existing.Circle1.Radius, existing.Circle2.Radius);
+            if (candidateMaxRadius != existingMaxRadius)
+                return candidateMaxRadius < existingMaxRadius;
+
+            return candidate.Circle1.Radius + candidate.Circle2.Radius <
+                   existing.Circle1.Radius + existing.Circle2.Radius;
+        }
+
+        private ulong GetAllSensorMask(Circle circle)
         {
             ulong mask = 0;
-            for (int i = 0; i < points.Length; i++)
+            for (int i = 0; i < MajCtx.SENSOR_COUNT; i++)
             {
-                if (math.distancesq(center, points[i]) <= radiusSq + 1e-3f)
+                float combinedRadius = circle.Radius + MajPos.GetSensorRadius((SensorType)i);
+                if (math.distancesq(circle.Center, MajPos.GetSensorWorldPos((SensorType)i)) <=
+                    combinedRadius * combinedRadius + 1e-4f)
+                {
+                    mask |= 1ul << i;
+                }
+            }
+            return mask;
+        }
+
+        private ulong GetCoveredMask(float2 center, float radius)
+        {
+            ulong mask = 0;
+            for (int i = 0; i < Points.Length; i++)
+            {
+                float combinedRadius = radius + PointRadii[i];
+                if (math.distancesq(center, Points[i]) <=
+                    combinedRadius * combinedRadius + 1e-4f)
                 {
                     mask |= (1ul << i);
                 }

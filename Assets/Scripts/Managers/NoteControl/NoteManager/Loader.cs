@@ -447,12 +447,15 @@ public partial class NoteManager
 
         // Solve Coverage for UNIQUE touches in this cluster
         var points = new float2[uniqueCount];
+        var pointRadii = new float[uniqueCount];
         for (int i = 0; i < uniqueCount; i++)
         {
-            points[i] = touches[startIdx + uniqueIndices[i]].centerPos;
+            var sensor = touches[startIdx + uniqueIndices[i]].sensor;
+            points[i] = MajPos.GetSensorWorldPos(sensor);
+            pointRadii[i] = MajPos.GetSensorRadius(sensor);
         }
 
-        var solverResult = CoverageSolver.Solve(points, groups, allowSlide: true);
+        var solverResult = CoverageSolver.Solve(points, pointRadii, groups, allowSlide: true);
 
         int coverageId = touchGroupCoverResults.Length;
         touchGroupCoverResults.Add(solverResult);
@@ -567,12 +570,15 @@ public partial class NoteManager
 
         // Solve Coverage for UNIQUE touch holds in this cluster
         var points = new float2[uniqueCount];
+        var pointRadii = new float[uniqueCount];
         for (int i = 0; i < uniqueCount; i++)
         {
-            points[i] = touchHolds[startIdx + uniqueIndices[i]].centerPos;
+            var sensor = touchHolds[startIdx + uniqueIndices[i]].sensor;
+            points[i] = MajPos.GetSensorWorldPos(sensor);
+            pointRadii[i] = MajPos.GetSensorRadius(sensor);
         }
 
-        var solverResult = CoverageSolver.Solve(points, groups);
+        var solverResult = CoverageSolver.Solve(points, pointRadii, groups);
 
         int coverageId = touchHoldGroupCoverResults.Length;
         touchHoldGroupCoverResults.Add(solverResult);

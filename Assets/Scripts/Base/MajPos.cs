@@ -34,6 +34,19 @@ public static class MajPos
     }
 
     /// <summary>
+    /// 获取输入判定使用的传感器圆心。
+    /// D 区的物理判定圆心与音符显示位置不同。
+    /// </summary>
+    [BurstCompile]
+    public static float2 GetSensorWorldPos(SensorType sensor)
+    {
+        int i = (int)sensor;
+        if (i >= 17 && i <= 24)
+            return RingPos(4.4f, i - 16, true);
+        return GetAreaPos(sensor);
+    }
+
+    /// <summary>
     /// 获取按键的世界坐标
     /// </summary>
     /// <param name="key">按键索引，注意是在0~7之间</param>
