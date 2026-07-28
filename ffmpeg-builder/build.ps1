@@ -154,11 +154,12 @@ COMMON=(
     --disable-autodetect
     --disable-avdevice
     --disable-avfilter
-    --disable-swresample
     --enable-avcodec
     --enable-avformat
     --enable-avutil
     --enable-swscale
+    --enable-swresample
+    --enable-hwaccels
     --enable-encoder=libx264
     --enable-encoder=aac
     --enable-encoder=mpeg4
@@ -208,11 +209,13 @@ win-x64)
     X264="$INSTALL_ROOT/x264"
     FFMPEG="$INSTALL_ROOT/ffmpeg"
     build_x264_native x86_64-w64-mingw32 "$X264"
-    build_ffmpeg "$X264" "$FFMPEG" "$BUILD_ROOT/ffmpeg"         --target-os=mingw32 --arch=x86_64 --enable-w32threads
+    # Windows: 显式开启 d3d11va 和 dxva2 硬件加速
+    build_ffmpeg "$X264" "$FFMPEG" "$BUILD_ROOT/ffmpeg"         --target-os=mingw32 --arch=x86_64 --enable-w32threads --enable-d3d11va --enable-dxva2
     cp -L "$FFMPEG/bin/avcodec-62.dll" "$OUTPUT_ROOT/"
     cp -L "$FFMPEG/bin/avformat-62.dll" "$OUTPUT_ROOT/"
     cp -L "$FFMPEG/bin/avutil-60.dll" "$OUTPUT_ROOT/"
     cp -L "$FFMPEG/bin/swscale-9.dll" "$OUTPUT_ROOT/"
+    cp -L "$FFMPEG/bin/swresample-6.dll" "$OUTPUT_ROOT/"
     cp -L /mingw64/bin/libwinpthread-1.dll "$OUTPUT_ROOT/"
     cp -L /mingw64/share/licenses/winpthreads/COPYING "$OUTPUT_ROOT/LICENSE.winpthread.txt"
     ;;
@@ -222,11 +225,13 @@ linux-x64)
     FFMPEG="$INSTALL_ROOT/ffmpeg"
     build_x264_native x86_64-linux "$X264"
     ORIGIN_RPATH='-Wl,-rpath,$ORIGIN'
-    build_ffmpeg "$X264" "$FFMPEG" "$BUILD_ROOT/ffmpeg"         --arch=x86_64 --enable-pthreads "--extra-ldflags=-L$X264/lib $ORIGIN_RPATH"
+    # Linux: 显式开启 vaapi 和 vdpau 硬件加速
+    build_ffmpeg "$X264" "$FFMPEG" "$BUILD_ROOT/ffmpeg"         --arch=x86_64 --enable-pthreads --enable-vaapi --enable-vdpau "--extra-ldflags=-L$X264/lib $ORIGIN_RPATH"
     cp -L "$FFMPEG/lib/libavcodec.so.62" "$OUTPUT_ROOT/libavcodec.so.62"
     cp -L "$FFMPEG/lib/libavformat.so.62" "$OUTPUT_ROOT/libavformat.so.62"
     cp -L "$FFMPEG/lib/libavutil.so.60" "$OUTPUT_ROOT/libavutil.so.60"
     cp -L "$FFMPEG/lib/libswscale.so.9" "$OUTPUT_ROOT/libswscale.so.9"
+    cp -L "$FFMPEG/lib/libswresample.so.6" "$OUTPUT_ROOT/libswresample.so.6"
     ;;
 osx)
     command -v clang >/dev/null || { echo "Xcode clang is required." >&2; exit 1; }
@@ -237,9 +242,10 @@ osx)
         FFMPEG="$INSTALL_ROOT/ffmpeg-$arch"
         FLAGS="-arch $arch -mmacosx-version-min=11.0"
         build_x264_macos "$arch" "$host" "$X264"
-        build_ffmpeg "$X264" "$FFMPEG" "$BUILD_ROOT/ffmpeg-$arch"             --target-os=darwin "--arch=$arch" --cc=clang --enable-pthreads             --install-name-dir=@loader_path             "--extra-cflags=$FLAGS -I$X264/include"             "--extra-ldflags=$FLAGS -L$X264/lib"
+        # macOS: 显式开启 videotoolbox 和 coreimage 硬件加速
+        build_ffmpeg "$X264" "$FFMPEG" "$BUILD_ROOT/ffmpeg-$arch"             --target-os=darwin "--arch=$arch" --cc=clang --enable-pthreads --enable-videotoolbox --enable-coreimage             --install-name-dir=@loader_path             "--extra-cflags=$FLAGS -I$X264/include"             "--extra-ldflags=$FLAGS -L$X264/lib"
     done
-    for lib in libavcodec.62.dylib libavformat.62.dylib libavutil.60.dylib libswscale.9.dylib; do
+    for lib in libavcodec.62.dylib libavformat.62.dylib libavutil.60.dylib libswscale.9.dylib libswresample.6.dylib; do
         lipo -create             "$INSTALL_ROOT/ffmpeg-x86_64/lib/$lib"             "$INSTALL_ROOT/ffmpeg-arm64/lib/$lib"             -output "$OUTPUT_ROOT/$lib"
     done
     ;;
@@ -277,4 +283,3 @@ catch {
         "'$TargetOutput' failed. Close Unity or any process using the DLLs, then run the script again. $($_.Exception.Message)"
 }
 Write-Host "Built FFmpeg runtime: $TargetOutput"
-
