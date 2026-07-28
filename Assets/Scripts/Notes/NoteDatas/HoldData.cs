@@ -83,6 +83,9 @@ public struct HoldData
             bodySprite = isBreak ? NoteSp.HOLD_BREAK_MINE : NoteSp.HOLD_MINE;
             lineSprite = NoteSp.LINE_MINE;
         }
+
+        // 一开始放开时间无穷大，按下后才能重置为0
+        releaseTimeSec = float.MaxValue;
     }
 
     public readonly bool IsFoldable(HoldData other) =>

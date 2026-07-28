@@ -1,6 +1,0 @@
-Target: win-x64
-FFmpeg branch: release/8.1
-FFmpeg commit: 8c9502e9b048e21e1cae96477e338ac0635645ba
-x264 branch: master
-x264 commit: 0480cb05fa188d37ae87e8f4fd8f1aea3711f7ee
-License: GPL v2 or later (FFmpeg built with libx264)

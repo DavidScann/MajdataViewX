@@ -46,7 +46,6 @@ public class AudioManager
     private List<float[]> noteSfxSamplesData = new(SFX_COUNT);
     private NativeArray<float> recordingBuffer;
     private int recordingSampleCount;
-    private int recordingCommittedSampleCount;
     private int recordingPreviousTouchHoldCount;
     private float recordingInitialAudioTime;
     private float recordingSpeed = 1f;
@@ -444,7 +443,6 @@ public class AudioManager
         if (recordingBuffer.IsCreated) recordingBuffer.Dispose();
         recordingBuffer = new NativeArray<float>(size, Allocator.Persistent, NativeArrayOptions.ClearMemory);
         recordingSampleCount = size;
-        recordingCommittedSampleCount = 0;
         recordingPreviousTouchHoldCount = 0;
         for (var i = 0; i < sfxPlayPointers.Length; i++)
         {
@@ -454,9 +452,8 @@ public class AudioManager
                     sfxPlayPointers[i][j] = -1; // 初始化指针
             }
         }
-        // Mix sources whose timing is known before recording begins. During capture,
-        // only the current dynamic-SFX interval remains mutable, so older intervals
-        // can be encoded without retaining the whole song.
+        // Mix sources whose timing is known before recording begins. Dynamic SFX
+        // are added frame by frame, then the completed buffer is muxed at the end.
         MixStaticRecordingAudio();
     }
 
@@ -499,39 +496,22 @@ public class AudioManager
                 (float)frameStartTime);
         }
 
-        // Static audio was mixed up front and the dynamic part for this frame is
-        // now complete. Everything before frameEndTime is immutable and writable.
-        CommitRecordingAudioThrough(frameEndTime);
     }
 
     public void EndRecordingAudio(float recordingElapsedTime)
     {
-        var finalSampleCount = FinalizeRecordingBuffer(recordingElapsedTime);
-        CommitRecordingSamples(finalSampleCount);
+        recordingSampleCount = FinalizeRecordingBuffer(recordingElapsedTime);
     }
 
-    private void CommitRecordingAudioThrough(double recordingEndTime)
+    public NativeArray<float> GetRecordingBuffer(out int sampleCount)
     {
-        var targetSampleCount = Math.Min(
-            (int)(recordingEndTime * SAMPLERATE) * CHANNELS,
-            recordingBuffer.Length);
-        CommitRecordingSamples(targetSampleCount);
-    }
+        if (!recordingBuffer.IsCreated)
+            throw new InvalidOperationException("Recording audio has not been initialized.");
 
-    private void CommitRecordingSamples(int targetSampleCount)
-    {
-        targetSampleCount = Math.Clamp(targetSampleCount, 0, recordingBuffer.Length);
-        targetSampleCount -= targetSampleCount % CHANNELS;
-        if (targetSampleCount <= recordingCommittedSampleCount)
-            return;
-
-        // Buffer ownership stays here. ScreenRecorder supplies only timestamps;
-        // AudioManager submits the immutable NativeArray range to the encoder.
-        FFmpegMediaEncoder.WriteAudioSamples(
-            recordingBuffer,
-            recordingCommittedSampleCount,
-            targetSampleCount - recordingCommittedSampleCount);
-        recordingCommittedSampleCount = targetSampleCount;
+        // The native muxer copies this data synchronously, so AudioManager keeps
+        // ownership and releases the buffer only after video_encoder_free returns.
+        sampleCount = recordingSampleCount;
+        return recordingBuffer;
     }
 
     private void TriggerSfxRecording(int index)
@@ -733,7 +713,6 @@ public class AudioManager
     {
         if (recordingBuffer.IsCreated) recordingBuffer.Dispose();
         recordingSampleCount = 0;
-        recordingCommittedSampleCount = 0;
         recordingPreviousTouchHoldCount = 0;
     }
 
