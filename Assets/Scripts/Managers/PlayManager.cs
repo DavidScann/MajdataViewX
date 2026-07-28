@@ -189,7 +189,8 @@ public class PlayManager : MonoBehaviour
                         title, artist, difficulty,
                         noteSpeed, touchSpeed,
                         _setting.SmoothSlideAnime,
-                        _setting.LegacySlideLayer);
+                        _setting.LegacySlideLayer,
+                        _setting.MineAutoSlide);
 
                     _allPerfectManager.enabled = false;
                     _timeProvider.SetStartTime(startAt, offset, speed, playmode);
@@ -201,7 +202,8 @@ public class PlayManager : MonoBehaviour
                         title, artist, difficulty,
                         noteSpeed, touchSpeed,
                         _setting.SmoothSlideAnime,
-                        _setting.LegacySlideLayer);
+                        _setting.LegacySlideLayer,
+                        _setting.MineAutoSlide);
 
                     _bgManager.PlaySongDetail();
                     _audioManager.noteSfxPlaybackRequests[AudioManager.TRACK_START] = true; //track_start
@@ -222,7 +224,8 @@ public class PlayManager : MonoBehaviour
                         title, artist, difficulty,
                         noteSpeed, touchSpeed,
                         _setting.SmoothSlideAnime,
-                        _setting.LegacySlideLayer);
+                        _setting.LegacySlideLayer,
+                        _setting.MineAutoSlide);
 
                     _bgManager.PlaySongDetail();
 

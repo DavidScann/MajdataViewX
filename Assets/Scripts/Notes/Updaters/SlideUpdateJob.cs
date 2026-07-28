@@ -50,7 +50,6 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
         var tapTiming = slide.usingSV
             ? TimeData.FakeNoteTime - TimeData.GetPositionAtTime(slide.tapTime)
             : TimeData.NoteTime - slide.tapTime;
-        if (tapTiming - slide.fadeInStartTiming < 0) return;
         var timing = slide.usingSV
             ? TimeData.FakeNoteTime - TimeData.GetPositionAtTime(slide.shootTime)
             : TimeData.NoteTime - slide.shootTime;
@@ -78,6 +77,10 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
             slide.lastStayTime -= TimeData.deltaTime;
             return;
         }
+
+        // 负 SV 可能让 tapTiming 在音符判定后重新回到淡入区间。
+        // 这里只裁剪尚未判定的渲染，不能阻断 SlideOK 和判定上报的生命周期。
+        if (tapTiming - slide.fadeInStartTiming < 0) return;
 
         RenderArrows(ref slide, index, tapTiming);
         RenderStar(ref slide, index, timing, tapTiming);
@@ -293,6 +296,8 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
                             ? (grade < JudgeGrade.FastPerfect3rd ? JudgeGrade.Miss : JudgeGrade.LateCritical)
                             : grade;
                     }
+                    // 非模拟模式下需要自行赋值finishJudgeTiming
+                    slide.finishJudgeTiming = TimeData.NoteTime;
                     FinishJudgeSlide(ref slide);
                     EndSlide(ref slide);
                     if (slide.isFolded) EndNote(ref slide);

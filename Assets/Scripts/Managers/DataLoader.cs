@@ -38,7 +38,8 @@ public class DataLoader : MonoBehaviour
         float noteSpeed,
         float touchSpeed,
         bool smoothSlideAnime,
-        bool legacySlideLayer)
+        bool legacySlideLayer,
+        bool mineAutoSlide)
     {
         titleText.text = title;
         artistText.text = artist;
@@ -57,6 +58,7 @@ public class DataLoader : MonoBehaviour
         _noteManager.SmoothSlideAnime = smoothSlideAnime;
         _noteManager.LegacySlideLayer = legacySlideLayer;
         _noteManager.Ignore = ignoreOffset;
+        _noteManager.MineAutoSlide = mineAutoSlide;
         _noteManager.Load(chart);
 
         await UniTask.Yield();

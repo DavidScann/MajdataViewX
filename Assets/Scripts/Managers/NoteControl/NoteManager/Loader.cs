@@ -17,6 +17,7 @@ public partial class NoteManager
     public float TouchSpeed = 7.5f;
     public bool LegacySlideLayer = false;
     public bool SmoothSlideAnime = true;
+    public bool MineAutoSlide = true;
 
     public double Ignore = 0f;
 
@@ -827,7 +828,7 @@ public partial class NoteManager
                 usingSV = note.UsingSV,
                 smoothSlideAnime = SmoothSlideAnime,
                 legacySlideLayer = LegacySlideLayer,
-                mineAutoSlide = note.IsMineSlide,
+                mineAutoSlide = MineAutoSlide,
             };
             if (lastContent == noteContent && slides.Length > 0 && slides[^1].IsFoldablePropOnly(slide))
             {
@@ -901,7 +902,7 @@ public partial class NoteManager
                 usingSV = note.UsingSV,
                 smoothSlideAnime = SmoothSlideAnime,
                 legacySlideLayer = LegacySlideLayer,
-                mineAutoSlide = note.IsMineSlide,
+                mineAutoSlide = MineAutoSlide,
             };
             slideData.Init();
             slides.Add(slideData);

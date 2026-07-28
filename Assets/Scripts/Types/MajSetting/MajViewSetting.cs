@@ -12,4 +12,5 @@
     public UIType UIType { get; set; } = UIType.Legacy;
     public double GlobalAudioOffset { get; set; } = 0;
     public bool LegacySlideLayer { get; set; } = false;
+    public bool MineAutoSlide { get; set; } = true;
 }
