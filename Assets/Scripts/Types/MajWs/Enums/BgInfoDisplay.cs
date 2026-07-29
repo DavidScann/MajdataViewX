@@ -11,4 +11,5 @@
     S_Border,
     SS_Border,
     SSS_Border,
+    DXScore_Dec,
 }

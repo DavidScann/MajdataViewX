@@ -97,6 +97,7 @@ public partial class ObjectCounter : MonoBehaviour
                 statusDXScore.gameObject.SetActive(false);
                 break;
             case BgInfoDisplay.DXScore:
+            case BgInfoDisplay.DXScore_Dec:
                 statusCombo.gameObject.SetActive(false);
                 statusAchievement.gameObject.SetActive(false);
                 statusDXScore.gameObject.SetActive(true);
@@ -214,6 +215,11 @@ public partial class ObjectCounter : MonoBehaviour
                 }
                 break;
             case BgInfoDisplay.DXScore:
+                {
+                    statusDXScore.text = curDXScore.ToString();
+                }
+                break;
+            case BgInfoDisplay.DXScore_Dec:
                 {
                     statusDXScore.text = (totalDXScore + lostDXScore).ToString();
                 }

@@ -1,14 +1,14 @@
 #region
 
+using Cysharp.Threading.Tasks;
+using MajSimai;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Cysharp.Threading.Tasks;
-using MajSimai;
+using System.Runtime.InteropServices.ComTypes;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
-
 using static MajCtx;
 
 #endregion
@@ -120,6 +120,7 @@ public partial class ObjectCounter : MonoBehaviour
     long lateCount = 0;
 
     long totalDXScore = 0;
+    long curDXScore = 0;
     long lostDXScore = 0;
 
     long combo = 0;
@@ -239,6 +240,24 @@ public partial class ObjectCounter : MonoBehaviour
                     BreakFinishedCount++;
                 }
             }
+
+            if (NoteHelper.IsSimulated) continue;
+            // ReportResult
+            var type = note.Type;
+            var judge = JudgeGrade.LateCritical;
+            var isBreak = note.IsBreak;
+            if (NoteHelper.AutoPlayMode is AutoPlayMode.Random)
+            {
+                judge = (JudgeGrade)MajBurst.GlobalRandom.NextInt((int)JudgeGrade.FastGood, (int)JudgeGrade.Miss);
+                judge = note.IsMine
+                    ? judge < JudgeGrade.FastPerfect3rd
+                        ? JudgeGrade.Miss
+                        : JudgeGrade.LateCritical
+                    : judge;
+            }
+            UpdateNoteScoreCount(type, judge, isBreak);
+            UpdateJudgeCountAndDXScore(judge);
+            UpdateFastLateCount(judge);
         }
     }
 
@@ -256,10 +275,15 @@ public partial class ObjectCounter : MonoBehaviour
         reportRequests.Clear();
     }
 
-    public void ReportResult(SimaiNoteType type, JudgeGrade judgeGrade, bool isBreak = false, bool updateAcc = true)
+    public void ReportResult(
+        SimaiNoteType type,
+        JudgeGrade judgeGrade,
+        bool isBreak = false,
+        bool updateAcc = true)
     {
         UpdateNoteScoreCount(type, judgeGrade, isBreak);
-        UpdateNoteCount(type, judgeGrade, isBreak);
+        UpdateNoteFinishedCount(type, judgeGrade, isBreak);
+        UpdateJudgeCountAndDXScore(judgeGrade);
         UpdateFastLateCount(judgeGrade);
         if (updateAcc) UpdateAccRate();
     }
@@ -397,7 +421,7 @@ public partial class ObjectCounter : MonoBehaviour
         accRate[3] = decimal.ToDouble(newAccRate[3] * 100);
         accRate[4] = decimal.ToDouble(newAccRate[4] * 100);
     }
-    private void UpdateNoteCount(SimaiNoteType type, JudgeGrade judge, bool isBreak)
+    private void UpdateNoteFinishedCount(SimaiNoteType type, JudgeGrade judge, bool isBreak)
     {
         if (isBreak)
         {
@@ -441,7 +465,9 @@ public partial class ObjectCounter : MonoBehaviour
             }
         }
         totalJudgedCount[judge]++;
-
+    }
+    private void UpdateJudgeCountAndDXScore(JudgeGrade judge)
+    {
         if (judge is not (JudgeGrade.Miss or JudgeGrade.TooFast))
             combo++;
 
@@ -456,12 +482,14 @@ public partial class ObjectCounter : MonoBehaviour
             case JudgeGrade.LateCritical:
             case JudgeGrade.FastCritical:
                 cPerfectCount++;
+                curDXScore += 3;
                 break;
             case JudgeGrade.LatePerfect3rd:
             case JudgeGrade.LatePerfect2nd:
             case JudgeGrade.FastPerfect2nd:
             case JudgeGrade.FastPerfect3rd:
                 perfectCount++;
+                curDXScore += 2;
                 lostDXScore -= 1;
                 break;
             case JudgeGrade.LateGreat3rd:
@@ -470,6 +498,7 @@ public partial class ObjectCounter : MonoBehaviour
             case JudgeGrade.FastGreat1st:
             case JudgeGrade.FastGreat2nd:
             case JudgeGrade.FastGreat3rd:
+                curDXScore += 1;
                 lostDXScore -= 2;
                 greatCount++;
                 break;
@@ -540,6 +569,7 @@ public partial class ObjectCounter : MonoBehaviour
         lateCount = 0;
 
         totalDXScore = 0;
+        curDXScore = 0;
         lostDXScore = 0;
 
         combo = 0;
