@@ -133,8 +133,8 @@ public partial class ObjectCounter : MonoBehaviour
     readonly Dictionary<JudgeGrade, int> judgedBreakCount = new();
     readonly Dictionary<JudgeGrade, int> totalJudgedCount = new();
 
-    readonly Dictionary<double, (int, int)> meterList = new();
-    readonly Dictionary<double, float> bpmList = new();
+    readonly List<(double Timing, int Numerator, int Denominator)> meterList = new();
+    readonly List<(double Timing, float Bpm)> bpmList = new();
 
     private NativeList<ReportResultEntry> reportRequests = new(65536, Allocator.Persistent);
     public NativeList<ReportResultEntry>.ParallelWriter ReportRequestsWriter => reportRequests.AsParallelWriter();

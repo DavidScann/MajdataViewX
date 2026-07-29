@@ -23,5 +23,6 @@ public partial class ObjectCounter : MonoBehaviour
     private void OnDestroy()
     {
         if (reportRequests.IsCreated) reportRequests.Dispose();
+        outputBuilder.Dispose();
     }
 }
