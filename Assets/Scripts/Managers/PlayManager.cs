@@ -67,7 +67,12 @@ public class PlayManager : MonoBehaviour
                 _audioManager.OnUpdate();
                 Thread.Sleep(1);
             }
-        });
+        })
+        {
+            IsBackground = true,
+            Name = "Majdata SFX Trigger",
+            Priority = System.Threading.ThreadPriority.Highest,
+        };
         _audioManagerThread.Start();
 
         MajBurst.__DataSS.Data = new MajBurstData
