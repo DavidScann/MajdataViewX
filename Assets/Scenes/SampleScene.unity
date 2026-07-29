@@ -2160,10 +2160,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ce9e0deb7f9bfcd419af9395eb9ca6b5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  AchievementDudColor: {r: 0.24705882, g: 0.49803922, b: 0.6901961, a: 0}
-  AchievementBronzeColor: {r: 0.49803922, g: 0.1882353, b: 0.1254902, a: 0}
-  AchievementSilverColor: {r: 0.627451, g: 0.627451, b: 0.627451, a: 0}
-  AchievementGoldColor: {r: 0.8784314, g: 0.7490196, b: 0.49803922, a: 0}
+  AchievementDudColor: {r: 0.24705882, g: 0.49803922, b: 0.6901961, a: 1}
+  AchievementBronzeColor: {r: 0.49803922, g: 0.1882353, b: 0.1254902, a: 1}
+  AchievementSilverColor: {r: 0.627451, g: 0.627451, b: 0.627451, a: 1}
+  AchievementGoldColor: {r: 0.8784314, g: 0.7490196, b: 0.49803922, a: 1}
   legacyUIRoot: {fileID: 1372501460}
   timeDisplay: {fileID: 1253199014}
   objectCount: {fileID: 1555395489}
