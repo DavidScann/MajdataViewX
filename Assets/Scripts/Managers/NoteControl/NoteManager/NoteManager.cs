@@ -10,6 +10,16 @@ using static MajCtx;
 
 public partial class NoteManager : MonoBehaviour
 {
+    /// <summary>
+    /// note数量/最后一个note的时间大于该常数时使用HIGH_DENSITY_CAPACITY_MULTIPLIER
+    /// </summary>
+    private const float HIGH_DENSITY_THRESHOLD = 1145.14f;
+    private const int HIGH_DENSITY_CAPACITY_MULTIPLIER = 3;
+    private const int DEFAULT_RENDER_CAPACITY = 65536;
+    private const int DEFAULT_SLIDE_RENDER_CAPACITY = 262144;
+
+    public float NoteDensity { get; private set; }
+
     NativeList<TapData> taps = new(1024, Allocator.Persistent);
     NativeList<EachLineData> eachLines = new(512, Allocator.Persistent);
     NativeList<HoldData> holds = new(1024, Allocator.Persistent);
@@ -37,6 +47,9 @@ public partial class NoteManager : MonoBehaviour
     Material _matSimple;
     Material _matNotes;
     Material _matMask;
+    Mesh _lineMesh;
+    Mesh _quadMesh;
+    int _renderCapacityMultiplier;
 
     JobHandle _prevChain;
     bool _isJobScheduledThisFrame;
@@ -47,8 +60,8 @@ public partial class NoteManager : MonoBehaviour
     }
     void Start()
     {
-        var lineMesh = MeshGenerator.CreateRingMesh(32, 0.5f, 0.3f);
-        var _quad = Resources.GetBuiltinResource<Mesh>("Quad.fbx");
+        _lineMesh = MeshGenerator.CreateRingMesh(32, 0.5f, 0.3f);
+        _quadMesh = Resources.GetBuiltinResource<Mesh>("Quad.fbx");
 
         //REMEMBER TO FORCE INCLUDE
         _matLine = new Material(Shader.Find("Custom/NoteLine"));
@@ -56,12 +69,7 @@ public partial class NoteManager : MonoBehaviour
         _matNotes = new Material(Shader.Find("Custom/NoteRich"));
         _matMask = new Material(Shader.Find("Custom/NoteMask"));
 
-        _tapLineGroup = new RenderGroup<LineRenderData>(_matLine, lineMesh, 0);
-        _eachLineGroup = new RenderGroup<LineRenderData>(_matLine, lineMesh, 1);
-        _slideGroup = new RenderGroup<SimpleRenderData>(_matSimple, _quad, 2, 262144); //slide真的会爆，神了
-        _notesGroup = new RenderGroup<NotesRenderData>(_matNotes, _quad, 3);
-        _thBorderGroup = new RenderGroup<MaskRenderData>(_matMask, _quad, 4);
-        _touchGroup = new RenderGroup<SimpleRenderData>(_matSimple, _quad, 5);
+        CreateRenderGroups(1);
 
         _noteUvsBuffer = new(
             GraphicsBuffer.Target.Structured,
@@ -73,13 +81,62 @@ public partial class NoteManager : MonoBehaviour
         {
             mat.SetBuffer("_SpriteRects", _noteUvsBuffer);
             mat.SetTexture("_MainTex", _noteSkinManager.Atlas);
-            mat.SetFloat("_AtlasSize", 8192);
+            mat.SetFloat("_AtlasSize", _noteSkinManager.Atlas.width);
             mat.SetFloat("_PixelsPerUnit", 100);
         }
         SetupMaterial(_matLine);
         SetupMaterial(_matSimple);
         SetupMaterial(_matNotes);
         SetupMaterial(_matMask);
+    }
+
+    private void CreateRenderGroups(int capacityMultiplier)
+    {
+        _renderCapacityMultiplier = capacityMultiplier;
+        var capacity = checked(DEFAULT_RENDER_CAPACITY * capacityMultiplier);
+        var slideCapacity = checked(DEFAULT_SLIDE_RENDER_CAPACITY * capacityMultiplier);
+
+        _tapLineGroup = new RenderGroup<LineRenderData>(_matLine, _lineMesh, 0, capacity);
+        _eachLineGroup = new RenderGroup<LineRenderData>(_matLine, _lineMesh, 1, capacity);
+        _slideGroup = new RenderGroup<SimpleRenderData>(_matSimple, _quadMesh, 2, slideCapacity);
+        _notesGroup = new RenderGroup<NotesRenderData>(_matNotes, _quadMesh, 3, capacity);
+        _thBorderGroup = new RenderGroup<MaskRenderData>(_matMask, _quadMesh, 4, capacity);
+        _touchGroup = new RenderGroup<SimpleRenderData>(_matSimple, _quadMesh, 5, capacity);
+    }
+
+    private void DisposeRenderGroups()
+    {
+        _tapLineGroup?.Dispose();
+        _eachLineGroup?.Dispose();
+        _slideGroup?.Dispose();
+        _notesGroup?.Dispose();
+        _thBorderGroup?.Dispose();
+        _touchGroup?.Dispose();
+    }
+
+    private void ConfigureRenderCapacity(SimaiChart chart)
+    {
+        var noteCount = 0;
+        var lastNoteTime = 0d;
+        foreach (var timing in chart.NoteTimings)
+        {
+            if (timing.Notes.Length == 0) continue;
+            noteCount += timing.Notes.Length;
+            lastNoteTime = timing.Timing;
+        }
+
+        NoteDensity = lastNoteTime > 0d
+            ? noteCount / (float)lastNoteTime
+            : noteCount > 0 ? float.PositiveInfinity : 0f;
+
+        var capacityMultiplier = NoteDensity > HIGH_DENSITY_THRESHOLD
+            ? HIGH_DENSITY_CAPACITY_MULTIPLIER
+            : 1;
+        if (capacityMultiplier == _renderCapacityMultiplier) return;
+
+        _prevChain.Complete();
+        DisposeRenderGroups();
+        CreateRenderGroups(capacityMultiplier);
     }
 
     void Update()
@@ -208,7 +265,17 @@ public partial class NoteManager : MonoBehaviour
                     touchGroupCoverResults = touchGroupCoverResults.AsArray(),
                 }.Schedule(touches.Length, 32, h);
 
-            _prevChain = h;
+            var tapLineSort = _tapLineGroup.ScheduleSort(h);
+            var eachLineSort = _eachLineGroup.ScheduleSort(h);
+            var slideSort = _slideGroup.ScheduleSort(h);
+            var notesSort = _notesGroup.ScheduleSort(h);
+            var thBorderSort = _thBorderGroup.ScheduleSort(h);
+            var touchSort = _touchGroup.ScheduleSort(h);
+
+            _prevChain = JobHandle.CombineDependencies(
+                JobHandle.CombineDependencies(tapLineSort, eachLineSort),
+                JobHandle.CombineDependencies(slideSort, notesSort),
+                JobHandle.CombineDependencies(thBorderSort, touchSort));
         }
         _isJobScheduledThisFrame = true;
     }
@@ -219,12 +286,12 @@ public partial class NoteManager : MonoBehaviour
 
         if (_isJobScheduledThisFrame)
         {
-            _tapLineGroup.UnlockWrite();
-            _eachLineGroup.UnlockWrite();
-            _slideGroup.UnlockWrite();
-            _notesGroup.UnlockWrite();
-            _thBorderGroup.UnlockWrite();
-            _touchGroup.UnlockWrite();
+            _tapLineGroup.UnlockWrite(false);
+            _eachLineGroup.UnlockWrite(false);
+            _slideGroup.UnlockWrite(false);
+            _notesGroup.UnlockWrite(false);
+            _thBorderGroup.UnlockWrite(false);
+            _touchGroup.UnlockWrite(false);
 
             _tapLineGroup.Render();
             _eachLineGroup.Render();
@@ -263,12 +330,7 @@ public partial class NoteManager : MonoBehaviour
     void OnDestroy()
     {
         _prevChain.Complete();
-        _tapLineGroup?.Dispose();
-        _eachLineGroup?.Dispose();
-        _slideGroup?.Dispose();
-        _notesGroup?.Dispose();
-        _thBorderGroup?.Dispose();
-        _touchGroup?.Dispose();
+        DisposeRenderGroups();
 
         _noteUvsBuffer?.Dispose();
 

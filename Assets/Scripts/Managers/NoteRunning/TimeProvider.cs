@@ -42,7 +42,8 @@ public class TimeProvider : MonoBehaviour
     private readonly Stopwatch playbackClock = new();
 
 
-    private string mmfAudioTimePath => Path.Combine(MajEnv.MajBase, "majdata_time.dat");
+    private string mmfAudioTimePath =>
+        Path.Combine(Application.persistentDataPath, "majdata_time.dat");
     private MemoryMappedFile mmfAudioTime;
     private MemoryMappedViewAccessor mmvAudioTime;
 

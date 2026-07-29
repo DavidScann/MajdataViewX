@@ -15,6 +15,7 @@ public class RenderGroup<T> : IDisposable where T : unmanaged, ISortableRenderDa
     GraphicsBuffer[] _argsBuffers = new GraphicsBuffer[MULTIPLE_COUNT];
     GraphicsBuffer.IndirectDrawIndexedArgs[][] _args = new GraphicsBuffer.IndirectDrawIndexedArgs[MULTIPLE_COUNT][];
     NativeArray<int> _counts;
+    NativeArray<T> _sortTemp;
 
     MaterialPropertyBlock _mpb;
     RenderParams _rp;
@@ -56,6 +57,7 @@ public class RenderGroup<T> : IDisposable where T : unmanaged, ISortableRenderDa
         }
 
         _counts = new NativeArray<int>(MULTIPLE_COUNT, Allocator.Persistent);
+        _sortTemp = new NativeArray<T>(_maxInstances, Allocator.Persistent);
     }
 
     public void AdvanceWrite()
@@ -69,20 +71,30 @@ public class RenderGroup<T> : IDisposable where T : unmanaged, ISortableRenderDa
         return _noteRenderDatasThisFrame;
     }
 
-    public void UnlockWrite(bool sort = true)
+    public unsafe void UnlockWrite(bool sort = true)
     {
-        var count = _counts[_writeIndex];
+        var count = Math.Min(_counts[_writeIndex], _maxInstances);
+        _counts[_writeIndex] = count;
         if (sort && count > 1)
         {
-            var subArray = _noteRenderDatasThisFrame.GetSubArray(0, count);
-            using var temp = new NativeArray<T>(count, Allocator.TempJob);
             new RadixSort.RadixSortJob<T>
             {
-                Data = subArray,
-                Temp = temp
+                Data = _noteRenderDatasThisFrame,
+                Temp = _sortTemp,
+                CountPtr = WriteCountPtr
             }.Run();
         }
         _buffers[_writeIndex].UnlockBufferAfterWrite<T>(count);
+    }
+
+    public unsafe JobHandle ScheduleSort(JobHandle dependency)
+    {
+        return new RadixSort.RadixSortJob<T>
+        {
+            Data = _noteRenderDatasThisFrame,
+            Temp = _sortTemp,
+            CountPtr = WriteCountPtr
+        }.Schedule(dependency);
     }
 
     public unsafe int* WriteCountPtr
@@ -128,6 +140,7 @@ public class RenderGroup<T> : IDisposable where T : unmanaged, ISortableRenderDa
             _argsBuffers[i]?.Dispose();
         }
         if (_counts.IsCreated) _counts.Dispose();
+        if (_sortTemp.IsCreated) _sortTemp.Dispose();
 
         GC.SuppressFinalize(this);
     }

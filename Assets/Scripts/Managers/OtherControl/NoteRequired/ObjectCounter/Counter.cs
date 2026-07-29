@@ -1,6 +1,5 @@
 #region
 
-using Cysharp.Threading.Tasks;
 using MajSimai;
 using System;
 using System.Collections.Generic;
@@ -139,61 +138,58 @@ public partial class ObjectCounter : MonoBehaviour
     private NativeList<ReportResultEntry> reportRequests = new(65536, Allocator.Persistent);
     public NativeList<ReportResultEntry>.ParallelWriter ReportRequestsWriter => reportRequests.AsParallelWriter();
 
-    public async UniTask CountNoteSumAsync(SimaiChart chart)
+    public void CountNoteSum(SimaiChart chart)
     {
-        await UniTask.RunOnThreadPool(() =>
+        foreach (var timing in chart.NoteTimings)
         {
-            foreach (var timing in chart.NoteTimings)
+            foreach (var note in timing.Notes)
             {
-                foreach (var note in timing.Notes)
+                if (!note.IsBreak)
                 {
-                    if (!note.IsBreak)
+                    switch (note.Type)
                     {
-                        switch (note.Type)
-                        {
-                            case SimaiNoteType.Tap:
-                                TapSum++;
-                                break;
-                            case SimaiNoteType.Hold:
-                            case SimaiNoteType.TouchHold:
-                                HoldSum++;
-                                break;
-                            case SimaiNoteType.Slide:
-                                if (!note.IsSlideNoHead)
-                                    TapSum++;
-                                if (note.IsSlideBreak)
-                                    BreakSum++;
-                                else
-                                    SlideSum++;
-                                break;
-                            case SimaiNoteType.Touch:
-                                TouchSum++;
-                                break;
-                        }
-                    }
-                    else
-                    {
-                        if (note.Type == SimaiNoteType.Slide)
-                        {
+                        case SimaiNoteType.Tap:
+                            TapSum++;
+                            break;
+                        case SimaiNoteType.Hold:
+                        case SimaiNoteType.TouchHold:
+                            HoldSum++;
+                            break;
+                        case SimaiNoteType.Slide:
                             if (!note.IsSlideNoHead)
-                                BreakSum++;
+                                TapSum++;
                             if (note.IsSlideBreak)
                                 BreakSum++;
                             else
                                 SlideSum++;
-                        }
-                        else
-                        {
+                            break;
+                        case SimaiNoteType.Touch:
+                            TouchSum++;
+                            break;
+                    }
+                }
+                else
+                {
+                    if (note.Type == SimaiNoteType.Slide)
+                    {
+                        if (!note.IsSlideNoHead)
                             BreakSum++;
-                        }
+                        if (note.IsSlideBreak)
+                            BreakSum++;
+                        else
+                            SlideSum++;
+                    }
+                    else
+                    {
+                        BreakSum++;
                     }
                 }
             }
-            NoteSum = TapSum + HoldSum + TouchSum + BreakSum + SlideSum;
-            TotalNoteBaseScore = (TapSum + TouchSum) * 500 + HoldSum * 1000 + SlideSum * 1500 + BreakSum * 2500;
-            TotalNoteExtraScore = BreakSum * 100;
-            totalDXScore = NoteSum * 3;
-        });
+        }
+        NoteSum = TapSum + HoldSum + TouchSum + BreakSum + SlideSum;
+        TotalNoteBaseScore = (TapSum + TouchSum) * 500 + HoldSum * 1000 + SlideSum * 1500 + BreakSum * 2500;
+        TotalNoteExtraScore = BreakSum * 100;
+        totalDXScore = NoteSum * 3;
     }
 
     public void CountIgnoreNoteCountAsync(IEnumerable<SimaiNote> notes)

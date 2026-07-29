@@ -43,7 +43,7 @@ public class BgManager : MonoBehaviour
     public bool IsBgLoaded => !hasBg || Bg != null;
     public bool IsVideoLoaded => !hasVideo || !string.IsNullOrWhiteSpace(VideoUrl);
 
-    private static Sprite _emptySprite;
+    private static Sprite? _emptySprite;
 
     private void Awake()
     {
@@ -92,7 +92,19 @@ public class BgManager : MonoBehaviour
 
     public void LoadBG(string path)
     {
+        DestroyLoadedBackground();
         Bg = TexLoader.LoadSprite(path);
+    }
+
+    private void DestroyLoadedBackground()
+    {
+        if (Bg == null) return;
+
+        var texture = Bg.texture;
+        Destroy(Bg);
+        if (texture != null)
+            Destroy(texture);
+        Bg = null;
     }
 
     public void ShowBG()
@@ -169,5 +181,18 @@ public class BgManager : MonoBehaviour
 
         if (songDetail != null)
             songDetail.SetActive(false);
+    }
+
+    private void OnDestroy()
+    {
+        DestroyLoadedBackground();
+        if (_emptySprite != null)
+        {
+            var texture = _emptySprite.texture;
+            Destroy(_emptySprite);
+            if (texture != null)
+                Destroy(texture);
+            _emptySprite = null;
+        }
     }
 }

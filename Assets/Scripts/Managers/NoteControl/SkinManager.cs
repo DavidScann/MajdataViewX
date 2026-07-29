@@ -479,75 +479,47 @@ public class SkinManager : MonoBehaviour
 
     private void BuildAtlas(List<(string path, int index, Texture2D tex)> sources)
     {
-        const int atlasSize = 8192;
+        const int maxAtlasSize = 8192;
 
-        sources.Sort((a, b) => b.tex.height.CompareTo(a.tex.height));
-
+        if (Uvs.IsCreated) Uvs.Dispose();
+        if (Atlas != null) Destroy(Atlas);
         Uvs = new NativeArray<float4>(COUNT, Allocator.Persistent);
-        Atlas = new Texture2D(atlasSize, atlasSize, TextureFormat.RGBA32, false);
-        var atlasPixels = Atlas.GetPixels32();
+        Atlas = new Texture2D(2, 2, TextureFormat.RGBA32, false);
 
-        var shelves = new List<(int y, int x, int remainingHeight)>();
-        int nextY = 0;
-        var placements = new (int x, int y)[COUNT];
+        var textures = new Texture2D[sources.Count];
+        for (var i = 0; i < sources.Count; i++)
+            textures[i] = sources[i].tex;
 
-        foreach (var (_, index, tex) in sources)
+        try
         {
-            int w = tex.width;
-            int h = tex.height;
-            bool placed = false;
+            var rects = Atlas.PackTextures(
+                textures,
+                padding: 0,
+                maximumAtlasSize: maxAtlasSize,
+                makeNoLongerReadable: true);
+            if (rects.Length != sources.Count)
+                throw new InvalidOperationException(
+                    $"Could not pack all skin textures into a {maxAtlasSize}x{maxAtlasSize} atlas.");
 
-            for (int s = 0; s < shelves.Count; s++)
+            var halfTexelX = 0.5f / Atlas.width;
+            var halfTexelY = 0.5f / Atlas.height;
+            for (var i = 0; i < sources.Count; i++)
             {
-                var (y, x, remainingHeight) = shelves[s];
-                if (h <= remainingHeight && x + w <= atlasSize)
-                {
-                    placements[index] = (x, y);
-                    shelves[s] = (y, x + w, remainingHeight);
-                    placed = true;
-                    break;
-                }
-            }
-
-            if (!placed)
-            {
-                if (nextY + h > atlasSize)
-                    break;
-
-                placements[index] = (0, nextY);
-                shelves.Add((nextY, w, h));
-                nextY += h;
+                var (_, index, _) = sources[i];
+                var rect = rects[i];
+                Uvs[index] = new float4(
+                    rect.xMin + halfTexelX,
+                    rect.yMin + halfTexelY,
+                    rect.xMax - halfTexelX,
+                    rect.yMax - halfTexelY);
             }
         }
-
-        foreach (var (_, index, tex) in sources)
+        finally
         {
-            var (px, py) = placements[index];
-            var pixels = tex.GetPixels32();
-            for (int y = 0; y < tex.height; y++)
-            {
-                for (int x = 0; x < tex.width; x++)
-                {
-                    int srcIdx = y * tex.width + x;
-                    int dstIdx = (py + y) * atlasSize + (px + x);
-                    atlasPixels[dstIdx] = pixels[srcIdx];
-                }
-            }
-
-            float invSize = 1f / atlasSize;
-            float halfTexel = 0.5f * invSize;
-            Uvs[index] = new float4(
-                px * invSize + halfTexel,
-                py * invSize + halfTexel,
-                (px + tex.width) * invSize - halfTexel,
-                (py + tex.height) * invSize - halfTexel
-            );
-
-            Destroy(tex);
+            foreach (var texture in textures)
+                if (texture != null)
+                    Destroy(texture);
         }
-
-        Atlas.SetPixels32(atlasPixels);
-        Atlas.Apply();
     }
 
     private void OnDestroy()

@@ -2,7 +2,6 @@
 
 using System;
 using Cysharp.Text;
-using Cysharp.Threading.Tasks;
 using MajSimai;
 using TMPro;
 using UnityEngine;
@@ -174,32 +173,32 @@ public partial class ObjectCounter : MonoBehaviour
         }
     }
 
-    public async UniTask ReportMeterBpmAsync(SimaiChart chart)
+    public void ReportMeterBpm(SimaiChart chart)
     {
-        await UniTask.RunOnThreadPool(() =>
+        meterList.Clear();
+        bpmList.Clear();
+
+        foreach (var timing in chart.CommaTimings)
         {
-            foreach (var timing in chart.CommaTimings)
+            var lastNum = 0;
+            var lastDeno = 0;
+            if (meterList.Count > 0)
             {
-                var lastNum = 0;
-                var lastDeno = 0;
-                if (meterList.Count > 0)
-                {
-                    var lastMeter = meterList[^1];
-                    lastNum = lastMeter.Numerator;
-                    lastDeno = lastMeter.Denominator;
-                }
-
-                if (timing.SignatureNumerator != lastNum || timing.SignatureDenominator != lastDeno)
-                    meterList.Add((
-                        timing.Timing,
-                        timing.SignatureNumerator,
-                        timing.SignatureDenominator));
-
-                var lastBpm = bpmList.Count > 0 ? bpmList[^1].Bpm : 0;
-                if (timing.Bpm != lastBpm)
-                    bpmList.Add((timing.Timing, timing.Bpm));
+                var lastMeter = meterList[^1];
+                lastNum = lastMeter.Numerator;
+                lastDeno = lastMeter.Denominator;
             }
-        });
+
+            if (timing.SignatureNumerator != lastNum || timing.SignatureDenominator != lastDeno)
+                meterList.Add((
+                    timing.Timing,
+                    timing.SignatureNumerator,
+                    timing.SignatureDenominator));
+
+            var lastBpm = bpmList.Count > 0 ? bpmList[^1].Bpm : 0;
+            if (timing.Bpm != lastBpm)
+                bpmList.Add((timing.Timing, timing.Bpm));
+        }
 
         var min = bpmList.Count > 0 ? bpmList[0].Bpm : 0;
         var max = min;

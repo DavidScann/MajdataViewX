@@ -48,8 +48,8 @@ public class DataLoader : MonoBehaviour
         levelText.text = chart.Level;
         designText.text = chart.Designer;
 
-        _objectCounter.CountNoteSumAsync(chart).Forget();
-        _objectCounter.ReportMeterBpmAsync(chart).Forget();
+        _objectCounter.CountNoteSum(chart);
+        _objectCounter.ReportMeterBpm(chart);
 
         _timeProvider.LoadSV(chart.CommaTimings);
 

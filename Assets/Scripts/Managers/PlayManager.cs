@@ -36,6 +36,7 @@ public class PlayManager : MonoBehaviour
     private static float _thisFrameSec = 0f;
 
     private static Thread? _audioManagerThread;
+    private static int _audioManagerThreadRunning;
 
     private static float? _speed;
 
@@ -60,9 +61,10 @@ public class PlayManager : MonoBehaviour
         canvasButtons = GameObject.Find("CanvasButtons");
 
         _ = new AudioManager();
+        Volatile.Write(ref _audioManagerThreadRunning, 1);
         _audioManagerThread = new Thread(() =>
         {
-            while (true)
+            while (Volatile.Read(ref _audioManagerThreadRunning) != 0)
             {
                 _audioManager.OnUpdate();
                 Thread.Sleep(1);
@@ -71,7 +73,7 @@ public class PlayManager : MonoBehaviour
         {
             IsBackground = true,
             Name = "Majdata SFX Trigger",
-            Priority = System.Threading.ThreadPriority.Highest,
+            Priority = System.Threading.ThreadPriority.AboveNormal,
         };
         _audioManagerThread.Start();
 
@@ -372,8 +374,15 @@ public class PlayManager : MonoBehaviour
 
     private void OnDestroy()
     {
+        Volatile.Write(ref _audioManagerThreadRunning, 0);
+        if (_audioManagerThread is { IsAlive: true } &&
+            _audioManagerThread != Thread.CurrentThread)
+        {
+            _audioManagerThread.Join();
+        }
+        _audioManagerThread = null;
+
         _audioManager.OnDestroy();
-        _audioManagerThread?.Abort();
         _inputManager.OnDestroy();
         MajBurst.InputData.Dispose();
     }

@@ -1,5 +1,6 @@
 using Unity.Burst;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 
 [BurstCompile]
@@ -10,10 +11,14 @@ public static class RadixSort
     {
         public NativeArray<T> Data;
         public NativeArray<T> Temp;
+        [NativeDisableUnsafePtrRestriction]
+        public unsafe int* CountPtr;
         
         public unsafe void Execute()
         {
-            int n = Data.Length;
+            int n = CountPtr == null ? Data.Length : *CountPtr;
+            if (n > Data.Length) n = Data.Length;
+            if (n < 0) n = 0;
             if (n < 2) return;
 
             // Sort descending: invert the key
