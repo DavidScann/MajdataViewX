@@ -4,6 +4,7 @@
     public float TouchSpeed { get; set; } = 7.5f;
     public bool SmoothSlideAnime { get; set; } = false;
     public float BackgroundDim { get; set; } = 0.7f;
+    public float BackgroundOutsideDim { get; set; } = 0.3f;
     public BgInfoDisplay ComboStatusType { get; set; } = BgInfoDisplay.Combo;
     public AutoPlayMode AutoMode { get; set; } = AutoPlayMode.Enable;
     public bool ShowHand { get; set; } = false;

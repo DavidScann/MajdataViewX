@@ -31,13 +31,13 @@ public partial class ObjectCounter : MonoBehaviour
     [SerializeField]
     private GameObject legacyUIRoot;
     [SerializeField]
-    private Text timeDisplay;
+    private TextMeshProUGUI timeDisplay;
     [SerializeField]
-    private Text objectCount;
+    private TextMeshProUGUI objectCount;
     [SerializeField]
-    private Text objectRate;
+    private TextMeshProUGUI objectRate;
     [SerializeField]
-    private Text judgeResultCount;
+    private TextMeshProUGUI judgeResultCount;
 
     //Trg UI
     [SerializeField]

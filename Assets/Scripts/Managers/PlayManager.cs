@@ -42,6 +42,7 @@ public class PlayManager : MonoBehaviour
     private static MajViewSetting _setting = new();
 
     private SpriteRenderer bgCover;
+    private SpriteRenderer bgOutsideCover;
     private GameObject canvasButtons;
 
     private void Awake()
@@ -54,7 +55,8 @@ public class PlayManager : MonoBehaviour
     {
         IsReloading = false;
 
-        bgCover = GameObject.Find("BackgroundCover").GetComponent<SpriteRenderer>();
+        bgCover = GameObject.Find("BgCover").GetComponent<SpriteRenderer>();
+        bgOutsideCover = GameObject.Find("BgOutsideCover").GetComponent<SpriteRenderer>();
         canvasButtons = GameObject.Find("CanvasButtons");
 
         _ = new AudioManager();
@@ -170,8 +172,9 @@ public class PlayManager : MonoBehaviour
             _objectCounter.StartOutput(_setting.ComboStatusType, _setting.UIType);
             //bg
             bgCover.color = new Color(0f, 0f, 0f, _setting.BackgroundDim);
+            bgOutsideCover.color = new Color(0f, 0f, 0f, _setting.BackgroundOutsideDim);
             _bgManager.ShowBG();
-            _bgManager.ShowVideo();
+            _bgManager.ShowVideo(_setting.ResizeBg);
             //sfx
             var clockCount = 0;
             if (playmode != PlaybackMode.Normal)
@@ -233,7 +236,6 @@ public class PlayManager : MonoBehaviour
                     _state = ViewStatus.Playing;
                     _screenRecorder.StartRecording(maidataPath,
                         _setting.OutputFps,
-                        _setting.ResizeBg,
                         () =>
                         {
                             _timeProvider.SetStartTime(startAt, offset, speed, playmode, _setting.OutputFps);

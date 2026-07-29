@@ -57,12 +57,12 @@ public class ScreenRecorder : MonoBehaviour
     }
 
     public async UniTask StartRecording(string maidataPath,
-        int fps, bool resizeBg, [CanBeNull] Action onStart = null)
+        int fps, [CanBeNull] Action onStart = null)
     {
         QualitySettings.vSyncCount = 0;
         try
         {
-            await CaptureScreen(maidataPath, fps, resizeBg, onStart);
+            await CaptureScreen(maidataPath, fps, onStart);
         }
         finally
         {
@@ -82,7 +82,7 @@ public class ScreenRecorder : MonoBehaviour
     }
 
     private async UniTask CaptureScreen(string maidataPath,
-        int fps, bool resizeBg, [CanBeNull] Action onStart = null)
+        int fps, [CanBeNull] Action onStart = null)
     {
         if (fps <= 0)
         {

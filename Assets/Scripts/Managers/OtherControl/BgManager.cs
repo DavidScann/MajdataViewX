@@ -18,6 +18,11 @@ public class BgManager : MonoBehaviour
     [SerializeField]
     private Sprite defaultBg;
 
+    [SerializeField]
+    private Material fullscreenBgMaterial;
+    [SerializeField]
+    private Material circledBgMaterial;
+
     private RawImage jacketImage;
     private GameObject songDetail;
     private static readonly int ShowHash = Animator.StringToHash("show");
@@ -26,7 +31,9 @@ public class BgManager : MonoBehaviour
     private VideoPlayer videoPlayer;
 
     private float smoothRDelta;
-    private float originalScaleX;
+
+    const float CIRCLED_SCALE_X = 1.1f;
+    const float FULLSCREEN_SCALE_X = 1.777f;
 
     private Sprite? Bg { get; set; }
     private string? VideoUrl { get; set; }
@@ -36,8 +43,7 @@ public class BgManager : MonoBehaviour
     public bool IsBgLoaded => !hasBg || Bg != null;
     public bool IsVideoLoaded => !hasVideo || !string.IsNullOrWhiteSpace(VideoUrl);
 
-    private Sprite _emptySprite;
-
+    private static Sprite _emptySprite;
 
     private void Awake()
     {
@@ -46,15 +52,15 @@ public class BgManager : MonoBehaviour
 
     private void Start()
     {
-        _emptySprite = Sprite.Create(new Texture2D(1080, 1080), new Rect(0, 0, 1080, 1080), new Vector2(0.5f, 0.5f));
         jacketImage = GameObject.Find("Jacket").GetComponent<RawImage>();
         songDetail = GameObject.Find("CanvasSongDetail");
         songDetail.SetActive(false);
 
-        originalScaleX = gameObject.transform.localScale.x;
         spriteRender = GetComponent<SpriteRenderer>();
         videoPlayer = GetComponent<VideoPlayer>();
         detailAnim = songDetail.GetComponent<Animator>();
+
+        _emptySprite = Sprite.Create(new Texture2D(1080, 1080), new Rect(0, 0, 1080, 1080), new Vector2(0.5f, 0.5f));
     }
 
     private void Update()
@@ -109,7 +115,7 @@ public class BgManager : MonoBehaviour
         VideoUrl = "file://" + path;
     }
 
-    public void ShowVideo()
+    public void ShowVideo(bool resizeBg)
     {
         if (!hasVideo) return;
 
@@ -128,7 +134,16 @@ public class BgManager : MonoBehaviour
             videoPlayer.time = _timeProvider.AudioTime;
 
             var scale = videoPlayer.height / (float)videoPlayer.width;
-            gameObject.transform.localScale = new Vector3(originalScaleX, originalScaleX * scale);
+            if (resizeBg)
+            {
+                gameObject.transform.localScale = new Vector3(FULLSCREEN_SCALE_X, FULLSCREEN_SCALE_X * scale);
+                spriteRender.material = fullscreenBgMaterial;
+            }
+            else
+            {
+                gameObject.transform.localScale = new Vector3(CIRCLED_SCALE_X, CIRCLED_SCALE_X * scale);
+                spriteRender.material = circledBgMaterial;
+            }
         }
     }
 
@@ -147,7 +162,8 @@ public class BgManager : MonoBehaviour
     public void ResetState()
     {
         videoPlayer.Stop();
-        gameObject.transform.localScale = new Vector3(1.1f, 1.1f, 1.1f);
+        gameObject.transform.localScale = new Vector3(CIRCLED_SCALE_X, CIRCLED_SCALE_X, CIRCLED_SCALE_X);
+        spriteRender.material = circledBgMaterial;
         spriteRender.sprite = defaultBg;
         smoothRDelta = 0f;
 
