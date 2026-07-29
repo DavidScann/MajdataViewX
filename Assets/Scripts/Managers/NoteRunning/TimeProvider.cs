@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.IO.MemoryMappedFiles;
 using MajSimai;
@@ -38,6 +39,7 @@ public class TimeProvider : MonoBehaviour
     private float speed;
     //for pause and resume
     private double accumulated;
+    private readonly Stopwatch playbackClock = new();
 
 
     private string mmfAudioTimePath => Path.Combine(MajEnv.MajBase, "majdata_time.dat");
@@ -83,30 +85,19 @@ public class TimeProvider : MonoBehaviour
         }
         else
         {
-            if (_audioManager != null && _audioManager.IsTrackPlaying)
-            {
-                double trackOffset = AudioManager.TRACK_ANSWER_PLAYBACK_OFFSET_SEC + _audioManager.GlobalAudioOffset;
-                double targetAudioTime = _audioManager.TrackCurrentSec + trackOffset;
-
-                double currentExpected = startAt + accumulated + (Time.realtimeSinceStartupAsDouble - startRealtime) * speed;
-                double diff = targetAudioTime - currentExpected;
-
-                // If the difference is large (e.g. paused/resumed or huge lag), snap it.
-                if (Math.Abs(diff) > 0.1)
-                {
-                    accumulated += diff;
-                }
-                else
-                {
-                    // Smoothly pull the system clock towards the audio hardware clock to fix "notes getting faster"
-                    accumulated += diff * Time.deltaTime * 5.0;
-                }
-            }
-
-            AudioTime = (float)(startAt + accumulated + (Time.realtimeSinceStartupAsDouble - startRealtime) * speed);
+            // Keep one monotonic clock as the source of truth. Audio and video are
+            // followers; an exhausted audio stream must never pull NoteTime back
+            // to its final sample.
+            AudioTime = (float)(startAt + accumulated + playbackClock.Elapsed.TotalSeconds * speed);
             NoteTime = AudioTime - offset;
+
+            double trackOffset =
+                AudioManager.TRACK_ANSWER_PLAYBACK_OFFSET_SEC +
+                _audioManager.GlobalAudioOffset;
+            _audioManager.SynchronizeTrack(AudioTime - trackOffset, speed);
         }
 
+        // The shared-memory clock uses the same monotonic timeline as NoteTime.
         mmvAudioTime.Write(0, AudioTime);
 
         TimeData.NoteTime = NoteTime;
@@ -160,6 +151,7 @@ public class TimeProvider : MonoBehaviour
         AudioTime = 0f;
         NoteTime = 0f;
         accumulated = 0f;
+        playbackClock.Reset();
         Time.timeScale = 1f;
 
         startAt = (float)_startAt;
@@ -170,17 +162,17 @@ public class TimeProvider : MonoBehaviour
         {
             case PlaybackMode.Normal:
                 {
-                    startRealtime = Time.realtimeSinceStartupAsDouble;
                     speed = _speed;
                     Time.captureFramerate = 0;
+                    playbackClock.Restart();
                 }
                 break;
             case PlaybackMode.IncludeOp:
                 {
-                    startRealtime = Time.realtimeSinceStartupAsDouble;
                     startAt -= SONG_DETAIL_OFFSET;
                     speed = _speed;
                     Time.captureFramerate = 0;
+                    playbackClock.Restart();
                 }
                 break;
             case PlaybackMode.Record:
@@ -206,8 +198,9 @@ public class TimeProvider : MonoBehaviour
         var now = IsRecord ? Time.timeAsDouble : Time.realtimeSinceStartupAsDouble;
         accumulated += IsRecord
             ? now - startRealtime
-            : (now - startRealtime) * speed;
+            : playbackClock.Elapsed.TotalSeconds * speed;
 
+        playbackClock.Reset();
         IsStart = false;
     }
 
@@ -216,7 +209,10 @@ public class TimeProvider : MonoBehaviour
         if (_speed != null) speed = _speed.Value;
         if (IsStart) return;
 
-        startRealtime = IsRecord ? Time.timeAsDouble : Time.realtimeSinceStartupAsDouble;
+        if (IsRecord)
+            startRealtime = Time.timeAsDouble;
+        else
+            playbackClock.Restart();
 
         IsStart = true;
     }
@@ -232,6 +228,7 @@ public class TimeProvider : MonoBehaviour
         offset = 0f;
         accumulated = 0f;
         speed = 1f;
+        playbackClock.Reset();
         Time.timeScale = 1f;
         Time.captureFramerate = 0;
     }

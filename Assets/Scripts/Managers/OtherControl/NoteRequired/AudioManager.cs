@@ -64,6 +64,10 @@ public class AudioManager
     const int REALTIME_SAMPLE_RATE = 48000;
     const int REALTIME_CHANNELS = 2;
     const int REALTIME_DEVICE_BUFFER_MS = 10;
+    const double TRACK_HARD_SYNC_THRESHOLD_SEC = 0.1;
+    const double TRACK_SYNC_DEAD_ZONE_SEC = 0.002;
+    const float TRACK_MAX_SPEED_CORRECTION = 0.02f;
+    const float TRACK_SYNC_GAIN = 0.5f;
 #if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
     const float EXCLUSIVE_WASAPI_BUFFER_SEC = 0.003f;
     private int _realtimeMixerHandle;
@@ -495,6 +499,42 @@ public class AudioManager
             TrackSample!.CurrentSec = _timeProvider.AudioTime - offset;
             waitingForTrackAudioStart = false;
         }
+    }
+
+    public void SynchronizeTrack(double targetSec, float playbackSpeed)
+    {
+        var track = TrackSample;
+        if (track == null || !track.IsPlaying)
+            return;
+
+        // Once the stopwatch timeline is outside the audio, the stream no longer
+        // participates in synchronization. In particular, its final sample must
+        // not clamp the note timeline at the end of a song.
+        if (targetSec < 0 || targetSec >= track.Length)
+        {
+            track.Speed = playbackSpeed;
+            return;
+        }
+
+        var driftSec = targetSec - track.CurrentSec;
+        if (Math.Abs(driftSec) >= TRACK_HARD_SYNC_THRESHOLD_SEC)
+        {
+            track.CurrentSec = targetSec;
+            track.Speed = playbackSpeed;
+            return;
+        }
+
+        if (Math.Abs(driftSec) <= TRACK_SYNC_DEAD_ZONE_SEC)
+        {
+            track.Speed = playbackSpeed;
+            return;
+        }
+
+        var correction = Mathf.Clamp(
+            (float)driftSec * TRACK_SYNC_GAIN,
+            -TRACK_MAX_SPEED_CORRECTION,
+            TRACK_MAX_SPEED_CORRECTION);
+        track.Speed = playbackSpeed * (1f + correction);
     }
 
     public void PauseTrack() => TrackSample?.Pause();

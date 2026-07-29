@@ -104,9 +104,9 @@ public class AudioSample : IDisposable
                 return Bass.ChannelIsActive(Decode);
             if (BassMix.ChannelGetMixer(Decode) == 0)
                 return PlaybackState.Stopped;
-            return BassMix.ChannelHasFlag(Decode, BassFlags.MixerChanPause)
-                ? PlaybackState.Paused
-                : PlaybackState.Playing;
+            if (BassMix.ChannelHasFlag(Decode, BassFlags.MixerChanPause))
+                return PlaybackState.Paused;
+            return Bass.ChannelIsActive(Decode);
         }
     }
 
@@ -179,6 +179,11 @@ public class AudioSample : IDisposable
             {
                 if (BassMix.ChannelGetMixer(voice) == 0)
                     continue;
+                if (Bass.ChannelIsActive(voice) == PlaybackState.Stopped)
+                {
+                    BassMix.MixerRemoveChannel(voice);
+                    continue;
+                }
                 BassMix.ChannelRemoveFlag(voice, BassFlags.MixerChanPause);
                 resumedAny = true;
             }
@@ -186,7 +191,10 @@ public class AudioSample : IDisposable
             if (!resumedAny)
             {
                 if (Mode == AudioMode.Stream)
+                {
+                    Bass.ChannelSetPosition(Decode, 0);
                     AddMixerVoice(Decode);
+                }
                 else
                     PlayOneShot();
             }
