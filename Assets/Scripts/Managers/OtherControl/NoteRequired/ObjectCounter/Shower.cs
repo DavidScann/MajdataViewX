@@ -68,6 +68,16 @@ public partial class ObjectCounter : MonoBehaviour
     private Text statusCombo;
     [SerializeField]
     private Text statusDXScore;
+    [SerializeField]
+    private Text headerAchievement;
+    [SerializeField]
+    private Text headerCombo;
+    [SerializeField]
+    private Text headerDXScore;
+    [SerializeField]
+    private Font TrgUIFont;
+    [SerializeField]
+    private Font LegacyUIFont;
 
     public void StartOutput(BgInfoDisplay mode, UIType type)
     {
@@ -132,6 +142,13 @@ public partial class ObjectCounter : MonoBehaviour
                     CurrentUIType = type;
                     legacyUIRoot.SetActive(true);
                     trgUIRoot.SetActive(false);
+                    
+                    statusAchievement.font = LegacyUIFont;
+                    headerAchievement.font = LegacyUIFont;
+                    statusCombo.font = LegacyUIFont;
+                    headerCombo.font = LegacyUIFont;
+                    statusDXScore.font = LegacyUIFont;
+                    headerDXScore.font = LegacyUIFont;
                     break;
                 }
             case UIType.TrgUI:
@@ -139,6 +156,13 @@ public partial class ObjectCounter : MonoBehaviour
                     CurrentUIType = type;
                     legacyUIRoot.SetActive(false);
                     trgUIRoot.SetActive(true);
+                    
+                    statusAchievement.font = TrgUIFont;
+                    headerAchievement.font = TrgUIFont;
+                    statusCombo.font = TrgUIFont;
+                    headerCombo.font = TrgUIFont;
+                    statusDXScore.font = TrgUIFont;
+                    headerDXScore.font = TrgUIFont;
                     break;
                 }
         }
