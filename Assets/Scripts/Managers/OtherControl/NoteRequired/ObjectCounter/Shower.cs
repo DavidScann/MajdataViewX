@@ -63,21 +63,22 @@ public partial class ObjectCounter : MonoBehaviour
 
     //Main Output
     [SerializeField]
-    private Text statusAchievement;
+    private TextMeshProUGUI statusAchievement;
     [SerializeField]
-    private Text statusCombo;
+    private TextMeshProUGUI statusCombo;
     [SerializeField]
-    private Text statusDXScore;
+    private TextMeshProUGUI statusDXScore;
     [SerializeField]
-    private Text headerAchievement;
+    private TextMeshProUGUI headerAchievement;
     [SerializeField]
-    private Text headerCombo;
+    private TextMeshProUGUI headerCombo;
     [SerializeField]
-    private Text headerDXScore;
+    private TextMeshProUGUI headerDXScore;
+
     [SerializeField]
-    private Font TrgUIFont;
+    private TMP_FontAsset LegacyUIComboFont;
     [SerializeField]
-    private Font LegacyUIFont;
+    private TMP_FontAsset TrgUIComboFont;
 
     public void StartOutput(BgInfoDisplay mode, UIType type)
     {
@@ -142,13 +143,13 @@ public partial class ObjectCounter : MonoBehaviour
                     CurrentUIType = type;
                     legacyUIRoot.SetActive(true);
                     trgUIRoot.SetActive(false);
-                    
-                    statusAchievement.font = LegacyUIFont;
-                    headerAchievement.font = LegacyUIFont;
-                    statusCombo.font = LegacyUIFont;
-                    headerCombo.font = LegacyUIFont;
-                    statusDXScore.font = LegacyUIFont;
-                    headerDXScore.font = LegacyUIFont;
+
+                    statusAchievement.font = LegacyUIComboFont;
+                    headerAchievement.font = LegacyUIComboFont;
+                    statusCombo.font = LegacyUIComboFont;
+                    headerCombo.font = LegacyUIComboFont;
+                    statusDXScore.font = LegacyUIComboFont;
+                    headerDXScore.font = LegacyUIComboFont;
                     break;
                 }
             case UIType.TrgUI:
@@ -156,13 +157,13 @@ public partial class ObjectCounter : MonoBehaviour
                     CurrentUIType = type;
                     legacyUIRoot.SetActive(false);
                     trgUIRoot.SetActive(true);
-                    
-                    statusAchievement.font = TrgUIFont;
-                    headerAchievement.font = TrgUIFont;
-                    statusCombo.font = TrgUIFont;
-                    headerCombo.font = TrgUIFont;
-                    statusDXScore.font = TrgUIFont;
-                    headerDXScore.font = TrgUIFont;
+
+                    statusAchievement.font = TrgUIComboFont;
+                    headerAchievement.font = TrgUIComboFont;
+                    statusCombo.font = TrgUIComboFont;
+                    headerCombo.font = TrgUIComboFont;
+                    statusDXScore.font = TrgUIComboFont;
+                    headerDXScore.font = TrgUIComboFont;
                     break;
                 }
         }
@@ -267,7 +268,7 @@ public partial class ObjectCounter : MonoBehaviour
                 }
                 break;
         }
-        void UpdateAchievementColor(double rate, Text textElement)
+        void UpdateAchievementColor(double rate, TextMeshProUGUI textElement)
         {
             var newColor = rate switch
             {
@@ -289,7 +290,7 @@ public partial class ObjectCounter : MonoBehaviour
             }
         }
 
-        void UpdateBorder(double rate, Text textElement)
+        void UpdateBorder(double rate, TextMeshProUGUI textElement)
         {
             if (rate <= 0)
             {
