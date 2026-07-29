@@ -1474,6 +1474,7 @@ MonoBehaviour:
   TouchSpeed: 7.5
   LegacySlideLayer: 0
   SmoothSlideAnime: 1
+  MineAutoSlide: 1
   Ignore: 0
 --- !u!1 &350294510
 GameObject:
@@ -2031,6 +2032,11 @@ MonoBehaviour:
   statusAchievement: {fileID: 2016887067}
   statusCombo: {fileID: 1429845006}
   statusDXScore: {fileID: 929458223}
+  headerAchievement: {fileID: 1323104353}
+  headerCombo: {fileID: 1265497215}
+  headerDXScore: {fileID: 285617440}
+  TrgUIFont: {fileID: 12800000, guid: f7a9e369a363a664e88bdc144e066513, type: 3}
+  LegacyUIFont: {fileID: 12800000, guid: e330574b8b2e3fb48b915214d9946961, type: 3}
 --- !u!1 &410561408
 GameObject:
   m_ObjectHideFlags: 0
