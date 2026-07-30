@@ -9,7 +9,7 @@ public static class MajPos
     public const float C_RADIUS = 1.15f;
     public const float D_RADIUS = 0.75f;
     public const float E_RADIUS = 0.70f;
-    
+
     // public const float A_RADIUS = 0.987f;
     // public const float B_RADIUS = 0.673f;
     // public const float C_RADIUS = 1.215f;
@@ -30,7 +30,7 @@ public static class MajPos
             return D_RADIUS;
         if (i >= 25 && i <= 32)
             return E_RADIUS;
-        return MajCtx.DJAUTO_HAND_RADIUS;
+        return 0f;
     }
 
     /// <summary>

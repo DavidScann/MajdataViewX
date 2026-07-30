@@ -111,7 +111,7 @@ public unsafe struct TapUpdateJob : IJobParallelFor
         if (NoteHelper.AutoPlayMode is AutoPlayMode.Disable) return;
 
         var timing = TimeData.NoteTime - tap.Time;
-        if (timing < NoteHelper.DJAUTO_AUTOPLAY_START_SEC) return;
+        if (timing < InputManager.DJAUTO_AUTOPLAY_START_SEC) return;
         switch (NoteHelper.AutoPlayMode)
         {
             case AutoPlayMode.Enable:

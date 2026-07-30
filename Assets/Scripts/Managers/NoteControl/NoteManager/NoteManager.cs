@@ -81,7 +81,13 @@ public partial class NoteManager : MonoBehaviour
         {
             mat.SetBuffer("_SpriteRects", _noteUvsBuffer);
             mat.SetTexture("_MainTex", _noteSkinManager.Atlas);
-            mat.SetFloat("_AtlasSize", _noteSkinManager.Atlas.width);
+            mat.SetVector(
+                "_AtlasSize",
+                new Vector4(
+                    _noteSkinManager.Atlas.width,
+                    _noteSkinManager.Atlas.height,
+                    0,
+                    0));
             mat.SetFloat("_PixelsPerUnit", 100);
         }
         SetupMaterial(_matLine);
@@ -117,13 +123,11 @@ public partial class NoteManager : MonoBehaviour
     private void ConfigureRenderCapacity(SimaiChart chart)
     {
         var noteCount = 0;
-        var lastNoteTime = 0d;
         foreach (var timing in chart.NoteTimings)
         {
-            if (timing.Notes.Length == 0) continue;
             noteCount += timing.Notes.Length;
-            lastNoteTime = timing.Timing;
         }
+        var lastNoteTime = chart.NoteTimings[^1].Timing;
 
         NoteDensity = lastNoteTime > 0d
             ? noteCount / (float)lastNoteTime
@@ -135,6 +139,7 @@ public partial class NoteManager : MonoBehaviour
         if (capacityMultiplier == _renderCapacityMultiplier) return;
 
         _prevChain.Complete();
+        _isJobScheduledThisFrame = false;
         DisposeRenderGroups();
         CreateRenderGroups(capacityMultiplier);
     }
@@ -142,6 +147,12 @@ public partial class NoteManager : MonoBehaviour
     void Update()
     {
         _prevChain.Complete();
+        if (!_timeProvider.IsRecord)
+        {
+            // 防止帧率对“下一帧应用”的机制产生过大影响
+            // Record模式下在TimeProvider中设定
+            InputManager.DJAUTO_AUTOPLAY_START_SEC_SS.Data = -Time.unscaledDeltaTime;
+        }
         _inputManager.BeginHandler(); // 这里牵扯到用户输入，需要一直调用
 
         if (taps.Length + eachLines.Length + holds.Length + slides.Length + touches.Length + touchHolds.Length == 0) return;

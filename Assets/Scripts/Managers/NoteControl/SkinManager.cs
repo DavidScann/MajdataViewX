@@ -497,7 +497,7 @@ public class SkinManager : MonoBehaviour
                 padding: 0,
                 maximumAtlasSize: maxAtlasSize,
                 makeNoLongerReadable: true);
-            if (rects.Length != sources.Count)
+            if (rects == null || rects.Length != sources.Count)
                 throw new InvalidOperationException(
                     $"Could not pack all skin textures into a {maxAtlasSize}x{maxAtlasSize} atlas.");
 

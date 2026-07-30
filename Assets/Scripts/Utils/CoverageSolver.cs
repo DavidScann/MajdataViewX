@@ -61,7 +61,7 @@ public static class CoverageSolver
         IReadOnlyList<float2> points,
         IReadOnlyList<float> pointRadii,
         IReadOnlyList<Group> groups,
-        float maxRadius = MajCtx.DJAUTO_HAND_MAX_RADIUS,
+        float maxRadius = InputManager.DJAUTO_HAND_MAX_RADIUS,
         bool allowSlide = false)
     {
         int n = points.Count;
@@ -400,7 +400,7 @@ public static class CoverageSolver
             NativeHashMap<ulong, Circle> maskToCircle,
             NativeList<ulong> uniqueMasks)
         {
-            float radius = math.min(MajCtx.DJAUTO_TOUCH_COVER_MIN_RADIUS, MaxRadius);
+            float radius = math.min(InputManager.DJAUTO_TOUCH_COVER_MIN_RADIUS, MaxRadius);
             ulong previousMask = ulong.MaxValue;
 
             for (int step = 0; step <= Points.Length; step++)

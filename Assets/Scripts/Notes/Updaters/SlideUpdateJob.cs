@@ -233,8 +233,8 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
         if (slide.isEnd || slide.isSlideEnd || slide.isJudged) return;
         var timing = TimeData.NoteTime - slide.shootTime;
         var autoplayStart = NoteHelper.AutoPlayMode == AutoPlayMode.DJAutoButton && slide.hasTapGuide
-            ? NoteHelper.DJAUTO_SLIDE_TAP_GUIDE_DELAY_SEC // 外键的DJAuto拍划🤝
-            : NoteHelper.DJAUTO_AUTOPLAY_START_SEC;
+            ? InputManager.DJAUTO_SLIDE_TAP_GUIDE_DELAY_SEC // 外键的DJAuto拍划🤝
+            : InputManager.DJAUTO_AUTOPLAY_START_SEC;
         if (timing < autoplayStart) return;
         switch (NoteHelper.AutoPlayMode)
         {

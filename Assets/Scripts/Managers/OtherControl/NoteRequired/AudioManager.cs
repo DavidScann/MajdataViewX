@@ -647,7 +647,7 @@ public class AudioManager
         recordingInitialAudioTime = initialAudioTime;
         recordingSpeed = Math.Max(speed, 0.01f);
         recordingInitialNoteTime = _timeProvider.NoteTime;
-        var trackOffset = TRACK_ANSWER_PLAYBACK_OFFSET_SEC + (float)GlobalAudioOffset;
+        var trackOffset = TRACK_ANSWER_PLAYBACK_OFFSET_SEC;
         var trackOutputStartTime = trackOffset - recordingInitialAudioTime;
         var leadAndTail = trackOutputStartTime
             + TimeProvider.SONG_DETAIL_OFFSET
@@ -864,7 +864,7 @@ public class AudioManager
             }
         }
 
-        var trackOffset = TRACK_ANSWER_PLAYBACK_OFFSET_SEC + (float)GlobalAudioOffset;
+        var trackOffset = TRACK_ANSWER_PLAYBACK_OFFSET_SEC;
         var initialTrackSec = recordingInitialAudioTime - trackOffset;
 
         // sample-accurate answers

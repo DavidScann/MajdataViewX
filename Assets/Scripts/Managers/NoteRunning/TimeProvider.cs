@@ -183,6 +183,8 @@ public class TimeProvider : MonoBehaviour
                     startAt -= SONG_DETAIL_OFFSET;
                     Time.timeScale = _speed;
                     Time.captureFramerate = fps;
+                    // 防止帧率对“下一帧应用”的机制产生过大影响
+                    InputManager.DJAUTO_AUTOPLAY_START_SEC_SS.Data = -1f / fps;
                 }
                 break;
         }

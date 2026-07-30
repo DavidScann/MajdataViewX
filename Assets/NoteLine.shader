@@ -28,7 +28,7 @@ Shader "Custom/NoteLine"
 
             StructuredBuffer<LineRenderData> _NoteBuffer;
             StructuredBuffer<float4> _SpriteRects;
-            float _AtlasSize;
+            float2 _AtlasSize;
             float _PixelsPerUnit;
 
             struct appdata { float4 vertex : POSITION; float2 uv : TEXCOORD0; };

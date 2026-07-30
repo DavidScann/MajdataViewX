@@ -98,13 +98,14 @@ public class BgManager : MonoBehaviour
 
     private void DestroyLoadedBackground()
     {
-        if (Bg == null) return;
+        if (Bg != null)
+        {
+            if (Bg.texture != null)
+                Destroy(Bg.texture);
 
-        var texture = Bg.texture;
-        Destroy(Bg);
-        if (texture != null)
-            Destroy(texture);
-        Bg = null;
+            Destroy(Bg);
+            Bg = null;
+        }
     }
 
     public void ShowBG()

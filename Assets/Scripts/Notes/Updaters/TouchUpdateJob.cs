@@ -166,8 +166,8 @@ public unsafe struct TouchUpdateJob : IJobParallelFor
         var cover = touchGroupCoverResults[touch.coverageId];
         var autoplayStart = NoteHelper.AutoPlayMode is AutoPlayMode.DJAutoButton or AutoPlayMode.DJAutoSensor &&
                             cover.Mode == CoverMode.DoubleCircleSlide
-                ? NoteHelper.DJAUTO_TOUCH_DOUBLE_CIRCLE_SLIDE_START_SEC
-                : NoteHelper.DJAUTO_AUTOPLAY_START_SEC;
+                ? InputManager.DJAUTO_TOUCH_DOUBLE_CIRCLE_SLIDE_START_SEC
+                : InputManager.DJAUTO_AUTOPLAY_START_SEC;
 
         if (timing < autoplayStart) return;
 

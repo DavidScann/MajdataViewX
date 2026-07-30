@@ -26,14 +26,6 @@ public static class MajCtx
     public const int BUTTON_COUNT = 8;
     public const int SENSOR_COUNT = 33;
 
-    public const float DJAUTO_HAND_RADIUS = 0.45f;
-    // Touch/TouchHold 覆盖圆的最小指尖尺寸；需要更少误触时可单独调小。
-    public const float DJAUTO_TOUCH_COVER_MIN_RADIUS = 0.45f;
-    // 所有 DJAuto 手势复用时允许扩大的最大半径。
-    public const float DJAUTO_HAND_MAX_RADIUS = 1.80f;
-    public const float DJAUTO_WIFI_RADIUS = 1.00f;
-    public const float BUTTON_HIT_RENDER_RADIUS = 0.4f;
-
     [BurstCompile]
     public static SensorType GetSensor(char areaPos, int startPos)
     {

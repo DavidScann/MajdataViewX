@@ -13,6 +13,24 @@ using TouchPhase = UnityEngine.InputSystem.TouchPhase;
 
 public class InputManager
 {
+    // Slide默认尺寸
+    public const float DJAUTO_HAND_RADIUS = 0.45f;
+    // Wifi默认尺寸
+    public const float DJAUTO_WIFI_RADIUS = 1.00f;
+    // Touch/TouchHold 覆盖圆的最小指尖尺寸；需要更少误触时可单独调小。
+    public const float DJAUTO_TOUCH_COVER_MIN_RADIUS = 0.45f;
+    // 所有 DJAuto 手势复用时允许扩大的最大半径。
+    public const float DJAUTO_HAND_MAX_RADIUS = 1.80f;
+
+    // mutable, depends on fps(djauto changes apply in next frame)
+    private struct DJAutoAutoplayStartSecKey { }
+    public static readonly SharedStatic<float> DJAUTO_AUTOPLAY_START_SEC_SS = SharedStatic<float>.GetOrCreate<InputManager, DJAutoAutoplayStartSecKey>();
+    public static float DJAUTO_AUTOPLAY_START_SEC => DJAUTO_AUTOPLAY_START_SEC_SS.Data;
+    public const float DJAUTO_TOUCH_DOUBLE_CIRCLE_SLIDE_START_SEC = -2 * FRAME_LENGTH_SEC;
+    public const float DJAUTO_SLIDE_TAP_GUIDE_DELAY_SEC = 3 * FRAME_LENGTH_SEC;
+
+    public const float BUTTON_HIT_RENDER_RADIUS = 0.4f;
+
     public bool ShowHand
     {
         get => InputData.ShowHand;
@@ -24,6 +42,7 @@ public class InputManager
     public InputManager()
     {
         _inputManager = this;
+        DJAUTO_AUTOPLAY_START_SEC_SS.Data = -0.013f;
         //get sensor positions
         for (var i = 0; i < SENSOR_COUNT; i++)
         {
@@ -224,7 +243,7 @@ public unsafe struct InputDataB
         var hand = new Circle
         {
             Center = MajPos.GetBtnPos((int)type),
-            Radius = DJAUTO_HAND_RADIUS
+            Radius = InputManager.DJAUTO_HAND_RADIUS
         };
         if (!TryRequestDJAutoHand(hand, DJAutoHandVisualKind.None, out _)) return;
 
@@ -238,7 +257,7 @@ public unsafe struct InputDataB
         var hand = new Circle
         {
             Center = SensorWorldPositions[(int)type],
-            Radius = DJAUTO_HAND_RADIUS
+            Radius = InputManager.DJAUTO_HAND_RADIUS
         };
         if (!TryRequestDJAutoHand(hand, DJAutoHandVisualKind.None, out _)) return;
 
@@ -255,7 +274,7 @@ public unsafe struct InputDataB
         {
             // 从 -2 帧提前起手落下两指，再用后半段 Perfect 窗口（12 帧，即 0.2 秒）完成滑动。
             // 这也是全屏扫动可接受的速度上限。
-            float slideStart = NoteHelper.DJAUTO_TOUCH_DOUBLE_CIRCLE_SLIDE_START_SEC;
+            float slideStart = InputManager.DJAUTO_TOUCH_DOUBLE_CIRCLE_SLIDE_START_SEC;
             float slideDuration = NoteHelper.TOUCH_JUDGE_SEG_3RD_PERFECT_MSEC / 1000f;
             float progress = math.saturate((timing - slideStart) / slideDuration);
             cover.Circle1.Center = math.lerp(cover.Circle1.Center, cover.Circle1End, progress);
@@ -421,7 +440,7 @@ public unsafe struct InputDataB
             }
 
             expandedRadius = math.max(expandedRadius, oldCircle.Radius);
-            if (expandedRadius > DJAUTO_HAND_MAX_RADIUS + 1e-4f)
+            if (expandedRadius > InputManager.DJAUTO_HAND_MAX_RADIUS + 1e-4f)
                 continue;
 
             Circle expandedCircle = oldCircle;
@@ -498,7 +517,7 @@ public unsafe struct InputDataB
     /// <summary>
     /// DJAuto处理星星
     /// </summary>
-    public void DJAutoHandleWorldPosition(in float2 pos, float radius = DJAUTO_HAND_RADIUS)
+    public void DJAutoHandleWorldPosition(in float2 pos, float radius = InputManager.DJAUTO_HAND_RADIUS)
     {
         var hand = new Circle { Center = pos, Radius = radius };
         if (TryRequestDJAutoHand(hand, DJAutoHandVisualKind.WorldHit, out _))
@@ -509,7 +528,7 @@ public unsafe struct InputDataB
     /// </summary>
     public void DJAutoHandleWifiWorldPosition(in float2 leftPos, in float2 rightPos)
     {
-        var leftHand = new Circle { Center = leftPos, Radius = DJAUTO_WIFI_RADIUS };
+        var leftHand = new Circle { Center = leftPos, Radius = InputManager.DJAUTO_WIFI_RADIUS };
         int leftHandIndex = -1;
         if (TryRequestDJAutoHand(
             leftHand,
@@ -519,7 +538,7 @@ public unsafe struct InputDataB
             SetSensorsFromMask(GetSensorMask(leftHand));
         }
 
-        var rightHand = new Circle { Center = rightPos, Radius = DJAUTO_WIFI_RADIUS };
+        var rightHand = new Circle { Center = rightPos, Radius = InputManager.DJAUTO_WIFI_RADIUS };
         if (TryRequestDJAutoHand(
             rightHand,
             DJAutoHandVisualKind.WorldHit,
@@ -594,7 +613,7 @@ public unsafe struct InputDataB
     /// 处理世界坐标（手）输入
     /// </summary>
     /// <param name="nextFrame">是否应用到下一帧（DJAuto）</param>
-    public void HandleWorldPosInput(in float2 pos, float radius = DJAUTO_HAND_RADIUS, bool nextFrame = false)
+    public void HandleWorldPosInput(in float2 pos, float radius = InputManager.DJAUTO_HAND_RADIUS, bool nextFrame = false)
     {
         for (int i = 0; i < SensorWorldPositions.Length; i++)
         {
@@ -668,7 +687,7 @@ public unsafe struct InputDataB
                     hitRender[idx] = new HitRenderData
                     {
                         pos = MajPos.GetBtnPos(i),
-                        radius = BUTTON_HIT_RENDER_RADIUS,
+                        radius = InputManager.BUTTON_HIT_RENDER_RADIUS,
                         color = new float4(0, 1, 1, 0.5f) // Cyan responsive color
                     };
                 }

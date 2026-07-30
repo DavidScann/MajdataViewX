@@ -218,7 +218,7 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
         if (NoteHelper.AutoPlayMode is AutoPlayMode.Disable) return;
 
         var timing = TimeData.NoteTime - hold.time;
-        if (timing < NoteHelper.DJAUTO_AUTOPLAY_START_SEC) return;
+        if (timing < InputManager.DJAUTO_AUTOPLAY_START_SEC) return;
 
         switch (NoteHelper.AutoPlayMode)
         {

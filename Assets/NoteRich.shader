@@ -35,7 +35,7 @@ Shader "Custom/NoteRich"
 
             StructuredBuffer<NotesRenderData> _NoteBuffer;
             StructuredBuffer<float4> _SpriteRects;
-            float _AtlasSize;
+            float2 _AtlasSize;
             float _PixelsPerUnit;
 
             struct appdata { float4 vertex : POSITION; float2 uv : TEXCOORD0; };
@@ -83,7 +83,7 @@ Shader "Custom/NoteRich"
                 
                 if (note.sliceBorder.x + note.sliceBorder.y > 0.0) {
                     float spriteH_uv = rect.w - rect.y;
-                    float nativeH = spriteH_uv * _AtlasSize / _PixelsPerUnit;
+                    float nativeH = spriteH_uv * _AtlasSize.y / _PixelsPerUnit;
                     float renderedH = (nativeH + note.stretchY) * note.scale;
                     renderedH = max(renderedH, 1e-6);
                     float topCapFrac = (note.sliceBorder.x * nativeH * note.scale) / renderedH;
