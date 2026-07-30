@@ -9,10 +9,6 @@ using Cysharp.Threading.Tasks;
 using JetBrains.Annotations;
 using MajSimai;
 using ManagedBass;
-#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
-using ManagedBass.Mix;
-using ManagedBass.Wasapi;
-#endif
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
@@ -61,20 +57,10 @@ public class AudioManager
     public bool IsShowingSongDetail => _timeProvider.AudioTime <= recordingInitialAudioTime + TimeProvider.SONG_DETAIL_OFFSET;
     const int SAMPLERATE = 44100;
     const int CHANNELS = 2;
-    const int REALTIME_SAMPLE_RATE = 48000;
-    const int REALTIME_CHANNELS = 2;
-    const int REALTIME_DEVICE_BUFFER_MS = 10;
     const double TRACK_HARD_SYNC_THRESHOLD_SEC = 0.1;
     const double TRACK_SYNC_DEAD_ZONE_SEC = 0.002;
     const float TRACK_MAX_SPEED_CORRECTION = 0.02f;
-    const float TRACK_SYNC_GAIN = 0.5f;
-#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
-    const float EXCLUSIVE_WASAPI_BUFFER_SEC = 0.003f;
-    private int _realtimeMixerHandle;
-    private bool _wasapiInitialized;
-    private bool _usingExclusiveWasapi;
-    private WasapiProcedure _wasapiOutputProcedure;
-#endif
+    const float TRACK_SYNC_GAIN = 0.1f;
 
     public const float TRACK_ANSWER_PLAYBACK_OFFSET_SEC = (16.66666f * 1) / 1000;
 
@@ -106,7 +92,11 @@ public class AudioManager
     {
         _audioManager = this;
         _sfxPtr = SfxRequestsPtr;
-        InitializeRealtimeOutput();
+        // Keep the track's output queue short so it stays responsive to
+        // dynamically triggered SFX. Bundled SFX assets are 48 kHz.
+        Bass.Configure(Configuration.UpdatePeriod, 5);
+        Bass.Configure(Configuration.PlaybackBufferLength, 10);
+        Bass.Init(-1, 48000);
 
         //Note SFX
         var sfxPath = MajEnv.GetPath("SFX");
@@ -152,14 +142,7 @@ public class AudioManager
                 "touch.wav" => 65535,
                 _ => 1
             };
-            var sample = new AudioSample(
-                path,
-                AudioMode.Sample,
-                maxNoOfPlaybacks,
-                RealtimeMixerHandle)
-            {
-                SampleType = type
-            };
+            var sample = new AudioSample(path, AudioMode.Sample, maxNoOfPlaybacks) { SampleType = type };
             sfxPlayPointers[sfxIndex] = new int[maxNoOfPlaybacks];
             sfxIndex++;
 
@@ -171,149 +154,6 @@ public class AudioManager
 
         isInited = true;
     }
-
-    private int RealtimeMixerHandle
-    {
-        get
-        {
-#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
-            return _realtimeMixerHandle;
-#else
-            return 0;
-#endif
-        }
-    }
-
-    private void InitializeRealtimeOutput()
-    {
-#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
-        try
-        {
-            if (TryInitializeExclusiveWasapi())
-                return;
-        }
-        catch (Exception ex)
-        {
-            Debug.LogWarning(
-                $"Exclusive WASAPI unavailable, using shared output: {ex.Message}");
-            CleanupExclusiveWasapi();
-        }
-#endif
-        InitializeSharedOutput();
-    }
-
-    private static void InitializeSharedOutput()
-    {
-        // PlaybackBufferLength only affects streams. DeviceBufferLength is the
-        // queue that determines how soon a newly started sample can be heard.
-        Bass.Configure(Configuration.UpdatePeriod, 5);
-        Bass.Configure(Configuration.PlaybackBufferLength, 10);
-        Bass.Configure(Configuration.DeviceBufferLength, REALTIME_DEVICE_BUFFER_MS);
-        if (!Bass.Init(-1, REALTIME_SAMPLE_RATE, DeviceInitFlags.Latency))
-            throw new InvalidOperationException(
-                $"BASS initialization failed: {Bass.LastError}");
-
-        var deviceInfo = Bass.Info;
-        Debug.Log(
-            $"BASS shared output latency={deviceInfo.Latency} ms, " +
-            $"minBuffer={deviceInfo.MinBufferLength} ms");
-    }
-
-#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
-    private bool TryInitializeExclusiveWasapi()
-    {
-        if (!Bass.Init(Bass.NoSoundDevice, REALTIME_SAMPLE_RATE))
-            return false;
-
-        _realtimeMixerHandle = BassMix.CreateMixerStream(
-            REALTIME_SAMPLE_RATE,
-            REALTIME_CHANNELS,
-            BassFlags.Decode | BassFlags.Float | BassFlags.MixerNonStop);
-        if (_realtimeMixerHandle == 0)
-        {
-            CleanupExclusiveWasapi();
-            return false;
-        }
-
-        _wasapiOutputProcedure = FillWasapiBuffer;
-        var flags =
-            WasapiInitFlags.Exclusive |
-            WasapiInitFlags.EventDriven |
-            WasapiInitFlags.Raw |
-            WasapiInitFlags.CategoryGameEffects;
-
-        if (!BassWasapi.Init(
-                -1,
-                REALTIME_SAMPLE_RATE,
-                REALTIME_CHANNELS,
-                flags,
-                EXCLUSIVE_WASAPI_BUFFER_SEC,
-                0,
-                _wasapiOutputProcedure,
-                IntPtr.Zero))
-        {
-            // Some drivers reject RAW even though exclusive event mode works.
-            flags &= ~WasapiInitFlags.Raw;
-            if (!BassWasapi.Init(
-                    -1,
-                    REALTIME_SAMPLE_RATE,
-                    REALTIME_CHANNELS,
-                    flags,
-                    EXCLUSIVE_WASAPI_BUFFER_SEC,
-                    0,
-                    _wasapiOutputProcedure,
-                    IntPtr.Zero))
-            {
-                CleanupExclusiveWasapi();
-                return false;
-            }
-        }
-
-        _wasapiInitialized = true;
-        if (!BassWasapi.Start())
-        {
-            CleanupExclusiveWasapi();
-            return false;
-        }
-
-        _usingExclusiveWasapi = true;
-        var info = BassWasapi.Info;
-        var bufferMs =
-            info.BufferLength * 1000.0 /
-            (info.Frequency * info.Channels * sizeof(float));
-        Debug.Log(
-            $"BASS exclusive WASAPI: {info.Frequency} Hz, " +
-            $"{info.Channels} ch, {bufferMs:F2} ms event buffer " +
-            $"(~{bufferMs * 2:F2} ms double-buffer path)");
-        return true;
-    }
-
-    private int FillWasapiBuffer(IntPtr buffer, int length, IntPtr user)
-    {
-        var written = Bass.ChannelGetData(
-            _realtimeMixerHandle,
-            buffer,
-            length);
-        return written < 0 ? 0 : written;
-    }
-
-    private void CleanupExclusiveWasapi()
-    {
-        if (_wasapiInitialized)
-        {
-            BassWasapi.Free();
-            _wasapiInitialized = false;
-        }
-        if (_realtimeMixerHandle != 0)
-        {
-            Bass.StreamFree(_realtimeMixerHandle);
-            _realtimeMixerHandle = 0;
-        }
-        Bass.Free();
-        _wasapiOutputProcedure = null;
-        _usingExclusiveWasapi = false;
-    }
-#endif
 
     public void Setting(double globalAudioOffset, MajVolumeSetting v)
     {
@@ -448,15 +288,6 @@ public class AudioManager
     {
         noteSfxPlaybackRequests.Dispose();
         ReleaseRecordingAudio();
-#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
-        if (_usingExclusiveWasapi)
-        {
-            BassWasapi.Stop(true);
-            BassWasapi.Free();
-            _wasapiInitialized = false;
-            _usingExclusiveWasapi = false;
-        }
-#endif
         Bass.Stop();
         Bass.Free();
     }
@@ -467,10 +298,7 @@ public class AudioManager
     public void LoadTrack(string path)
     {
         TrackSample?.Dispose();
-        TrackSample = new AudioSample(
-            path,
-            AudioMode.Stream,
-            mixerHandle: RealtimeMixerHandle)
+        TrackSample = new AudioSample(path, AudioMode.Stream)
         {
             SampleType = SampleType.Track,
         };
