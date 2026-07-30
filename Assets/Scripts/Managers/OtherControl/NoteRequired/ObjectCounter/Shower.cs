@@ -83,6 +83,10 @@ public partial class ObjectCounter : MonoBehaviour
     private TMP_FontAsset LegacyUIComboFont;
     [SerializeField]
     private TMP_FontAsset TrgUIComboFont;
+    [SerializeField]
+    private TMP_FontAsset LegacyUIComboHeaderFont;
+    [SerializeField]
+    private TMP_FontAsset TrgUIComboHeaderFont;
 
     public void StartOutput(BgInfoDisplay mode, UIType type)
     {
@@ -149,11 +153,11 @@ public partial class ObjectCounter : MonoBehaviour
                     trgUIRoot.SetActive(false);
 
                     statusAchievement.font = LegacyUIComboFont;
-                    headerAchievement.font = LegacyUIComboFont;
+                    headerAchievement.font = LegacyUIComboHeaderFont;
                     statusCombo.font = LegacyUIComboFont;
-                    headerCombo.font = LegacyUIComboFont;
+                    headerCombo.font = LegacyUIComboHeaderFont;
                     statusDXScore.font = LegacyUIComboFont;
-                    headerDXScore.font = LegacyUIComboFont;
+                    headerDXScore.font = LegacyUIComboHeaderFont;
                     break;
                 }
             case UIType.TrgUI:
@@ -163,11 +167,11 @@ public partial class ObjectCounter : MonoBehaviour
                     trgUIRoot.SetActive(true);
 
                     statusAchievement.font = TrgUIComboFont;
-                    headerAchievement.font = TrgUIComboFont;
+                    headerAchievement.font = TrgUIComboHeaderFont;
                     statusCombo.font = TrgUIComboFont;
-                    headerCombo.font = TrgUIComboFont;
+                    headerCombo.font = TrgUIComboHeaderFont;
                     statusDXScore.font = TrgUIComboFont;
-                    headerDXScore.font = TrgUIComboFont;
+                    headerDXScore.font = TrgUIComboHeaderFont;
                     break;
                 }
         }
