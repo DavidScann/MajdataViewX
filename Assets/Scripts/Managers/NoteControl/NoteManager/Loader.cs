@@ -35,6 +35,7 @@ public partial class NoteManager
 
     public unsafe void Load(SimaiChart chart)
     {
+        if (chart.IsEmpty) return;
         ConfigureRenderCapacity(chart);
 
         areaPoolIndex = 0;
