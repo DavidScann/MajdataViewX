@@ -292,16 +292,38 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
         var noteTime = TimeData.NoteTime;
         var timing = noteTime - hold.time;
 
-        // ---- Head judgment ----
-        if (!hold.isHeadJudged)
+        if (hold.isMine)
         {
-            if (hold.isMine && timing >= NoteHelper.MINE_END_SEC)
+            var buttonClicked = InputData.GetButtonState(hold.Key).IsPadDown;
+            var sensorClicked = InputData.GetSensorState(hold.Key).IsPadDown;
+            if ((buttonClicked || sensorClicked) &&
+                timing >= -NoteHelper.TAP_JUDGE_GOOD_AREA_MSEC / 1000f)
+            {
+                hold.judgeGrade = JudgeGrade.Miss;
+                hold.isHeadJudged = true;
+                hold.headDiff = timing;
+                EndNote(ref hold);
+                return;
+            }
+            if (timing >= hold.LastFor)
             {
                 hold.judgeGrade = JudgeGrade.LateCritical;
                 hold.isHeadJudged = true;
-                return;
+                hold.holdPercent = 1f;
+                EndNote(ref hold);
             }
-            if (!hold.isMine && timing > NoteHelper.TAP_JUDGE_GOOD_AREA_MSEC / 1000f)
+            return;
+        }
+
+        // ---- Head judgment ----
+        if (!hold.isHeadJudged)
+        {
+            var buttonClicked = InputData.GetButtonState(hold.Key).IsPadDown;
+            var sensorClicked = InputData.GetSensorState(hold.Key).IsPadDown;
+
+            var clicked = sensorClicked || buttonClicked;
+
+            if (timing > NoteHelper.TAP_JUDGE_GOOD_AREA_MSEC / 1000f)
             {
                 hold.judgeGrade = JudgeGrade.Miss;
                 hold.isHeadJudged = true;
@@ -310,11 +332,6 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
                 // can still be recovered to LateGood by the release-percent mapping below.
                 return;
             }
-
-            var buttonClicked = InputData.GetButtonState(hold.Key).IsPadDown;
-            var sensorClicked = InputData.GetSensorState(hold.Key).IsPadDown;
-
-            var clicked = sensorClicked || buttonClicked;
 
             if (!clicked) return;
             if (timing < -NoteHelper.TAP_JUDGE_GOOD_AREA_MSEC / 1000f) return;
@@ -379,7 +396,7 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
             hold.judgeGrade,
             false,
             false,
-            false,
+            hold.isMine,
             0
         );
         NoteHelper.PlayTapEffect(JudgeEffectRequests,

@@ -232,29 +232,36 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
         var noteTime = TimeData.NoteTime;
         var timing = noteTime - th.time;
 
-        if (!th.isHeadJudged)
+        if (th.isMine)
         {
-            if (th.isMine && timing >= NoteHelper.MINE_END_SEC)
+            var mineClicked = InputData.GetSensorState(th.sensor).IsPadDown;
+            if (mineClicked &&
+                timing >= -NoteHelper.TOUCH_JUDGE_GOOD_AREA_MSEC / 1000f)
+            {
+                th.judgeGrade = JudgeGrade.Miss;
+                th.isHeadJudged = true;
+                th.headDiff = timing;
+                EndNote(ref th);
+                return;
+            }
+            if (timing >= th.LastFor)
             {
                 th.judgeGrade = JudgeGrade.LateCritical;
                 th.isHeadJudged = true;
-                return;
+                th.holdPercent = 1f;
+                EndNote(ref th);
             }
-            if (!th.isMine && timing > NoteHelper.TOUCH_JUDGE_GOOD_AREA_MSEC / 1000f)
+            return;
+        }
+
+        if (!th.isHeadJudged)
+        {
+            if (timing > NoteHelper.TOUCH_JUDGE_GOOD_AREA_MSEC / 1000f)
             {
                 th.judgeGrade = JudgeGrade.Miss;
                 th.isHeadJudged = true;
                 th.headDiff = NoteHelper.TOUCH_JUDGE_GOOD_AREA_MSEC / 1000f;
                 return;
-            }
-
-            var _on = InputData.GetSensorState(th.sensor).Status;
-            if (th.groupId != -1)
-            {
-                if (touchHoldGroupPressedCounts[th.groupId] * 2 > touchHoldGroupTotalCounts[th.groupId])
-                {
-                    _on = true;
-                }
             }
 
             var clicked = InputData.GetSensorState(th.sensor).IsPadDown;

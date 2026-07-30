@@ -355,6 +355,8 @@ public partial class NoteManager
         int[] originalToUnique = new int[count];
         for (int i = 0; i < count; i++)
         {
+            if (touches[startIdx + i].isMine) continue;
+
             int foundUnique = -1;
             for (int j = 0; j < uniqueIndices.Count; j++)
             {
@@ -376,6 +378,8 @@ public partial class NoteManager
         }
 
         int uniqueCount = uniqueIndices.Count;
+        if (uniqueCount == 0) return;
+
         bool[] visited = new bool[uniqueCount];
         var groups = new List<Group>();
         var uniqueGroupIds = new int[uniqueCount];
@@ -417,6 +421,7 @@ public partial class NoteManager
                 int totalTouchesInGroup = 0;
                 for (int c = 0; c < count; c++)
                 {
+                    if (touches[startIdx + c].isMine) continue;
                     if (component.Contains(originalToUnique[c]))
                         totalTouchesInGroup++;
                 }
@@ -439,6 +444,8 @@ public partial class NoteManager
 
         for (int i = 0; i < count; i++)
         {
+            if (touches[startIdx + i].isMine) continue;
+
             int uIdx = originalToUnique[i];
             if (uniqueGroupIds[uIdx] != -1)
             {
@@ -465,6 +472,8 @@ public partial class NoteManager
 
         for (int i = 0; i < count; i++)
         {
+            if (touches[startIdx + i].isMine) continue;
+
             var t = touches[startIdx + i];
             t.coverageId = coverageId;
             touches[startIdx + i] = t;
@@ -479,6 +488,8 @@ public partial class NoteManager
         int[] originalToUnique = new int[count];
         for (int i = 0; i < count; i++)
         {
+            if (touchHolds[startIdx + i].isMine) continue;
+
             int foundUnique = -1;
             for (int j = 0; j < uniqueIndices.Count; j++)
             {
@@ -500,6 +511,8 @@ public partial class NoteManager
         }
 
         int uniqueCount = uniqueIndices.Count;
+        if (uniqueCount == 0) return;
+
         bool[] visited = new bool[uniqueCount];
         var groups = new List<Group>();
         var uniqueGroupIds = new int[uniqueCount];
@@ -540,6 +553,7 @@ public partial class NoteManager
                 int totalTouchesInGroup = 0;
                 for (int c = 0; c < count; c++)
                 {
+                    if (touchHolds[startIdx + c].isMine) continue;
                     if (component.Contains(originalToUnique[c]))
                         totalTouchesInGroup++;
                 }
@@ -562,6 +576,8 @@ public partial class NoteManager
 
         for (int i = 0; i < count; i++)
         {
+            if (touchHolds[startIdx + i].isMine) continue;
+
             int uIdx = originalToUnique[i];
             if (uniqueGroupIds[uIdx] != -1)
             {
@@ -588,6 +604,8 @@ public partial class NoteManager
 
         for (int i = 0; i < count; i++)
         {
+            if (touchHolds[startIdx + i].isMine) continue;
+
             var t = touchHolds[startIdx + i];
             t.coverageId = coverageId;
             touchHolds[startIdx + i] = t;

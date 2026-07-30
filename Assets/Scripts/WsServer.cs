@@ -60,7 +60,8 @@ public class WsServer : MonoBehaviour
             {
                 if (MessageQueue.TryDequeue(out var json))
                 {
-                    while (_playManager == null)
+                    while (_playManager == null ||
+                           PlayManager.Summary.State is ViewStatus.Busy)
                         await UniTask.Yield(PlayerLoopTiming.Update, cancellationToken);
 
                     Debug.Log($"dequeue: {json}");

@@ -160,7 +160,9 @@ public class PlayManager : MonoBehaviour
         while (_state is ViewStatus.Busy)
             await UniTask.Yield();
 
-        var lastState = _state;
+        if (_state is not ViewStatus.Loaded)
+            return false;
+
         _state = ViewStatus.Busy;
         try
         {
@@ -278,6 +280,9 @@ public class PlayManager : MonoBehaviour
         while (_state is ViewStatus.Busy)
             await UniTask.Yield();
 
+        if (_state is not ViewStatus.Paused)
+            return;
+
         _state = ViewStatus.Busy;
         try
         {
@@ -304,6 +309,9 @@ public class PlayManager : MonoBehaviour
         while (_state is ViewStatus.Busy)
             await UniTask.Yield();
 
+        if (_state is not ViewStatus.Playing)
+            return;
+
         _state = ViewStatus.Busy;
         try
         {
@@ -329,6 +337,9 @@ public class PlayManager : MonoBehaviour
     {
         while (_state is ViewStatus.Busy)
             await UniTask.Yield();
+
+        if (_state is not (ViewStatus.Playing or ViewStatus.Paused or ViewStatus.Error))
+            return;
 
         _state = ViewStatus.Busy;
         try
