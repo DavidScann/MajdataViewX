@@ -164,9 +164,8 @@ public unsafe struct TouchUpdateJob : IJobParallelFor
 
         var timing = TimeData.NoteTime - touch.time;
         if (touch.coverageId < 0 && NoteHelper.IsSimulated) return;
-        var cover = touchGroupCoverResults[touch.coverageId];
         var autoplayStart = NoteHelper.AutoPlayMode is AutoPlayMode.DJAutoButton or AutoPlayMode.DJAutoSensor &&
-                            cover.Mode == CoverMode.DoubleCircleSlide
+                            touchGroupCoverResults[touch.coverageId].Mode == CoverMode.DoubleCircleSlide
                 ? InputManager.DJAUTO_TOUCH_DOUBLE_CIRCLE_SLIDE_START_SEC
                 : InputManager.DJAUTO_AUTOPLAY_START_SEC;
 
@@ -196,7 +195,7 @@ public unsafe struct TouchUpdateJob : IJobParallelFor
                 {
                     if (!touch.isSlideGuide)
                     {
-                        InputData.DJAutoAddGroupCoverage(cover, timing);
+                        InputData.DJAutoAddGroupCoverage(touchGroupCoverResults[touch.coverageId], timing);
                     }
                 }
                 break;
