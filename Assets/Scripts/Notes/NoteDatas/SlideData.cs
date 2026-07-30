@@ -20,7 +20,7 @@ public struct SlideData
     /// </summary>
     public float judgeTiming;
     /// <summary>
-    /// 实际被判定的时间
+    /// 显示slideok的时间（实际被判定的时间 + lastStayTime）
     /// </summary>
     public float finishJudgeTiming;
 
@@ -125,6 +125,11 @@ public struct SlideData
         currentOnL = SensorType.Invalid;
         currentOnR = SensorType.Invalid;
 
+        // 如果是 mine slide 就不要播放音效
+        if (isMine)
+        {
+            isSoundPlayed = true;
+        }
 
         // 计算Slide淡入时机
         // 8.0速时应当提前300ms显示Slide
