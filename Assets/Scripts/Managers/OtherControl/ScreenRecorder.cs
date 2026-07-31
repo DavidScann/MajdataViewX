@@ -16,11 +16,10 @@ using static MajCtx;
 public class ScreenRecorder : MonoBehaviour
 {
     private const string EncoderDllName = "RenderingOut";
-    private const int VideoBitRate = 12_000_000;
 
     [DllImport(EncoderDllName, CallingConvention = CallingConvention.StdCall)]
     private static extern IntPtr video_encoder_create(
-        int bitRate,
+        int quality,
         int width,
         int height,
         int fps,
@@ -57,12 +56,12 @@ public class ScreenRecorder : MonoBehaviour
     }
 
     public async UniTask StartRecording(string maidataPath,
-        int fps, [CanBeNull] Action onStart = null)
+        int fps, ExportQuality quality, [CanBeNull] Action onStart = null)
     {
         QualitySettings.vSyncCount = 0;
         try
         {
-            await CaptureScreen(maidataPath, fps, onStart);
+            await CaptureScreen(maidataPath, fps, quality, onStart);
         }
         finally
         {
@@ -82,7 +81,7 @@ public class ScreenRecorder : MonoBehaviour
     }
 
     private async UniTask CaptureScreen(string maidataPath,
-        int fps, [CanBeNull] Action onStart = null)
+        int fps, ExportQuality quality, [CanBeNull] Action onStart = null)
     {
         if (fps <= 0)
         {
@@ -127,7 +126,7 @@ public class ScreenRecorder : MonoBehaviour
             if (File.Exists(outPath)) File.Delete(outPath);
 
             encoder = video_encoder_create(
-                VideoBitRate,
+                (int)quality,
                 width,
                 height,
                 fps,

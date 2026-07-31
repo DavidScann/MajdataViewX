@@ -9,6 +9,7 @@
     public AutoPlayMode AutoMode { get; set; } = AutoPlayMode.Enable;
     public bool ShowHand { get; set; } = false;
     public int OutputFps { get; set; } = 60;
+    public ExportQuality ExportQuality { get; set; } = ExportQuality.High;
     public bool ResizeBg { get; set; } = false;
     public UIType UIType { get; set; } = UIType.Legacy;
     public double GlobalAudioOffset { get; set; } = 0;

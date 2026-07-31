@@ -92,9 +92,18 @@ powershell -ExecutionPolicy Bypass -File .\ffmpeg-builder\build.ps1
 
 </details>
 
-<br/>
-
 > 其他问题见 [MajdataX 的 issue 页面](https://github.com/re-poem/MajdataViewX/issues) 或者 **[提交 Issue](https://github.com/re-poem/MajdataViewX/issues/new)**
+
+
+## 导出说明 / Export Description
+
+| 编码器 | 码控模式 | Low (0) | Medium (1) | High (2) | Ultra (3) |
+|---|---|---|---|---|---|
+| libx264   | CRF   | 28 | 23 | 18 | 14 |
+| h264_nvenc | CQ    | 30 | 24 | 18 | 14 |
+| h264_qsv  | ICQ   | 32 | 25 | 18 | 14 |
+| h264_amf  | QVBR  | 30 | 24 | 18 | 14 |
+| h264_mf   | 码率 (Mbps @1080p60) | 4 | 8 | 16 | 32 |
 
 <br/>
 <br/>

@@ -244,7 +244,7 @@ public class PlayManager : MonoBehaviour
                     _allPerfectManager.enabled = true;
                     _state = ViewStatus.Playing;
                     _screenRecorder.StartRecording(maidataPath,
-                        _setting.OutputFps,
+                        _setting.OutputFps, _setting.ExportQuality,
                         () =>
                         {
                             _timeProvider.SetStartTime(startAt, offset, speed, playmode, _setting.OutputFps);
@@ -370,7 +370,6 @@ public class PlayManager : MonoBehaviour
         _noteManager.ResetState();
         _timeProvider.ResetState();
         _audioManager.ResetState();
-        _screenRecorder.ResetState();
         _bgManager.ResetState();
         _effectManager.ResetState();
         _inputManager.ResetState();
