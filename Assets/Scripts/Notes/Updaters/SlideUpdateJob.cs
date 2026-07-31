@@ -283,9 +283,10 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
                         }
                         else
                         {
+                            // 这里起始点不用TooFast，兼容一下普通slide
                             var grade = (JudgeGrade)GlobalRandom.NextInt((int)JudgeGrade.FastGood, (int)JudgeGrade.Miss);
                             slide.judgeGrade = slide.isMine
-                                ? (grade < JudgeGrade.FastPerfect3rd ? JudgeGrade.Miss : JudgeGrade.LateCritical)
+                                ? (grade < JudgeGrade.FastPerfect3rd ? JudgeGrade.TooFast : JudgeGrade.LateCritical)
                                 : grade;
                         }
                         // 非模拟模式下需要自行赋值finishJudgeTiming
@@ -711,6 +712,8 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
             JudgeGrade.FastGood => 12,
             JudgeGrade.LateGreat1st or JudgeGrade.LateGreat2nd or JudgeGrade.LateGreat3rd => 18,
             JudgeGrade.LateGood => 24,
+            JudgeGrade.Miss => 30,
+            JudgeGrade.TooFast => 36,
             _ => 30,
         };
 

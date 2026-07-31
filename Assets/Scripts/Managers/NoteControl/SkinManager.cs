@@ -154,6 +154,13 @@ public class SkinManager : MonoBehaviour
         JUST_WIFI_U_MISS,
         JUST_WIFI_D_MISS,
 
+        JUST_STR_L_TOOFAST,
+        JUST_STR_R_TOOFAST,
+        JUST_CURV_L_TOOFAST,
+        JUST_CURV_R_TOOFAST,
+        JUST_WIFI_U_TOOFAST,
+        JUST_WIFI_D_TOOFAST,
+
         JUST_STR_L_BREAK,
         JUST_STR_R_BREAK,
         JUST_CURV_L_BREAK,
@@ -370,6 +377,13 @@ public class SkinManager : MonoBehaviour
         Add(sources, NoteSp.JUST_CURV_R_MISS, slideOkPath + "/miss_curv_r.png");
         Add(sources, NoteSp.JUST_WIFI_U_MISS, slideOkPath + "/miss_wifi_u.png");
         Add(sources, NoteSp.JUST_WIFI_D_MISS, slideOkPath + "/miss_wifi_d.png");
+
+        Add(sources, NoteSp.JUST_STR_L_TOOFAST, slideOkPath + "/toofast_str_l.png");
+        Add(sources, NoteSp.JUST_STR_R_TOOFAST, slideOkPath + "/toofast_str_r.png");
+        Add(sources, NoteSp.JUST_CURV_L_TOOFAST, slideOkPath + "/toofast_curv_l.png");
+        Add(sources, NoteSp.JUST_CURV_R_TOOFAST, slideOkPath + "/toofast_curv_r.png");
+        Add(sources, NoteSp.JUST_WIFI_U_TOOFAST, slideOkPath + "/toofast_wifi_u.png");
+        Add(sources, NoteSp.JUST_WIFI_D_TOOFAST, slideOkPath + "/toofast_wifi_d.png");
 
         Add(sources, NoteSp.JUST_STR_L_BREAK, slideOkPath + "/just_str_l_break.png");
         Add(sources, NoteSp.JUST_STR_R_BREAK, slideOkPath + "/just_str_r_break.png");
