@@ -838,7 +838,7 @@ public partial class NoteManager
                 Speed = NoteSpeed * timing.HSpeed,
                 ButtonOrderIndex = _buttonOrderIndex[note.StartPosition - 1]++,
                 SensorOrderIndex = _sensorOrderIndex[note.StartPosition - 1]++,
-                IsStar = true,
+                IsStar = !note.IsTapHeadSlide,
                 IsDouble = isDouble,
                 RotateSpeed = rotateSpeed,
                 IsEach = isNoteEach,
