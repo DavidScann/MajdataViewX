@@ -28,6 +28,8 @@ public class InputManager
     public static float DJAUTO_AUTOPLAY_START_SEC => DJAUTO_AUTOPLAY_START_SEC_SS.Data;
     public const float DJAUTO_TOUCH_DOUBLE_CIRCLE_SLIDE_START_SEC = -2 * FRAME_LENGTH_SEC;
     public const float DJAUTO_SLIDE_TAP_GUIDE_DELAY_SEC = 3 * FRAME_LENGTH_SEC;
+    
+    public const float DJAUTO_SLIDE_RELEASE_DELAY_SEC = 6 * FRAME_LENGTH_SEC;
 
     public const float BUTTON_HIT_RENDER_RADIUS = 0.4f;
 
