@@ -43,12 +43,10 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
         if (hold.isFolded) return;
         if (hold.isEnd) return;
 
-        var noteTime = TimeData.NoteTime;
-
         // ---- body ----
         var headTiming = hold.usingSV
             ? TimeData.FakeNoteTime - TimeData.GetPositionAtTime(hold.time)
-            : noteTime - hold.time;
+            : TimeData.NoteTime - hold.time;
         var headDistance = headTiming * hold.speed + 4.8f;
         var clampedDistance = math.max(headDistance, 1.225f);
 
@@ -58,7 +56,7 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
         // ---- Tail (hold end) ----
         var tailTiming = hold.usingSV
             ? TimeData.FakeNoteTime - TimeData.GetPositionAtTime(hold.time + hold.LastFor)
-            : noteTime - (hold.time + hold.LastFor);
+            : TimeData.NoteTime - (hold.time + hold.LastFor);
         var tailDistance = tailTiming * hold.speed + 4.8f;
 
         // ---- Invisible ----

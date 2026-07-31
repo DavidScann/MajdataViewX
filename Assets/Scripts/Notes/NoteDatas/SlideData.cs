@@ -36,7 +36,8 @@ public struct SlideData
     public bool isEx;
     public bool isBreak;
     public bool isMine;
-    public bool usingSV;
+    // slide不适合SV！
+    //public bool usingSV;
 
     public bool isWifi;
 
@@ -213,13 +214,6 @@ public struct SlideData
 
         lastStayTime = LastFor * Const;
         judgeTiming = shootTime + LastFor * (1f - Const);
-
-        if (usingSV) // 此时已LoadSV，可以直接用
-        {
-            var endPos = TimeData.GetPositionAtTime(shootTime + LastFor);
-            judgeTiming = TimeData.GetPositionAtTime(judgeTiming);
-            lastStayTime = endPos - judgeTiming;
-        }
     }
 
     /// <summary>
@@ -227,8 +221,6 @@ public struct SlideData
     /// tapTime + content->时长 = shootTime/LastFor
     /// content->slideShape = startPos/endPos/那一大串表示judgeQueue和slideArrows的
     /// </summary>
-    /// <param name="other"></param>
-    /// <returns></returns>
     public readonly bool IsFoldablePropOnly(SlideData other) =>
         tapTime == other.tapTime &&
         //shootTime == other.shootTime &&
@@ -241,6 +233,5 @@ public struct SlideData
         isEx == other.isEx &&
         isBreak == other.isBreak &&
         isMine == other.isMine &&
-        usingSV == other.usingSV &&
         mineAutoSlide == other.mineAutoSlide;
 }

@@ -47,12 +47,8 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
         //slide的判TransformUpdate和生命周期有点耦合，把folded移到各个render去比较好
         if (slide.isEnd) return;
 
-        var tapTiming = slide.usingSV
-            ? TimeData.FakeNoteTime - TimeData.GetPositionAtTime(slide.tapTime)
-            : TimeData.NoteTime - slide.tapTime;
-        var timing = slide.usingSV
-            ? TimeData.FakeNoteTime - TimeData.GetPositionAtTime(slide.shootTime)
-            : TimeData.NoteTime - slide.shootTime;
+        var tapTiming = TimeData.NoteTime - slide.tapTime;
+        var timing = TimeData.NoteTime - slide.shootTime;
         slide.process = math.saturate(timing / math.max(slide.LastFor, 0.001f));
 
         if (slide.isSlideEnd)
@@ -71,6 +67,7 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
             RenderStar(ref slide, index, timing, tapTiming);
             if (slide.lastStayTime <= 0)
             {
+                // render slideok不能用sv影响的时间
                 slide.finishJudgeTiming = TimeData.NoteTime;
                 EndSlide(ref slide);
             }
@@ -203,7 +200,7 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
         {
             // 让 wifi 也可以使用 processIdx 来计算 eaten
             slide.processIdx = math.max((int)(slide.process * (slide.slideArrowsCount - 1)), 1);
-            
+
             var starPos = stackalloc float2[3]; //C, L, R   //这里不借助slideArrows，提供不了另两条的信息
             slide.starPos = starPos[0] = slide.starPosConstC * slide.process + slide.starPosStart;
             slide.starPosL = starPos[1] = slide.starPosConstL * slide.process + slide.starPosStart;
@@ -236,9 +233,8 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
         // 模拟模式下，快星星会划到底，慢星星就不会黏在最后一个区
         // 所以IsJudged之后晚100ms再松手，如果这100ms以内已经IsSlideEnd了那就直接松
         // 非模拟模式下IsJudged和IsSlideEnd同步所以行为不变
-        if (
-            slide.isEnd || slide.isSlideEnd || 
-            (slide.isJudged && TimeData.NoteTime > slide.judgeTime + InputManager.DJAUTO_SLIDE_RELEASE_DELAY_SEC)
+        if (slide.isEnd || slide.isSlideEnd ||
+           (slide.isJudged && TimeData.NoteTime > slide.judgeTime + InputManager.DJAUTO_SLIDE_RELEASE_DELAY_SEC)
         ) return;
         var timing = TimeData.NoteTime - slide.shootTime;
         var autoplayStart = NoteHelper.AutoPlayMode == AutoPlayMode.DJAutoButton && slide.hasTapGuide
@@ -250,181 +246,181 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
             // 非模拟模式下星星可以正常走到尾再显示slideok并销毁
             case AutoPlayMode.Enable:
             case AutoPlayMode.Random:
-            {
-                if (slide.smoothSlideAnime)
                 {
-                    // 先前 RenderStar 的时候计算过 processIdx 可以直接拿来用
-                    slide.eaten = slide.processIdx - 1;
-                }
-                else
-                {
-                    // slide 各判定区长度差异很大（conn slide更严重）所以直接 lerp 不是很好看
-                    // 这里借用一下 judgeCurrent 存储目前到哪个区了
-                    if (slide.processIdx > slide.judgeQueue[slide.judgeCurrent].ArrowProgressFinish)
+                    if (slide.smoothSlideAnime)
                     {
-                        slide.eaten = slide.judgeQueue[slide.judgeCurrent].ArrowProgressFinish;
-                        slide.judgeCurrent++;
-                    }
-                    else if (slide.processIdx > slide.judgeQueue[slide.judgeCurrent].ArrowProgressPush)
-                    {
-                        slide.eaten = slide.judgeQueue[slide.judgeCurrent].ArrowProgressPush;
-                    }
-                }
-
-                if (!slide.isSoundPlayed)
-                {
-                    NoteHelper.PlaySlideSound(SfxRequests,
-                        slide.isBreak
-                    );
-                    slide.isSoundPlayed = true;
-                }
-
-                if (slide.process >= 1)
-                {
-                    if (NoteHelper.AutoPlayMode is AutoPlayMode.Enable)
-                    {
-                        slide.judgeGrade = JudgeGrade.LateCritical;
+                        // 先前 RenderStar 的时候计算过 processIdx 可以直接拿来用
+                        slide.eaten = slide.processIdx - 1;
                     }
                     else
                     {
-                        var grade = (JudgeGrade)GlobalRandom.NextInt((int)JudgeGrade.FastGood, (int)JudgeGrade.Miss);
-                        slide.judgeGrade = slide.isMine
-                            ? (grade < JudgeGrade.FastPerfect3rd ? JudgeGrade.Miss : JudgeGrade.LateCritical)
-                            : grade;
+                        // slide 各判定区长度差异很大（conn slide更严重）所以直接 lerp 不是很好看
+                        // 这里借用一下 judgeCurrent 存储目前到哪个区了
+                        if (slide.processIdx > slide.judgeQueue[slide.judgeCurrent].ArrowProgressFinish)
+                        {
+                            slide.eaten = slide.judgeQueue[slide.judgeCurrent].ArrowProgressFinish;
+                            slide.judgeCurrent++;
+                        }
+                        else if (slide.processIdx > slide.judgeQueue[slide.judgeCurrent].ArrowProgressPush)
+                        {
+                            slide.eaten = slide.judgeQueue[slide.judgeCurrent].ArrowProgressPush;
+                        }
                     }
-                    // 非模拟模式下需要自行赋值finishJudgeTiming
-                    slide.finishJudgeTiming = TimeData.NoteTime;
-                    FinishJudgeSlide(ref slide);
-                    EndSlide(ref slide);
-                    if (slide.isFolded) EndNote(ref slide);
+
+                    if (!slide.isSoundPlayed)
+                    {
+                        NoteHelper.PlaySlideSound(SfxRequests,
+                            slide.isBreak
+                        );
+                        slide.isSoundPlayed = true;
+                    }
+
+                    if (slide.process >= 1)
+                    {
+                        if (NoteHelper.AutoPlayMode is AutoPlayMode.Enable)
+                        {
+                            slide.judgeGrade = JudgeGrade.LateCritical;
+                        }
+                        else
+                        {
+                            var grade = (JudgeGrade)GlobalRandom.NextInt((int)JudgeGrade.FastGood, (int)JudgeGrade.Miss);
+                            slide.judgeGrade = slide.isMine
+                                ? (grade < JudgeGrade.FastPerfect3rd ? JudgeGrade.Miss : JudgeGrade.LateCritical)
+                                : grade;
+                        }
+                        // 非模拟模式下需要自行赋值finishJudgeTiming
+                        slide.finishJudgeTiming = TimeData.NoteTime;
+                        FinishJudgeSlide(ref slide);
+                        EndSlide(ref slide);
+                        if (slide.isFolded) EndNote(ref slide);
+                    }
+                    break;
                 }
-                break;
-            }
             // 模拟模式下需要等待星星完全结束（isSlideEnd），但因为isJudged所以并不会把手黏在这里
             case AutoPlayMode.DJAutoButton:
             case AutoPlayMode.DJAutoSensor:
             case AutoPlayMode.Disable: // disable也要处理mine情况
-            {
-                // 不是 mine slide 的话就只需要产生输入就行了
-                if (!slide.isMine)
                 {
-                    // Folded Slide 与可见副本轨迹完全相同，只消费可见副本产生的输入，
-                    // 不计算手位，也不进入申请、扩圆或合并流程。
-                    if (slide.isFolded) break;
-                    
-                    if (NoteHelper.AutoPlayMode is AutoPlayMode.Disable) break;
-                    
-                    // 启动 Tap 只负责把 DJAuto 的输入推迟几帧，不能同时吃掉 Slide 的起始轨迹。
-                    // 因此输入开始时从路径起点重新走，画面上的星星仍保持原来的时间轴。
-                    var inputProcess = autoplayStart > 0
-                        ? math.saturate((timing - autoplayStart) / math.max(slide.LastFor, 0.001f))
-                        : slide.process;
-
-                    if (!slide.isWifi)
+                    // 不是 mine slide 的话就只需要产生输入就行了
+                    if (!slide.isMine)
                     {
-                        if (autoplayStart <= 0)
+                        // Folded Slide 与可见副本轨迹完全相同，只消费可见副本产生的输入，
+                        // 不计算手位，也不进入申请、扩圆或合并流程。
+                        if (slide.isFolded) break;
+
+                        if (NoteHelper.AutoPlayMode is AutoPlayMode.Disable) break;
+
+                        // 启动 Tap 只负责把 DJAuto 的输入推迟几帧，不能同时吃掉 Slide 的起始轨迹。
+                        // 因此输入开始时从路径起点重新走，画面上的星星仍保持原来的时间轴。
+                        var inputProcess = autoplayStart > 0
+                            ? math.saturate((timing - autoplayStart) / math.max(slide.LastFor, 0.001f))
+                            : slide.process;
+
+                        if (!slide.isWifi)
                         {
-                            InputData.DJAutoHandleWorldPosition(slide.starPos);
-                            return;
+                            if (autoplayStart <= 0)
+                            {
+                                InputData.DJAutoHandleWorldPosition(slide.starPos);
+                                return;
+                            }
+
+                            var lastIndex = slide.slideArrowsCount - 1;
+                            var distance = inputProcess * slide.slideArrows[lastIndex].L;
+                            var nextIndex = 1;
+                            while (nextIndex < lastIndex && slide.slideArrows[nextIndex].L < distance)
+                                nextIndex++;
+
+                            var previous = slide.slideArrows[nextIndex - 1];
+                            var next = slide.slideArrows[nextIndex];
+                            var progress = math.unlerp(previous.L, next.L, distance);
+                            InputData.DJAutoHandleWorldPosition(
+                                new float2(
+                                    math.lerp(previous.X, next.X, progress),
+                                    math.lerp(previous.Y, next.Y, progress)
+                                )
+                            );
+                        }
+                        else
+                        {
+                            //划wifi时使用大手子
+                            var center = slide.starPosConstC * inputProcess + slide.starPosStart;
+                            var left = slide.starPosConstL * inputProcess + slide.starPosStart;
+                            var right = slide.starPosConstR * inputProcess + slide.starPosStart;
+                            InputData.DJAutoHandleWifiWorldPosition(
+                                (left + center) / 2,
+                                (right + center) / 2
+                            );
                         }
 
-                        var lastIndex = slide.slideArrowsCount - 1;
-                        var distance = inputProcess * slide.slideArrows[lastIndex].L;
-                        var nextIndex = 1;
-                        while (nextIndex < lastIndex && slide.slideArrows[nextIndex].L < distance)
-                            nextIndex++;
-
-                        var previous = slide.slideArrows[nextIndex - 1];
-                        var next = slide.slideArrows[nextIndex];
-                        var progress = math.unlerp(previous.L, next.L, distance);
-                        InputData.DJAutoHandleWorldPosition(
-                            new float2(
-                                math.lerp(previous.X, next.X, progress),
-                                math.lerp(previous.Y, next.Y, progress)
-                            )
-                        );
+                        break;
                     }
-                    else
-                    {
-                        //划wifi时使用大手子
-                        var center = slide.starPosConstC * inputProcess + slide.starPosStart;
-                        var left = slide.starPosConstL * inputProcess + slide.starPosStart;
-                        var right = slide.starPosConstR * inputProcess + slide.starPosStart;
-                        InputData.DJAutoHandleWifiWorldPosition(
-                            (left + center) / 2,
-                            (right + center) / 2
-                        );
-                    }
-                    
-                    break;
-                }
 
-                // Mine slide 逻辑上是程序自动推进，故不进入 DJAuto 正常流程（否则会占用手）
-                if (!slide.mineAutoSlide) break;
+                    // Mine slide 逻辑上是程序自动推进，故不进入 DJAuto 正常流程（否则会占用手）
+                    if (!slide.mineAutoSlide) break;
 
-                // 目前判定到哪个区
-                var idx = slide.judgeCurrent;
-                if (slide.isWifi)
-                {
-                    // wifi 的情况，取三支里剩的最长的
-                    idx = math.min(slide.judgeCurrent, math.min(slide.judgeL_Current, slide.judgeR_Current));
-                }
-                
-                // 剩一个区就不动了，留给check表演
-                if (idx >= slide.judgeQueueCount - 1) break;
-
-                var newEaten = 0;
-                // wifi 三支判定队列的 ArrowProgress 是一样的
-                if (slide.processIdx > slide.judgeQueue[idx].ArrowProgressFinish)
-                {
-                    // 如果引导星星已经走完这个区了，就推进一个区
-                    newEaten = slide.judgeQueue[idx].ArrowProgressFinish;
-                    
+                    // 目前判定到哪个区
+                    var idx = slide.judgeCurrent;
                     if (slide.isWifi)
                     {
-                        // wifi 的情况要分别检查三支各自是否需要推进
-                        if (slide.judgeCurrent <= idx)
-                        {
-                            slide.judgeCurrent = idx + 1;
-                            slide.currentOn = SensorType.Invalid;
-                        }
-
-                        if (slide.judgeL_Current <= idx)
-                        {
-                            slide.judgeL_Current = idx + 1;
-                            slide.currentOnL = SensorType.Invalid;
-                        }
-
-                        if (slide.judgeR_Current <= idx)
-                        {
-                            slide.judgeR_Current = idx + 1;
-                            slide.currentOnR = SensorType.Invalid;
-                        }
+                        // wifi 的情况，取三支里剩的最长的
+                        idx = math.min(slide.judgeCurrent, math.min(slide.judgeL_Current, slide.judgeR_Current));
                     }
-                    else
+
+                    // 剩一个区就不动了，留给check表演
+                    if (idx >= slide.judgeQueueCount - 1) break;
+
+                    var newEaten = 0;
+                    // wifi 三支判定队列的 ArrowProgress 是一样的
+                    if (slide.processIdx > slide.judgeQueue[idx].ArrowProgressFinish)
                     {
-                        // 普通slide肯定需要推进了
-                        slide.currentOn = SensorType.Invalid;
-                        slide.judgeCurrent++;
+                        // 如果引导星星已经走完这个区了，就推进一个区
+                        newEaten = slide.judgeQueue[idx].ArrowProgressFinish;
+
+                        if (slide.isWifi)
+                        {
+                            // wifi 的情况要分别检查三支各自是否需要推进
+                            if (slide.judgeCurrent <= idx)
+                            {
+                                slide.judgeCurrent = idx + 1;
+                                slide.currentOn = SensorType.Invalid;
+                            }
+
+                            if (slide.judgeL_Current <= idx)
+                            {
+                                slide.judgeL_Current = idx + 1;
+                                slide.currentOnL = SensorType.Invalid;
+                            }
+
+                            if (slide.judgeR_Current <= idx)
+                            {
+                                slide.judgeR_Current = idx + 1;
+                                slide.currentOnR = SensorType.Invalid;
+                            }
+                        }
+                        else
+                        {
+                            // 普通slide肯定需要推进了
+                            slide.currentOn = SensorType.Invalid;
+                            slide.judgeCurrent++;
+                        }
                     }
-                }
-                else if (slide.processIdx > slide.judgeQueue[idx].ArrowProgressPush)
-                {
-                    newEaten = slide.judgeQueue[idx].ArrowProgressPush;
-                }
-                
-                if (slide.smoothSlideAnime)
-                {
-                    newEaten = slide.processIdx - 1;
-                }
+                    else if (slide.processIdx > slide.judgeQueue[idx].ArrowProgressPush)
+                    {
+                        newEaten = slide.judgeQueue[idx].ArrowProgressPush;
+                    }
 
-                if (newEaten > slide.eaten)
-                {
-                    slide.eaten = newEaten;
-                }
+                    if (slide.smoothSlideAnime)
+                    {
+                        newEaten = slide.processIdx - 1;
+                    }
 
-                break;
-            }
+                    if (newEaten > slide.eaten)
+                    {
+                        slide.eaten = newEaten;
+                    }
+
+                    break;
+                }
         }
     }
 
@@ -433,24 +429,18 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
         if (!NoteHelper.IsSimulated) return;
         if (slide.isEnd || slide.isSlideEnd || slide.isJudged) return;
 
+        // slide的正解帧是 星星进入最后一个判定区的时间，所以判定部分受SV影响
         var tapTiming = TimeData.NoteTime - slide.tapTime;
-        if (tapTiming < -NoteHelper.SLIDE_CHECK_AHEAD_TIME_MSEC / 1000f) return; // 提前100ms接受判定
-
         var timing = TimeData.NoteTime - slide.shootTime;
+
+        if (tapTiming < -NoteHelper.SLIDE_CHECK_AHEAD_TIME_MSEC / 1000f) return; // 提前100ms接受判定
         var remaining = slide.LastFor - timing;
 
-        // var stayTime = slide.LastFor * slide.Const;
-        // if (slide.usingSV)
-        // {
-        //     var endPos = TimeData.GetPositionAtTime(slide.shootTime + slide.LastFor);
-        //     var judgePos = TimeData.GetPositionAtTime(slide.shootTime + slide.LastFor * (1f - slide.Const));
-        //     stayTime = endPos - judgePos;
-        // }
         // 星星 miss 的时间点在结束后 +550ms
         var forceJudge = timing - slide.LastFor - NoteHelper.SLIDE_FORCE_MISS / 1000f;
         // mine 星星 perfect 的时间点在slide结束
-        // mineAutoSlide开着时直到倒数第二个区都会被djauto摸掉，此时最后一个区如果蹭到了就miss
-        bool timeout = slide.isMine ? (remaining <= 0) : (forceJudge >= 0);
+        // mineAutoSlide开着时直到倒数第二个区都会被滚木摸掉，此时最后一个区如果蹭到了就miss
+        bool timeout = slide.isMine ? (TimeData.NoteTime >= slide.judgeTiming) : (forceJudge >= 0);
 
         if (timeout)
         {
@@ -483,7 +473,7 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
                 FinishJudgeSlide(ref slide);
                 return;
             }
-            
+
             if (slide.currentOn >= SensorType.A1) //有按下
             {
                 newEaten = slide.judgeQueue[slide.judgeCurrent].ArrowProgressPush;
@@ -636,7 +626,7 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
             return JudgeGrade.TooFast;
         }
 
-        var triggerTime = slide.usingSV ? TimeData.FakeNoteTime : TimeData.NoteTime;
+        var triggerTime = TimeData.NoteTime;
 
         const float totalInterval = 36f / 60; // 秒
         const float nPInterval = 14f / 60; // Perfect基础区间
