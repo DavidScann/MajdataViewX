@@ -92,10 +92,11 @@ public class AudioManager
     {
         _audioManager = this;
         _sfxPtr = SfxRequestsPtr;
+        // DO NOT USE THIS, MAY CAUSE PROBLEMS
         // Keep the track's output queue short so it stays responsive to
         // dynamically triggered SFX. Bundled SFX assets are 48 kHz.
-        Bass.Configure(Configuration.UpdatePeriod, 20);
-        Bass.Configure(Configuration.PlaybackBufferLength, 40);
+        //Bass.Configure(Configuration.UpdatePeriod, 20);
+        //Bass.Configure(Configuration.PlaybackBufferLength, 40);
         Bass.Init(-1, 48000);
 
         //Note SFX
