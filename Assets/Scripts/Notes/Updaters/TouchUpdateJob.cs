@@ -212,8 +212,8 @@ public unsafe struct TouchUpdateJob : IJobParallelFor
 
         if (touch.isMine)
         {
-            var mineOn = InputData.GetSensorState(touch.sensor).Status;
-            if (mineOn && diffSec >= -NoteHelper.TAP_JUDGE_GOOD_AREA_MSEC / 1000f)
+            var mineOn = InputData.GetSensorState(touch.sensor).IsPadDown;
+            if (mineOn && diffSec >= -NoteHelper.TOUCH_JUDGE_GOOD_AREA_MSEC / 1000f)
             {
                 touch.judgeGrade = JudgeGrade.Miss;
                 touch.isJudged = true;

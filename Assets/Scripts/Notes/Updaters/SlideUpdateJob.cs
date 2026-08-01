@@ -447,7 +447,7 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
         {
             slide.judgeGrade = slide.isMine
                 ? JudgeGrade.LateCritical
-                : (GetRemainingAreaCount(slide) <= 1 ? JudgeGrade.LateGood : JudgeGrade.Miss);
+                : (CanLeaveTailAsGood(slide) ? JudgeGrade.LateGood : JudgeGrade.Miss);
             // 此处将lastStayTime置0，去除slideok显示延迟
             slide.lastStayTime = 0;
             FinishJudgeSlide(ref slide);
@@ -606,17 +606,27 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
             cur = (byte)queueCount;
         }
     }
-    private int GetRemainingAreaCount(SlideData slide)
+    /// <summary>
+    /// 留尾判绿：slide 因 timeout 判 Miss 时，若剩余判定段满足条件则提升为 LateGood。
+    /// Slide：剩余 ≤ 1 段。
+    /// Wifi：三支各自剩余 ≤ 1 段。其中中间支(judgeQueue)末段是两段拼合的 OR 段，
+    /// 官机在留尾检查时将其算作两段（bug），故中间支只要未完全清空就 ≥ 2 段，无法判绿。
+    /// </summary>
+    private bool CanLeaveTailAsGood(SlideData slide)
     {
         if (!slide.isWifi)
         {
-            return slide.judgeQueueCount - slide.judgeCurrent;
+            return slide.judgeQueueCount - slide.judgeCurrent <= 1;
         }
         else
         {
-            return slide.judgeQueueCount - slide.judgeCurrent +
-                    slide.judgeQueueLCount - slide.judgeL_Current +
-                    slide.judgeQueueRCount - slide.judgeR_Current;
+            var cRemaining = slide.judgeQueueCount - slide.judgeCurrent;
+            // 中间支末段为合并段，官机留尾检查时按2段计：未清空则 +1
+            if (slide.judgeCurrent < slide.judgeQueueCount)
+                cRemaining += 1;
+            return cRemaining <= 1
+                && slide.judgeQueueLCount - slide.judgeL_Current <= 1
+                && slide.judgeQueueRCount - slide.judgeR_Current <= 1;
         }
     }
 

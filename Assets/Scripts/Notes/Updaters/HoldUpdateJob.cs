@@ -385,7 +385,7 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
             else
             {
                 hold.isHolding = false;
-                if (timing > NoteHelper.TOUCH_HOLD_HEAD_IGNORE_LENGTH_SEC && remainingTime > NoteHelper.TOUCH_HOLD_TAIL_IGNORE_LENGTH_SEC)
+                if (timing > NoteHelper.HOLD_HEAD_IGNORE_LENGTH_SEC && remainingTime > NoteHelper.HOLD_TAIL_IGNORE_LENGTH_SEC)
                     hold.playerIdleTimeSec += TimeData.deltaTime;
             }
         }
