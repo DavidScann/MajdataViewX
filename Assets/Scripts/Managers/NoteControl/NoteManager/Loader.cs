@@ -36,7 +36,23 @@ public partial class NoteManager
     public unsafe void Load(SimaiChart chart)
     {
         if (chart.IsEmpty) return;
+        _prevChain.Complete();
         ConfigureRenderCapacity(chart);
+
+        // 防御性清空：正常流程下 Stop 时 ResetState 已清空，
+        // 此处防止"未 Stop 就重新 Load"导致 NativeList 累积
+        taps.Clear();
+        eachLines.Clear();
+        holds.Clear();
+        slides.Clear();
+        touches.Clear();
+        touchHolds.Clear();
+        touchGroupTotalCounts.Clear();
+        touchGroupJudgedCounts.Clear();
+        touchGroupCoverResults.Clear();
+        touchHoldGroupTotalCounts.Clear();
+        touchHoldGroupPressedCounts.Clear();
+        touchHoldGroupCoverResults.Clear();
 
         areaPoolIndex = 0;
         posePoolIndex = 0;
@@ -260,6 +276,12 @@ public partial class NoteManager
         _wsServer.Error(errorMsg);
     }
 
+    /// <remarks>
+    /// 本来isEach在isMine时应该被忽略，但实际上
+    /// isEach对判定并无影响，主要取其skin的区别，
+    /// 而且mine的tapline同样需要换为each line
+    /// 因此全部丢进LoadSkin作特判
+    /// </remarks>
     private unsafe void LoadTiming(in SimaiTimingPoint timing)
     {
         int touchStartIdx = touches.Length;

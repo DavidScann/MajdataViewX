@@ -344,7 +344,8 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
             (int)th.sensor + 8,
             th.judgeGrade,
             th.isBreak,
-            th.isHanabi
+            th.isHanabi,
+            th.isMine
         );
         NoteHelper.ReportResult(ReportResults,
             th.judgeGrade,

@@ -80,11 +80,9 @@ public struct TapData
                 }
                 if (IsMine)
                 {
-                    if (IsBreak)
-                        TapSprite = NoteSp.STAR_BREAK_DOUBLE_MINE;
-                    else
-                        TapSprite = NoteSp.STAR_MINE_DOUBLE;
+                    TapSprite = IsBreak ? NoteSp.STAR_BREAK_DOUBLE_MINE : NoteSp.STAR_MINE_DOUBLE;
                     LineSprite = NoteSp.LINE_MINE;
+                    ExColor = Ex_Mine;
                 }
             }
             else
@@ -107,11 +105,9 @@ public struct TapData
                 }
                 if (IsMine)
                 {
-                    if (IsBreak)
-                        TapSprite = NoteSp.STAR_BREAK_MINE;
-                    else
-                        TapSprite = NoteSp.STAR_MINE;
+                    TapSprite = IsBreak ? NoteSp.STAR_BREAK_MINE : NoteSp.STAR_MINE;
                     LineSprite = NoteSp.LINE_MINE;
+                    ExColor = Ex_Mine;
                 }
             }
         }
@@ -135,13 +131,15 @@ public struct TapData
             }
             if (IsMine)
             {
-                if (IsBreak)
-                    TapSprite = NoteSp.TAP_BREAK_MINE;
-                else
-                    TapSprite = NoteSp.TAP_MINE;
+                TapSprite = IsBreak ? NoteSp.TAP_BREAK_MINE : NoteSp.TAP_MINE;
                 LineSprite = NoteSp.LINE_MINE;
+                ExColor = Ex_Mine;
             }
         }
+
+        // Each Tap Line优先级高于break低于mine
+        if (IsEach && !IsMine)
+            LineSprite = NoteSp.LINE_EACH;
     }
 
     public readonly bool IsFoldable(TapData other) =>

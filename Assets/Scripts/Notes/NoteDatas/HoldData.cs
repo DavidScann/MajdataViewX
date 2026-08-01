@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using Unity.Burst;
 using Unity.Mathematics;
 
@@ -81,11 +82,17 @@ public struct HoldData
         if (isMine)
         {
             bodySprite = isBreak ? NoteSp.HOLD_BREAK_MINE : NoteSp.HOLD_MINE;
+            endSprite = NoteSp.HOLD_END_MINE;
             lineSprite = NoteSp.LINE_MINE;
+            exColor = Ex_Mine;
         }
 
-        // 一开始放开时间无穷大，按下后才能重置为0
-        releaseTimeSec = float.MaxValue;
+        // Each Tap Line优先级高于break低于mine
+        if (isEach && !isMine)
+            lineSprite = NoteSp.LINE_EACH;
+
+        // 一开始放开时间无穷大，按下后才能重置为0，避免一开始就小于release忽略时间
+        releaseTimeSec = float.PositiveInfinity;
     }
 
     public readonly bool IsFoldable(HoldData other) =>

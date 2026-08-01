@@ -236,6 +236,7 @@ public class SkinManager : MonoBehaviour
         HOLD_END,
         HOLD_END_EACH,
         HOLD_END_BREAK,
+        HOLD_END_MINE,
     }
 
 
@@ -244,6 +245,7 @@ public class SkinManager : MonoBehaviour
     public static readonly float4 Ex_Each = new(1f, 0.9607843f, 0.3647059f, 1f);
     public static readonly float4 Ex_Star = new(0f, 0.8f, 1f, 1f);
     public static readonly float4 Ex_Break = new(1f, 0.74509805f, 0.3137255f, 1f);
+    public static readonly float4 Ex_Mine = new(0.15294117f, 0.15294117f, 0.15294117f, 1f);
 
     public const float HoldBaseWidth = 1.22f;              // legacy spriteRenderer.size.x
     public const float HoldCapAllowance = 1.4f;            // legacy total sprite height
@@ -451,6 +453,7 @@ public class SkinManager : MonoBehaviour
         Add(sources, NoteSp.HOLD_END, noteGuidePath + "/Hold_End.png");
         Add(sources, NoteSp.HOLD_END_EACH, noteGuidePath + "/Hold_Each_End.png");
         Add(sources, NoteSp.HOLD_END_BREAK, noteGuidePath + "/Hold_Break_End.png");
+        Add(sources, NoteSp.HOLD_END_MINE, noteGuidePath + "/Hold_Mine_End.png");
 
         // Load judge sprites separately for EffectManager (atlas textures get destroyed)
         JudgeText[0] = TexLoader.LoadSprite(judgeTextPath + "/judge_text_miss.png");

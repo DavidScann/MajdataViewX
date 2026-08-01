@@ -400,7 +400,8 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
         NoteHelper.PlayTapEffect(JudgeEffectRequests,
             (int)hold.Key,
             hold.judgeGrade,
-            hold.isBreak
+            hold.isBreak,
+            hold.isMine
         );
         NoteHelper.ReportResult(ReportResults,
             hold.judgeGrade,

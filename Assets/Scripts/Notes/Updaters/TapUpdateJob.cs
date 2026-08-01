@@ -217,7 +217,8 @@ public unsafe struct TapUpdateJob : IJobParallelFor
         NoteHelper.PlayTapEffect(JudgeEffectRequests,
             (int)tap.Key,
             tap.JudgeGrade,
-            tap.IsBreak
+            tap.IsBreak,
+            tap.IsMine
         );
         NoteHelper.ReportResult(ReportResults,
             tap.JudgeGrade,

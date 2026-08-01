@@ -736,7 +736,7 @@ public unsafe struct SlideUpdateJob : IJobParallelFor
         if (slide.isBreak && off == 0) // break perfect
         {
             bool flag = ((int)(timing / MajCtx.FRAME_LENGTH_SEC) / 2) % 2 == 0;
-            if (flag) off = 36; // 偏移到Break Skin
+            if (flag) off = 42; // 偏移到Break Skin
         }
 
         var idx = Interlocked.Increment(ref *SlidesWriteCountPtr) - 1;

@@ -280,7 +280,8 @@ public unsafe struct TouchUpdateJob : IJobParallelFor
             (int)touch.sensor + 8,
             touch.judgeGrade,
             touch.isBreak,
-            touch.isHanabi
+            touch.isHanabi,
+            touch.isMine
         );
         NoteHelper.ReportResult(ReportResults,
             touch.judgeGrade,

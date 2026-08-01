@@ -77,6 +77,9 @@ public struct TouchHoldData
             else
                 _borderOnSpriteCache = borderSprite = NoteSp.TOUCH_HOLD_BORDER_MINE;
         }
+
+        // 一开始放开时间无穷大，按下后才能重置为0，避免一开始就小于release忽略时间
+        releaseTimeSec = float.PositiveInfinity;
     }
 
     public readonly bool IsFoldable(TouchHoldData other) =>

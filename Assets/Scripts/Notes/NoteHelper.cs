@@ -347,8 +347,9 @@ public static unsafe class NoteHelper
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void PlayTapEffect(
         EffectData* JudgeEffectRequests,
-        int key, JudgeGrade judge, bool isBreak)
+        int key, JudgeGrade judge, bool isBreak, bool isMine)
     {
+        if (isMine || judge is JudgeGrade.TooFast or JudgeGrade.Miss) return;
         JudgeEffectRequests[key].Effect = EffectType.Tap;
         JudgeEffectRequests[key].IsBreak = isBreak;
         JudgeEffectRequests[key].JudgeGrade = judge;
@@ -361,8 +362,9 @@ public static unsafe class NoteHelper
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void PlayTouchEffect(
         EffectData* JudgeEffectRequests,
-        int key, JudgeGrade judge, bool isBreak, bool isHanabi)
+        int key, JudgeGrade judge, bool isBreak, bool isHanabi, bool isMine)
     {
+        if (isMine || judge is JudgeGrade.TooFast or JudgeGrade.Miss) return;
         JudgeEffectRequests[key].Effect = EffectType.Touch;
         if (isHanabi && (judge is not JudgeGrade.Miss or JudgeGrade.TooFast))
             JudgeEffectRequests[key].Effect |= EffectType.Firework;

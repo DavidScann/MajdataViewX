@@ -115,6 +115,7 @@ powershell -ExecutionPolicy Bypass -File .\ffmpeg-builder\build.ps1
 - **[bbben](https://github.com/LingFeng-bbben)**
 - **[Moying-moe](https://github.com/Moying-moe/maimaiMuriDetector)**
 - **[Lezi](https://github.com/LeZi9916)**
+- **[Minepig](https://github.com/Minepig)**
 - **RE_POEM**
 
 ### Contributors

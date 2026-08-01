@@ -26,8 +26,11 @@ public class AudioManager
 
     [CanBeNull] private AudioSample TrackSample;
     [CanBeNull] private float[] TrackSampleData;
+    [CanBeNull] private string _trackPath;
     private float TrackSampleVolume;
-    public bool IsTrackLoaded => TrackSample != null && TrackSampleData != null;
+    // TrackSampleData 仅导出(Record)模式混音用，普通播放无需加载，
+    // 故 IsTrackLoaded 只取决于 Bass 流是否就绪
+    public bool IsTrackLoaded => TrackSample != null;
     public bool IsTrackPlaying => TrackSample != null && TrackSample.IsPlaying;
     public double TrackCurrentSec => TrackSample != null ? TrackSample.CurrentSec : 0;
 
@@ -287,6 +290,8 @@ public class AudioManager
 
     public void OnDestroy()
     {
+        TrackSample?.Dispose();
+        TrackSample = null;
         noteSfxPlaybackRequests.Dispose();
         ReleaseRecordingAudio();
         Bass.Stop();
@@ -298,12 +303,15 @@ public class AudioManager
 
     public void LoadTrack(string path)
     {
+        _trackPath = path;
         TrackSample?.Dispose();
         TrackSample = new AudioSample(path, AudioMode.Stream)
         {
             SampleType = SampleType.Track,
         };
-        TrackSampleData = GetSampleDataFromFile(path);
+        // 整首PCM(数十MB,落LOH)仅导出模式混音用，延迟到 BeginRecordingAudio 按需加载，
+        // 避免普通播放模式持有大数组、切歌时靠GC延迟回收(表现为内存几十秒后才回落)
+        TrackSampleData = null;
     }
 
     public void PlayTrack()
@@ -389,6 +397,10 @@ public class AudioManager
     public unsafe void ResetState()
     {
         StopTrack();
+        // 释放上一曲的音频资源：Bass非托管流立即释放，PCM大数组脱离引用以便GC回收
+        TrackSample?.Dispose();
+        TrackSample = null;
+        TrackSampleData = null;
         //StopTouchHoldSound();
         //_sfxPtr[TOUCHHOLD] = false;
         ActiveTouchHoldCount = 0;
@@ -495,6 +507,8 @@ public class AudioManager
                     sfxPlayPointers[i][j] = -1; // 初始化指针
             }
         }
+        // 按需加载整首PCM：普通播放模式下 TrackSampleData 保持为null，仅导出模式走到这里
+        TrackSampleData ??= GetSampleDataFromFile(_trackPath);
         // Mix sources whose timing is known before recording begins. Dynamic SFX
         // are added frame by frame, then the completed buffer is muxed at the end.
         MixStaticRecordingAudio();

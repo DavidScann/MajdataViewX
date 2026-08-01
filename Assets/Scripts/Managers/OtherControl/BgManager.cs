@@ -175,6 +175,8 @@ public class BgManager : MonoBehaviour
     public void ResetState()
     {
         videoPlayer.Stop();
+        // 销毁上一曲背景图(Texture2D/Sprite)，避免滞留到下次 LoadBG
+        DestroyLoadedBackground();
         gameObject.transform.localScale = new Vector3(CIRCLED_SCALE_X, CIRCLED_SCALE_X, CIRCLED_SCALE_X);
         spriteRender.material = circledBgMaterial;
         spriteRender.sprite = defaultBg;
