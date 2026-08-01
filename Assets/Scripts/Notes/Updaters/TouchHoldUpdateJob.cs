@@ -270,6 +270,7 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
             {
                 th.judgeGrade = JudgeGrade.Miss;
                 th.isHeadJudged = true;
+                th.canHold = false;
                 th.headDiff = NoteHelper.TOUCH_JUDGE_GOOD_AREA_MSEC / 1000f;
                 return;
             }
@@ -290,6 +291,7 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
 
             th.judgeGrade = NoteHelper.GetTouchJudge(timing);
             th.isHeadJudged = true;
+            th.canHold = true;
             th.headDiff = timing;
 
             if (th.headGroupId != -1 && th.judgeGrade != JudgeGrade.Miss)
@@ -308,7 +310,7 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
         if (remainingTime <= 0)
         {
             var realityHT = th.LastFor - (NoteHelper.TOUCH_HOLD_HEAD_IGNORE_LENGTH_SEC + NoteHelper.TOUCH_HOLD_TAIL_IGNORE_LENGTH_SEC) - math.max(th.headDiff, 0f);
-            var pct = math.clamp((realityHT - th.playerIdleTime) / math.max(realityHT, 0.001f), 0f, 1f);
+            var pct = math.clamp((realityHT - th.playerIdleTimeSec) / math.max(realityHT, 0.001f), 0f, 1f);
             th.holdPercent = pct;
             if (!th.isMine)
                 th.judgeGrade = NoteHelper.GetHoldFinalGrade(th.judgeGrade, pct, realityHT);
@@ -319,6 +321,21 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
         if (!TimeData.IsStart) return;
 
         var on = InputData.GetSensorState(th.sensor).Status;
+
+        // 头判没了等pad down
+        if (!th.canHold)
+        {
+            if (InputData.GetSensorState(th.sensor).IsPadDown)
+            {
+                th.canHold = true;
+            }
+            else
+            {
+                on = false;
+            }
+        }
+
+        // touch group 的官更大
         if (th.groupId != -1)
         {
             if (touchHoldGroupPressedCounts[th.groupId] * 2 > touchHoldGroupTotalCounts[th.groupId])
@@ -329,23 +346,23 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
 
         if (on)
         {
-            th.releaseTimeSec = 0f;
+            th.lastReleaseTimeSec = 0f;
             th.isHolding = true;
 
             // touchHoldGroupPressedCount在外部处理
         }
         else
         {
-            if (th.releaseTimeSec <= NoteHelper.DELUXE_HOLD_RELEASE_IGNORE_TIME_SEC)
+            if (th.lastReleaseTimeSec <= NoteHelper.DELUXE_HOLD_RELEASE_IGNORE_TIME_SEC)
             {
-                th.releaseTimeSec += TimeData.deltaTime;
+                th.lastReleaseTimeSec += TimeData.deltaTime;
                 th.isHolding = true;
             }
             else
             {
                 th.isHolding = false;
                 if (timing > NoteHelper.TOUCH_HOLD_HEAD_IGNORE_LENGTH_SEC && remainingTime > NoteHelper.TOUCH_HOLD_TAIL_IGNORE_LENGTH_SEC)
-                    th.playerIdleTime += TimeData.deltaTime;
+                    th.playerIdleTimeSec += TimeData.deltaTime;
             }
         }
     }

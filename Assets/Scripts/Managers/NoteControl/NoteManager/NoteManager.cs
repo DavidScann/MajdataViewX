@@ -189,10 +189,18 @@ public partial class NoteManager : MonoBehaviour
                     touchHoldGroupPressedCounts[i] = 0;
                 for (int i = 0; i < touchHolds.Length; i++)
                 {
-                    var t = touchHolds[i];
-                    if (t.groupId != -1 && !t.isEnd && t.isHolding)
+                    ref var t = ref touchHolds.ElementRef(i);
+                    if (t.groupId != -1)
                     {
-                        touchHoldGroupPressedCounts[t.groupId]++;
+                        if (t.isEnd)
+                        {
+                            touchHoldGroupTotalCounts[t.groupId]--;
+                            t.groupId = -1;
+                        }
+                        else if (MajBurst.InputData.GetSensorState(t.sensor).Status)
+                        {
+                            touchHoldGroupPressedCounts[t.groupId]++;
+                        }
                     }
                 }
             }

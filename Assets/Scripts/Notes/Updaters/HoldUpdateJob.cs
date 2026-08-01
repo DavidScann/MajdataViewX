@@ -325,6 +325,7 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
             {
                 hold.judgeGrade = JudgeGrade.Miss;
                 hold.isHeadJudged = true;
+                hold.canHold = false;
                 hold.headDiff = NoteHelper.TAP_JUDGE_GOOD_AREA_MSEC / 1000f;
                 // NOTE: DO NOT EndNote here. A missed head keeps tracking the body and
                 // can still be recovered to LateGood by the release-percent mapping below.
@@ -340,6 +341,7 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
 
             hold.judgeGrade = NoteHelper.GetTapJudge(timing, hold.isEx);
             hold.isHeadJudged = true;
+            hold.canHold = true;
             hold.headDiff = timing;
             NoteHelper.PlayHoldSound(SfxRequests,
                 hold.judgeGrade,
@@ -356,7 +358,7 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
         if (remainingTime <= 0)
         {
             var realityHT = hold.LastFor - (NoteHelper.HOLD_HEAD_IGNORE_LENGTH_SEC + NoteHelper.HOLD_TAIL_IGNORE_LENGTH_SEC) - math.max(hold.headDiff, 0f);
-            var pct = math.clamp((realityHT - hold.playerIdleTime) / math.max(realityHT, 0.001f), 0f, 1f);
+            var pct = math.clamp((realityHT - hold.playerIdleTimeSec) / math.max(realityHT, 0.001f), 0f, 1f);
             hold.holdPercent = pct;
             if (!hold.isMine)
                 hold.judgeGrade = NoteHelper.GetHoldFinalGrade(hold.judgeGrade, pct, realityHT);
@@ -366,24 +368,40 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
 
         if (!TimeData.IsStart) return;
 
-        var on = InputData.GetSensorState(hold.Key).Status || InputData.GetButtonState(hold.Key).Status;
+        var btnStatus = InputData.GetButtonState(hold.Key);
+        var senStatus = InputData.GetSensorState(hold.Key);
+        var on = btnStatus.Status || senStatus.Status;
+
+        // 头判没了等pad down
+        if (!hold.canHold)
+        {
+            if (btnStatus.IsPadDown || senStatus.IsPadDown)
+            {
+                hold.canHold = true;
+            }
+            else
+            {
+                on = false;
+            }
+        }
+
         if (on)
         {
-            hold.releaseTimeSec = 0f;
+            hold.lastReleaseTimeSec = 0f;
             hold.isHolding = true;
         }
         else
         {
-            if (hold.releaseTimeSec <= NoteHelper.DELUXE_HOLD_RELEASE_IGNORE_TIME_SEC)
+            if (hold.lastReleaseTimeSec <= NoteHelper.DELUXE_HOLD_RELEASE_IGNORE_TIME_SEC)
             {
-                hold.releaseTimeSec += TimeData.deltaTime;
+                hold.lastReleaseTimeSec += TimeData.deltaTime;
                 hold.isHolding = true;
             }
             else
             {
                 hold.isHolding = false;
                 if (timing > NoteHelper.TOUCH_HOLD_HEAD_IGNORE_LENGTH_SEC && remainingTime > NoteHelper.TOUCH_HOLD_TAIL_IGNORE_LENGTH_SEC)
-                    hold.playerIdleTime += TimeData.deltaTime;
+                    hold.playerIdleTimeSec += TimeData.deltaTime;
             }
         }
     }

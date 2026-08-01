@@ -359,10 +359,10 @@ public partial class NoteManager
         int touchCount = touches.Length - touchStartIdx;
         int thCount = touchHolds.Length - touchHoldStartIdx;
 
-        // touchhold 头判和 touch 一起算 touchGroup；按下 group 另算
-        if (touchCount > 0 || thCount > 0)
+        // touch 头判与 touchhold 头判分开算 group；touchhold 按下 group 另算
+        if (touchCount > 0)
         {
-            ProcessTouchGroups(touchStartIdx, touchCount, touchHoldStartIdx, thCount);
+            ProcessTouchGroups(touchStartIdx, touchCount);
         }
         if (thCount > 0)
         {
@@ -491,51 +491,35 @@ public partial class NoteManager
     }
 
     /// <summary>
-    /// 头判 group：touch 和 touchhold 的头判一起参与 touchGroup（多数通过则全部判）。
-    /// touch 写 groupId/coverageId，touchhold 写 headGroupId/headCoverageId。
+    /// 头判 group：仅 touch 之间多数通过。写 touch 的 groupId/coverageId。
     /// </summary>
-    private void ProcessTouchGroups(int touchStartIdx, int touchCount, int thStartIdx, int thCount)
+    private void ProcessTouchGroups(int startIdx, int count)
     {
-        if (touchCount == 0 && thCount == 0) return;
+        if (count == 0) return;
 
-        // 收集非 mine note 的 sensor（mine 不参与 group），同时记原索引用于回写
-        var sensors = new List<SensorType>(touchCount + thCount);
-        var touchIdx = new List<int>(touchCount);
-        var thIdx = new List<int>(thCount);
-        for (int i = 0; i < touchCount; i++)
+        var sensors = new List<SensorType>(count);
+        var idx = new List<int>(count);
+        for (int i = 0; i < count; i++)
         {
-            if (touches[touchStartIdx + i].isMine) continue;
-            sensors.Add(touches[touchStartIdx + i].sensor);
-            touchIdx.Add(i);
-        }
-        for (int i = 0; i < thCount; i++)
-        {
-            if (touchHolds[thStartIdx + i].isMine) continue;
-            sensors.Add(touchHolds[thStartIdx + i].sensor);
-            thIdx.Add(i);
+            if (touches[startIdx + i].isMine) continue;
+            sensors.Add(touches[startIdx + i].sensor);
+            idx.Add(i);
         }
 
         var build = BuildTouchGroups(sensors, touchGroupTotalCounts, touchGroupJudgedCounts, touchGroupCoverResults, allowSlide: true);
 
-        for (int k = 0; k < touchIdx.Count; k++)
+        for (int k = 0; k < idx.Count; k++)
         {
-            var t = touches[touchStartIdx + touchIdx[k]];
+            var t = touches[startIdx + idx[k]];
             t.groupId = build.MemberGroupIds[k];
             t.coverageId = build.CoverageId;
-            touches[touchStartIdx + touchIdx[k]] = t;
-        }
-        for (int k = 0; k < thIdx.Count; k++)
-        {
-            var t = touchHolds[thStartIdx + thIdx[k]];
-            t.headGroupId = build.MemberGroupIds[touchIdx.Count + k];
-            t.headCoverageId = build.CoverageId;
-            touchHolds[thStartIdx + thIdx[k]] = t;
+            touches[startIdx + idx[k]] = t;
         }
     }
 
     /// <summary>
-    /// 按下 group：仅 touchhold 之间，hold 期间多数按下则视为按下。
-    /// 写 touchhold 的 groupId/coverageId。
+    /// touchhold 的头判 group 与按下 group 分开算（均仅 touchhold 之间，互不影响，也不与 touch 头判合并）：
+    /// 头判 group 走 touchGroup 累计计数(多数通过带飞头判)，按下 group 走 touchHoldGroup 每帧重置计数(hold 期间多数按下)。
     /// </summary>
     private void ProcessTouchHoldGroups(int startIdx, int count)
     {
@@ -550,13 +534,18 @@ public partial class NoteManager
             idx.Add(i);
         }
 
-        var build = BuildTouchGroups(sensors, touchHoldGroupTotalCounts, touchHoldGroupPressedCounts, touchHoldGroupCoverResults, allowSlide: false);
+        // 头判 group：与 touch 头判分开，独立多数通过
+        var headBuild = BuildTouchGroups(sensors, touchGroupTotalCounts, touchGroupJudgedCounts, touchGroupCoverResults, allowSlide: true);
+        // 按下 group：hold 期间多数按下
+        var holdBuild = BuildTouchGroups(sensors, touchHoldGroupTotalCounts, touchHoldGroupPressedCounts, touchHoldGroupCoverResults, allowSlide: false);
 
         for (int k = 0; k < idx.Count; k++)
         {
             var t = touchHolds[startIdx + idx[k]];
-            t.groupId = build.MemberGroupIds[k];
-            t.coverageId = build.CoverageId;
+            t.headGroupId = headBuild.MemberGroupIds[k];
+            t.headCoverageId = headBuild.CoverageId;
+            t.groupId = holdBuild.MemberGroupIds[k];
+            t.coverageId = holdBuild.CoverageId;
             touchHolds[startIdx + idx[k]] = t;
         }
     }

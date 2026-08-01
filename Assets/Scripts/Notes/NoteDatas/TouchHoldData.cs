@@ -39,12 +39,13 @@ public struct TouchHoldData
     public NoteSp _borderOnSpriteCache;
 
     public bool isHeadJudged;
-    public JudgeGrade judgeGrade;
     public float headDiff;
-    public float playerIdleTime;
-    public float holdPercent;
+    public JudgeGrade judgeGrade;
+    public bool canHold;
     public bool isHolding;
-    public float releaseTimeSec;
+    public float holdPercent;
+    public float playerIdleTimeSec;
+    public float lastReleaseTimeSec;
 
     // 头判参与 touchGroup（与 touch 的 groupId 同语义，和同 timing 的 touch 一起多数通过）
     public int headGroupId;
@@ -85,7 +86,7 @@ public struct TouchHoldData
         }
 
         // 一开始放开时间无穷大，按下后才能重置为0，避免一开始就小于release忽略时间
-        releaseTimeSec = float.PositiveInfinity;
+        lastReleaseTimeSec = float.PositiveInfinity;
     }
 
     public readonly bool IsFoldable(TouchHoldData other) =>
