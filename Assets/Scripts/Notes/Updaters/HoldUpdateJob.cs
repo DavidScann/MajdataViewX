@@ -325,7 +325,6 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
             {
                 hold.judgeGrade = JudgeGrade.Miss;
                 hold.isHeadJudged = true;
-                hold.canHold = false;
                 hold.headDiff = NoteHelper.TAP_JUDGE_GOOD_AREA_MSEC / 1000f;
                 // NOTE: DO NOT EndNote here. A missed head keeps tracking the body and
                 // can still be recovered to LateGood by the release-percent mapping below.
@@ -341,7 +340,6 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
 
             hold.judgeGrade = NoteHelper.GetTapJudge(timing, hold.isEx);
             hold.isHeadJudged = true;
-            hold.canHold = true;
             hold.headDiff = timing;
             NoteHelper.PlayHoldSound(SfxRequests,
                 hold.judgeGrade,
@@ -371,19 +369,6 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
         var btnStatus = InputData.GetButtonState(hold.Key);
         var senStatus = InputData.GetSensorState(hold.Key);
         var on = btnStatus.Status || senStatus.Status;
-
-        // 头判没了等pad down
-        if (!hold.canHold)
-        {
-            if (btnStatus.IsPadDown || senStatus.IsPadDown)
-            {
-                hold.canHold = true;
-            }
-            else
-            {
-                on = false;
-            }
-        }
 
         if (on)
         {

@@ -43,7 +43,6 @@ public struct HoldData
     public bool isHeadJudged;
     public float headDiff;
     public JudgeGrade judgeGrade;
-    public bool canHold;
     public bool isHolding;
     public float holdPercent;
     public float playerIdleTimeSec;

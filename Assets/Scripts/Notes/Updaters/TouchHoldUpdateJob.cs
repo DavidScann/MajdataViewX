@@ -270,7 +270,6 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
             {
                 th.judgeGrade = JudgeGrade.Miss;
                 th.isHeadJudged = true;
-                th.canHold = false;
                 th.headDiff = NoteHelper.TOUCH_JUDGE_GOOD_AREA_MSEC / 1000f;
                 return;
             }
@@ -291,7 +290,6 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
 
             th.judgeGrade = NoteHelper.GetTouchJudge(timing);
             th.isHeadJudged = true;
-            th.canHold = true;
             th.headDiff = timing;
 
             if (th.headGroupId != -1 && th.judgeGrade != JudgeGrade.Miss)
@@ -322,20 +320,6 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
 
         var on = InputData.GetSensorState(th.sensor).Status;
 
-        // 头判没了等pad down
-        if (!th.canHold)
-        {
-            if (InputData.GetSensorState(th.sensor).IsPadDown)
-            {
-                th.canHold = true;
-            }
-            else
-            {
-                on = false;
-            }
-        }
-
-        // touch group 的官更大
         if (th.groupId != -1)
         {
             if (touchHoldGroupPressedCounts[th.groupId] * 2 > touchHoldGroupTotalCounts[th.groupId])
