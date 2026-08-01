@@ -32,6 +32,9 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
     public EffectData* JudgeEffectRequests;
     public NativeList<ReportResultEntry>.ParallelWriter ReportResults;
 
+    [ReadOnly] public NativeArray<int> touchGroupTotalCounts;
+    [NativeDisableParallelForRestriction] public NativeArray<int> touchGroupJudgedCounts;
+    [ReadOnly] public NativeArray<CoverResult> touchGroupCoverResults;
     [ReadOnly] public NativeArray<int> touchHoldGroupTotalCounts;
     [ReadOnly] public NativeArray<int> touchHoldGroupPressedCounts;
     [ReadOnly] public NativeArray<CoverResult> touchHoldGroupCoverResults;
@@ -216,9 +219,16 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
             case AutoPlayMode.DJAutoButton:
             case AutoPlayMode.DJAutoSensor:
                 if (th.isMine) break;
-                if (!th.isHeadJudged || math.max(th.LastFor - timing, 0) > 0)
+                // 头判阶段用 touchGroup 覆盖(和 touch 共享)，hold 阶段用 touchHoldGroup 覆盖
+                if (!th.isHeadJudged)
                 {
-                    InputData.DJAutoAddGroupCoverage(touchHoldGroupCoverResults[th.coverageId]);
+                    if (th.headCoverageId >= 0)
+                        InputData.DJAutoAddGroupCoverage(touchGroupCoverResults[th.headCoverageId], timing);
+                }
+                else if (math.max(th.LastFor - timing, 0) > 0)
+                {
+                    if (th.coverageId >= 0)
+                        InputData.DJAutoAddGroupCoverage(touchHoldGroupCoverResults[th.coverageId]);
                 }
                 break;
         }
@@ -265,6 +275,13 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
             }
 
             var clicked = InputData.GetSensorState(th.sensor).IsPadDown;
+            if (th.headGroupId != -1)
+            {
+                if (touchGroupJudgedCounts[th.headGroupId] * 2 > touchGroupTotalCounts[th.headGroupId])
+                {
+                    clicked = true;
+                }
+            }
 
             if (!clicked) return;
             var diffMSec = timing * 1000;
@@ -274,6 +291,16 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
             th.judgeGrade = NoteHelper.GetTouchJudge(timing);
             th.isHeadJudged = true;
             th.headDiff = timing;
+
+            if (th.headGroupId != -1 && th.judgeGrade != JudgeGrade.Miss)
+            {
+                unsafe
+                {
+                    var ptr = (int*)touchGroupJudgedCounts.GetUnsafePtr();
+                    Interlocked.Increment(ref ptr[th.headGroupId]);
+                }
+            }
+
             return;
         }
 
@@ -304,6 +331,8 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
         {
             th.releaseTimeSec = 0f;
             th.isHolding = true;
+
+            // touchHoldGroupPressedCount在外部处理
         }
         else
         {

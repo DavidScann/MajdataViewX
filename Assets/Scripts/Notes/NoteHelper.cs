@@ -349,9 +349,9 @@ public static unsafe class NoteHelper
         EffectData* JudgeEffectRequests,
         int key, JudgeGrade judge, bool isBreak, bool isMine)
     {
-        if (isMine || judge is JudgeGrade.TooFast or JudgeGrade.Miss) return;
         JudgeEffectRequests[key].Effect = EffectType.Tap;
         JudgeEffectRequests[key].IsBreak = isBreak;
+        JudgeEffectRequests[key].IsMine = isMine;
         JudgeEffectRequests[key].JudgeGrade = judge;
     }
 
@@ -364,11 +364,11 @@ public static unsafe class NoteHelper
         EffectData* JudgeEffectRequests,
         int key, JudgeGrade judge, bool isBreak, bool isHanabi, bool isMine)
     {
-        if (isMine || judge is JudgeGrade.TooFast or JudgeGrade.Miss) return;
         JudgeEffectRequests[key].Effect = EffectType.Touch;
-        if (isHanabi && (judge is not JudgeGrade.Miss or JudgeGrade.TooFast))
+        if (isHanabi && (judge is not (JudgeGrade.Miss or JudgeGrade.TooFast)))
             JudgeEffectRequests[key].Effect |= EffectType.Firework;
         JudgeEffectRequests[key].IsBreak = isBreak;
+        JudgeEffectRequests[key].IsMine = isMine;
         JudgeEffectRequests[key].JudgeGrade = judge;
     }
 

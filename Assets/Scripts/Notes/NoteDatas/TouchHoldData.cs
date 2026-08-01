@@ -46,11 +46,17 @@ public struct TouchHoldData
     public bool isHolding;
     public float releaseTimeSec;
 
+    // 头判参与 touchGroup（与 touch 的 groupId 同语义，和同 timing 的 touch 一起多数通过）
+    public int headGroupId;
+    public int headCoverageId;
+    // 按下 group：touchhold 专属的 touchHoldGroup（hold 期间多数按下）
     public int groupId;
     public int coverageId;
 
     public void Init()
     {
+        headGroupId = -1;
+        headCoverageId = -1;
         groupId = -1;
         coverageId = -1;
         fanAlpha = 0;

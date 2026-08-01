@@ -357,78 +357,87 @@ public partial class NoteManager
         }
 
         int touchCount = touches.Length - touchStartIdx;
-        if (touchCount > 0)
-        {
-            ProcessTouchGroups(touchStartIdx, touchCount);
-        }
-
         int thCount = touchHolds.Length - touchHoldStartIdx;
+
+        // touchhold 头判和 touch 一起算 touchGroup；按下 group 另算
+        if (touchCount > 0 || thCount > 0)
+        {
+            ProcessTouchGroups(touchStartIdx, touchCount, touchHoldStartIdx, thCount);
+        }
         if (thCount > 0)
         {
             ProcessTouchHoldGroups(touchHoldStartIdx, thCount);
         }
     }
 
-    private void ProcessTouchGroups(int startIdx, int count)
+    private struct TouchGroupBuild
     {
-        if (count == 0) return;
+        public int[] MemberGroupIds;
+        public int CoverageId;
+    }
 
-        List<int> uniqueIndices = new List<int>();
-        int[] originalToUnique = new int[count];
+    /// <summary>
+    /// 把同 timing 的一批 touch 类 note 按传感器邻接关系聚成判定 group，并算出 DJAuto 覆盖。
+    /// 算法：去重(同 sensor 合并) -> BFS 连通分量 -> 分量内 ≥5 个 sensor 才建 group(多数通过)。
+    /// group 的 totalCount 等计数由调用方传入的 list 承接，groupId 即追加时的下标。
+    /// </summary>
+    private static TouchGroupBuild BuildTouchGroups(
+        IReadOnlyList<SensorType> sensors,
+        NativeList<int> totalCountsOut,
+        NativeList<int> counterOut,
+        NativeList<CoverResult> coverResultsOut,
+        bool allowSlide)
+    {
+        int count = sensors.Count;
+        var memberGroupIds = new int[count];
+        for (int i = 0; i < count; i++) memberGroupIds[i] = -1;
+
+        // 1. 去重：同 sensor 合并为一个 unique
+        var uniqueIndices = new List<int>();      // unique -> 该 sensor 的首个 member 索引
+        var memberToUnique = new int[count];
         for (int i = 0; i < count; i++)
         {
-            if (touches[startIdx + i].isMine) continue;
-
-            int foundUnique = -1;
+            int found = -1;
             for (int j = 0; j < uniqueIndices.Count; j++)
             {
-                if (touches[startIdx + i].sensor == touches[startIdx + uniqueIndices[j]].sensor)
+                if (sensors[uniqueIndices[j]] == sensors[i])
                 {
-                    foundUnique = j;
+                    found = j;
                     break;
                 }
             }
-            if (foundUnique != -1)
-            {
-                originalToUnique[i] = foundUnique;
-            }
-            else
-            {
-                originalToUnique[i] = uniqueIndices.Count;
-                uniqueIndices.Add(i);
-            }
+            memberToUnique[i] = found != -1 ? found : uniqueIndices.Count;
+            if (found == -1) uniqueIndices.Add(i);
         }
 
         int uniqueCount = uniqueIndices.Count;
-        if (uniqueCount == 0) return;
+        if (uniqueCount == 0)
+            return new TouchGroupBuild { MemberGroupIds = memberGroupIds, CoverageId = -1 };
 
-        bool[] visited = new bool[uniqueCount];
-        var groups = new List<Group>();
+        // 2. BFS 连通分量：TOUCH_GROUPS 邻接关系
+        var visited = new bool[uniqueCount];
         var uniqueGroupIds = new int[uniqueCount];
         for (int i = 0; i < uniqueCount; i++) uniqueGroupIds[i] = -1;
+        var groups = new List<Group>();
 
         for (int i = 0; i < uniqueCount; i++)
         {
             if (visited[i]) continue;
 
-            // Find connected component
-            List<int> component = new List<int>();
-            Queue<int> queue = new Queue<int>();
+            var component = new List<int>();
+            var queue = new Queue<int>();
             queue.Enqueue(i);
             visited[i] = true;
-
             while (queue.Count > 0)
             {
                 int curr = queue.Dequeue();
                 component.Add(curr);
 
+                var s1 = sensors[uniqueIndices[curr]];
                 for (int j = 0; j < uniqueCount; j++)
                 {
                     if (visited[j]) continue;
-
-                    SensorType s1 = touches[startIdx + uniqueIndices[curr]].sensor;
-                    SensorType s2 = touches[startIdx + uniqueIndices[j]].sensor;
-
+                    var s2 = sensors[uniqueIndices[j]];
                     if (TouchGroupManager.TOUCH_GROUPS.TryGetValue(s1, out var adj) && adj.Contains(s2))
                     {
                         visited[j] = true;
@@ -437,200 +446,118 @@ public partial class NoteManager
                 }
             }
 
-            if (component.Count >= 5)
+            // 3. ≥5 个 sensor 才算一个判定 group（多数通过阈值）
+            if (component.Count < 5) continue;
+
+            int groupId = totalCountsOut.Length;
+            // total 含同 sensor 重复的 note（每个实际 note 都计入判定计数）
+            int total = 0;
+            for (int m = 0; m < count; m++)
             {
-                int groupId = touchGroupTotalCounts.Length;
-                int totalTouchesInGroup = 0;
-                for (int c = 0; c < count; c++)
-                {
-                    if (touches[startIdx + c].isMine) continue;
-                    if (component.Contains(originalToUnique[c]))
-                        totalTouchesInGroup++;
-                }
-
-                touchGroupTotalCounts.Add(totalTouchesInGroup);
-                touchGroupJudgedCounts.Add(0);
-
-                var groupDef = new Group { PointIndices = new int[component.Count] };
-
-                for (int k = 0; k < component.Count; k++)
-                {
-                    int uIdx = component[k];
-                    uniqueGroupIds[uIdx] = groupId;
-                    groupDef.PointIndices[k] = uIdx;
-                }
-
-                groups.Add(groupDef);
+                if (component.Contains(memberToUnique[m])) total++;
             }
+            totalCountsOut.Add(total);
+            counterOut.Add(0);
+
+            var groupDef = new Group { PointIndices = new int[component.Count] };
+            for (int k = 0; k < component.Count; k++)
+            {
+                int u = component[k];
+                uniqueGroupIds[u] = groupId;
+                groupDef.PointIndices[k] = u;
+            }
+            groups.Add(groupDef);
         }
 
+        // 4. 回填每个 member 的 groupId
         for (int i = 0; i < count; i++)
-        {
-            if (touches[startIdx + i].isMine) continue;
+            memberGroupIds[i] = uniqueGroupIds[memberToUnique[i]];
 
-            int uIdx = originalToUnique[i];
-            if (uniqueGroupIds[uIdx] != -1)
-            {
-                var t = touches[startIdx + i];
-                t.groupId = uniqueGroupIds[uIdx];
-                touches[startIdx + i] = t;
-            }
-        }
-
-        // Solve Coverage for UNIQUE touches in this cluster
+        // 5. 算 DJAuto 覆盖（以 unique 传感器点位求解）
         var points = new float2[uniqueCount];
         var pointRadii = new float[uniqueCount];
         for (int i = 0; i < uniqueCount; i++)
         {
-            var sensor = touches[startIdx + uniqueIndices[i]].sensor;
+            var sensor = sensors[uniqueIndices[i]];
             points[i] = MajPos.GetSensorWorldPos(sensor);
             pointRadii[i] = MajPos.GetSensorRadius(sensor);
         }
+        var cover = CoverageSolver.Solve(points, pointRadii, groups, allowSlide: allowSlide);
 
-        var solverResult = CoverageSolver.Solve(points, pointRadii, groups, allowSlide: true);
+        int coverageId = coverResultsOut.Length;
+        coverResultsOut.Add(cover);
 
-        int coverageId = touchGroupCoverResults.Length;
-        touchGroupCoverResults.Add(solverResult);
+        return new TouchGroupBuild { MemberGroupIds = memberGroupIds, CoverageId = coverageId };
+    }
 
-        for (int i = 0; i < count; i++)
+    /// <summary>
+    /// 头判 group：touch 和 touchhold 的头判一起参与 touchGroup（多数通过则全部判）。
+    /// touch 写 groupId/coverageId，touchhold 写 headGroupId/headCoverageId。
+    /// </summary>
+    private void ProcessTouchGroups(int touchStartIdx, int touchCount, int thStartIdx, int thCount)
+    {
+        if (touchCount == 0 && thCount == 0) return;
+
+        // 收集非 mine note 的 sensor（mine 不参与 group），同时记原索引用于回写
+        var sensors = new List<SensorType>(touchCount + thCount);
+        var touchIdx = new List<int>(touchCount);
+        var thIdx = new List<int>(thCount);
+        for (int i = 0; i < touchCount; i++)
         {
-            if (touches[startIdx + i].isMine) continue;
+            if (touches[touchStartIdx + i].isMine) continue;
+            sensors.Add(touches[touchStartIdx + i].sensor);
+            touchIdx.Add(i);
+        }
+        for (int i = 0; i < thCount; i++)
+        {
+            if (touchHolds[thStartIdx + i].isMine) continue;
+            sensors.Add(touchHolds[thStartIdx + i].sensor);
+            thIdx.Add(i);
+        }
 
-            var t = touches[startIdx + i];
-            t.coverageId = coverageId;
-            touches[startIdx + i] = t;
+        var build = BuildTouchGroups(sensors, touchGroupTotalCounts, touchGroupJudgedCounts, touchGroupCoverResults, allowSlide: true);
+
+        for (int k = 0; k < touchIdx.Count; k++)
+        {
+            var t = touches[touchStartIdx + touchIdx[k]];
+            t.groupId = build.MemberGroupIds[k];
+            t.coverageId = build.CoverageId;
+            touches[touchStartIdx + touchIdx[k]] = t;
+        }
+        for (int k = 0; k < thIdx.Count; k++)
+        {
+            var t = touchHolds[thStartIdx + thIdx[k]];
+            t.headGroupId = build.MemberGroupIds[touchIdx.Count + k];
+            t.headCoverageId = build.CoverageId;
+            touchHolds[thStartIdx + thIdx[k]] = t;
         }
     }
 
+    /// <summary>
+    /// 按下 group：仅 touchhold 之间，hold 期间多数按下则视为按下。
+    /// 写 touchhold 的 groupId/coverageId。
+    /// </summary>
     private void ProcessTouchHoldGroups(int startIdx, int count)
     {
         if (count == 0) return;
 
-        List<int> uniqueIndices = new List<int>();
-        int[] originalToUnique = new int[count];
+        var sensors = new List<SensorType>(count);
+        var idx = new List<int>(count);
         for (int i = 0; i < count; i++)
         {
             if (touchHolds[startIdx + i].isMine) continue;
-
-            int foundUnique = -1;
-            for (int j = 0; j < uniqueIndices.Count; j++)
-            {
-                if (touchHolds[startIdx + i].sensor == touchHolds[startIdx + uniqueIndices[j]].sensor)
-                {
-                    foundUnique = j;
-                    break;
-                }
-            }
-            if (foundUnique != -1)
-            {
-                originalToUnique[i] = foundUnique;
-            }
-            else
-            {
-                originalToUnique[i] = uniqueIndices.Count;
-                uniqueIndices.Add(i);
-            }
+            sensors.Add(touchHolds[startIdx + i].sensor);
+            idx.Add(i);
         }
 
-        int uniqueCount = uniqueIndices.Count;
-        if (uniqueCount == 0) return;
+        var build = BuildTouchGroups(sensors, touchHoldGroupTotalCounts, touchHoldGroupPressedCounts, touchHoldGroupCoverResults, allowSlide: false);
 
-        bool[] visited = new bool[uniqueCount];
-        var groups = new List<Group>();
-        var uniqueGroupIds = new int[uniqueCount];
-        for (int i = 0; i < uniqueCount; i++) uniqueGroupIds[i] = -1;
-
-        for (int i = 0; i < uniqueCount; i++)
+        for (int k = 0; k < idx.Count; k++)
         {
-            if (visited[i]) continue;
-
-            List<int> component = new List<int>();
-            Queue<int> queue = new Queue<int>();
-            queue.Enqueue(i);
-            visited[i] = true;
-
-            while (queue.Count > 0)
-            {
-                int curr = queue.Dequeue();
-                component.Add(curr);
-
-                for (int j = 0; j < uniqueCount; j++)
-                {
-                    if (visited[j]) continue;
-
-                    SensorType s1 = touchHolds[startIdx + uniqueIndices[curr]].sensor;
-                    SensorType s2 = touchHolds[startIdx + uniqueIndices[j]].sensor;
-
-                    if (TouchGroupManager.TOUCH_GROUPS.TryGetValue(s1, out var adj) && adj.Contains(s2))
-                    {
-                        visited[j] = true;
-                        queue.Enqueue(j);
-                    }
-                }
-            }
-
-            if (component.Count >= 5)
-            {
-                int groupId = touchHoldGroupTotalCounts.Length;
-                int totalTouchesInGroup = 0;
-                for (int c = 0; c < count; c++)
-                {
-                    if (touchHolds[startIdx + c].isMine) continue;
-                    if (component.Contains(originalToUnique[c]))
-                        totalTouchesInGroup++;
-                }
-
-                touchHoldGroupTotalCounts.Add(totalTouchesInGroup);
-                touchHoldGroupPressedCounts.Add(0);
-
-                var groupDef = new Group { PointIndices = new int[component.Count] };
-
-                for (int k = 0; k < component.Count; k++)
-                {
-                    int uIdx = component[k];
-                    uniqueGroupIds[uIdx] = groupId;
-                    groupDef.PointIndices[k] = uIdx;
-                }
-
-                groups.Add(groupDef);
-            }
-        }
-
-        for (int i = 0; i < count; i++)
-        {
-            if (touchHolds[startIdx + i].isMine) continue;
-
-            int uIdx = originalToUnique[i];
-            if (uniqueGroupIds[uIdx] != -1)
-            {
-                var t = touchHolds[startIdx + i];
-                t.groupId = uniqueGroupIds[uIdx];
-                touchHolds[startIdx + i] = t;
-            }
-        }
-
-        // Solve Coverage for UNIQUE touch holds in this cluster
-        var points = new float2[uniqueCount];
-        var pointRadii = new float[uniqueCount];
-        for (int i = 0; i < uniqueCount; i++)
-        {
-            var sensor = touchHolds[startIdx + uniqueIndices[i]].sensor;
-            points[i] = MajPos.GetSensorWorldPos(sensor);
-            pointRadii[i] = MajPos.GetSensorRadius(sensor);
-        }
-
-        var solverResult = CoverageSolver.Solve(points, pointRadii, groups);
-
-        int coverageId = touchHoldGroupCoverResults.Length;
-        touchHoldGroupCoverResults.Add(solverResult);
-
-        for (int i = 0; i < count; i++)
-        {
-            if (touchHolds[startIdx + i].isMine) continue;
-
-            var t = touchHolds[startIdx + i];
-            t.coverageId = coverageId;
-            touchHolds[startIdx + i] = t;
+            var t = touchHolds[startIdx + idx[k]];
+            t.groupId = build.MemberGroupIds[k];
+            t.coverageId = build.CoverageId;
+            touchHolds[startIdx + idx[k]] = t;
         }
     }
 

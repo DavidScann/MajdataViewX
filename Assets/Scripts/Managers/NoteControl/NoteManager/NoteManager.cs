@@ -27,6 +27,9 @@ public partial class NoteManager : MonoBehaviour
     NativeList<TouchData> touches = new(1024, Allocator.Persistent);
     NativeList<TouchHoldData> touchHolds = new(1024, Allocator.Persistent);
 
+    /// <summary>
+    /// 这个包含touchhold的头判
+    /// </summary>
     NativeList<int> touchGroupTotalCounts = new(256, Allocator.Persistent);
     NativeList<int> touchGroupJudgedCounts = new(256, Allocator.Persistent);
     NativeList<CoverResult> touchGroupCoverResults = new(256, Allocator.Persistent);
@@ -187,10 +190,9 @@ public partial class NoteManager : MonoBehaviour
                 for (int i = 0; i < touchHolds.Length; i++)
                 {
                     var t = touchHolds[i];
-                    if (t.groupId != -1 && !t.isEnd)
+                    if (t.groupId != -1 && !t.isEnd && t.isHolding)
                     {
-                        if (MajBurst.InputData.GetSensorState(t.sensor).Status)
-                            touchHoldGroupPressedCounts[t.groupId]++;
+                        touchHoldGroupPressedCounts[t.groupId]++;
                     }
                 }
             }
@@ -234,6 +236,9 @@ public partial class NoteManager : MonoBehaviour
                     SfxRequests = _audioManager.SfxRequestsPtr,
                     JudgeEffectRequests = _effectManager.JudgeEffectRequestsPtr,
                     ReportResults = _objectCounter.ReportRequestsWriter,
+                    touchGroupTotalCounts = touchGroupTotalCounts.AsArray(),
+                    touchGroupJudgedCounts = touchGroupJudgedCounts.AsArray(),
+                    touchGroupCoverResults = touchGroupCoverResults.AsArray(),
                     touchHoldGroupTotalCounts = touchHoldGroupTotalCounts.AsArray(),
                     touchHoldGroupPressedCounts = touchHoldGroupPressedCounts.AsArray(),
                     touchHoldGroupCoverResults = touchHoldGroupCoverResults.AsArray(),

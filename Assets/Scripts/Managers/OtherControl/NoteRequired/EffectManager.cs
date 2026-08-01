@@ -117,18 +117,24 @@ public class EffectManager : MonoBehaviour
         for (var i = 0; i < judgeEffectRequests.Length; i++)
         {
             var req = judgeEffectRequests[i];
-            if (req.Effect.HasFlag(EffectType.Tap))
+
+            if (!req.IsMine ||
+                (req.IsMine && req.JudgeGrade is (JudgeGrade.Miss or JudgeGrade.TooFast)))
             {
-                PlayTapEffect(i, req.JudgeGrade, req.IsBreak);
+                if (req.Effect.HasFlag(EffectType.Tap))
+                {
+                    PlayTapEffect(i, req.JudgeGrade, req.IsBreak);
+                }
+                if (req.Effect.HasFlag(EffectType.Touch))
+                {
+                    PlayTouchEffect(i, req.JudgeGrade, req.IsBreak);
+                }
+                if (req.Effect.HasFlag(EffectType.Firework))
+                {
+                    PlayFireworkEffect(i);
+                }
             }
-            if (req.Effect.HasFlag(EffectType.Touch))
-            {
-                PlayTouchEffect(i, req.JudgeGrade, req.IsBreak);
-            }
-            if (req.Effect.HasFlag(EffectType.Firework))
-            {
-                PlayFireworkEffect(i);
-            }
+
             holdEffects[i].SetActive(req.HasHolding);
             if (req.HasHolding)
             {
@@ -312,6 +318,7 @@ public struct EffectData
     public EffectType Effect;
     public JudgeGrade JudgeGrade;
     public bool IsBreak;
+    public bool IsMine;
     public bool HasHolding;
     public Color HoldingColor;
 }
