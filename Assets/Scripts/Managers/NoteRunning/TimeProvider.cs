@@ -1,8 +1,8 @@
-﻿#pragma warning disable CS8500 // 这会获取托管类型的地址、获取其大小或声明指向它的指针
 #region
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.IO.MemoryMappedFiles;
 using MajSimai;
@@ -33,15 +33,17 @@ public class TimeProvider : MonoBehaviour
     private static NativeList<(float time, float sVeloc)> SVList = new(20, Allocator.Persistent);
     private static NativeArray<(float k, float b)> SVFuncArgs;
 
-    private float startRealtime; //the beginning of the program is 0
+    private double startRealtime; //the beginning of the program is 0
     private float startAt; //the beginning of the audio is 0
     private float offset;
     private float speed;
     //for pause and resume
-    private float accumulated;
+    private double accumulated;
+    private readonly Stopwatch playbackClock = new();
 
 
-    private string mmfAudioTimePath => Path.Combine(MajEnv.MajBase, "majdata_time.dat");
+    private string mmfAudioTimePath =>
+        Path.Combine(Application.persistentDataPath, "majdata_time.dat");
     private MemoryMappedFile mmfAudioTime;
     private MemoryMappedViewAccessor mmvAudioTime;
 
@@ -50,6 +52,7 @@ public class TimeProvider : MonoBehaviour
     private void Awake()
     {
         _timeProvider = this;
+        ResetState();
 
         var mmfAudioTimeFileStream = new FileStream(
             mmfAudioTimePath,
@@ -70,26 +73,35 @@ public class TimeProvider : MonoBehaviour
         mmvAudioTime = mmfAudioTime.CreateViewAccessor();
     }
 
-    private unsafe void Update()
+    private void Update()
     {
+        TimeData.IsStart = IsStart;
+        TimeData.deltaTime = IsRecord ? FRAME_LENGTH_SEC : Time.deltaTime;
         if (!IsStart) return;
 
         if (IsRecord)
         {
-            AudioTime = startAt + accumulated + (Time.time - startRealtime);
+            AudioTime = (float)(startAt + accumulated + (Time.timeAsDouble - startRealtime));
             NoteTime = AudioTime - offset;
         }
         else
         {
-            AudioTime = startAt + accumulated + (Time.realtimeSinceStartup - startRealtime) * speed;
+            // Keep one monotonic clock as the source of truth. Audio and video are
+            // followers; an exhausted audio stream must never pull NoteTime back
+            // to its final sample.
+            AudioTime = (float)(startAt + accumulated + playbackClock.Elapsed.TotalSeconds * speed);
             NoteTime = AudioTime - offset;
+
+            double trackOffset =
+                AudioManager.TRACK_ANSWER_PLAYBACK_OFFSET_SEC +
+                _audioManager.GlobalAudioOffset;
+            _audioManager.SynchronizeTrack(AudioTime - trackOffset, speed);
         }
 
+        // The shared-memory clock uses the same monotonic timeline as NoteTime.
         mmvAudioTime.Write(0, AudioTime);
 
-        TimeData.IsStart = IsStart;
         TimeData.NoteTime = NoteTime;
-        TimeData.deltaTime = Time.deltaTime;
     }
 
     public unsafe void LoadSV(ReadOnlySpan<SimaiTimingPoint> commaTimings)
@@ -103,7 +115,6 @@ public class TimeProvider : MonoBehaviour
                 SVList.Add(((float)timing.Timing, timing.SVeloc));
             }
         }
-
         if (SVList.Length == 0)
         {
             return;
@@ -120,12 +131,10 @@ public class TimeProvider : MonoBehaviour
         for (var i = 0; i < SVList.Length; i++)
         {
             var (time, sveloc) = SVList[i];
-
             pos += lastSpeed * (time - lastTime);
 
-            //PositionFunctions.Add((t) => pos + lastSpeed * (t - lastTime));
-            SVFuncArgs[i + 1] = (lastSpeed, pos - lastSpeed * lastTime);
-
+            // 使用当前点的时间和当前新的速度构建往后的运动方程
+            SVFuncArgs[i + 1] = (sveloc, pos - sveloc * time);
             lastTime = time;
             lastSpeed = sveloc;
         }
@@ -143,6 +152,7 @@ public class TimeProvider : MonoBehaviour
         AudioTime = 0f;
         NoteTime = 0f;
         accumulated = 0f;
+        playbackClock.Reset();
         Time.timeScale = 1f;
 
         startAt = (float)_startAt;
@@ -153,26 +163,28 @@ public class TimeProvider : MonoBehaviour
         {
             case PlaybackMode.Normal:
                 {
-                    startRealtime = Time.realtimeSinceStartup;
                     speed = _speed;
                     Time.captureFramerate = 0;
+                    playbackClock.Restart();
                 }
                 break;
             case PlaybackMode.IncludeOp:
                 {
-                    startRealtime = Time.realtimeSinceStartup;
                     startAt -= SONG_DETAIL_OFFSET;
                     speed = _speed;
                     Time.captureFramerate = 0;
+                    playbackClock.Restart();
                 }
                 break;
             case PlaybackMode.Record:
                 {
                     IsRecord = true;
-                    startRealtime = Time.time;
+                    startRealtime = Time.timeAsDouble;
                     startAt -= SONG_DETAIL_OFFSET;
                     Time.timeScale = _speed;
                     Time.captureFramerate = fps;
+                    // 防止帧率对“下一帧应用”的机制产生过大影响
+                    InputManager.DJAUTO_AUTOPLAY_START_SEC_SS.Data = -1f / fps;
                 }
                 break;
         }
@@ -186,11 +198,12 @@ public class TimeProvider : MonoBehaviour
     {
         if (!IsStart) return;
 
-        var now = IsRecord ? Time.time : Time.realtimeSinceStartup;
+        var now = IsRecord ? Time.timeAsDouble : Time.realtimeSinceStartupAsDouble;
         accumulated += IsRecord
             ? now - startRealtime
-            : (now - startRealtime) * speed;
+            : playbackClock.Elapsed.TotalSeconds * speed;
 
+        playbackClock.Reset();
         IsStart = false;
     }
 
@@ -199,7 +212,10 @@ public class TimeProvider : MonoBehaviour
         if (_speed != null) speed = _speed.Value;
         if (IsStart) return;
 
-        startRealtime = IsRecord ? Time.time : Time.realtimeSinceStartup;
+        if (IsRecord)
+            startRealtime = Time.timeAsDouble;
+        else
+            playbackClock.Restart();
 
         IsStart = true;
     }
@@ -215,6 +231,7 @@ public class TimeProvider : MonoBehaviour
         offset = 0f;
         accumulated = 0f;
         speed = 1f;
+        playbackClock.Reset();
         Time.timeScale = 1f;
         Time.captureFramerate = 0;
     }
@@ -237,6 +254,9 @@ public struct TimeDataB
     public float NoteTime;
     public readonly float FakeNoteTime => GetPositionAtTime(NoteTime);
 
+    /// <summary>
+    /// 录制模式时恒为FRAME_LENGTH_SEC，因此无法与Time.xxx配合使用！！！
+    /// </summary>
     public float deltaTime;
 
     // public NativeList<(float time, float sVeloc)> SVList;
@@ -273,7 +293,7 @@ public struct TimeDataB
             }
             else low = mid + 1;
         }
-        return SVFuncArgs[^1].k * t + SVFuncArgs[^1].k;
+        return SVFuncArgs[^1].k * t + SVFuncArgs[^1].b;
     }
 
     public readonly float GetFrame() => NoteTime * 1000 / 16.6667f;

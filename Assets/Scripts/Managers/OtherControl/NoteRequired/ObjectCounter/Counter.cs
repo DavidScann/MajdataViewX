@@ -1,14 +1,13 @@
 #region
 
+using MajSimai;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Cysharp.Threading.Tasks;
-using MajSimai;
+using System.Runtime.InteropServices.ComTypes;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
-
 using static MajCtx;
 
 #endregion
@@ -120,6 +119,7 @@ public partial class ObjectCounter : MonoBehaviour
     long lateCount = 0;
 
     long totalDXScore = 0;
+    long curDXScore = 0;
     long lostDXScore = 0;
 
     long combo = 0;
@@ -132,96 +132,39 @@ public partial class ObjectCounter : MonoBehaviour
     readonly Dictionary<JudgeGrade, int> judgedBreakCount = new();
     readonly Dictionary<JudgeGrade, int> totalJudgedCount = new();
 
-    readonly Dictionary<double, (int, int)> meterList = new();
-    readonly Dictionary<double, float> bpmList = new();
+    readonly List<(double Timing, int Numerator, int Denominator)> meterList = new();
+    readonly List<(double Timing, float Bpm)> bpmList = new();
 
     private NativeList<ReportResultEntry> reportRequests = new(65536, Allocator.Persistent);
     public NativeList<ReportResultEntry>.ParallelWriter ReportRequestsWriter => reportRequests.AsParallelWriter();
 
-    public async UniTask CountNoteSumAsync(SimaiChart chart)
+    public void CountNoteSum(SimaiChart chart)
     {
-        await UniTask.RunOnThreadPool(() =>
+        foreach (var timing in chart.NoteTimings)
         {
-            foreach (var timing in chart.NoteTimings)
-            {
-                foreach (var note in timing.Notes)
-                {
-                    if (!note.IsBreak)
-                    {
-                        switch (note.Type)
-                        {
-                            case SimaiNoteType.Tap:
-                                TapSum++;
-                                break;
-                            case SimaiNoteType.Hold:
-                            case SimaiNoteType.TouchHold:
-                                HoldSum++;
-                                break;
-                            case SimaiNoteType.Slide:
-                                if (!note.IsSlideNoHead)
-                                    TapSum++;
-                                if (note.IsSlideBreak)
-                                    BreakSum++;
-                                else
-                                    SlideSum++;
-                                break;
-                            case SimaiNoteType.Touch:
-                                TouchSum++;
-                                break;
-                        }
-                    }
-                    else
-                    {
-                        if (note.Type == SimaiNoteType.Slide)
-                        {
-                            if (!note.IsSlideNoHead)
-                                BreakSum++;
-                            if (note.IsSlideBreak)
-                                BreakSum++;
-                            else
-                                SlideSum++;
-                        }
-                        else
-                        {
-                            BreakSum++;
-                        }
-                    }
-                }
-            }
-            NoteSum = TapSum + HoldSum + TouchSum + BreakSum + SlideSum;
-            TotalNoteBaseScore = (TapSum + TouchSum) * 500 + HoldSum * 1000 + SlideSum * 1500 + BreakSum * 2500;
-            TotalNoteExtraScore = BreakSum * 100;
-            totalDXScore = NoteSum * 3;
-        });
-    }
-
-    public async UniTask CountIgnoreNoteCountAsync(IEnumerable<SimaiNote> notes)
-    {
-        await UniTask.RunOnThreadPool(() =>
-        {
-            foreach (var note in notes)
+            foreach (var note in timing.Notes)
             {
                 if (!note.IsBreak)
                 {
                     switch (note.Type)
                     {
                         case SimaiNoteType.Tap:
-                            TapFinishedCount++;
+                            TapSum++;
                             break;
                         case SimaiNoteType.Hold:
                         case SimaiNoteType.TouchHold:
-                            HoldFinishedCount++;
+                            HoldSum++;
                             break;
                         case SimaiNoteType.Slide:
                             if (!note.IsSlideNoHead)
-                                TapFinishedCount++;
+                                TapSum++;
                             if (note.IsSlideBreak)
-                                BreakFinishedCount++;
+                                BreakSum++;
                             else
-                                SlideFinishedCount++;
+                                SlideSum++;
                             break;
                         case SimaiNoteType.Touch:
-                            TouchFinishedCount++;
+                            TouchSum++;
                             break;
                     }
                 }
@@ -230,37 +173,113 @@ public partial class ObjectCounter : MonoBehaviour
                     if (note.Type == SimaiNoteType.Slide)
                     {
                         if (!note.IsSlideNoHead)
-                            BreakFinishedCount++;
+                            BreakSum++;
+                        if (note.IsSlideBreak)
+                            BreakSum++;
+                        else
+                            SlideSum++;
+                    }
+                    else
+                    {
+                        BreakSum++;
+                    }
+                }
+            }
+        }
+        NoteSum = TapSum + HoldSum + TouchSum + BreakSum + SlideSum;
+        TotalNoteBaseScore = (TapSum + TouchSum) * 500 + HoldSum * 1000 + SlideSum * 1500 + BreakSum * 2500;
+        TotalNoteExtraScore = BreakSum * 100;
+        totalDXScore = NoteSum * 3;
+    }
+
+    public void CountIgnoreNoteCountAsync(IEnumerable<SimaiNote> notes)
+    {
+        foreach (var note in notes)
+        {
+            if (!note.IsBreak)
+            {
+                switch (note.Type)
+                {
+                    case SimaiNoteType.Tap:
+                        TapFinishedCount++;
+                        break;
+                    case SimaiNoteType.Hold:
+                    case SimaiNoteType.TouchHold:
+                        HoldFinishedCount++;
+                        break;
+                    case SimaiNoteType.Slide:
+                        if (!note.IsSlideNoHead)
+                            TapFinishedCount++;
                         if (note.IsSlideBreak)
                             BreakFinishedCount++;
                         else
                             SlideFinishedCount++;
-                    }
-                    else
-                    {
-                        BreakFinishedCount++;
-                    }
+                        break;
+                    case SimaiNoteType.Touch:
+                        TouchFinishedCount++;
+                        break;
                 }
             }
-        });
+            else
+            {
+                if (note.Type == SimaiNoteType.Slide)
+                {
+                    if (!note.IsSlideNoHead)
+                        BreakFinishedCount++;
+                    if (note.IsSlideBreak)
+                        BreakFinishedCount++;
+                    else
+                        SlideFinishedCount++;
+                }
+                else
+                {
+                    BreakFinishedCount++;
+                }
+            }
+
+            if (NoteHelper.IsSimulated) continue;
+            // ReportResult
+            var type = note.Type;
+            var judge = JudgeGrade.LateCritical;
+            var isBreak = note.IsBreak;
+            if (NoteHelper.AutoPlayMode is AutoPlayMode.Random)
+            {
+                judge = (JudgeGrade)MajBurst.GlobalRandom.NextInt((int)JudgeGrade.FastGood, (int)JudgeGrade.Miss);
+                judge = note.IsMine
+                    ? judge < JudgeGrade.FastPerfect3rd
+                        ? JudgeGrade.Miss
+                        : JudgeGrade.LateCritical
+                    : judge;
+            }
+            UpdateNoteScoreCount(type, judge, isBreak);
+            UpdateJudgeCountAndDXScore(judge);
+            UpdateFastLateCount(judge);
+        }
     }
 
     public void ProcessReportRequests()
     {
         if (reportRequests.Length == 0) return;
 
-        foreach (var entry in reportRequests.AsParallelReader())
+        var length = reportRequests.Length;
+        for (int i = 0; i < length; i++)
         {
+            var entry = reportRequests[i];
             ReportResult(entry.NoteType, entry.Grade, entry.IsBreak, updateAcc: false);
         }
         UpdateAccRate();
         reportRequests.Clear();
     }
 
-    public void ReportResult(SimaiNoteType type, JudgeGrade judgeGrade, bool isBreak = false, bool updateAcc = true)
+    public void ReportResult(
+        SimaiNoteType type,
+        JudgeGrade judgeGrade,
+        bool isBreak = false,
+        bool updateAcc = true)
     {
         UpdateNoteScoreCount(type, judgeGrade, isBreak);
-        UpdateNoteCount(type, judgeGrade, isBreak);
+        UpdateNoteFinishedCount(type, judgeGrade, isBreak);
+        UpdateJudgeCountAndDXScore(judgeGrade);
         UpdateFastLateCount(judgeGrade);
         if (updateAcc) UpdateAccRate();
     }
@@ -299,8 +318,8 @@ public partial class ObjectCounter : MonoBehaviour
                     break;
                 case JudgeGrade.LateGreat3rd:
                 case JudgeGrade.LateGreat2nd:
-                case JudgeGrade.LateGreat:
-                case JudgeGrade.FastGreat:
+                case JudgeGrade.LateGreat1st:
+                case JudgeGrade.FastGreat1st:
                 case JudgeGrade.FastGreat2nd:
                 case JudgeGrade.FastGreat3rd:
                     CurrentNoteBaseScore += (long)(baseScore * 0.8);
@@ -346,8 +365,8 @@ public partial class ObjectCounter : MonoBehaviour
                     LostNoteExtraScore += 60;
                     LostNoteExtraScoreClassic += 100;
                     break;
-                case JudgeGrade.LateGreat:
-                case JudgeGrade.FastGreat:
+                case JudgeGrade.LateGreat1st:
+                case JudgeGrade.FastGreat1st:
                     CurrentNoteBaseScore += 2000;
                     CurrentNoteExtraScore += 40;
                     LostNoteBaseScore += 500;
@@ -369,7 +388,8 @@ public partial class ObjectCounter : MonoBehaviour
                     LostNoteExtraScore += 25;
                     LostNoteExtraScoreClassic += 50;
                     break;
-                case JudgeGrade.Perfect:
+                case JudgeGrade.LateCritical:
+                case JudgeGrade.FastCritical:
                     CurrentNoteBaseScore += 2500;
                     CurrentNoteExtraScore += 100;
                     CurrentNoteExtraScoreClassic += 100;
@@ -397,7 +417,7 @@ public partial class ObjectCounter : MonoBehaviour
         accRate[3] = decimal.ToDouble(newAccRate[3] * 100);
         accRate[4] = decimal.ToDouble(newAccRate[4] * 100);
     }
-    private void UpdateNoteCount(SimaiNoteType type, JudgeGrade judge, bool isBreak)
+    private void UpdateNoteFinishedCount(SimaiNoteType type, JudgeGrade judge, bool isBreak)
     {
         if (isBreak)
         {
@@ -441,7 +461,9 @@ public partial class ObjectCounter : MonoBehaviour
             }
         }
         totalJudgedCount[judge]++;
-
+    }
+    private void UpdateJudgeCountAndDXScore(JudgeGrade judge)
+    {
         if (judge is not (JudgeGrade.Miss or JudgeGrade.TooFast))
             combo++;
 
@@ -453,22 +475,26 @@ public partial class ObjectCounter : MonoBehaviour
                 combo = 0;
                 lostDXScore -= 3;
                 break;
-            case JudgeGrade.Perfect:
+            case JudgeGrade.LateCritical:
+            case JudgeGrade.FastCritical:
                 cPerfectCount++;
+                curDXScore += 3;
                 break;
             case JudgeGrade.LatePerfect3rd:
             case JudgeGrade.LatePerfect2nd:
             case JudgeGrade.FastPerfect2nd:
             case JudgeGrade.FastPerfect3rd:
                 perfectCount++;
+                curDXScore += 2;
                 lostDXScore -= 1;
                 break;
             case JudgeGrade.LateGreat3rd:
             case JudgeGrade.LateGreat2nd:
-            case JudgeGrade.LateGreat:
-            case JudgeGrade.FastGreat:
+            case JudgeGrade.LateGreat1st:
+            case JudgeGrade.FastGreat1st:
             case JudgeGrade.FastGreat2nd:
             case JudgeGrade.FastGreat3rd:
+                curDXScore += 1;
                 lostDXScore -= 2;
                 greatCount++;
                 break;
@@ -483,15 +509,15 @@ public partial class ObjectCounter : MonoBehaviour
     {
         if (judge is JudgeGrade.Miss or JudgeGrade.TooFast)
             return;
-        if ((int)judge < 7)
+        if (judge < JudgeGrade.FastCritical)
             fastCount++;
-        else if ((int)judge > 7)
+        else if (judge > JudgeGrade.LateCritical)
             lateCount++;
     }
 
     public void ResetState()
     {
-        for (var i = 0; i <= 14; i++)
+        for (var i = 0; i <= 15; i++)
         {
             judgedTapCount[(JudgeGrade)i] = 0;
             judgedHoldCount[(JudgeGrade)i] = 0;
@@ -539,6 +565,7 @@ public partial class ObjectCounter : MonoBehaviour
         lateCount = 0;
 
         totalDXScore = 0;
+        curDXScore = 0;
         lostDXScore = 0;
 
         combo = 0;

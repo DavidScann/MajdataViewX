@@ -18,6 +18,11 @@ public class BgManager : MonoBehaviour
     [SerializeField]
     private Sprite defaultBg;
 
+    [SerializeField]
+    private Material fullscreenBgMaterial;
+    [SerializeField]
+    private Material circledBgMaterial;
+
     private RawImage jacketImage;
     private GameObject songDetail;
     private static readonly int ShowHash = Animator.StringToHash("show");
@@ -26,7 +31,9 @@ public class BgManager : MonoBehaviour
     private VideoPlayer videoPlayer;
 
     private float smoothRDelta;
-    private float originalScaleX;
+
+    const float CIRCLED_SCALE_X = 1.1f;
+    const float FULLSCREEN_SCALE_X = 1.777f;
 
     private Sprite? Bg { get; set; }
     private string? VideoUrl { get; set; }
@@ -35,6 +42,8 @@ public class BgManager : MonoBehaviour
     public static bool hasVideo;
     public bool IsBgLoaded => !hasBg || Bg != null;
     public bool IsVideoLoaded => !hasVideo || !string.IsNullOrWhiteSpace(VideoUrl);
+
+    private static Sprite? _emptySprite;
 
     private void Awake()
     {
@@ -47,10 +56,11 @@ public class BgManager : MonoBehaviour
         songDetail = GameObject.Find("CanvasSongDetail");
         songDetail.SetActive(false);
 
-        originalScaleX = gameObject.transform.localScale.x;
         spriteRender = GetComponent<SpriteRenderer>();
         videoPlayer = GetComponent<VideoPlayer>();
         detailAnim = songDetail.GetComponent<Animator>();
+
+        _emptySprite = Sprite.Create(new Texture2D(1080, 1080), new Rect(0, 0, 1080, 1080), new Vector2(0.5f, 0.5f));
     }
 
     private void Update()
@@ -82,7 +92,20 @@ public class BgManager : MonoBehaviour
 
     public void LoadBG(string path)
     {
-        Bg = SpriteLoader.Load(path);
+        DestroyLoadedBackground();
+        Bg = TexLoader.LoadSprite(path);
+    }
+
+    private void DestroyLoadedBackground()
+    {
+        if (Bg != null)
+        {
+            if (Bg.texture != null)
+                Destroy(Bg.texture);
+
+            Destroy(Bg);
+            Bg = null;
+        }
     }
 
     public void ShowBG()
@@ -105,7 +128,7 @@ public class BgManager : MonoBehaviour
         VideoUrl = "file://" + path;
     }
 
-    public void ShowVideo()
+    public void ShowVideo(bool resizeBg)
     {
         if (!hasVideo) return;
 
@@ -116,8 +139,7 @@ public class BgManager : MonoBehaviour
             videoPlayer.Prepare();
 
             //secret hack: if not so, the bg won't be set to defaultBg but full white
-            spriteRender.sprite =
-                Sprite.Create(new Texture2D(1080, 1080), new Rect(0, 0, 1080, 1080), new Vector2(0.5f, 0.5f));
+            spriteRender.sprite = _emptySprite;
 
             while (_timeProvider.AudioTime <= 0) yield return new WaitForEndOfFrame();
             while (!videoPlayer.isPrepared) yield return new WaitForEndOfFrame();
@@ -125,7 +147,16 @@ public class BgManager : MonoBehaviour
             videoPlayer.time = _timeProvider.AudioTime;
 
             var scale = videoPlayer.height / (float)videoPlayer.width;
-            gameObject.transform.localScale = new Vector3(originalScaleX, originalScaleX * scale);
+            if (resizeBg)
+            {
+                gameObject.transform.localScale = new Vector3(FULLSCREEN_SCALE_X, FULLSCREEN_SCALE_X * scale);
+                spriteRender.material = fullscreenBgMaterial;
+            }
+            else
+            {
+                gameObject.transform.localScale = new Vector3(CIRCLED_SCALE_X, CIRCLED_SCALE_X * scale);
+                spriteRender.material = circledBgMaterial;
+            }
         }
     }
 
@@ -144,11 +175,27 @@ public class BgManager : MonoBehaviour
     public void ResetState()
     {
         videoPlayer.Stop();
-        gameObject.transform.localScale = new Vector3(1.1f, 1.1f, 1.1f);
+        // 销毁上一曲背景图(Texture2D/Sprite)，避免滞留到下次 LoadBG
+        DestroyLoadedBackground();
+        gameObject.transform.localScale = new Vector3(CIRCLED_SCALE_X, CIRCLED_SCALE_X, CIRCLED_SCALE_X);
+        spriteRender.material = circledBgMaterial;
         spriteRender.sprite = defaultBg;
         smoothRDelta = 0f;
 
         if (songDetail != null)
             songDetail.SetActive(false);
+    }
+
+    private void OnDestroy()
+    {
+        DestroyLoadedBackground();
+        if (_emptySprite != null)
+        {
+            var texture = _emptySprite.texture;
+            Destroy(_emptySprite);
+            if (texture != null)
+                Destroy(texture);
+            _emptySprite = null;
+        }
     }
 }

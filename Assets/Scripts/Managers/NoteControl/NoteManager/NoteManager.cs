@@ -10,6 +10,16 @@ using static MajCtx;
 
 public partial class NoteManager : MonoBehaviour
 {
+    /// <summary>
+    /// note数量/最后一个note的时间大于该常数时使用HIGH_DENSITY_CAPACITY_MULTIPLIER
+    /// </summary>
+    private const float HIGH_DENSITY_THRESHOLD = 1145.14f;
+    private const int HIGH_DENSITY_CAPACITY_MULTIPLIER = 3;
+    private const int DEFAULT_RENDER_CAPACITY = 65536;
+    private const int DEFAULT_SLIDE_RENDER_CAPACITY = 262144;
+
+    public float NoteDensity { get; private set; }
+
     NativeList<TapData> taps = new(1024, Allocator.Persistent);
     NativeList<EachLineData> eachLines = new(512, Allocator.Persistent);
     NativeList<HoldData> holds = new(1024, Allocator.Persistent);
@@ -17,20 +27,32 @@ public partial class NoteManager : MonoBehaviour
     NativeList<TouchData> touches = new(1024, Allocator.Persistent);
     NativeList<TouchHoldData> touchHolds = new(1024, Allocator.Persistent);
 
-    NoteRenderGroup<LineRenderData> _tapLineGroup;
-    NoteRenderGroup<LineRenderData> _eachLineGroup;
-    NoteRenderGroup<SimpleRenderData> _slideGroup;
-    NoteRenderGroup<SimpleRenderData> _holdEndGroup;
-    NoteRenderGroup<NotesRenderData> _notesGroup;
-    NoteRenderGroup<SimpleRenderData> _touchGroup;
-    NoteRenderGroup<MaskRenderData> _touchHoldGroup;
+    /// <summary>
+    /// 这个包含touchhold的头判
+    /// </summary>
+    NativeList<int> touchGroupTotalCounts = new(256, Allocator.Persistent);
+    NativeList<int> touchGroupJudgedCounts = new(256, Allocator.Persistent);
+    NativeList<CoverResult> touchGroupCoverResults = new(256, Allocator.Persistent);
+
+    NativeList<int> touchHoldGroupTotalCounts = new(256, Allocator.Persistent);
+    NativeList<int> touchHoldGroupPressedCounts = new(256, Allocator.Persistent);
+    NativeList<CoverResult> touchHoldGroupCoverResults = new(256, Allocator.Persistent);
+
+    RenderGroup<LineRenderData> _tapLineGroup;
+    RenderGroup<LineRenderData> _eachLineGroup;
+    RenderGroup<SimpleRenderData> _slideGroup;
+    RenderGroup<NotesRenderData> _notesGroup;
+    RenderGroup<MaskRenderData> _thBorderGroup;
+    RenderGroup<SimpleRenderData> _touchGroup;
 
     GraphicsBuffer _noteUvsBuffer;
-    Mesh _quad;
     Material _matLine;
     Material _matSimple;
     Material _matNotes;
     Material _matMask;
+    Mesh _lineMesh;
+    Mesh _quadMesh;
+    int _renderCapacityMultiplier;
 
     JobHandle _prevChain;
     bool _isJobScheduledThisFrame;
@@ -41,20 +63,16 @@ public partial class NoteManager : MonoBehaviour
     }
     void Start()
     {
-        _quad = Resources.GetBuiltinResource<Mesh>("Quad.fbx");
+        _lineMesh = MeshGenerator.CreateRingMesh(32, 0.5f, 0.3f);
+        _quadMesh = Resources.GetBuiltinResource<Mesh>("Quad.fbx");
 
+        //REMEMBER TO FORCE INCLUDE
         _matLine = new Material(Shader.Find("Custom/NoteLine"));
         _matSimple = new Material(Shader.Find("Custom/NoteSimple"));
         _matNotes = new Material(Shader.Find("Custom/NoteRich"));
         _matMask = new Material(Shader.Find("Custom/NoteMask"));
 
-        _tapLineGroup = new NoteRenderGroup<LineRenderData>(_matLine, _quad, 0);
-        _eachLineGroup = new NoteRenderGroup<LineRenderData>(_matLine, _quad, 1);
-        _slideGroup = new NoteRenderGroup<SimpleRenderData>(_matSimple, _quad, 2);
-        _holdEndGroup = new NoteRenderGroup<SimpleRenderData>(_matSimple, _quad, 3);
-        _notesGroup = new NoteRenderGroup<NotesRenderData>(_matNotes, _quad, 4);
-        _touchGroup = new NoteRenderGroup<SimpleRenderData>(_matSimple, _quad, 5);
-        _touchHoldGroup = new NoteRenderGroup<MaskRenderData>(_matMask, _quad, 6);
+        CreateRenderGroups(1);
 
         _noteUvsBuffer = new(
             GraphicsBuffer.Target.Structured,
@@ -66,7 +84,13 @@ public partial class NoteManager : MonoBehaviour
         {
             mat.SetBuffer("_SpriteRects", _noteUvsBuffer);
             mat.SetTexture("_MainTex", _noteSkinManager.Atlas);
-            mat.SetFloat("_AtlasSize", 8192);
+            mat.SetVector(
+                "_AtlasSize",
+                new Vector4(
+                    _noteSkinManager.Atlas.width,
+                    _noteSkinManager.Atlas.height,
+                    0,
+                    0));
             mat.SetFloat("_PixelsPerUnit", 100);
         }
         SetupMaterial(_matLine);
@@ -75,39 +99,158 @@ public partial class NoteManager : MonoBehaviour
         SetupMaterial(_matMask);
     }
 
+    private void CreateRenderGroups(int capacityMultiplier)
+    {
+        _renderCapacityMultiplier = capacityMultiplier;
+        var capacity = checked(DEFAULT_RENDER_CAPACITY * capacityMultiplier);
+        var slideCapacity = checked(DEFAULT_SLIDE_RENDER_CAPACITY * capacityMultiplier);
+
+        _tapLineGroup = new RenderGroup<LineRenderData>(_matLine, _lineMesh, 0, capacity);
+        _eachLineGroup = new RenderGroup<LineRenderData>(_matLine, _lineMesh, 1, capacity);
+        _slideGroup = new RenderGroup<SimpleRenderData>(_matSimple, _quadMesh, 2, slideCapacity);
+        _notesGroup = new RenderGroup<NotesRenderData>(_matNotes, _quadMesh, 3, capacity);
+        _thBorderGroup = new RenderGroup<MaskRenderData>(_matMask, _quadMesh, 4, capacity);
+        _touchGroup = new RenderGroup<SimpleRenderData>(_matSimple, _quadMesh, 5, capacity);
+    }
+
+    private void DisposeRenderGroups()
+    {
+        _tapLineGroup?.Dispose();
+        _eachLineGroup?.Dispose();
+        _slideGroup?.Dispose();
+        _notesGroup?.Dispose();
+        _thBorderGroup?.Dispose();
+        _touchGroup?.Dispose();
+    }
+
+    private void ConfigureRenderCapacity(SimaiChart chart)
+    {
+        var noteCount = 0;
+        foreach (var timing in chart.NoteTimings)
+        {
+            noteCount += timing.Notes.Length;
+        }
+        var lastNoteTime = chart.NoteTimings[^1].Timing;
+
+        NoteDensity = lastNoteTime > 0d
+            ? noteCount / (float)lastNoteTime
+            : noteCount > 0 ? float.PositiveInfinity : 0f;
+
+        var capacityMultiplier = NoteDensity > HIGH_DENSITY_THRESHOLD
+            ? HIGH_DENSITY_CAPACITY_MULTIPLIER
+            : 1;
+        if (capacityMultiplier == _renderCapacityMultiplier) return;
+
+        _prevChain.Complete();
+        _isJobScheduledThisFrame = false;
+        DisposeRenderGroups();
+        CreateRenderGroups(capacityMultiplier);
+    }
+
     void Update()
     {
         _prevChain.Complete();
+        if (!_timeProvider.IsRecord)
+        {
+            // 防止帧率对“下一帧应用”的机制产生过大影响
+            // Record模式下在TimeProvider中设定
+            InputManager.DJAUTO_AUTOPLAY_START_SEC_SS.Data = -Time.unscaledDeltaTime;
+        }
+        _inputManager.BeginHandler(); // 这里牵扯到用户输入，需要一直调用
 
         if (taps.Length + eachLines.Length + holds.Length + slides.Length + touches.Length + touchHolds.Length == 0) return;
 
         _tapLineGroup.AdvanceWrite();
         _eachLineGroup.AdvanceWrite();
         _slideGroup.AdvanceWrite();
-        _holdEndGroup.AdvanceWrite();
         _notesGroup.AdvanceWrite();
+        _thBorderGroup.AdvanceWrite();
         _touchGroup.AdvanceWrite();
-        _touchHoldGroup.AdvanceWrite();
 
         var tapLinesRender = _tapLineGroup.LockForWrite();
         var eachLinesRender = _eachLineGroup.LockForWrite();
         var slidesRender = _slideGroup.LockForWrite();
-        var holdEndRender = _holdEndGroup.LockForWrite();
         var notesRender = _notesGroup.LockForWrite();
+        var maskRender = _thBorderGroup.LockForWrite();
         var touchesRender = _touchGroup.LockForWrite();
-        var maskRender = _touchHoldGroup.LockForWrite();
 
         unsafe
         {
             _tapLineGroup.ResetCount();
             _eachLineGroup.ResetCount();
             _slideGroup.ResetCount();
-            _holdEndGroup.ResetCount();
             _notesGroup.ResetCount();
+            _thBorderGroup.ResetCount();
             _touchGroup.ResetCount();
-            _touchHoldGroup.ResetCount();
+
+            if (touchHoldGroupTotalCounts.Length > 0)
+            {
+                for (int i = 0; i < touchHoldGroupTotalCounts.Length; i++)
+                    touchHoldGroupPressedCounts[i] = 0;
+                for (int i = 0; i < touchHolds.Length; i++)
+                {
+                    ref var t = ref touchHolds.ElementRef(i);
+                    if (t.groupId != -1)
+                    {
+                        if (t.isEnd)
+                        {
+                            touchHoldGroupTotalCounts[t.groupId]--;
+                            t.groupId = -1;
+                        }
+                        else if (MajBurst.InputData.GetSensorState(t.sensor).Status)
+                        {
+                            touchHoldGroupPressedCounts[t.groupId]++;
+                        }
+                    }
+                }
+            }
 
             JobHandle h = default;
+
+            // DJAuto持续输入必须先续占下一帧的手，Tap/Touch 只能使用剩余额度，因此hold/slide类note先update
+            if (holds.Length > 0)
+                h = new HoldUpdateJob
+                {
+                    holds = holds.AsArray(),
+                    tapLinesRender = tapLinesRender,
+                    notesRender = notesRender,
+                    TapLinesWriteCountPtr = _tapLineGroup.WriteCountPtr,
+                    NotesWriteCountPtr = _notesGroup.WriteCountPtr,
+                    SfxRequests = _audioManager.SfxRequestsPtr,
+                    JudgeEffectRequests = _effectManager.JudgeEffectRequestsPtr,
+                    ReportResults = _objectCounter.ReportRequestsWriter,
+                }.Schedule(holds.Length, 32, h);
+
+            if (slides.Length > 0)
+                h = new SlideUpdateJob
+                {
+                    slides = slides.AsArray(),
+                    slidesRender = slidesRender,
+                    notesRender = notesRender,
+                    SlidesWriteCountPtr = _slideGroup.WriteCountPtr,
+                    NotesWriteCountPtr = _notesGroup.WriteCountPtr,
+                    SfxRequests = _audioManager.SfxRequestsPtr,
+                    ReportResults = _objectCounter.ReportRequestsWriter,
+                }.Schedule(slides.Length, 32, h);
+
+            if (touchHolds.Length > 0)
+                h = new TouchHoldUpdateJob
+                {
+                    touchHolds = touchHolds.AsArray(),
+                    simpleRender = touchesRender,
+                    SimpleWriteCountPtr = _touchGroup.WriteCountPtr,
+                    maskRender = maskRender,
+                    MaskWriteCountPtr = _thBorderGroup.WriteCountPtr,
+                    SfxRequests = _audioManager.SfxRequestsPtr,
+                    JudgeEffectRequests = _effectManager.JudgeEffectRequestsPtr,
+                    ReportResults = _objectCounter.ReportRequestsWriter,
+                    touchGroupTotalCounts = touchGroupTotalCounts.AsArray(),
+                    touchGroupJudgedCounts = touchGroupJudgedCounts.AsArray(),
+                    touchGroupCoverResults = touchGroupCoverResults.AsArray(),
+                    touchHoldGroupTotalCounts = touchHoldGroupTotalCounts.AsArray(),
+                    touchHoldGroupPressedCounts = touchHoldGroupPressedCounts.AsArray(),
+                    touchHoldGroupCoverResults = touchHoldGroupCoverResults.AsArray(),
+                }.Schedule(touchHolds.Length, 32, h);
 
             if (taps.Length > 0)
                 h = new TapUpdateJob
@@ -132,33 +275,6 @@ public partial class NoteManager : MonoBehaviour
                     EachLinesWriteCountPtr = _eachLineGroup.WriteCountPtr,
                 }.Schedule(eachLines.Length, 32, h);
 
-            if (holds.Length > 0)
-                h = new HoldUpdateJob
-                {
-                    holds = holds.AsArray(),
-                    tapLinesRender = tapLinesRender,
-                    notesRender = notesRender,
-                    simpleRender = holdEndRender,
-                    TapLinesWriteCountPtr = _tapLineGroup.WriteCountPtr,
-                    NotesWriteCountPtr = _notesGroup.WriteCountPtr,
-                    SimpleWriteCountPtr = _holdEndGroup.WriteCountPtr,
-                    SfxRequests = _audioManager.SfxRequestsPtr,
-                    JudgeEffectRequests = _effectManager.JudgeEffectRequestsPtr,
-                    ReportResults = _objectCounter.ReportRequestsWriter,
-                }.Schedule(holds.Length, 32, h);
-
-            if (slides.Length > 0)
-                h = new SlideUpdateJob
-                {
-                    slides = slides.AsArray(),
-                    slidesRender = slidesRender,
-                    notesRender = notesRender,
-                    SlidesWriteCountPtr = _slideGroup.WriteCountPtr,
-                    NotesWriteCountPtr = _notesGroup.WriteCountPtr,
-                    SfxRequests = _audioManager.SfxRequestsPtr,
-                    ReportResults = _objectCounter.ReportRequestsWriter,
-                }.Schedule(slides.Length, 32, h);
-
             if (touches.Length > 0)
                 h = new TouchUpdateJob
                 {
@@ -168,22 +284,22 @@ public partial class NoteManager : MonoBehaviour
                     SfxRequests = _audioManager.SfxRequestsPtr,
                     JudgeEffectRequests = _effectManager.JudgeEffectRequestsPtr,
                     ReportResults = _objectCounter.ReportRequestsWriter,
+                    touchGroupTotalCounts = touchGroupTotalCounts.AsArray(),
+                    touchGroupJudgedCounts = touchGroupJudgedCounts.AsArray(),
+                    touchGroupCoverResults = touchGroupCoverResults.AsArray(),
                 }.Schedule(touches.Length, 32, h);
 
-            if (touchHolds.Length > 0)
-                h = new TouchHoldUpdateJob
-                {
-                    touchHolds = touchHolds.AsArray(),
-                    simpleRender = touchesRender,
-                    SimpleWriteCountPtr = _touchGroup.WriteCountPtr,
-                    maskRender = maskRender,
-                    MaskWriteCountPtr = _touchHoldGroup.WriteCountPtr,
-                    SfxRequests = _audioManager.SfxRequestsPtr,
-                    JudgeEffectRequests = _effectManager.JudgeEffectRequestsPtr,
-                    ReportResults = _objectCounter.ReportRequestsWriter,
-                }.Schedule(touchHolds.Length, 32, h);
+            var tapLineSort = _tapLineGroup.ScheduleSort(h);
+            var eachLineSort = _eachLineGroup.ScheduleSort(h);
+            var slideSort = _slideGroup.ScheduleSort(h);
+            var notesSort = _notesGroup.ScheduleSort(h);
+            var thBorderSort = _thBorderGroup.ScheduleSort(h);
+            var touchSort = _touchGroup.ScheduleSort(h);
 
-            _prevChain = h;
+            _prevChain = JobHandle.CombineDependencies(
+                JobHandle.CombineDependencies(tapLineSort, eachLineSort),
+                JobHandle.CombineDependencies(slideSort, notesSort),
+                JobHandle.CombineDependencies(thBorderSort, touchSort));
         }
         _isJobScheduledThisFrame = true;
     }
@@ -192,46 +308,53 @@ public partial class NoteManager : MonoBehaviour
     {
         _prevChain.Complete();
 
-        if (!_isJobScheduledThisFrame) return;
+        if (_isJobScheduledThisFrame)
+        {
+            _tapLineGroup.UnlockWrite(false);
+            _eachLineGroup.UnlockWrite(false);
+            _slideGroup.UnlockWrite(false);
+            _notesGroup.UnlockWrite(false);
+            _thBorderGroup.UnlockWrite(false);
+            _touchGroup.UnlockWrite(false);
 
-        _tapLineGroup.UnlockWrite();
-        _eachLineGroup.UnlockWrite();
-        _slideGroup.UnlockWrite();
-        _holdEndGroup.UnlockWrite();
-        _notesGroup.UnlockWrite();
-        _touchGroup.UnlockWrite();
-        _touchHoldGroup.UnlockWrite();
+            _tapLineGroup.Render();
+            _eachLineGroup.Render();
+            _slideGroup.Render();
+            _notesGroup.Render();
+            _thBorderGroup.Render();
+            _touchGroup.Render();
 
-        _tapLineGroup.Render();
-        _eachLineGroup.Render();
-        _slideGroup.Render();
-        _holdEndGroup.Render();
-        _notesGroup.Render();
-        _touchGroup.Render();
-        _touchHoldGroup.Render();
+            _tapLineGroup.Swap();
+            _eachLineGroup.Swap();
+            _slideGroup.Swap();
+            _notesGroup.Swap();
+            _thBorderGroup.Swap();
+            _touchGroup.Swap();
 
-        _tapLineGroup.Swap();
-        _eachLineGroup.Swap();
-        _slideGroup.Swap();
-        _holdEndGroup.Swap();
-        _notesGroup.Swap();
-        _touchGroup.Swap();
-        _touchHoldGroup.Swap();
+            _objectCounter.ProcessReportRequests();
+            MajBurst.InputData.ApplyNextIndices();
 
-        _objectCounter.ProcessReportRequests();
+            // 思来想去在th内做加减确实不比在这里遍历一次快
+            // 去他妈的可读性
+            {
+                int activeTouchHolds = 0;
+                for (int i = 0; i < touchHolds.Length; i++)
+                {
+                    if (touchHolds[i].isHolding) activeTouchHolds++;
+                }
+                _audioManager.ActiveTouchHoldCount = activeTouchHolds;
+            }
 
-        _isJobScheduledThisFrame = false;
+            _isJobScheduledThisFrame = false;
+        }
+
+        _inputManager.EndHandler();
     }
 
     void OnDestroy()
     {
-        _tapLineGroup?.Dispose();
-        _eachLineGroup?.Dispose();
-        _slideGroup?.Dispose();
-        _holdEndGroup?.Dispose();
-        _notesGroup?.Dispose();
-        _touchGroup?.Dispose();
-        _touchHoldGroup?.Dispose();
+        _prevChain.Complete();
+        DisposeRenderGroups();
 
         _noteUvsBuffer?.Dispose();
 
@@ -241,36 +364,40 @@ public partial class NoteManager : MonoBehaviour
         if (slides.IsCreated) slides.Dispose();
         if (touches.IsCreated) touches.Dispose();
         if (touchHolds.IsCreated) touchHolds.Dispose();
+
+        if (touchGroupTotalCounts.IsCreated) touchGroupTotalCounts.Dispose();
+        if (touchGroupJudgedCounts.IsCreated) touchGroupJudgedCounts.Dispose();
+        if (touchGroupCoverResults.IsCreated) touchGroupCoverResults.Dispose();
+        if (touchHoldGroupTotalCounts.IsCreated) touchHoldGroupTotalCounts.Dispose();
+        if (touchHoldGroupPressedCounts.IsCreated) touchHoldGroupPressedCounts.Dispose();
+        if (touchHoldGroupCoverResults.IsCreated) touchHoldGroupCoverResults.Dispose();
     }
 
     public void ResetState()
     {
+        _prevChain.Complete();
         taps.Clear();
         eachLines.Clear();
         holds.Clear();
         slides.Clear();
         touches.Clear();
         touchHolds.Clear();
-    }
-}
 
-public struct NoteRenderData : IComparable<NoteRenderData>
-{
-    public float2 pos;
-    public float angRad;
-    public float2 scale;
-    public uint spriteId;
-    public float4 color;
-    public float brightness;
-
-    public uint exSprite;
-    public float4 exColor;
-
-    public uint sort;
-
-    public readonly int CompareTo(NoteRenderData other)
-    {
-        // reverse
-        return other.sort.CompareTo(sort);
+        touchGroupTotalCounts.Clear();
+        touchGroupJudgedCounts.Clear();
+        touchGroupCoverResults.Clear();
+        touchHoldGroupTotalCounts.Clear();
+        touchHoldGroupPressedCounts.Clear();
+        touchHoldGroupCoverResults.Clear();
+        unsafe
+        {
+            if (slideAreaPool != null)
+                UnsafeUtility.Free(slideAreaPool, Allocator.Persistent);
+            if (slidePosePool != null)
+                UnsafeUtility.Free(slidePosePool, Allocator.Persistent);
+            slideAreaPool = null;
+            slidePosePool = null;
+        }
+        MajBurst.MultTouchHandler.Clear();
     }
 }

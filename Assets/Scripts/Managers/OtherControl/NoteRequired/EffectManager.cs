@@ -1,7 +1,8 @@
-﻿#nullable enable
+#nullable enable
 
 #region
 
+using System;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
@@ -13,31 +14,37 @@ using static MajCtx;
 
 public class EffectManager : MonoBehaviour
 {
-    public const int EFFECT_COUNT = 8;
+    public const int EFFECT_COUNT = BUTTON_COUNT + SENSOR_COUNT;
 
     private static readonly int PerfectHash = Animator.StringToHash("perfect");
     private static readonly int GreatHash = Animator.StringToHash("great");
-    private static readonly int BreakHash = Animator.StringToHash("break");
+    private static readonly int GoodHash = Animator.StringToHash("good");
+    private static readonly int BPerfectHash = Animator.StringToHash("bPerfect");
     private static readonly int BGreatHash = Animator.StringToHash("bGreat");
     private static readonly int BGoodHash = Animator.StringToHash("bGood");
+    private static readonly int FireHash = Animator.StringToHash("fire");
 
-    public static bool showFL;
-    public static bool showLevel;
+    [SerializeField]
+    GameObject effectPrefab;
 
     public NativeArray<EffectData> judgeEffectRequests = new(EFFECT_COUNT, Allocator.Persistent);
     public unsafe EffectData* JudgeEffectRequestsPtr => (EffectData*)judgeEffectRequests.GetUnsafePtr();
 
-    private readonly Animator[] judgeAnimators = new Animator[8];
-    private readonly GameObject[] judgeEffects = new GameObject[8];
-    private readonly Animator[] tapAnimators = new Animator[8];
-    private readonly GameObject[] tapEffects = new GameObject[8];
-    private readonly GameObject[] greatEffects = new GameObject[8];
-    private readonly GameObject[] goodEffects = new GameObject[8];
-    private readonly Animator[] fastLateAnims = new Animator[8];
-    private readonly GameObject[] fastLateEffects = new GameObject[8];
-    private readonly GameObject[] holdEffects = new GameObject[8];
-    private readonly Material[] holdMaterials = new Material[8];
-    Sprite[] judgeText;
+    private readonly Animator[] tapAnimators = new Animator[EFFECT_COUNT];
+
+    private readonly GameObject[] holdEffects = new GameObject[EFFECT_COUNT];
+    private readonly Material[] holdMaterials = new Material[EFFECT_COUNT];
+
+    private readonly GameObject[] touchEffects = new GameObject[EFFECT_COUNT];
+    private readonly Animator[] touchAnimators = new Animator[EFFECT_COUNT];
+
+    private readonly Animator[] judgeAnimators = new Animator[EFFECT_COUNT];
+    private readonly SpriteRenderer[] judgeRenderers = new SpriteRenderer[EFFECT_COUNT];
+
+    private readonly SpriteRenderer[] fastLateRenderers = new SpriteRenderer[EFFECT_COUNT];
+
+    private GameObject fireworkEffect;
+    private Animator fireworkAnimator;
 
     private void Awake()
     {
@@ -46,43 +53,52 @@ public class EffectManager : MonoBehaviour
 
     private void Start()
     {
-        var tapEffectParent = transform.GetChild(0).gameObject;
-        var greatEffectParent = transform.GetChild(1).gameObject;
-        var goodEffectParent = transform.GetChild(2).gameObject;
-        var judgeEffectParent = transform.GetChild(3).gameObject;
-        var flParent = transform.GetChild(4).gameObject;
-        var holdEffectParent = transform.GetChild(5).gameObject;
+        var parent = GameObject.Find("NoteEffects");
 
-        for (var i = 0; i < 8; i++)
+        for (var i = 0; i < EFFECT_COUNT; i++)
         {
-            judgeEffects[i] = judgeEffectParent.transform.GetChild(i).gameObject;
-            judgeAnimators[i] = judgeEffects[i].GetComponent<Animator>();
+            float2 pos;
+            if (i < BUTTON_COUNT)
+            {
+                pos = MajPos.GetBtnPos(i);
+            }
+            else
+            {
+                pos = MajPos.GetAreaPos((SensorType)i - 8);
+            }
+            float ang = 0f;
+            if (i - 8 < 16)       // 1~8, A1~B8
+                ang = -45f * (i % 8) - 22.5f;
+            else if (i - 8 > 16)  // D1~E8
+                ang = -45f * (i % 8 - 1) - 22.5f;
 
-            fastLateEffects[i] = flParent.transform.GetChild(i).gameObject;
-            fastLateAnims[i] = fastLateEffects[i].GetComponent<Animator>();
+            var effect = Instantiate(
+                effectPrefab,
+                new Vector3(pos.x, pos.y, 0),
+                Quaternion.Euler(new Vector3(0, 0, ang)),
+                parent.transform);
 
-            goodEffects[i] = goodEffectParent.transform.GetChild(i).gameObject;
-            greatEffects[i] = greatEffectParent.transform.GetChild(i).gameObject;
-            tapEffects[i] = tapEffectParent.transform.GetChild(i).gameObject;
-            tapAnimators[i] = tapEffects[i].GetComponent<Animator>();
+            var tapEffect = effect.transform.GetChild(0).gameObject;
+            tapAnimators[i] = tapEffect.GetComponent<Animator>();
+            if (i > 7) tapEffect.SetActive(false); // touch 部分的不要了 
 
-            holdEffects[i] = holdEffectParent.transform.GetChild(i).gameObject;
+            holdEffects[i] = effect.transform.GetChild(1).gameObject;
             holdMaterials[i] = holdEffects[i].GetComponent<ParticleSystemRenderer>().material;
-
-            goodEffects[i].SetActive(false);
-            greatEffects[i].SetActive(false);
-            tapEffects[i].SetActive(false);
             holdEffects[i].SetActive(false);
-        }
 
-        judgeText = _noteSkinManager.JudgeText;
+            touchEffects[i] = effect.transform.GetChild(2).gameObject;
+            touchEffects[i].transform.localEulerAngles = new Vector3(0, 0, -ang); // 回正
+            touchAnimators[i] = touchEffects[i].GetComponent<Animator>();
+            if (i <= 7) touchEffects[i].SetActive(false); // tap 部分的不要了 
 
-        foreach (var judgeEffect in judgeEffects)
-        {
-            judgeEffect.transform.GetChild(0).GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite =
-                _noteSkinManager.JudgeText[0];
-            judgeEffect.transform.GetChild(0).GetChild(1).gameObject.GetComponent<SpriteRenderer>().sprite =
-                _noteSkinManager.JudgeText_Break;
+            var judgeEffect = effect.transform.GetChild(3).gameObject;
+            judgeAnimators[i] = judgeEffect.GetComponent<Animator>();
+            judgeRenderers[i] = judgeEffect.transform.GetChild(0).GetChild(0).gameObject.GetComponent<SpriteRenderer>();
+            judgeEffect.transform.GetChild(0).GetChild(1).gameObject.GetComponent<SpriteRenderer>().sprite = _noteSkinManager.JudgeText_BPerfect;
+            fastLateRenderers[i] = judgeEffect.transform.GetChild(1).GetChild(0).GetComponent<SpriteRenderer>();
+
+            fireworkEffect = GameObject.Find("FireworkEffect");
+            fireworkAnimator = fireworkEffect.GetComponent<Animator>();
         }
     }
 
@@ -96,39 +112,29 @@ public class EffectManager : MonoBehaviour
         if (judgeEffectRequests.IsCreated) judgeEffectRequests.Dispose();
     }
 
-    public void SetDisplayMode(JudgeDisplayMode mode)
-    {
-        switch (mode)
-        {
-            case JudgeDisplayMode.None:
-                showFL = showLevel = false;
-                break;
-            case JudgeDisplayMode.FastLate:
-                showFL = true;
-                showLevel = false;
-                break;
-            case JudgeDisplayMode.Level:
-                showFL = false;
-                showLevel = true;
-                break;
-            case JudgeDisplayMode.Both:
-            default:
-                showFL = showLevel = true;
-                break;
-        }
-    }
-
     public void ProcessEffectRequests()
     {
         for (var i = 0; i < judgeEffectRequests.Length; i++)
         {
             var req = judgeEffectRequests[i];
-            if (req.HasEffect)
+
+            if (!req.IsMine ||
+                (req.IsMine && req.JudgeGrade is (JudgeGrade.Miss or JudgeGrade.TooFast)))
             {
-                ResetEffect(i);
-                PlayJudgeEffect(i, req.JudgeGrade, req.IsBreak);
-                PlayFastLateEffect(i, req.JudgeGrade);
+                if (req.Effect.HasFlag(EffectType.Tap))
+                {
+                    PlayTapEffect(i, req.JudgeGrade, req.IsBreak);
+                }
+                if (req.Effect.HasFlag(EffectType.Touch))
+                {
+                    PlayTouchEffect(i, req.JudgeGrade, req.IsBreak);
+                }
+                if (req.Effect.HasFlag(EffectType.Firework))
+                {
+                    PlayFireworkEffect(i);
+                }
             }
+
             holdEffects[i].SetActive(req.HasHolding);
             if (req.HasHolding)
             {
@@ -140,108 +146,164 @@ public class EffectManager : MonoBehaviour
             judgeEffectRequests[i] = default;
     }
 
-    public void ResetEffect(int pos)
+    private void PlayTapEffect(int pos, JudgeGrade judge, bool isBreak)
     {
-        tapEffects[pos].SetActive(false);
-        greatEffects[pos].SetActive(false);
-        goodEffects[pos].SetActive(false);
-    }
-
-    private void PlayJudgeEffect(int pos, JudgeGrade judge, bool isBreak)
-    {
+        // Effect & Judge Text
         switch (judge)
         {
             case JudgeGrade.LateGood:
             case JudgeGrade.FastGood:
-                SetJudgeEffect(pos, judgeText[1]);
+                judgeRenderers[pos].sprite = _noteSkinManager.JudgeText[1];
                 if (isBreak)
                 {
-                    tapEffects[pos].SetActive(true);
                     tapAnimators[pos].speed = 0.9f;
                     tapAnimators[pos].SetTrigger(BGoodHash);
                 }
                 else
                 {
-                    goodEffects[pos].SetActive(true);
+                    tapAnimators[pos].speed = 1f;
+                    tapAnimators[pos].SetTrigger(GoodHash);
                 }
                 break;
             case JudgeGrade.LateGreat3rd:
             case JudgeGrade.LateGreat2nd:
-            case JudgeGrade.LateGreat:
+            case JudgeGrade.LateGreat1st:
             case JudgeGrade.FastGreat3rd:
             case JudgeGrade.FastGreat2nd:
-            case JudgeGrade.FastGreat:
-                SetJudgeEffect(pos, judgeText[2]);
+            case JudgeGrade.FastGreat1st:
+                judgeRenderers[pos].sprite = _noteSkinManager.JudgeText[2];
                 if (isBreak)
                 {
-                    tapEffects[pos].SetActive(true);
                     tapAnimators[pos].speed = 0.9f;
                     tapAnimators[pos].SetTrigger(BGreatHash);
                 }
                 else
                 {
-                    greatEffects[pos].SetActive(true);
-                    greatEffects[pos].gameObject.GetComponent<Animator>().SetTrigger(GreatHash);
+                    tapAnimators[pos].speed = 1f;
+                    tapAnimators[pos].SetTrigger(GreatHash);
                 }
                 break;
             case JudgeGrade.LatePerfect3rd:
             case JudgeGrade.LatePerfect2nd:
             case JudgeGrade.FastPerfect3rd:
             case JudgeGrade.FastPerfect2nd:
-                SetJudgeEffect(pos, judgeText[3]);
-                tapEffects[pos].SetActive(true);
+                judgeRenderers[pos].sprite = _noteSkinManager.JudgeText[3];
                 if (isBreak)
                 {
                     tapAnimators[pos].speed = 0.9f;
-                    tapAnimators[pos].SetTrigger(BreakHash);
+                    tapAnimators[pos].SetTrigger(BPerfectHash);
+                }
+                else
+                {
+                    tapAnimators[pos].speed = 1f;
+                    tapAnimators[pos].SetTrigger(PerfectHash);
                 }
                 break;
-            case JudgeGrade.Perfect:
-                SetJudgeEffect(pos, judgeText[4]);
-                tapEffects[pos].SetActive(true);
+            case JudgeGrade.LateCritical:
+            case JudgeGrade.FastCritical:
+                judgeRenderers[pos].sprite = _noteSkinManager.JudgeText[4];
                 if (isBreak)
                 {
                     tapAnimators[pos].speed = 0.9f;
-                    tapAnimators[pos].SetTrigger(BreakHash);
+                    tapAnimators[pos].SetTrigger(BPerfectHash);
+                }
+                else
+                {
+                    tapAnimators[pos].speed = 1f;
+                    tapAnimators[pos].SetTrigger(PerfectHash);
                 }
                 break;
             default:
-                SetJudgeEffect(pos, judgeText[0]);
+                judgeRenderers[pos].sprite = _noteSkinManager.JudgeText[0];
                 break;
         }
 
-        if (showLevel)
-        {
-            if (isBreak && judge == JudgeGrade.Perfect)
-                judgeAnimators[pos].SetTrigger(BreakHash);
-            else
-                judgeAnimators[pos].SetTrigger(PerfectHash);
-        }
-    }
-
-    private void SetJudgeEffect(int pos, Sprite sprite)
-    {
-        if (!showLevel) return;
-        judgeEffects[pos].transform.GetChild(0).GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = sprite;
-    }
-
-    private void PlayFastLateEffect(int pos, JudgeGrade judge)
-    {
-        if (!showFL) return;
-
-        if (judge is JudgeGrade.Miss or JudgeGrade.Perfect)
-        {
-            fastLateEffects[pos].SetActive(false);
-            return;
-        }
-
-        fastLateEffects[pos].SetActive(true);
-        var isFast = (int)judge > 7;
-        if (isFast)
-            fastLateEffects[pos].transform.GetChild(0).GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = _noteSkinManager.FastText;
+        // Judge Anim
+        if (isBreak && (judge is JudgeGrade.LateCritical or JudgeGrade.FastCritical))
+            judgeAnimators[pos].SetTrigger(BPerfectHash);
         else
-            fastLateEffects[pos].transform.GetChild(0).GetChild(0).gameObject.GetComponent<SpriteRenderer>().sprite = _noteSkinManager.LateText;
-        fastLateAnims[pos].SetTrigger(PerfectHash);
+            judgeAnimators[pos].SetTrigger(PerfectHash);
+
+        // Fast / Late
+        if (judge is JudgeGrade.Miss or JudgeGrade.LateCritical or JudgeGrade.FastCritical)
+        {
+            fastLateRenderers[pos].sprite = null;
+        }
+        else
+        {
+            var isFast = judge <= JudgeGrade.FastCritical;
+            if (isFast)
+                fastLateRenderers[pos].sprite = _noteSkinManager.FastText;
+            else
+                fastLateRenderers[pos].sprite = _noteSkinManager.LateText;
+        }
+    }
+
+    private void PlayTouchEffect(int pos, JudgeGrade judge, bool isBreak)
+    {
+        // Effect & Judge Text
+        switch (judge)
+        {
+            case JudgeGrade.LateGood:
+            case JudgeGrade.FastGood:
+                judgeRenderers[pos].sprite = _noteSkinManager.JudgeText[1];
+                touchAnimators[pos].SetTrigger(GoodHash);
+                break;
+            case JudgeGrade.LateGreat3rd:
+            case JudgeGrade.LateGreat2nd:
+            case JudgeGrade.LateGreat1st:
+            case JudgeGrade.FastGreat3rd:
+            case JudgeGrade.FastGreat2nd:
+            case JudgeGrade.FastGreat1st:
+                judgeRenderers[pos].sprite = _noteSkinManager.JudgeText[2];
+                touchAnimators[pos].SetTrigger(GreatHash);
+                break;
+            case JudgeGrade.LatePerfect3rd:
+            case JudgeGrade.LatePerfect2nd:
+            case JudgeGrade.FastPerfect3rd:
+            case JudgeGrade.FastPerfect2nd:
+                judgeRenderers[pos].sprite = _noteSkinManager.JudgeText[3];
+                touchAnimators[pos].SetTrigger(PerfectHash);
+                break;
+            case JudgeGrade.LateCritical:
+            case JudgeGrade.FastCritical:
+                judgeRenderers[pos].sprite = _noteSkinManager.JudgeText[4];
+                touchAnimators[pos].SetTrigger(PerfectHash);
+                break;
+            default:
+                judgeRenderers[pos].sprite = _noteSkinManager.JudgeText[0];
+                break;
+        }
+
+        // Judge Anim
+        if (isBreak && (judge is JudgeGrade.LateCritical or JudgeGrade.FastCritical))
+            judgeAnimators[pos].SetTrigger(BPerfectHash);
+        else
+            judgeAnimators[pos].SetTrigger(PerfectHash);
+
+        // Fast / Late
+        if (judge is JudgeGrade.Miss or JudgeGrade.LateCritical or JudgeGrade.FastCritical)
+        {
+            fastLateRenderers[pos].sprite = null;
+        }
+        else
+        {
+            var isFast = judge <= JudgeGrade.FastCritical;
+            if (isFast)
+                fastLateRenderers[pos].sprite = _noteSkinManager.FastText;
+            else
+                fastLateRenderers[pos].sprite = _noteSkinManager.LateText;
+        }
+    }
+
+    public void PlayFireworkEffect(int pos)
+    {
+        float2 worldPos;
+        if (pos is < 0 or > EFFECT_COUNT) return;
+        else if (pos < BUTTON_COUNT) worldPos = MajPos.GetBtnPos(pos);
+        else worldPos = MajPos.GetAreaPos((SensorType)(pos - 8));
+        fireworkEffect.transform.position = new float3(worldPos, 0);
+        fireworkAnimator.SetTrigger(FireHash);
     }
 
     public void ResetState()
@@ -253,9 +315,19 @@ public class EffectManager : MonoBehaviour
 
 public struct EffectData
 {
-    public bool HasEffect;
+    public EffectType Effect;
     public JudgeGrade JudgeGrade;
     public bool IsBreak;
+    public bool IsMine;
     public bool HasHolding;
     public Color HoldingColor;
+}
+
+[Flags]
+public enum EffectType
+{
+    None = 0,
+    Tap = 1 << 0,
+    Touch = 1 << 1,
+    Firework = 1 << 2
 }

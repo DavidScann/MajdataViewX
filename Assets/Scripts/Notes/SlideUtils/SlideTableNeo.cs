@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 
 namespace Notes.SlideUtils
@@ -11,14 +10,12 @@ namespace Notes.SlideUtils
     public readonly struct SlideArea
     {
         /// <summary>
-        /// 判定段按下以后应当消除的箭头总数，注意计数包含了路径起终点，所以一般比实际显示的箭头数目多一个
-        /// （最后一个区多两个）
+        /// 判定段按下以后应当消除的箭头总数，起点已被扣除，最后一个区会比实际箭头数多
         /// </summary>
         public readonly int ArrowProgressPush;
 
         /// <summary>
-        /// 判定段完成以后应当消除的箭头总数，注意计数包含了路径起终点，所以一般比实际显示的箭头数目多一个
-        /// （最后一个区多两个）
+        /// 判定段完成以后应当消除的箭头总数，起点已被扣除，最后一个区会比实际箭头数多
         /// </summary>
         public readonly int ArrowProgressFinish;
 
@@ -26,7 +23,7 @@ namespace Notes.SlideUtils
         /// 判定段包含的第一个判定区
         /// </summary>
         public readonly SensorType SensorA;
-        
+
         /// <summary>
         /// 判定段包含的第二个判定区
         /// </summary>
@@ -47,7 +44,7 @@ namespace Notes.SlideUtils
     public readonly struct SlidePose
     {
         public readonly float X, Y, RotZ, L;
-        
+
         public SlidePose(float x, float y, float rotZ, float l)
         {
             X = x;
@@ -56,7 +53,7 @@ namespace Notes.SlideUtils
             L = l;
         }
     }
-    
+
     public enum SlideOkType
     {
         StraightL,
@@ -65,6 +62,13 @@ namespace Notes.SlideUtils
         CircleR,
         WifiU,
         WifiD,
+    }
+    
+    public enum SlideFlag
+    {
+        None,
+        NormalV,
+        SpecialV
     }
 
     public readonly struct SlideMetadata
@@ -75,9 +79,11 @@ namespace Notes.SlideUtils
         public readonly float SlideLength;
         /// <summary>这个参数为 true 表示最后一个箭头距离终点太近，只在 conn-slide 的非最终段显示</summary>
         public readonly bool ConditionalLastArrow;
+        /// <summary>用来标记是不是大V</summary>
+        public readonly SlideFlag Flag;
         /// <summary>判定队列，若为 Wifi 则表示中间一支的判定队列</summary>
         public readonly SlideArea[] JudgeAreaQueue;
-        
+
         /// <summary>
         /// <para>slide 每个箭头的位置与方向</para>
         /// <para>注意数组中包含了路径起点和终点，真正应该显示的箭头需要去掉这两项
@@ -85,26 +91,27 @@ namespace Notes.SlideUtils
         /// <para>普通 slide 可以直接拿这个数组来更新引导星星，Wifi 就别用这个了</para>
         /// </summary>
         public readonly SlidePose[] ArrowPoses;
-        
+
         /// <summary>slideOK 的位置与方向，以图片中点为锚点。
         /// 请注意素材的尺寸：直线和圆弧形 slideOK 为 410x140，Wifi 为 668x200</summary>
         public readonly SlidePose OkPose;
         /// <summary>slideOK 的种类，告诉你该用哪张素材</summary>
         public readonly SlideOkType OkType;
-        
+
         /// <summary>Wifi 左边一支的判定队列（终点在中间支的顺时针方向）</summary>
         public readonly SlideArea[] JudgeAreaQueueL;
         /// <summary>Wifi 右边一支的判定队列（终点在中间支的逆时针方向）</summary>
         public readonly SlideArea[] JudgeAreaQueueR;
 
         public SlideMetadata(
-            SlideArea[] judgeAreaQueue, 
+            SlideArea[] judgeAreaQueue,
             float slideConst,
             float slideLength,
             SlidePose[] arrowPoses,
-            bool conditionalLastArrow, 
-            SlidePose okPose, 
-            SlideOkType okType
+            bool conditionalLastArrow,
+            SlidePose okPose,
+            SlideOkType okType,
+            SlideFlag flag
             )
         {
             SlideConst = slideConst;
@@ -116,18 +123,20 @@ namespace Notes.SlideUtils
             OkType = okType;
             JudgeAreaQueueL = null;
             JudgeAreaQueueR = null;
+            Flag = flag;
         }
-        
+
         public SlideMetadata(
             SlideArea[] judgeAreaQueueL,
             SlideArea[] judgeAreaQueueC,
             SlideArea[] judgeAreaQueueR,
             float slideConst,
             float slideLength,
-            SlidePose[] arrowPoses, 
-            bool conditionalLastArrow, 
-            SlidePose okPose, 
-            SlideOkType okType
+            SlidePose[] arrowPoses,
+            bool conditionalLastArrow,
+            SlidePose okPose,
+            SlideOkType okType,
+            SlideFlag flag
             )
         {
             SlideConst = slideConst;
@@ -139,6 +148,7 @@ namespace Notes.SlideUtils
             OkType = okType;
             JudgeAreaQueueL = judgeAreaQueueL;
             JudgeAreaQueueR = judgeAreaQueueR;
+            Flag = flag;
         }
     }
 
@@ -149,11 +159,11 @@ namespace Notes.SlideUtils
             var x = (float)rawData.Point.Real;
             var y = (float)rawData.Point.Imaginary;
             var phase = rawData.Direction.Phase;  // -pi ~ pi
-            
+
             // rawData 中 phase 是弧度，0 度是箭头朝正右，逆时针为正
             // View 中 rotZ 是角度，0 度是箭头朝正左，逆时针为正
             var rotZ = (float)(180 + phase * 180 / Math.PI);    // should be 0 ~ 360
-            
+
             return new SlidePose(x, y, rotZ, (float)rawData.PathLength);
         }
 
@@ -161,7 +171,7 @@ namespace Notes.SlideUtils
         public const double CircleOkRadius = MajGeometry.MainRadius * 462.0 / 480.0;
         /// <summary>需要贴图尺寸 410x140</summary>
         public const double StraightOkDistance = MajGeometry.MainRadius * 205.0 / 480.0;
-        
+
         /// <summary>
         /// 获取圆弧 slide 的 slideOK 姿势
         /// </summary>
@@ -202,19 +212,21 @@ namespace Notes.SlideUtils
         /// <summary>
         /// 使用指定的 slide 路径打表
         /// </summary>
-        public static SlideMetadata CreateSlideEntry(ParametricSlidePath slidePath)
+        public static SlideMetadata CreateSlideEntry(ParametricSlidePath slidePath, SlideFlag flag = SlideFlag.None)
         {
             var arrowData = SlideDataBuilder.BuildArrowData(slidePath);
             var areaData = SlideDataBuilder.BuildSlideAreas(slidePath);
-            return CreateSlideEntry(arrowData, areaData, slidePath.GetEndShape());
+            return CreateSlideEntry(arrowData, areaData, slidePath.GetEndShape(), flag);
         }
 
         /// <summary>
         /// 使用指定的 slide 路径打表，如果需要对原始参数做调整的话用这个
         /// </summary>
         public static SlideMetadata CreateSlideEntry(
-            SlideArrowRawData[] arrowRawData, SlideAreaRawData[] areaRawData, SlideEndShape endShape
-            )
+            SlideArrowRawData[] arrowRawData,
+            SlideAreaRawData[] areaRawData,
+            SlideEndShape endShape,
+            SlideFlag flag = SlideFlag.None)
         {
             // ========== ========== ========== ========== ========== ========== ==========
             // 整理箭头数据
@@ -238,14 +250,23 @@ namespace Notes.SlideUtils
             var areaList = new List<SlideArea>();
 
             var arrowIdx = 1;
+            var lastLength = 0.0;
+            var firstAreaMinIdx = 2;    // 第一个区至少删两个箭头
+            var finalAreaMaxIdx = conditionalLastArrow? arrowCount - 7 : arrowCount - 6;  // 最后一个区至少留四个箭头
             SensorType sensorA;
             SensorType sensorB;
             for (var i = 0; i <= areaRawData.Length - 2; i++) // 最后一个判定段要特殊处理
             {
-                while (arrowRawData[arrowIdx].PathLength <= areaRawData[i].LengthAfterPush) arrowIdx++;
-                var push = arrowIdx - 1;   // 单纯是因为想多留 1 个箭头而已
-                while (arrowRawData[arrowIdx].PathLength <= areaRawData[i].LengthAfterFinish) arrowIdx++;
-                var finish = arrowIdx - 1;
+                var targetLength = lastLength + 0.33 * (areaRawData[i].LengthAfterPush - lastLength);
+                while (arrowRawData[arrowIdx].PathLength <= targetLength) arrowIdx++;
+                lastLength = areaRawData[i].LengthAfterPush;
+                var push = Math.Max(arrowIdx - 1, firstAreaMinIdx);   // 扣掉本来就不显示的路径起点
+                
+                targetLength = lastLength + 0.33 * (areaRawData[i].LengthAfterFinish - lastLength);
+                while (arrowRawData[arrowIdx].PathLength <= targetLength) arrowIdx++;
+                var finish = Math.Min(arrowIdx - 1, finalAreaMaxIdx);   // 扣掉本来就不显示的路径起点
+                lastLength = areaRawData[i].LengthAfterFinish;
+                
                 sensorA = (SensorType)areaRawData[i].SensorA;
                 sensorB = (SensorType)areaRawData[i].SensorB;
                 areaList.Add(new SlideArea(push, finish, sensorA, sensorB));
@@ -253,7 +274,7 @@ namespace Notes.SlideUtils
 
             sensorA = (SensorType)areaRawData[^1].SensorA;
             sensorB = (SensorType)areaRawData[^1].SensorB;
-            areaList.Add(new SlideArea(arrowCount, arrowCount, sensorA,  sensorB));
+            areaList.Add(new SlideArea(arrowCount, arrowCount, sensorA, sensorB));
 
             var slideLength = arrowRawData[^1].PathLength;
             var slideConst = (float)(1.0 - areaRawData[^2].LengthAfterFinish / slideLength);
@@ -264,48 +285,47 @@ namespace Notes.SlideUtils
             var endButton = areaRawData[^1].SensorA + 1;   // 直接从判定队列里抠出最后一个区的键位
             SlideOkType okType;
             SlidePose okPose;
-            
+
             switch (endShape)
             {
                 case SlideEndShape.CircleCCW:
-                {
-                    okType = SlideOkType.CircleL;
-                    okPose = CalcCircleOkPose(endButton, true);
-                    break;
-                }
+                    {
+                        okType = SlideOkType.CircleL;
+                        okPose = CalcCircleOkPose(endButton, true);
+                        break;
+                    }
                 case SlideEndShape.CircleCW:
-                {
-                    okType = SlideOkType.CircleR;
-                    okPose = CalcCircleOkPose(endButton, false);
-                    break;
-                }
+                    {
+                        okType = SlideOkType.CircleR;
+                        okPose = CalcCircleOkPose(endButton, false);
+                        break;
+                    }
                 case SlideEndShape.Straight:
                 default:
-                {
-                    var isLeft = (endButton > 4);
-                    okType = isLeft ? SlideOkType.StraightL : SlideOkType.StraightR;
-                    okPose = CalcStraightOkPose(arrowRawData[^1], isLeft);
-                    break;
-                }
+                    {
+                        var isLeft = (endButton > 4);
+                        okType = isLeft ? SlideOkType.StraightL : SlideOkType.StraightR;
+                        okPose = CalcStraightOkPose(arrowRawData[^1], isLeft);
+                        break;
+                    }
             }
 
             return new SlideMetadata(
                 areaList.ToArray(), slideConst, (float)slideLength,
                 arrowPoseList.ToArray(), conditionalLastArrow,
-                okPose, okType
-                );
+                okPose, okType, flag);
         }
 
         public static readonly double[] WifiPos =
         {
-            4.279, 3.658, 3.010, 2.337, 1.637, 0.911, 0.158, -0.621, -1.426, -2.257, -3.115
+            4.8, 4.279, 3.658, 3.010, 2.337, 1.637, 0.911, 0.158, -0.621, -1.426, -2.257, -3.115, -4.8
         };
 
         public static readonly int[] WifiArrow =
         {
             1, 2, 4, 5, 7, 8, 11
         };
-        
+
         /// <summary>需要贴图尺寸 668x200</summary>
         public const double WifiOkRadius = MajGeometry.MainRadius * 424.0 / 480.0;
 
@@ -318,8 +338,8 @@ namespace Notes.SlideUtils
             var arrowPoseList = new List<SlidePose>();
             var startPoint = MajGeometry.PointGroupA(start);
             var phase = startPoint.Phase;
-            
-            for (var i = 0; i < 11; i++)
+
+            for (var i = 0; i < WifiPos.Length; i++)
             {
                 // // magic
                 // var l = 57.63636 + 23.13636 * i + 0.5 * i * i;
@@ -331,10 +351,10 @@ namespace Notes.SlideUtils
                 var rotZ = (float)(360 - 45 * start);    // should be 0 ~ 360
                 arrowPoseList.Add(new SlidePose((float)pos.Real, (float)pos.Imaginary, rotZ, (float)length));
             }
-            
-            var okType = (start is 3 or 4 or 5 or 6) ? SlideOkType.WifiD : SlideOkType.WifiU;
+
+            var okType = (start is 3 or 4 or 5 or 6) ? SlideOkType.WifiU : SlideOkType.WifiD;
             var okPos = Complex.FromPolarCoordinates(-WifiOkRadius, phase);
-            var okRotZ = 157.5f - 45 * start;
+            var okRotZ = 202.5f - 45 * start;
             if (okType == SlideOkType.WifiD) okRotZ += 180;
             var okPose = new SlidePose((float)okPos.Real, (float)okPos.Imaginary, okRotZ, 0);
 
@@ -358,7 +378,7 @@ namespace Notes.SlideUtils
                 new(WifiArrow[4], WifiArrow[5],
                     (SensorType)((start + 1) & 7 | 8), SensorType.Invalid), // B3=10
                 new(WifiArrow[6], WifiArrow[6],
-                    (SensorType)((start + 2) & 7), (SensorType)((start + 3) & 7 + 17)), // A4=3, D5=21
+                    (SensorType)((start + 2) & 7), (SensorType)(((start + 3) & 7) + 17)), // A4=3, D5=21
             };
             var judgeL = new SlideArea[]    // 1w5 的 1-6 部分
             {
@@ -369,20 +389,19 @@ namespace Notes.SlideUtils
                 new(WifiArrow[4], WifiArrow[5],
                     (SensorType)((start - 3) & 7 | 8), SensorType.Invalid), // B7=14
                 new(WifiArrow[6], WifiArrow[6],
-                    (SensorType)((start - 4) & 7), (SensorType)((start - 4) & 7 + 17)), // A6=5, D6=22
+                    (SensorType)((start - 4) & 7), (SensorType)(((start - 4) & 7) + 17)), // A6=5, D6=22
             };
-            
+
             return new SlideMetadata(
-                judgeL, judgeC, judgeR, 0.162870f, (float)(MajGeometry.MainRadius * 2), 
+                judgeL, judgeC, judgeR, 0.162870f, (float)(MajGeometry.MainRadius * 2),
                 arrowPoseList.ToArray(), false,
-                okPose, okType
-                );
+                okPose, okType, SlideFlag.None);
         }
 
         /// <summary>获取除了 wifi 以外的标准 slide</summary>
         /// <remarks>没有做任何参数校验，获取前记得初始化</remarks>
         public static SlideMetadata GetStandardSlide(string key) => SLIDE_TABLE[key];
-        
+
         /// <summary>获取 wifi</summary>
         /// <remarks>没有做任何参数校验，获取前记得初始化</remarks>
         public static SlideMetadata GetWifiSlide(string key) => WIFI_TABLE[key];
@@ -391,12 +410,14 @@ namespace Notes.SlideUtils
         /// <remarks>没有做任何 wifi 的特判，如果待连接的 slide 里有 wifi 是 UB</remarks>
         public static SlideMetadata MakeConnSlide(IList<SlideMetadata> slides)
         {
+            if (slides.Count == 1) return slides[0];
+
             var judgeAreas = new List<SlideArea>();
             var arrowPoses = new List<SlidePose>();
-            
+
             // 起点单独处理
             arrowPoses.Add(slides[0].ArrowPoses[0]);
-            
+
             var totalLength = 0f;
             var arrowProgress = 0;
             foreach (var slide in slides)
@@ -422,28 +443,31 @@ namespace Notes.SlideUtils
                         arrowProgress + area.ArrowProgressFinish,
                         area.SensorA,
                         area.SensorB));
+                    //{ IsSkippable = area.IsSkippable }
+                    //此处忽略所有星星的判定保护，单条大V星星会直接返回原对象不受影响
+                    //1-3这种在NoteManager->Loader中赋值完成后处理
                 }
-                
+
                 totalLength += slide.SlideLength;
                 // ArrowPoses 数组天生比实际显示的箭头数量多 2 个
                 arrowProgress += slide.ArrowPoses.Length - 2;
             }
-            
+
             var lastSlide = slides[^1];
             // 补上路径终点
             var lastPose = lastSlide.ArrowPoses[^1];
             arrowPoses.Add(new SlidePose(lastPose.X, lastPose.Y, lastPose.RotZ, totalLength));
             var arrowCount = arrowPoses.Count;
-            
+
             if (arrowCount != arrowProgress + 2)    // assertion
             {
                 throw new InvalidOperationException("Assertion failed: arrowCount == arrowProgress + 2");
             }
-            
+
             // 补上最后一个区
             var lastArea = lastSlide.JudgeAreaQueue[^1];
             judgeAreas.Add(new SlideArea(arrowCount, arrowCount, lastArea.SensorA, lastArea.SensorB));
-            
+
             var slideConst = lastSlide.SlideConst * lastSlide.SlideLength / totalLength;
 
             return new SlideMetadata(
@@ -453,8 +477,9 @@ namespace Notes.SlideUtils
                 arrowPoses.ToArray(),
                 lastSlide.ConditionalLastArrow,
                 lastSlide.OkPose,
-                lastSlide.OkType
-            );
+                lastSlide.OkType,
+                SlideFlag.None
+                );
         }
 
         /// <summary>用 slide-code 直接生成一条完整的自定义 slide</summary>
@@ -475,17 +500,17 @@ namespace Notes.SlideUtils
         public static void InitializeStandardSlideTable()
         {
             SlideDataBuilder.InitializeSlideAreaLookup();
-            
+
             SLIDE_TABLE.Clear();
             WIFI_TABLE.Clear();
-            
+
             for (var diff = 2; diff <= 6; diff++)
             {
                 // 直线形
                 var path = SlidePathConstructor.BeginAt((int)SensorType.A1)
                     .LineToPoint(diff)
                     .GeneratePath();
-                
+
                 for (var i = 0; i <= 7; i++)
                 {
                     var start = 1 + i;
@@ -504,7 +529,7 @@ namespace Notes.SlideUtils
                 var pathCircle = SlidePathConstructor.BeginAt((int)SensorType.A1)
                     .ArcToAngle(9, MajGeometry.GetPoint(diff).Phase + phaseNudge, true, false)
                     .GeneratePath();
-                
+
                 // p slide
                 ParametricSlidePath pathP;
                 if (diff == 5)
@@ -533,7 +558,7 @@ namespace Notes.SlideUtils
                         .LineToPoint(diff)
                         .GeneratePath();
                 }
-                
+
                 // pp slide
                 ParametricSlidePath pathPP;
                 if (diff == 3 || diff == 4)
@@ -553,34 +578,34 @@ namespace Notes.SlideUtils
                         .LineToPoint(diff)
                         .GeneratePath();
                 }
-                
+
                 for (var i = 0; i <= 7; i++)
                 {
                     var start = 1 + i;
                     var end = 1 + ((i + diff) & 7);
-                    
-                    var key = (start is 3 or 4 or 5 or 6) ? $"{start}>{end}" :  $"{start}<{end}";
+
+                    var key = (start is 3 or 4 or 5 or 6) ? $"{start}>{end}" : $"{start}<{end}";
                     pathCircle.SetRotoreflection(false, i);
                     SLIDE_TABLE.Add(key, CreateSlideEntry(pathCircle));
-                    
+
                     key = $"{start}p{end}";
                     pathP.SetRotoreflection(false, i);
                     SLIDE_TABLE.Add(key, CreateSlideEntry(pathP));
-                    
+
                     key = $"{start}pp{end}";
                     pathPP.SetRotoreflection(false, i);
                     SLIDE_TABLE.Add(key, CreateSlideEntry(pathPP));
-                    
+
                     end = 1 + ((i - diff) & 7);
-                    
-                    key = (start is 3 or 4 or 5 or 6) ? $"{start}<{end}" :  $"{start}>{end}";
+
+                    key = (start is 3 or 4 or 5 or 6) ? $"{start}<{end}" : $"{start}>{end}";
                     pathCircle.SetRotoreflection(true, i);
                     SLIDE_TABLE.Add(key, CreateSlideEntry(pathCircle));
-                    
+
                     key = $"{start}q{end}";
                     pathP.SetRotoreflection(true, i);
                     SLIDE_TABLE.Add(key, CreateSlideEntry(pathP));
-                    
+
                     key = $"{start}qq{end}";
                     pathPP.SetRotoreflection(true, i);
                     SLIDE_TABLE.Add(key, CreateSlideEntry(pathPP));
@@ -595,7 +620,7 @@ namespace Notes.SlideUtils
                     .LineToPoint((int)SensorType.C)
                     .LineToPoint(diff)
                     .GeneratePath();
-                
+
                 for (var i = 0; i <= 7; i++)
                 {
                     var start = 1 + i;
@@ -613,7 +638,7 @@ namespace Notes.SlideUtils
                     .LineToPoint((int)SensorType.B3)
                     .LineToPoint((int)SensorType.A5)
                     .GeneratePath();
-                
+
                 for (var i = 0; i <= 7; i++)
                 {
                     var start = 1 + i;
@@ -626,7 +651,7 @@ namespace Notes.SlideUtils
                     SLIDE_TABLE.Add(key, CreateSlideEntry(path));
                 }
             }
-            
+
             for (var diff = 1; diff <= 4; diff++)
             {
                 // L slide
@@ -634,7 +659,8 @@ namespace Notes.SlideUtils
                     .LineToPoint((int)SensorType.A7)
                     .LineToPoint(diff)
                     .GeneratePath();
-                
+                var isSpecial = diff == 4;
+
                 for (var i = 0; i <= 7; i++)
                 {
                     var start = 1 + i;
@@ -642,13 +668,13 @@ namespace Notes.SlideUtils
                     var end = 1 + ((i + diff) & 7);
                     var key = $"{start}V{mid}{end}";
                     path.SetRotoreflection(false, i);
-                    SLIDE_TABLE.Add(key, CreateSlideEntry(path));
-                    
+                    SLIDE_TABLE.Add(key, CreateSlideEntry(path, isSpecial ? SlideFlag.SpecialV : SlideFlag.NormalV));
+
                     mid = 1 + ((i + 2) & 7);
                     end = 1 + ((i - diff) & 7);
                     key = $"{start}V{mid}{end}";
                     path.SetRotoreflection(true, i);
-                    SLIDE_TABLE.Add(key, CreateSlideEntry(path));
+                    SLIDE_TABLE.Add(key, CreateSlideEntry(path, isSpecial ? SlideFlag.SpecialV : SlideFlag.NormalV));
                 }
             }
 
@@ -660,8 +686,6 @@ namespace Notes.SlideUtils
                 var key = $"{start}w{end}";
                 WIFI_TABLE.Add(key, CreateWifiEntry(start));
             }
-
         }
-        
     }
 }

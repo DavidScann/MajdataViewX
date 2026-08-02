@@ -1,10 +1,9 @@
-﻿#nullable enable
+#nullable enable
 
 #region
 
 using System;
 using System.Collections.Concurrent;
-using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Threading;
@@ -24,6 +23,7 @@ public class WsServer : MonoBehaviour
 {
     public static readonly ConcurrentQueue<string> MessageQueue = new();
     private WebSocketServer? webSocket;
+    private CancellationToken _lifetimeCancellationToken;
 
     private void Awake()
     {
@@ -35,12 +35,14 @@ public class WsServer : MonoBehaviour
     {
         SceneManager.LoadScene(1);
 
-        Application.targetFrameRate = -1;
+        QualitySettings.vSyncCount = 1;
 
         webSocket = new WebSocketServer("ws://127.0.0.1:8083");
         webSocket.AddWebSocketService<MajdataWsService>("/majdata");
         webSocket.Start();
-        ProcessQueue().Forget();
+        _lifetimeCancellationToken = this.GetCancellationTokenOnDestroy();
+        ProcessQueue(_lifetimeCancellationToken).Forget();
+        BroadcastHeartbeat(_lifetimeCancellationToken).Forget();
 
 #if UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX
         // 补全 Mac 常见的环境变量路径（Homebrew 在 Intel 和 Apple Silicon 的路径不同）
@@ -50,22 +52,48 @@ public class WsServer : MonoBehaviour
 #endif
     }
 
-    private async UniTaskVoid ProcessQueue()
+    private async UniTaskVoid ProcessQueue(CancellationToken cancellationToken)
     {
-        while (this != null)
+        try
         {
-            if (MessageQueue.TryDequeue(out var json))
+            while (!cancellationToken.IsCancellationRequested)
             {
-                while (_playManager == null)
-                    await UniTask.Yield();
+                if (MessageQueue.TryDequeue(out var json))
+                {
+                    while (_playManager == null ||
+                           PlayManager.Summary.State is ViewStatus.Busy)
+                        await UniTask.Yield(PlayerLoopTiming.Update, cancellationToken);
 
-                Debug.Log($"dequeue: {json}");
-                await HandleMessageAsync(json);
+                    Debug.Log($"dequeue: {json}");
+                    await HandleMessageAsync(json);
+                }
+                else
+                {
+                    await UniTask.Yield(PlayerLoopTiming.Update, cancellationToken);
+                }
             }
-            else
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+    }
+
+    private async UniTaskVoid BroadcastHeartbeat(CancellationToken cancellationToken)
+    {
+        try
+        {
+            while (!cancellationToken.IsCancellationRequested)
             {
-                await UniTask.Yield();
+                await UniTask.Delay(
+                    TimeSpan.FromSeconds(1),
+                    DelayType.Realtime,
+                    PlayerLoopTiming.Update,
+                    cancellationToken);
+                Response(MajWsResponseType.Heartbeat, PlayManager.Summary);
             }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
         }
     }
 
@@ -144,7 +172,6 @@ public class WsServer : MonoBehaviour
         catch (Exception ex)
         {
             Error(ex);
-            throw;
         }
     }
 
@@ -165,12 +192,12 @@ public class WsServer : MonoBehaviour
             Broadcast(JsonConvert.SerializeObject(rsp));
     }
 
-    void Error<T>(T exception) where T : Exception
+    public void Error<T>(T exception) where T : Exception
     {
         Response(MajWsResponseType.Error, exception.ToString());
     }
 
-    void Error(string errMsg)
+    public void Error(string errMsg)
     {
         Response(MajWsResponseType.Error, errMsg);
     }
@@ -185,48 +212,8 @@ public class WsServer : MonoBehaviour
     }
 }
 
-public class MajdataWsService : WebSocketBehavior, IDisposable
+public class MajdataWsService : WebSocketBehavior
 {
-    public MajdataWsService()
-    {
-        _ = UniTask.RunOnThreadPool(() =>
-        {
-            while (true)
-            {
-                try
-                {
-                    if (Sessions is null)
-                        continue;
-                    var json = GetSummaryJson();
-                    Sessions.Broadcast(json);
-                }
-                catch (InvalidOperationException)
-                {
-                }
-                finally
-                {
-                    Thread.Sleep(1000);
-                }
-            }
-
-        });
-    }
-
-    private static string GetSummaryJson()
-    {
-        var rsp = new MajWsResponseBase()
-        {
-            responseType = MajWsResponseType.Heartbeat,
-            responseData = PlayManager.Summary
-        };
-        var json = JsonConvert.SerializeObject(rsp);
-        return json;
-    }
-
-    public void Dispose()
-    {
-    }
-
     protected override void OnMessage(MessageEventArgs e)
     {
         var json = e.IsText ? e.Data : Encoding.UTF8.GetString(e.RawData);

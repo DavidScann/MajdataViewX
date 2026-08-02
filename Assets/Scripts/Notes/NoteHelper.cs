@@ -1,4 +1,3 @@
-#pragma warning disable CS8500
 
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -15,8 +14,12 @@ public static unsafe class NoteHelper
 {
     public static readonly SharedStatic<AutoPlayMode> AutoPlayModeSS =
         SharedStatic<AutoPlayMode>.GetOrCreate<InputManager>();
-    public static readonly AutoPlayMode AutoPlayMode =
+    public static AutoPlayMode AutoPlayMode =>
         AutoPlayModeSS.Data;
+
+    public static bool IsSimulated => AutoPlayMode is
+        AutoPlayMode.DJAutoSensor or AutoPlayMode.DJAutoButton or AutoPlayMode.Disable;
+    // Force burst recompile
 
     // ---- Judgment constants ----
     public const float TAP_JUDGE_SEG_1ST_PERFECT_MSEC = 1 * FRAME_LENGTH_MSEC;
@@ -27,6 +30,13 @@ public static unsafe class NoteHelper
     public const float TAP_JUDGE_SEG_3RD_GREAT_MSEC = 6 * FRAME_LENGTH_MSEC;
     public const float TAP_JUDGE_GOOD_AREA_MSEC = 9 * FRAME_LENGTH_MSEC;
 
+    public const float HOLD_HEAD_IGNORE_LENGTH_SEC = 6 * FRAME_LENGTH_SEC;
+    public const float HOLD_TAIL_IGNORE_LENGTH_SEC = 12 * FRAME_LENGTH_SEC;
+    public const float DELUXE_HOLD_RELEASE_IGNORE_TIME_SEC = 2 * FRAME_LENGTH_SEC;
+
+    public const float SLIDE_CHECK_AHEAD_TIME_MSEC = 6 * FRAME_LENGTH_MSEC;
+    public const float SLIDE_FORCE_MISS = 33 * FRAME_LENGTH_MSEC;
+
     public const float TOUCH_JUDGE_SEG_1ST_PERFECT_MSEC = 9 * FRAME_LENGTH_MSEC;
     public const float TOUCH_JUDGE_SEG_2ND_PERFECT_MSEC = 10.5f * FRAME_LENGTH_MSEC;
     public const float TOUCH_JUDGE_SEG_3RD_PERFECT_MSEC = 12 * FRAME_LENGTH_MSEC;
@@ -35,14 +45,13 @@ public static unsafe class NoteHelper
     public const float TOUCH_JUDGE_SEG_3RD_GREAT_MSEC = 15 * FRAME_LENGTH_MSEC;
     public const float TOUCH_JUDGE_GOOD_AREA_MSEC = 18 * FRAME_LENGTH_MSEC;
 
-    public const float TOUCH_DISPLAY_OFFSET_SEC = 0 * FRAME_LENGTH_SEC;
-    public const float TOUCH_HOLD_DISPLAY_OFFSET_SEC = 0 * FRAME_LENGTH_SEC;
-
-    public const float HOLD_HEAD_IGNORE_LENGTH_SEC = 6 * FRAME_LENGTH_SEC;
-    public const float HOLD_TAIL_IGNORE_LENGTH_SEC = 12 * FRAME_LENGTH_SEC;
     public const float TOUCH_HOLD_HEAD_IGNORE_LENGTH_SEC = 15 * FRAME_LENGTH_SEC;
     public const float TOUCH_HOLD_TAIL_IGNORE_LENGTH_SEC = 12 * FRAME_LENGTH_SEC;
-    public const float DELUXE_HOLD_RELEASE_IGNORE_TIME_SEC = 2 * FRAME_LENGTH_SEC;
+
+    public const float MINE_END_SEC = 3 * FRAME_LENGTH_SEC;
+
+
+
 
     // ============== Pure Math ==============
 
@@ -79,17 +88,32 @@ public static unsafe class NoteHelper
         var diffMSec = math.abs(diffSec * 1000);
         var result = diffMSec switch
         {
-            <= TAP_JUDGE_SEG_1ST_PERFECT_MSEC => JudgeGrade.Perfect,
+            <= TAP_JUDGE_SEG_1ST_PERFECT_MSEC => isFast ? JudgeGrade.FastCritical : JudgeGrade.LateCritical,
             <= TAP_JUDGE_SEG_2ND_PERFECT_MSEC => isFast ? JudgeGrade.FastPerfect2nd : JudgeGrade.LatePerfect2nd,
             <= TAP_JUDGE_SEG_3RD_PERFECT_MSEC => isFast ? JudgeGrade.FastPerfect3rd : JudgeGrade.LatePerfect3rd,
-            <= TAP_JUDGE_SEG_1ST_GREAT_MSEC => isFast ? JudgeGrade.FastGreat : JudgeGrade.LateGreat,
+            <= TAP_JUDGE_SEG_1ST_GREAT_MSEC => isFast ? JudgeGrade.FastGreat1st : JudgeGrade.LateGreat1st,
             <= TAP_JUDGE_SEG_2ND_GREAT_MSEC => isFast ? JudgeGrade.FastGreat2nd : JudgeGrade.LateGreat2nd,
             <= TAP_JUDGE_SEG_3RD_GREAT_MSEC => isFast ? JudgeGrade.FastGreat3rd : JudgeGrade.LateGreat3rd,
             _ => isFast ? JudgeGrade.FastGood : JudgeGrade.LateGood
         };
 
-        if (isEx) result = JudgeGrade.Perfect;
+        if (isEx) result = isFast ? JudgeGrade.FastCritical : JudgeGrade.LateCritical;
         return result;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [BurstCompile]
+    public static JudgeGrade GetTouchJudge(float diffSec)
+    {
+        var diffMSec = diffSec * 1000;
+        return diffMSec < 0 ? JudgeGrade.FastCritical
+            : diffMSec <= TOUCH_JUDGE_SEG_1ST_PERFECT_MSEC ? JudgeGrade.LateCritical
+            : diffMSec <= TOUCH_JUDGE_SEG_2ND_PERFECT_MSEC ? JudgeGrade.LatePerfect2nd
+            : diffMSec <= TOUCH_JUDGE_SEG_3RD_PERFECT_MSEC ? JudgeGrade.LatePerfect3rd
+            : diffMSec <= TOUCH_JUDGE_SEG_1ST_GREAT_MSEC ? JudgeGrade.LateGreat1st
+            : diffMSec <= TOUCH_JUDGE_SEG_2ND_GREAT_MSEC ? JudgeGrade.LateGreat2nd
+            : diffMSec <= TOUCH_JUDGE_SEG_3RD_GREAT_MSEC ? JudgeGrade.LateGreat3rd
+            : JudgeGrade.LateGood;
     }
 
     /// <summary>
@@ -104,33 +128,71 @@ public static unsafe class NoteHelper
     {
         if (realityHT <= 0f) return head;
 
-        var j = (int)head;
-        var isLate = j < 7; // Miss/Late side
-        var good = isLate ? JudgeGrade.LateGood : JudgeGrade.FastGood;
-        var great = isLate ? JudgeGrade.LateGreat : JudgeGrade.FastGreat;
-        var perfect2 = isLate ? JudgeGrade.LatePerfect2nd : JudgeGrade.FastPerfect2nd;
-
+        // 与官机不同，这里不会向上修正头判
         if (percent >= 1f)
         {
-            if (head == JudgeGrade.Miss) return JudgeGrade.LateGood;
-            if (math.abs(j - 7) == 6) return great; // head was a Good -> upgrade to Great
-            return head;
+            switch (head)   // 按满的情况下 good->great, miss->good
+            {
+                case JudgeGrade.TooFast:
+                    return JudgeGrade.FastGood;
+                case JudgeGrade.Miss:
+                    return JudgeGrade.LateGood;
+                case JudgeGrade.FastGood:
+                    return JudgeGrade.FastGreat3rd;
+                case JudgeGrade.LateGood:
+                    return JudgeGrade.LateGreat3rd;
+                default:
+                    return head;
+            }
         }
         if (percent >= 0.67f)
         {
-            if (head == JudgeGrade.Miss) return JudgeGrade.LateGood;
-            if (math.abs(j - 7) == 6) return great;
-            if (head == JudgeGrade.Perfect) return perfect2;
-            return head;
+            switch (head)   // 按 >=67% 的情况下 good->great, miss->good, cp->p
+            {
+                case JudgeGrade.TooFast:
+                    return JudgeGrade.FastGood;
+                case JudgeGrade.Miss:
+                    return JudgeGrade.LateGood;
+                case JudgeGrade.FastGood:
+                    return JudgeGrade.FastGreat3rd;
+                case JudgeGrade.LateGood:
+                    return JudgeGrade.LateGreat3rd;
+                case JudgeGrade.FastCritical:
+                    return JudgeGrade.FastPerfect2nd;
+                case JudgeGrade.LateCritical:
+                    return JudgeGrade.LatePerfect2nd;
+                default:
+                    return head;
+            }
         }
         if (percent >= 0.33f)
         {
-            if (math.abs(j - 7) >= 6) return good; // Miss or Good -> Good
-            return great;
+            switch (head)   // 按 >=33% 的情况下 miss->good, cp&p->great
+            {
+                case JudgeGrade.TooFast:
+                    return JudgeGrade.FastGood;
+                case JudgeGrade.Miss:
+                    return JudgeGrade.LateGood;
+                case JudgeGrade.FastCritical:
+                case JudgeGrade.FastPerfect2nd:
+                case JudgeGrade.FastPerfect3rd:
+                    return JudgeGrade.FastGreat1st;
+                case JudgeGrade.LateCritical:
+                case JudgeGrade.LatePerfect2nd:
+                case JudgeGrade.LatePerfect3rd:
+                    return JudgeGrade.LateGreat1st;
+                default:
+                    return head;
+            }
         }
-        if (percent >= 0.05f) return good;
-        if (head == JudgeGrade.Miss) return JudgeGrade.Miss;
-        return good;
+        if (percent >= 0.05f)
+        {
+            return head <= JudgeGrade.FastCritical ? JudgeGrade.FastGood : JudgeGrade.LateGood;
+        }
+
+        if (head is JudgeGrade.TooFast or JudgeGrade.Miss) return head;
+
+        return head <= JudgeGrade.FastCritical ? JudgeGrade.FastGood : JudgeGrade.LateGood;
     }
 
 
@@ -140,11 +202,13 @@ public static unsafe class NoteHelper
     public static void PlayTapSound(bool* SfxRequests,
         JudgeGrade grade, bool isBreak, bool isEx, bool isMine, float diff)
     {
-        if (isMine &&
-            grade is JudgeGrade.Miss or JudgeGrade.TooFast)
+        if (isMine && grade is JudgeGrade.Miss or JudgeGrade.TooFast)
+        {
+            //TODO
             return;
+        }
 
-        if (grade is JudgeGrade.Miss or JudgeGrade.TooFast || isMine)
+        if (isMine || grade is JudgeGrade.Miss or JudgeGrade.TooFast)
             return;
 
         if (isBreak)
@@ -153,19 +217,20 @@ public static unsafe class NoteHelper
             {
                 case JudgeGrade.LateGood:
                 case JudgeGrade.FastGood:
-                case JudgeGrade.LateGreat:
+                case JudgeGrade.LateGreat1st:
                 case JudgeGrade.LateGreat2nd:
                 case JudgeGrade.LateGreat3rd:
                 case JudgeGrade.FastGreat3rd:
                 case JudgeGrade.FastGreat2nd:
-                case JudgeGrade.FastGreat:
+                case JudgeGrade.FastGreat1st:
                 case JudgeGrade.LatePerfect3rd:
                 case JudgeGrade.FastPerfect3rd:
                 case JudgeGrade.LatePerfect2nd:
                 case JudgeGrade.FastPerfect2nd:
                     SfxRequests[AudioManager.BREAK_JUDGE] = true;
                     break;
-                case JudgeGrade.Perfect:
+                case JudgeGrade.LateCritical:
+                case JudgeGrade.FastCritical:
                     SfxRequests[AudioManager.BREAK_JUDGE] = true;
                     SfxRequests[AudioManager.BREAK_SFX] = true;
                     break;
@@ -185,19 +250,20 @@ public static unsafe class NoteHelper
             case JudgeGrade.FastGood:
                 SfxRequests[AudioManager.TAP_GOOD] = true;
                 break;
-            case JudgeGrade.LateGreat:
+            case JudgeGrade.LateGreat1st:
             case JudgeGrade.LateGreat2nd:
             case JudgeGrade.LateGreat3rd:
             case JudgeGrade.FastGreat3rd:
             case JudgeGrade.FastGreat2nd:
-            case JudgeGrade.FastGreat:
+            case JudgeGrade.FastGreat1st:
                 SfxRequests[AudioManager.TAP_GREAT] = true;
                 break;
             case JudgeGrade.LatePerfect3rd:
             case JudgeGrade.FastPerfect3rd:
             case JudgeGrade.LatePerfect2nd:
             case JudgeGrade.FastPerfect2nd:
-            case JudgeGrade.Perfect:
+            case JudgeGrade.LateCritical:
+            case JudgeGrade.FastCritical:
                 SfxRequests[AudioManager.TAP_PERFECT] = true;
                 break;
         }
@@ -211,19 +277,26 @@ public static unsafe class NoteHelper
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void PlayTouchSound(bool* SfxRequests)
+    public static void PlayTouchSound(bool* SfxRequests,
+        JudgeGrade grade, bool isMine, bool isHanabi)
     {
+        if (isMine && grade is JudgeGrade.Miss or JudgeGrade.TooFast)
+        {
+            //MEYBE TODO
+            return;
+        }
+
+        if (isMine || grade is JudgeGrade.Miss or JudgeGrade.TooFast)
+            return;
+
         SfxRequests[AudioManager.TOUCH] = true;
+        if (isHanabi)
+            SfxRequests[AudioManager.FIREWORK] = true;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void PlayHanabiSound(bool* SfxRequests)
-    {
-        SfxRequests[AudioManager.FIREWORK] = true;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void PlaySlideSound(bool* SfxRequests, bool isBreak)
+    public static void PlaySlideSound(bool* SfxRequests,
+        bool isBreak)
     {
         if (isBreak)
         {
@@ -234,10 +307,23 @@ public static unsafe class NoteHelper
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void PlayBreakSlideEndSound(bool* SfxRequests)
+    public static void PlaySlideEndSound(bool* SfxRequests,
+        JudgeGrade grade, bool isMine, bool isBreak)
     {
-        SfxRequests[AudioManager.BREAK_SLIDE_JUDGE] = true;
-        // SfxRequests[AudioManager.BREAK_SFX] = true;  // blame @LeZi9916
+        if (isMine && grade is JudgeGrade.Miss or JudgeGrade.TooFast)
+        {
+            //MAYBE TODO
+            return;
+        }
+
+        if (isMine || grade is JudgeGrade.Miss or JudgeGrade.TooFast)
+            return;
+
+        if (isBreak)
+        {
+            SfxRequests[AudioManager.BREAK_SLIDE_JUDGE] = true;
+            // SfxRequests[AudioManager.BREAK_SFX] = true;  // blame @LeZi9916
+        }
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -254,16 +340,42 @@ public static unsafe class NoteHelper
 
     // ============== Effect ==============
 
+    /// <summary>
+    /// 播放tap类型打击特效
+    /// </summary>
+    /// <param name="key">对应的button/sensor位置，注意sensor需要+8，以区分键与A区</param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void PlayEffect(
+    public static void PlayTapEffect(
         EffectData* JudgeEffectRequests,
-        int key, JudgeGrade judge, bool isBreak)
+        int key, JudgeGrade judge, bool isBreak, bool isMine)
     {
-        JudgeEffectRequests[key].HasEffect = true;
+        JudgeEffectRequests[key].Effect = EffectType.Tap;
         JudgeEffectRequests[key].IsBreak = isBreak;
+        JudgeEffectRequests[key].IsMine = isMine;
         JudgeEffectRequests[key].JudgeGrade = judge;
     }
 
+    /// <summary>
+    /// 播放touch类型打击特效
+    /// </summary>
+    /// <param name="key">对应的button/sensor位置，注意sensor需要+8，以区分键与A区</param>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void PlayTouchEffect(
+        EffectData* JudgeEffectRequests,
+        int key, JudgeGrade judge, bool isBreak, bool isHanabi, bool isMine)
+    {
+        JudgeEffectRequests[key].Effect = EffectType.Touch;
+        if (isHanabi && (judge is not (JudgeGrade.Miss or JudgeGrade.TooFast)))
+            JudgeEffectRequests[key].Effect |= EffectType.Firework;
+        JudgeEffectRequests[key].IsBreak = isBreak;
+        JudgeEffectRequests[key].IsMine = isMine;
+        JudgeEffectRequests[key].JudgeGrade = judge;
+    }
+
+    /// <summary>
+    /// 播放hold按住特效
+    /// </summary>
+    /// <param name="key">对应的button/sensor位置，注意sensor需要+8，以区分键与A区</param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void SetHoldEffect(
         EffectData* JudgeEffectRequests,
@@ -278,20 +390,21 @@ public static unsafe class NoteHelper
             case JudgeGrade.FastGood:
                 JudgeEffectRequests[key].HoldingColor = new Color(0.56f, 1f, 0.59f); // Green
                 break;
-            case JudgeGrade.LateGreat:
+            case JudgeGrade.LateGreat1st:
             case JudgeGrade.LateGreat2nd:
             case JudgeGrade.LateGreat3rd:
             case JudgeGrade.FastGreat3rd:
             case JudgeGrade.FastGreat2nd:
-            case JudgeGrade.FastGreat:
+            case JudgeGrade.FastGreat1st:
                 JudgeEffectRequests[key].HoldingColor = new Color(1f, 0.70f, 0.94f); // Pink
                 break;
             case JudgeGrade.LatePerfect3rd:
             case JudgeGrade.FastPerfect3rd:
             case JudgeGrade.LatePerfect2nd:
             case JudgeGrade.FastPerfect2nd:
-            case JudgeGrade.Perfect:
-                JudgeEffectRequests[key].HoldingColor = new Color(1f, 0.93f, 0.61f); // Green
+            case JudgeGrade.LateCritical:
+            case JudgeGrade.FastCritical:
+                JudgeEffectRequests[key].HoldingColor = new Color(1f, 0.93f, 0.61f); // Gold
                 break;
             case JudgeGrade.Miss:
             case JudgeGrade.TooFast:

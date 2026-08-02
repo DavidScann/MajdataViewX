@@ -56,20 +56,20 @@ namespace Notes.SlideUtils
             {
                 throw new ArgumentException($"should end with 'K' command");
             }
-        
+
             var commands = new List<Command>();
             var currentType = CommandType.NodeA;
             var value = TryParseDigit(code[0]);
             if (value < 0) throw new ArgumentException($"invalid char '{code[0]}'");
-        
+
             commands.Add(new Command(currentType, value));
-        
+
             for (var ptr = 1; ptr < code.Length; ptr++)
             {
                 var ch = code[ptr];
                 if (CommandChars.Contains(ch))
                 {
-                    currentType = (CommandType) Array.IndexOf(CommandChars, ch);
+                    currentType = (CommandType)Array.IndexOf(CommandChars, ch);
                     if (currentType == CommandType.NodeC)
                     {
                         commands.Add(new Command(CommandType.NodeC, 0));
@@ -128,10 +128,10 @@ namespace Notes.SlideUtils
 
             if (diff.Magnitude < orbit.Radius)
                 throw new ArgumentException($"impossible: {last.Type}{last.Value} -> Orbit{current.Value}");
-        
+
             constructor.TangentToCircle(orbit, isCcw);
         }
-    
+
         public static void OrbitToNode(SlidePathConstructor constructor, Command last, Command current)
         {
             var isCcw = (last.Type == CommandType.OrbitCcw);
@@ -146,10 +146,10 @@ namespace Notes.SlideUtils
 
             if (diff.Magnitude < orbit.Radius)
                 throw new ArgumentException($"impossible: Orbit{last.Value} -> {current.Type}{current.Value}");
-        
+
             constructor.ArcToTangentTowards(node, orbit.Center, isCcw).LineToPoint(node);
         }
-    
+
         public static void OrbitToOrbit(SlidePathConstructor constructor, Command last, Command current)
         {
             if (current.Type != last.Type) throw new ArgumentException($"orbit type mismatch");
@@ -182,10 +182,10 @@ namespace Notes.SlideUtils
                     .ArcToAngle(data.Item1.Center, data.Item2, isCcw, false);
                 return;
             }
-        
+
             constructor.ExternTangentTransfer(lastOrbit.Center, currentOrbit, isCcw);
         }
-    
+
         /// <summary>
         /// Parse a specific slide-code into a path object
         /// </summary>
@@ -211,46 +211,46 @@ namespace Notes.SlideUtils
                         case CommandType.NodeB:
                         case CommandType.NodeC:
                         case CommandType.NodeEnd:
-                        {
-                            switch (lastCmd.Type)
                             {
-                                case CommandType.NodeA:
-                                case CommandType.NodeB:
-                                case CommandType.NodeC:
-                                    NodeToNode(generator, lastCmd, cmd);
-                                    break;
-                                case CommandType.OrbitCcw:
-                                case CommandType.OrbitCw:
-                                    OrbitToNode(generator, lastCmd, cmd);
-                                    break;
-                                case CommandType.NodeEnd:
-                                    throw new ArgumentException($"'K' should be the last command");
-                                default:
-                                    throw new ArgumentOutOfRangeException();
+                                switch (lastCmd.Type)
+                                {
+                                    case CommandType.NodeA:
+                                    case CommandType.NodeB:
+                                    case CommandType.NodeC:
+                                        NodeToNode(generator, lastCmd, cmd);
+                                        break;
+                                    case CommandType.OrbitCcw:
+                                    case CommandType.OrbitCw:
+                                        OrbitToNode(generator, lastCmd, cmd);
+                                        break;
+                                    case CommandType.NodeEnd:
+                                        throw new ArgumentException($"'K' should be the last command");
+                                    default:
+                                        throw new ArgumentOutOfRangeException();
+                                }
+                                break;
                             }
-                            break;
-                        }
                         case CommandType.OrbitCcw:
                         case CommandType.OrbitCw:
-                        {
-                            switch (lastCmd.Type)
                             {
-                                case CommandType.NodeA:
-                                case CommandType.NodeB:
-                                case CommandType.NodeC:
-                                    NodeToOrbit(generator, lastCmd, cmd);
-                                    break;
-                                case CommandType.OrbitCcw:
-                                case CommandType.OrbitCw:
-                                    OrbitToOrbit(generator, lastCmd, cmd);
-                                    break;
-                                case CommandType.NodeEnd:
-                                    throw new ArgumentException($"'K' should be the last command");
-                                default:
-                                    throw new ArgumentOutOfRangeException();
+                                switch (lastCmd.Type)
+                                {
+                                    case CommandType.NodeA:
+                                    case CommandType.NodeB:
+                                    case CommandType.NodeC:
+                                        NodeToOrbit(generator, lastCmd, cmd);
+                                        break;
+                                    case CommandType.OrbitCcw:
+                                    case CommandType.OrbitCw:
+                                        OrbitToOrbit(generator, lastCmd, cmd);
+                                        break;
+                                    case CommandType.NodeEnd:
+                                        throw new ArgumentException($"'K' should be the last command");
+                                    default:
+                                        throw new ArgumentOutOfRangeException();
+                                }
+                                break;
                             }
-                            break;
-                        }
                         default:
                             throw new ArgumentOutOfRangeException();
                     }
@@ -260,7 +260,7 @@ namespace Notes.SlideUtils
 
                 return generator.GeneratePath();
             }
-            catch (ArgumentException e)
+            catch
             {
                 return null;
             }

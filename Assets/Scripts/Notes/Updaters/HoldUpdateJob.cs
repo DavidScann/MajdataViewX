@@ -1,14 +1,13 @@
-#pragma warning disable CS8500
-using System.Threading;
 using MajSimai;
+using System.Threading;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
-
-using static NoteSkinManager;
+using UnityEngine.UIElements;
 using static MajBurst;
+using static SkinManager;
 
 [BurstCompile]
 public unsafe struct HoldUpdateJob : IJobParallelFor
@@ -19,15 +18,11 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
     public NativeArray<LineRenderData> tapLinesRender;
     [NativeDisableParallelForRestriction]
     public NativeArray<NotesRenderData> notesRender;
-    [NativeDisableParallelForRestriction]
-    public NativeArray<SimpleRenderData> simpleRender;
 
     [NativeDisableUnsafePtrRestriction]
     public int* TapLinesWriteCountPtr;
     [NativeDisableUnsafePtrRestriction]
     public int* NotesWriteCountPtr;
-    [NativeDisableUnsafePtrRestriction]
-    public int* SimpleWriteCountPtr;
 
     [NativeDisableUnsafePtrRestriction]
     public bool* SfxRequests;
@@ -37,23 +32,21 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
 
     public void Execute(int index)
     {
-        var hold = holds[index];
+        ref var hold = ref holds.ElementRef(index);
         TransformUpdate(ref hold, index);
         AutoplayUpdate(ref hold);
         CheckUpdate(ref hold);
-        holds[index] = hold;
     }
 
     private void TransformUpdate(ref HoldData hold, int index)
     {
+        if (hold.isFolded) return;
         if (hold.isEnd) return;
-
-        var noteTime = TimeData.NoteTime;
 
         // ---- body ----
         var headTiming = hold.usingSV
             ? TimeData.FakeNoteTime - TimeData.GetPositionAtTime(hold.time)
-            : noteTime - hold.time;
+            : TimeData.NoteTime - hold.time;
         var headDistance = headTiming * hold.speed + 4.8f;
         var clampedDistance = math.max(headDistance, 1.225f);
 
@@ -63,11 +56,15 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
         // ---- Tail (hold end) ----
         var tailTiming = hold.usingSV
             ? TimeData.FakeNoteTime - TimeData.GetPositionAtTime(hold.time + hold.LastFor)
-            : noteTime - (hold.time + hold.LastFor);
+            : TimeData.NoteTime - (hold.time + hold.LastFor);
         var tailDistance = tailTiming * hold.speed + 4.8f;
 
         // ---- Invisible ----
         if (destScale < 0f) return;
+
+        // sortTime (30 bits): [19 bits: time (87 mins wrap)] + [11 bits: index tie-breaker (2048 wrap)]
+        var timePart = ((uint)math.max(0f, hold.time * 100f)) & 0x7FFFF;
+        var sortTime = ((timePart << 11) | (uint)(index & 0x7FF)) & 0x3FFFFFFF;
 
         // ---- shine ----
         if (hold.isBreak)           // break shine
@@ -81,44 +78,49 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
             var extra = (1f - math.abs(frame - 8f) / 8f) * 0.5f; //0->0.5->0
             hold.brightness = 1f + extra;
         }
+        else
+        {
+            hold.brightness = 1f;
+        }
 
         // ---- hold effect ----
         NoteHelper.SetHoldEffect(JudgeEffectRequests,
-            (int)hold.key,
+            (int)hold.Key,
             hold.judgeGrade,
             hold.isHolding
         );
 
         // ---- hold on/off skin ----
-        if (hold.LastFor > 0.3f && // 忽略短hold
-            headTiming >= 0.1f &&  // 忽略头6帧
-            !hold.isMine)          // 忽略mine
+        // if (hold.LastFor > (NoteHelper.HOLD_HEAD_IGNORE_LENGTH_SEC + NoteHelper.HOLD_TAIL_IGNORE_LENGTH_SEC) && // 忽略短hold
+        //     headTiming >= NoteHelper.HOLD_HEAD_IGNORE_LENGTH_SEC &&  // 忽略头6帧
+        //     !hold.isMine)          // 忽略mine
+        if (!hold.isMine && headTiming >= 0.01f)
         {
             if (hold.isHolding)
             {
                 if (hold.isBreak)
                 {
-                    hold.bodySprite = HOLD_BREAK_ON;
+                    hold.bodySprite = NoteSp.HOLD_BREAK_ON;
                 }
                 else if (hold.isEach)
                 {
-                    hold.bodySprite = HOLD_EACH_ON;
+                    hold.bodySprite = NoteSp.HOLD_EACH_ON;
                 }
                 else if (hold.isMine)
                 {
                     if (hold.isBreak)
-                        hold.bodySprite = HOLD_BREAK_MINE_ON;
+                        hold.bodySprite = NoteSp.HOLD_BREAK_MINE_ON;
                     else
-                        hold.bodySprite = HOLD_MINE_ON;
+                        hold.bodySprite = NoteSp.HOLD_MINE_ON;
                 }
                 else
                 {
-                    hold.bodySprite = HOLD_ON;
+                    hold.bodySprite = NoteSp.HOLD_ON;
                 }
             }
             else
             {
-                hold.bodySprite = HOLD_OFF;
+                hold.bodySprite = NoteSp.HOLD_OFF;
             }
         }
 
@@ -131,14 +133,14 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
                 angRad = math.radians(hold.ang),
                 scale = lineScale,
                 spriteId = hold.lineSprite,
-                sort = (uint)index,
+                sort = sortTime,
             };
         }
 
         // ---- body ----
         if (headDistance < 1.225f)
         {
-            NoteHelper.GetPosFromDistance(1.225f, hold.key, out var pos);
+            NoteHelper.GetPosFromDistance(1.225f, hold.Key, out var pos);
             hold.pos = pos;
             hold.scale = destScale;
             hold.stretchY = -0.58f; //原图带有一定高度
@@ -151,14 +153,14 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
             var barLen = math.max(headClamped - tailClamped, 0f);
             var midDist = (headClamped + tailClamped) * 0.5f;
 
-            NoteHelper.GetPosFromDistance(midDist, hold.key, out var pos);
+            NoteHelper.GetPosFromDistance(midDist, hold.Key, out var pos);
             hold.pos = pos;
             hold.scale = 1;
             hold.stretchY = barLen - 0.58f;
 
             if (tailDistance >= 1.225f)
             {
-                NoteHelper.GetPosFromDistance(math.min(tailDistance, 4.8f), hold.key, out var endPos);
+                NoteHelper.GetPosFromDistance(math.min(tailDistance, 4.8f), hold.Key, out var endPos);
                 hold.holdEndPos = endPos;
                 hold.holdEndScale = 1f;
             }
@@ -183,22 +185,27 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
                 exSprite = hold.isEx ? hold.exSprite : 0u,
                 exColor = hold.exColor,
                 sliceBorder = hold.sliceBorder,
-                sort = (uint)index,
+                sort = sortTime,
             };
         }
 
         // ---- Write holdEnd
         if (hold.holdEndScale > 0f)
         {
-            var endIdx = Interlocked.Increment(ref *SimpleWriteCountPtr) - 1;
-            simpleRender[endIdx] = new SimpleRenderData
+            var endIdx = Interlocked.Increment(ref *NotesWriteCountPtr) - 1;
+            notesRender[endIdx] = new NotesRenderData
             {
                 pos = hold.holdEndPos,
                 angRad = math.radians(hold.ang),
-                scale = new float2(1f, 1f),
+                scale = 1f,
+                stretchY = 0,
                 spriteId = hold.endSprite,
                 color = new float4(1, 1, 1, 1),
-                sort = (uint)index,
+                brightness = 1f,
+                exSprite = 0,
+                exColor = float4.zero,
+                sliceBorder = float2.zero,
+                sort = sortTime,
             };
         }
     }
@@ -206,41 +213,70 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
     private void AutoplayUpdate(ref HoldData hold)
     {
         if (hold.isEnd) return;
+        if (NoteHelper.AutoPlayMode is AutoPlayMode.Disable) return;
 
         var timing = TimeData.NoteTime - hold.time;
-        if (timing < -0.01f) return;
+        if (timing < InputManager.DJAUTO_AUTOPLAY_START_SEC) return;
 
         switch (NoteHelper.AutoPlayMode)
         {
             case AutoPlayMode.Enable:
-                if (!hold.isJudged)
+                if (!hold.isHeadJudged)
                 {
-                    hold.judgeGrade = hold.isMine ? JudgeGrade.Miss : JudgeGrade.Perfect;
-                    hold.isJudged = true;
+                    hold.judgeGrade = JudgeGrade.LateCritical;
+                    hold.isHeadJudged = true;
                     hold.isHolding = true;
                     hold.headDiff = 0;
+                    NoteHelper.PlayHoldSound(SfxRequests,
+                        hold.judgeGrade,
+                        hold.isBreak,
+                        hold.isEx,
+                        hold.isMine,
+                        hold.headDiff
+                    );
                 }
-                if (hold.isJudged && math.max(hold.LastFor - timing, 0) <= 0)
+                if (hold.isHeadJudged && math.max(hold.LastFor - timing, 0) <= 0)
                 {
                     hold.holdPercent = 1f;
                     EndNote(ref hold);
                 }
                 break;
             case AutoPlayMode.Random:
-                if (!hold.isJudged)
+                if (!hold.isHeadJudged)
                 {
-                    var gradeIndex = new Random(114514).NextInt(1, 14);
+                    var grade = (JudgeGrade)GlobalRandom.NextInt((int)JudgeGrade.FastGood, (int)JudgeGrade.Miss);
                     hold.judgeGrade = hold.isMine
-                        ? (gradeIndex > 4 ? JudgeGrade.Miss : JudgeGrade.Perfect)
-                        : (JudgeGrade)gradeIndex;
-                    hold.isJudged = true;
+                        ? (grade < JudgeGrade.FastPerfect3rd ? JudgeGrade.Miss : JudgeGrade.LateCritical)
+                        : grade;
+                    hold.isHeadJudged = true;
                     hold.isHolding = true;
-                    hold.headDiff = gradeIndex > 7 ? 11.4514f : -11.4514f;
+                    hold.headDiff = grade >= JudgeGrade.LateCritical ? 11.4514f : -11.4514f;
+                    NoteHelper.PlayHoldSound(SfxRequests,
+                        hold.judgeGrade,
+                        hold.isBreak,
+                        hold.isEx,
+                        hold.isMine,
+                        hold.headDiff
+                    );
                 }
-                if (hold.isJudged && hold.LastFor - timing <= 0)
+                if (hold.isHeadJudged && hold.LastFor - timing <= 0)
                 {
                     hold.holdPercent = 1f;
                     EndNote(ref hold);
+                }
+                break;
+            case AutoPlayMode.DJAutoButton:
+                if (hold.isMine) break;
+                if (!hold.isHeadJudged || math.max(hold.LastFor - timing, 0) > 0)
+                {
+                    InputData.DJAutoSetButtonOn(hold.Key);
+                }
+                break;
+            case AutoPlayMode.DJAutoSensor:
+                if (hold.isMine) break;
+                if (!hold.isHeadJudged || math.max(hold.LastFor - timing, 0) > 0)
+                {
+                    InputData.DJAutoSetSensorOn(hold.Key);
                 }
                 break;
         }
@@ -248,41 +284,70 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
 
     private void CheckUpdate(ref HoldData hold)
     {
-        if (NoteHelper.AutoPlayMode is AutoPlayMode.Enable or AutoPlayMode.Random) return;
         if (hold.isEnd) return;
+        if (!NoteHelper.IsSimulated) return;
 
         var noteTime = TimeData.NoteTime;
         var timing = noteTime - hold.time;
-        var key = (int)hold.key;
 
-        // ---- Head judgment ----
-        if (!hold.isJudged)
+        if (hold.isMine)
         {
-            if (hold.isMine && timing >= 0.016667f)
-            {
-                hold.judgeGrade = JudgeGrade.Perfect;
-                hold.isJudged = true;
-                hold.isHolding = true;
-                return;
-            }
-            if (!hold.isMine && timing > 0.15f)
+            var buttonClicked = InputData.GetButtonState(hold.Key).IsPadDown;
+            var sensorClicked = InputData.GetSensorState(hold.Key).IsPadDown;
+            if ((buttonClicked || sensorClicked) &&
+                timing >= -NoteHelper.TAP_JUDGE_GOOD_AREA_MSEC / 1000f)
             {
                 hold.judgeGrade = JudgeGrade.Miss;
-                hold.isJudged = true;
-                hold.headDiff = 0.15f;
-                // NOTE: do NOT EndNote here. A missed head keeps tracking the body and
+                hold.isHeadJudged = true;
+                hold.headDiff = timing;
+                EndNote(ref hold);
+                return;
+            }
+            if (timing >= hold.LastFor)
+            {
+                hold.judgeGrade = JudgeGrade.LateCritical;
+                hold.isHeadJudged = true;
+                hold.holdPercent = 1f;
+                EndNote(ref hold);
+            }
+            return;
+        }
+
+        // ---- Head judgment ----
+        if (!hold.isHeadJudged)
+        {
+            var buttonClicked = InputData.GetButtonState(hold.Key).IsPadDown;
+            var sensorClicked = InputData.GetSensorState(hold.Key).IsPadDown;
+
+            var clicked = sensorClicked || buttonClicked;
+
+            if (timing > NoteHelper.TAP_JUDGE_GOOD_AREA_MSEC / 1000f)
+            {
+                hold.judgeGrade = JudgeGrade.Miss;
+                hold.isHeadJudged = true;
+                hold.headDiff = NoteHelper.TAP_JUDGE_GOOD_AREA_MSEC / 1000f;
+                // NOTE: DO NOT EndNote here. A missed head keeps tracking the body and
                 // can still be recovered to LateGood by the release-percent mapping below.
                 return;
             }
 
-            if (!MajBurst.InputData.GetSensorState(hold.key).Status) return;
+            if (!clicked) return;
             if (timing < -NoteHelper.TAP_JUDGE_GOOD_AREA_MSEC / 1000f) return;
-            if (!MajBurst.InputData.CanJudgeSensor(hold.key, hold.sensorOrderIndex)) return;
+            var canJudge =
+                (buttonClicked && InputData.CanJudgeButton(hold.Key, hold.ButtonOrderIndex)) ||
+                (sensorClicked && InputData.CanJudgeSensor(hold.Key, hold.SensorOrderIndex));
+            if (!canJudge) return;
 
             hold.judgeGrade = NoteHelper.GetTapJudge(timing, hold.isEx);
-            hold.isJudged = true;
-            hold.isHolding = true;
+            hold.isHeadJudged = true;
             hold.headDiff = timing;
+            NoteHelper.PlayHoldSound(SfxRequests,
+                hold.judgeGrade,
+                hold.isBreak,
+                hold.isEx,
+                hold.isMine,
+                hold.headDiff
+            );
             return;
         }
 
@@ -290,8 +355,8 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
         var remainingTime = math.max(hold.LastFor - timing, 0);
         if (remainingTime <= 0)
         {
-            var realityHT = hold.LastFor - 0.3f - math.max(hold.headDiff, 0f);
-            var pct = math.clamp((realityHT - hold.playerIdleTime) / math.max(realityHT, 0.001f), 0f, 1f);
+            var realityHT = hold.LastFor - (NoteHelper.HOLD_HEAD_IGNORE_LENGTH_SEC + NoteHelper.HOLD_TAIL_IGNORE_LENGTH_SEC) - math.max(hold.headDiff, 0f);
+            var pct = math.clamp((realityHT - hold.playerIdleTimeSec) / math.max(realityHT, 0.001f), 0f, 1f);
             hold.holdPercent = pct;
             if (!hold.isMine)
                 hold.judgeGrade = NoteHelper.GetHoldFinalGrade(hold.judgeGrade, pct, realityHT);
@@ -301,32 +366,53 @@ public unsafe struct HoldUpdateJob : IJobParallelFor
 
         if (!TimeData.IsStart) return;
 
-        var on = MajBurst.InputData.GetSensorState(hold.key).Status;
-        if (timing > 0.25f && remainingTime > 0.2f && !on)
-            hold.playerIdleTime += TimeData.deltaTime;
+        var btnStatus = InputData.GetButtonState(hold.Key);
+        var senStatus = InputData.GetSensorState(hold.Key);
+        var on = btnStatus.Status || senStatus.Status;
+
+        if (on)
+        {
+            hold.lastReleaseTimeSec = 0f;
+            hold.isHolding = true;
+        }
+        else
+        {
+            if (hold.lastReleaseTimeSec <= NoteHelper.DELUXE_HOLD_RELEASE_IGNORE_TIME_SEC)
+            {
+                hold.lastReleaseTimeSec += TimeData.deltaTime;
+                hold.isHolding = true;
+            }
+            else
+            {
+                hold.isHolding = false;
+                if (timing > NoteHelper.HOLD_HEAD_IGNORE_LENGTH_SEC && remainingTime > NoteHelper.HOLD_TAIL_IGNORE_LENGTH_SEC)
+                    hold.playerIdleTimeSec += TimeData.deltaTime;
+            }
+        }
     }
 
     private void EndNote(ref HoldData hold)
     {
-        NoteHelper.PlayHoldSound(SfxRequests,
+        NoteHelper.PlayTapSound(SfxRequests,
+            hold.judgeGrade,
+            false,
+            false,
+            hold.isMine,
+            0
+        );
+        NoteHelper.PlayTapEffect(JudgeEffectRequests,
+            (int)hold.Key,
             hold.judgeGrade,
             hold.isBreak,
-            hold.isEx,
-            hold.isMine,
-            hold.headDiff
-        );
-        NoteHelper.PlayEffect(JudgeEffectRequests,
-            (int)hold.key,
-            hold.judgeGrade,
-            hold.isBreak
+            hold.isMine
         );
         NoteHelper.ReportResult(ReportResults,
             hold.judgeGrade,
             hold.isBreak,
             SimaiNoteType.Hold
         );
-        MajBurst.InputData.NextTapHold(
-            hold.key
+        InputData.NextTapHold(
+            hold.Key
         );
         hold.isEnd = true;
     }

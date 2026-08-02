@@ -1,4 +1,4 @@
-﻿#region
+#region
 
 using System;
 using System.Collections;
@@ -26,33 +26,46 @@ public class AudioManager
 
     [CanBeNull] private AudioSample TrackSample;
     [CanBeNull] private float[] TrackSampleData;
+    [CanBeNull] private string _trackPath;
     private float TrackSampleVolume;
-    public bool IsTrackLoaded => TrackSample != null && TrackSampleData != null;
+    // TrackSampleData 仅导出(Record)模式混音用，普通播放无需加载，
+    // 故 IsTrackLoaded 只取决于 Bass 流是否就绪
+    public bool IsTrackLoaded => TrackSample != null;
+    public bool IsTrackPlaying => TrackSample != null && TrackSample.IsPlaying;
+    public double TrackCurrentSec => TrackSample != null ? TrackSample.CurrentSec : 0;
 
     //answer SFX
     List<AnswerTimingPoint> answerTimingPoints = new();
     private readonly object answerSfxLock = new();
     //note SFX
-    //DO NOT TOUCH THIS IN THIS FILE, MAY CAUSE AtomicSafetyHandle Exception
+    //DO NOT USE THIS IN THIS FILE, MAY CAUSE AtomicSafetyHandle Exception, WE DONT CARE THIS
     public NativeArray<bool> noteSfxPlaybackRequests = new(SFX_COUNT, Allocator.Persistent);
     public unsafe bool* SfxRequestsPtr => (bool*)noteSfxPlaybackRequests.GetUnsafePtr();
-    private unsafe bool* _sfxPtr;
+    private unsafe bool* _sfxPtr;    // USE THIS INSTEAD
+
     List<AudioSample> NoteSfxs = new(SFX_COUNT);
 
-    //SFX for recording
+    //for recording
     private List<float[]> noteSfxSamplesData = new(SFX_COUNT);
-    private float[] recordingBuffer;
+    private NativeArray<float> recordingBuffer;
+    private int recordingSampleCount;
+    private int recordingPreviousTouchHoldCount;
     private float recordingInitialAudioTime;
     private float recordingSpeed = 1f;
-    private int[] sfxPlayPointers = new int[SFX_COUNT]; //-1 is not playing
+    private float recordingInitialNoteTime;
+    private int[][] sfxPlayPointers = new int[SFX_COUNT][]; //-1 is not playing
 
     public double GlobalAudioOffset { get; private set; }
 
     public bool IsShowingSongDetail => _timeProvider.AudioTime <= recordingInitialAudioTime + TimeProvider.SONG_DETAIL_OFFSET;
     const int SAMPLERATE = 44100;
     const int CHANNELS = 2;
+    const double TRACK_HARD_SYNC_THRESHOLD_SEC = 0.1;
+    const double TRACK_SYNC_DEAD_ZONE_SEC = 0.002;
+    const float TRACK_MAX_SPEED_CORRECTION = 0.02f;
+    const float TRACK_SYNC_GAIN = 0.1f;
 
-    const float TRACK_ANSWER_PLAYBACK_OFFSET_SEC = (16.66666f * 1) / 1000;
+    public const float TRACK_ANSWER_PLAYBACK_OFFSET_SEC = (16.66666f * 1) / 1000;
 
     public const int TAP_PERFECT = 0;
     public const int TAP_GREAT = 1;
@@ -71,22 +84,27 @@ public class AudioManager
     public const int TRACK_START = 14;
     public const int ALL_PERFECT = 15;
 
-    private List<Guid> touchholdRiserPlayingTask = new();
-    private bool isTouchholdRiserPlaying;
     private bool waitingForTrackAudioStart;
 
     private bool isInited;
+
+    public int ActiveTouchHoldCount { get; set; }
+    private int _prevActiveTouchHoldCount;
 
     public unsafe AudioManager()
     {
         _audioManager = this;
         _sfxPtr = SfxRequestsPtr;
-        Bass.Configure(Configuration.UpdatePeriod, 20);
-        Bass.Configure(Configuration.PlaybackBufferLength, 40);
-        Bass.Init(-1, 44100);
+        // DO NOT USE THIS, MAY CAUSE PROBLEMS
+        // Keep the track's output queue short so it stays responsive to
+        // dynamically triggered SFX. Bundled SFX assets are 48 kHz.
+        //Bass.Configure(Configuration.UpdatePeriod, 20);
+        //Bass.Configure(Configuration.PlaybackBufferLength, 40);
+        Bass.Init(-1, 48000);
 
         //Note SFX
         var sfxPath = MajEnv.GetPath("SFX");
+        int sfxIndex = 0;
         foreach (var filename in new[]
                 {
                     "tap_perfect.wav",
@@ -109,17 +127,29 @@ public class AudioManager
         {
             //sample
             var path = Path.Combine(sfxPath, filename);
-            var sample = new AudioSample(path, AudioMode.Sample);
-            sample.SampleType = filename switch
+            var type = filename switch
             {
-                var p when p.StartsWith("answer") => SampleType.Answer,
-                var p when p.StartsWith("break") => SampleType.Break,
-                var p when p.StartsWith("slide") => SampleType.Slide,
-                var p when p.StartsWith("tap") => SampleType.Tap,
-                var p when p.StartsWith("touch") => SampleType.Touch,
-                var p when p.StartsWith("track") => SampleType.Track,
-                _ => sample.SampleType
+                "track_start.wav" or "all_perfect.wav" => SampleType.Track,
+                "answer.wav" or "answer_clock.wav" => SampleType.Answer,
+                "tap_perfect.wav" or "tap_great.wav" or "tap_good.wav" or "tap_ex.wav" => SampleType.Tap,
+                "break_tap.wav" or "break.wav" => SampleType.Break,
+                "slide.wav" => SampleType.Slide,
+                "slide_break_start.wav" or "slide_break_slide.wav" => SampleType.BreakSlide,
+                "touch.wav" or "touch_Hold_riser.wav" => SampleType.Touch,
+                "touch_hanabi.wav" => SampleType.Hanabi,
+                _ => SampleType.Track
             };
+            var maxNoOfPlaybacks = filename switch
+            {
+                "answer.wav" or "answer_clock.wav" => 65535,
+                "tap_perfect.wav" or "tap_great.wav" or "tap_good.wav" or "tap_ex.wav" => 65535,
+                "touch.wav" => 65535,
+                _ => 1
+            };
+            var sample = new AudioSample(path, AudioMode.Sample, maxNoOfPlaybacks) { SampleType = type };
+            sfxPlayPointers[sfxIndex] = new int[maxNoOfPlaybacks];
+            sfxIndex++;
+
             NoteSfxs.Add(sample);
 
             //data
@@ -134,29 +164,19 @@ public class AudioManager
         GlobalAudioOffset = globalAudioOffset;
 
         foreach (var sample in NoteSfxs)
-            switch (sample.SampleType)
+            sample.Volume = sample.SampleType switch
             {
-                case SampleType.Answer:
-                    sample.Volume = v.Answer;
-                    break;
-                case SampleType.Break:
-                    sample.Volume = v.Break;
-                    break;
-                case SampleType.Slide:
-                    sample.Volume = v.Slide;
-                    break;
-                case SampleType.Tap:
-                    sample.Volume = v.Tap;
-                    break;
-                case SampleType.Touch:
-                    sample.Volume = v.Touch;
-                    break;
-                case SampleType.Track:
-                default:
-                    sample.Volume = v.Track;
-                    break;
-            }
-
+                SampleType.Track => v.Track,
+                SampleType.Answer => v.Answer,
+                SampleType.Tap => v.Tap,
+                SampleType.Slide => v.Slide,
+                SampleType.Break => v.Break,
+                SampleType.BreakSlide => v.BreakSlide,
+                SampleType.Ex => v.Ex,
+                SampleType.Touch => v.Touch,
+                SampleType.Hanabi => v.Hanabi,
+                _ => v.Track,
+            };
         TrackSampleVolume = v.Track;
     }
 
@@ -193,6 +213,12 @@ public class AudioManager
         for (var i = 0; i < SFX_COUNT; i++)
         {
             var isRequested = _sfxPtr[i];
+
+            if (i != TOUCHHOLD && isRequested)
+            {
+                _sfxPtr[i] = false;
+            }
+
             switch (i)
             {
                 case TAP_PERFECT:
@@ -230,20 +256,7 @@ public class AudioManager
                     if (isRequested) NoteSfxs[TOUCH].PlayOneShot();
                     break;
                 case TOUCHHOLD:
-                    if (isRequested)
-                    {
-                        if (isTouchholdRiserPlaying) break;
-
-                        isTouchholdRiserPlaying = true;
-                        NoteSfxs[TOUCHHOLD].PlayOneShot();
-                    }
-                    else
-                    {
-                        if (!isTouchholdRiserPlaying) break;
-
-                        isTouchholdRiserPlaying = false;
-                        NoteSfxs[TOUCHHOLD].Stop();
-                    }
+                    // Handled at the end of OnUpdate based on ActiveTouchHoldCount
                     break;
                 case FIREWORK:
                     if (isRequested) NoteSfxs[FIREWORK].PlayOneShot();
@@ -262,17 +275,25 @@ public class AudioManager
                     break;
             }
         }
-        //clear
-        for (var i = 0; i < SFX_COUNT; i++)
+
+        int currentCount = ActiveTouchHoldCount;
+        if (currentCount > _prevActiveTouchHoldCount)
         {
-            if (i != TOUCHHOLD) //manual control
-                _sfxPtr[i] = false;
+            NoteSfxs[TOUCHHOLD].PlayOneShot();
         }
+        else if (currentCount == 0 && _prevActiveTouchHoldCount > 0)
+        {
+            NoteSfxs[TOUCHHOLD].Stop();
+        }
+        _prevActiveTouchHoldCount = currentCount;
     }
 
     public void OnDestroy()
     {
+        TrackSample?.Dispose();
+        TrackSample = null;
         noteSfxPlaybackRequests.Dispose();
+        ReleaseRecordingAudio();
         Bass.Stop();
         Bass.Free();
     }
@@ -282,12 +303,15 @@ public class AudioManager
 
     public void LoadTrack(string path)
     {
+        _trackPath = path;
         TrackSample?.Dispose();
         TrackSample = new AudioSample(path, AudioMode.Stream)
         {
             SampleType = SampleType.Track,
         };
-        TrackSampleData = GetSampleDataFromFile(path);
+        // 整首PCM(数十MB,落LOH)仅导出模式混音用，延迟到 BeginRecordingAudio 按需加载，
+        // 避免普通播放模式持有大数组、切歌时靠GC延迟回收(表现为内存几十秒后才回落)
+        TrackSampleData = null;
     }
 
     public void PlayTrack()
@@ -314,6 +338,42 @@ public class AudioManager
         }
     }
 
+    public void SynchronizeTrack(double targetSec, float playbackSpeed)
+    {
+        var track = TrackSample;
+        if (track == null || !track.IsPlaying)
+            return;
+
+        // Once the stopwatch timeline is outside the audio, the stream no longer
+        // participates in synchronization. In particular, its final sample must
+        // not clamp the note timeline at the end of a song.
+        if (targetSec < 0 || targetSec >= track.Length)
+        {
+            track.Speed = playbackSpeed;
+            return;
+        }
+
+        var driftSec = targetSec - track.CurrentSec;
+        if (Math.Abs(driftSec) >= TRACK_HARD_SYNC_THRESHOLD_SEC)
+        {
+            track.CurrentSec = targetSec;
+            track.Speed = playbackSpeed;
+            return;
+        }
+
+        if (Math.Abs(driftSec) <= TRACK_SYNC_DEAD_ZONE_SEC)
+        {
+            track.Speed = playbackSpeed;
+            return;
+        }
+
+        var correction = Mathf.Clamp(
+            (float)driftSec * TRACK_SYNC_GAIN,
+            -TRACK_MAX_SPEED_CORRECTION,
+            TRACK_MAX_SPEED_CORRECTION);
+        track.Speed = playbackSpeed * (1f + correction);
+    }
+
     public void PauseTrack() => TrackSample?.Pause();
 
     public void StopTrack()
@@ -325,21 +385,27 @@ public class AudioManager
     //for pause resume
     public void PauseTouchHoldSound()
     {
-        if (isTouchholdRiserPlaying)
+        if (_prevActiveTouchHoldCount > 0)
             NoteSfxs[TOUCHHOLD].Pause(); //seen as still playing
     }
     public void ResumeTouchHoldSound()
     {
-        if (isTouchholdRiserPlaying)
+        if (_prevActiveTouchHoldCount > 0)
             NoteSfxs[TOUCHHOLD].Play();
     }
 
     public unsafe void ResetState()
     {
         StopTrack();
+        // 释放上一曲的音频资源：Bass非托管流立即释放，PCM大数组脱离引用以便GC回收
+        TrackSample?.Dispose();
+        TrackSample = null;
+        TrackSampleData = null;
         //StopTouchHoldSound();
-        _sfxPtr[TOUCHHOLD] = false;
-        touchholdRiserPlayingTask.Clear();
+        //_sfxPtr[TOUCHHOLD] = false;
+        ActiveTouchHoldCount = 0;
+        _prevActiveTouchHoldCount = 0;
+        NoteSfxs[TOUCHHOLD].Stop();
 
         lock (answerSfxLock)
             answerTimingPoints.Clear();
@@ -417,71 +483,218 @@ public class AudioManager
 
     //recording control
 
-    public void PrepareRecordingBuffer(float initialAudioTime, float speed)
+    public void BeginRecordingAudio(float initialAudioTime, float speed)
     {
         recordingInitialAudioTime = initialAudioTime;
         recordingSpeed = Math.Max(speed, 0.01f);
-        var trackOffset = TRACK_ANSWER_PLAYBACK_OFFSET_SEC + (float)GlobalAudioOffset;
+        recordingInitialNoteTime = _timeProvider.NoteTime;
+        var trackOffset = TRACK_ANSWER_PLAYBACK_OFFSET_SEC;
         var trackOutputStartTime = trackOffset - recordingInitialAudioTime;
-        var leadAndTail = Math.Max(TimeProvider.SONG_DETAIL_OFFSET + 8f, trackOutputStartTime + 8f);
+        var leadAndTail = trackOutputStartTime
+            + TimeProvider.SONG_DETAIL_OFFSET
+            + NoteSfxs[ALL_PERFECT].Length;
         var totalLen = TrackSample!.Length / recordingSpeed + leadAndTail; // 留给开头演出和结尾AP音效
-        var size = (int)(totalLen * SAMPLERATE * CHANNELS);
-        recordingBuffer = new float[size];
-        Array.Clear(recordingBuffer, 0, recordingBuffer.Length);
-        for (var i = 0; i < sfxPlayPointers.Length; i++) sfxPlayPointers[i] = -1; // 初始化指针
+        var size = (int)Math.Ceiling(Math.Max(0.1, totalLen) * SAMPLERATE) * CHANNELS;
+        if (recordingBuffer.IsCreated) recordingBuffer.Dispose();
+        recordingBuffer = new NativeArray<float>(size, Allocator.Persistent, NativeArrayOptions.ClearMemory);
+        recordingSampleCount = size;
+        recordingPreviousTouchHoldCount = 0;
+        for (var i = 0; i < sfxPlayPointers.Length; i++)
+        {
+            if (sfxPlayPointers[i] != null)
+            {
+                for (var j = 0; j < sfxPlayPointers[i].Length; j++)
+                    sfxPlayPointers[i][j] = -1; // 初始化指针
+            }
+        }
+        // 按需加载整首PCM：普通播放模式下 TrackSampleData 保持为null，仅导出模式走到这里
+        TrackSampleData ??= GetSampleDataFromFile(_trackPath);
+        // Mix sources whose timing is known before recording begins. Dynamic SFX
+        // are added frame by frame, then the completed buffer is muxed at the end.
+        MixStaticRecordingAudio();
     }
 
-    public void TriggerSfxRecording(int index)
+    public unsafe void UpdateRecordingAudioFrame(double frameStartTime, double frameEndTime)
     {
-        if (index < 0 || index >= noteSfxSamplesData.Count) return;
-        sfxPlayPointers[index] = 0;
-    }
-    public void StopSfxRecording(int index)
-    {
-        if (index < 0 || index >= noteSfxSamplesData.Count) return;
-        sfxPlayPointers[index] = -1;
+        if (!recordingBuffer.IsCreated)
+            throw new InvalidOperationException("Recording audio has not been initialized.");
+        if (frameEndTime < frameStartTime)
+            throw new ArgumentOutOfRangeException(nameof(frameEndTime));
+
+        if (!IsShowingSongDetail)
+        {
+            for (var i = 0; i < SFX_COUNT; i++)
+            {
+                if (i == TRACK_START || i == TOUCHHOLD || i == ANSWER || i == ANSWER_CLOCK)
+                    continue;
+
+                if (_sfxPtr[i])
+                {
+                    TriggerSfxRecording(i);
+                    _sfxPtr[i] = false;
+                }
+            }
+
+            var currentTouchHoldCount = ActiveTouchHoldCount;
+            if (currentTouchHoldCount > recordingPreviousTouchHoldCount)
+            {
+                var newVoices = currentTouchHoldCount - recordingPreviousTouchHoldCount;
+                for (var i = 0; i < newVoices; i++)
+                    TriggerSfxRecording(TOUCHHOLD);
+            }
+            else if (currentTouchHoldCount == 0 && recordingPreviousTouchHoldCount > 0)
+            {
+                StopSfxRecording(TOUCHHOLD);
+            }
+
+            recordingPreviousTouchHoldCount = currentTouchHoldCount;
+            UpdateSfxRecording(
+                (float)(frameEndTime - frameStartTime),
+                (float)frameStartTime);
+        }
+
     }
 
-    public void UpdateSfxRecording(float deltaTime, float recordingElapsedTime)
+    public void EndRecordingAudio(float recordingElapsedTime)
+    {
+        recordingSampleCount = FinalizeRecordingBuffer(recordingElapsedTime);
+    }
+
+    public NativeArray<float> GetRecordingBuffer(out int sampleCount)
+    {
+        if (!recordingBuffer.IsCreated)
+            throw new InvalidOperationException("Recording audio has not been initialized.");
+
+        // The native muxer copies this data synchronously, so AudioManager keeps
+        // ownership and releases the buffer only after video_encoder_free returns.
+        sampleCount = recordingSampleCount;
+        return recordingBuffer;
+    }
+
+    private void TriggerSfxRecording(int index)
+    {
+        if (index < 0 || index >= noteSfxSamplesData.Count) return;
+        var pointers = sfxPlayPointers[index];
+        if (pointers == null || pointers.Length == 0) return;
+
+        int bestIdx = 0;
+        int maxProgress = -2;
+        for (int i = 0; i < pointers.Length; i++)
+        {
+            if (pointers[i] == -1)
+            {
+                bestIdx = i;
+                break;
+            }
+            if (pointers[i] > maxProgress)
+            {
+                maxProgress = pointers[i];
+                bestIdx = i;
+            }
+        }
+        pointers[bestIdx] = 0;
+    }
+    private void StopSfxRecording(int index)
+    {
+        if (index < 0 || index >= noteSfxSamplesData.Count) return;
+        var pointers = sfxPlayPointers[index];
+        if (pointers != null)
+        {
+            for (int i = 0; i < pointers.Length; i++)
+                pointers[i] = -1;
+        }
+    }
+
+    private void UpdateSfxRecording(float deltaTime, float recordingElapsedTime)
     {
         // 计算当前帧在 buffer 中的起始采样位置
         var bufferStartPos = (int)(recordingElapsedTime * SAMPLERATE) * CHANNELS;
         // 这一帧应该写入的采样长度
-        var samplesToCopy = (int)(deltaTime * SAMPLERATE) * CHANNELS;
+        // Absolute frame boundaries avoid cumulative rounding gaps at FPS values
+        // such as 59, where sampleRate / fps is fractional.
+        var bufferEndPos = (int)((recordingElapsedTime + deltaTime) * SAMPLERATE) * CHANNELS;
+        var samplesToCopy = Math.Max(0, bufferEndPos - bufferStartPos);
 
         for (var i = 0; i < sfxPlayPointers.Length; i++)
         {
-            if (i == TRACK_START || sfxPlayPointers[i] == -1) continue;
+            if (i == TRACK_START || sfxPlayPointers[i] == null) continue;
 
+            var pointers = sfxPlayPointers[i];
             var sfxData = noteSfxSamplesData[i];
             var vol = NoteSfxs[i].Volume;
 
-            for (var j = 0; j < samplesToCopy; j++)
+            for (var p = 0; p < pointers.Length; p++)
             {
-                var sfxIdx = sfxPlayPointers[i] + j;
-                if (sfxIdx < sfxData.Length)
+                if (pointers[p] == -1) continue;
+
+                for (var j = 0; j < samplesToCopy; j++)
                 {
-                    var dstIdx = bufferStartPos + j;
-                    if (dstIdx >= 0 && dstIdx < recordingBuffer.Length)
+                    var sfxIdx = pointers[p] + j;
+                    if (sfxIdx < sfxData.Length)
                     {
-                        // 同种类指针重置，不会自叠加
-                        var mixed = recordingBuffer[dstIdx] + sfxData[sfxIdx] * vol;
-                        recordingBuffer[dstIdx] = Math.Clamp(mixed, -1.0f, 1.0f);
+                        var dstIdx = bufferStartPos + j;
+                        if (dstIdx >= 0 && dstIdx < recordingBuffer.Length)
+                        {
+                            var mixed = recordingBuffer[dstIdx] + sfxData[sfxIdx] * vol;
+                            recordingBuffer[dstIdx] = Math.Clamp(mixed, -1.0f, 1.0f);
+                        }
+                    }
+                    else
+                    {
+                        pointers[p] = -1;
+                        break;
                     }
                 }
-                else
-                {
-                    sfxPlayPointers[i] = -1;
-                    break;
-                }
-            }
 
-            if (sfxPlayPointers[i] != -1)
-                sfxPlayPointers[i] += samplesToCopy;
+                if (pointers[p] != -1)
+                    pointers[p] += samplesToCopy;
+            }
         }
     }
 
-    public void ExportFinalWav(string outputPath)
+    private int FinalizeRecordingBuffer(float recordingElapsedTime)
+    {
+        // Flush remaining playing SFXs and calculate max required time
+        float maxTime = recordingElapsedTime;
+
+        var bufferStartPos = (int)(recordingElapsedTime * SAMPLERATE) * CHANNELS;
+        for (var i = 0; i < sfxPlayPointers.Length; i++)
+        {
+            if (i == TRACK_START || sfxPlayPointers[i] == null) continue;
+            var pointers = sfxPlayPointers[i];
+            var sfxData = noteSfxSamplesData[i];
+            var vol = NoteSfxs[i].Volume;
+
+            for (var p = 0; p < pointers.Length; p++)
+            {
+                if (pointers[p] != -1)
+                {
+                    int remain = sfxData.Length - pointers[p];
+                    float endTime = recordingElapsedTime + ((float)remain / CHANNELS / SAMPLERATE);
+                    if (endTime > maxTime) maxTime = endTime;
+
+                    for (int j = 0; j < remain; j++)
+                    {
+                        var dstIdx = bufferStartPos + j;
+                        if (dstIdx >= 0 && dstIdx < recordingBuffer.Length)
+                        {
+                            var mixed = recordingBuffer[dstIdx] + sfxData[pointers[p] + j] * vol;
+                            recordingBuffer[dstIdx] = Math.Clamp(mixed, -1.0f, 1.0f);
+                        }
+                    }
+                    pointers[p] = -1;
+                }
+            }
+        }
+
+        recordingSampleCount = Math.Min(
+            (int)Math.Ceiling(maxTime * SAMPLERATE) * CHANNELS,
+            recordingBuffer.Length);
+        recordingSampleCount -= recordingSampleCount % CHANNELS;
+        return recordingSampleCount;
+    }
+
+    private void MixStaticRecordingAudio()
     {
         // track start
         var trackStartSampleData = noteSfxSamplesData[TRACK_START];
@@ -494,11 +707,40 @@ public class AudioManager
             }
         }
 
-
-        var trackOffset = TRACK_ANSWER_PLAYBACK_OFFSET_SEC +
-                            (float)GlobalAudioOffset;
+        var trackOffset = TRACK_ANSWER_PLAYBACK_OFFSET_SEC;
         var initialTrackSec = recordingInitialAudioTime - trackOffset;
-        var trackStartFrameCount = (int)((initialTrackSec + TimeProvider.SONG_DETAIL_OFFSET) * SAMPLERATE * recordingSpeed);
+
+        // sample-accurate answers
+        var answerData = noteSfxSamplesData[ANSWER];
+        var answerClockData = noteSfxSamplesData[ANSWER_CLOCK];
+        var answerVol = NoteSfxs[ANSWER].Volume;
+        var answerClockVol = NoteSfxs[ANSWER_CLOCK].Volume;
+
+        foreach (var timing in answerTimingPoints)
+        {
+            // Mirror the real-time trigger at Update():
+            // NoteTime > timing + TRACK_ANSWER_PLAYBACK_OFFSET_SEC.
+            var triggerNoteTime = timing.Timing + TRACK_ANSWER_PLAYBACK_OFFSET_SEC;
+            float exactOutputSec = (triggerNoteTime - recordingInitialNoteTime) / recordingSpeed;
+            if (exactOutputSec < 0) continue;
+
+            int startSample = (int)(exactOutputSec * SAMPLERATE);
+            int startIdx = startSample * CHANNELS;
+
+            var sfxData = timing.IsClock ? answerClockData : answerData;
+            var vol = timing.IsClock ? answerClockVol : answerVol;
+
+            for (int i = 0; i < sfxData.Length; i++)
+            {
+                int dstIdx = startIdx + i;
+                if (dstIdx >= 0 && dstIdx < recordingBuffer.Length)
+                {
+                    var mixed = recordingBuffer[dstIdx] + sfxData[i] * vol;
+                    recordingBuffer[dstIdx] = Math.Clamp(mixed, -1.0f, 1.0f);
+                }
+            }
+        }
+        var trackStartFrameCount = (int)((initialTrackSec + TimeProvider.SONG_DETAIL_OFFSET) * SAMPLERATE);
         var trackFrameCount = TrackSampleData.Length / CHANNELS;
         var recordingFrameCount = recordingBuffer.Length / CHANNELS;
 
@@ -522,8 +764,17 @@ public class AudioManager
             }
         }
 
-        WavFileWriter.WriteFile(outputPath, SAMPLERATE, CHANNELS, recordingBuffer);
     }
+
+    public void ReleaseRecordingAudio()
+    {
+        if (recordingBuffer.IsCreated) recordingBuffer.Dispose();
+        recordingSampleCount = 0;
+        recordingPreviousTouchHoldCount = 0;
+    }
+
+    public int SampleRate => SAMPLERATE;
+    public int Channels => CHANNELS;
 
 
 

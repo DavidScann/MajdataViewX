@@ -17,11 +17,13 @@ public partial class ObjectCounter : MonoBehaviour
     private void Update()
     {
         // ProcessReportRequests(); // in NoteManager, after job complete
-        UpdateOutput();
+        if (_timeProvider.IsStart)
+            UpdateOutput();
     }
 
     private void OnDestroy()
     {
         if (reportRequests.IsCreated) reportRequests.Dispose();
+        outputBuilder.Dispose();
     }
 }

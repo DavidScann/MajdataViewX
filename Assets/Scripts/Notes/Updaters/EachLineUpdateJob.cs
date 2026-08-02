@@ -1,4 +1,3 @@
-#pragma warning disable CS8500
 using System.Threading;
 using Unity.Burst;
 using Unity.Collections;
@@ -20,7 +19,7 @@ public unsafe struct EachLineUpdateJob : IJobParallelFor
 
     public void Execute(int index)
     {
-        var el = eachLines[index];
+        ref var el = ref eachLines.ElementRef(index);
         if (el.isEnd) return;
 
         var timing = el.usingSV
@@ -41,15 +40,17 @@ public unsafe struct EachLineUpdateJob : IJobParallelFor
 
         el.scale = clampedDistance / 4.8f;
 
+        // sortTime (30 bits): [19 bits: time (87 mins wrap)] + [11 bits: index tie-breaker (2048 wrap)]
+        var timePart = ((uint)math.max(0f, el.time * 100f)) & 0x7FFFF;
+        var sortTime = ((timePart << 11) | (uint)(index & 0x7FF)) & 0x3FFFFFFF;
+
         var idx = Interlocked.Increment(ref *EachLinesWriteCountPtr) - 1;
         eachLinesRender[idx] = new LineRenderData
         {
             angRad = math.radians(el.ang),
             scale = el.scale,
             spriteId = el.lineSprite,
-            sort = (uint)index,
+            sort = sortTime,
         };
-
-        eachLines[index] = el;
     }
 }

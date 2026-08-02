@@ -1,7 +1,13 @@
-using System;
-using System.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 using MajSimai;
+using Notes.SlideUtils;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
+using Unity.Mathematics;
 using UnityEngine;
 using static MajCtx;
 
@@ -9,67 +15,542 @@ public partial class NoteManager
 {
     public float NoteSpeed = 7f;
     public float TouchSpeed = 7.5f;
-    public bool legacySlideLayer = false;
-    public bool smoothSlideAnime = true;
+    public bool LegacySlideLayer = false;
+    public bool SmoothSlideAnime = true;
+    public bool MineAutoSlide = true;
 
-    private int[] _buttonOrderIndex = new int[InputDataB.BUTTON_COUNT];
-    private int[] _sensorOrderIndex = new int[InputDataB.SENSOR_COUNT];
+    public double Ignore = 0f;
 
-    public void Load(SimaiChart chart)
+    private readonly int[] _buttonOrderIndex = new int[BUTTON_COUNT];
+    private readonly int[] _sensorOrderIndex = new int[SENSOR_COUNT];
+
+    private unsafe SlideArea* slideAreaPool;
+    private unsafe SlidePose* slidePosePool;
+    private int areaPoolIndex = 0;
+    private int posePoolIndex = 0;
+    private readonly List<SlideArea[]> loadedSlideAreaArrays = new();
+    private readonly List<SlidePose[]> loadedSlidePoseArrays = new();
+
+    private readonly List<NoteRegister>[] loadedTouches = new List<NoteRegister>[SENSOR_COUNT];
+
+    public unsafe void Load(SimaiChart chart)
     {
-        for (int i = 0; i < 34; i++) _sensorOrderIndex[i] = 0;
+        if (chart.IsEmpty) return;
+        _prevChain.Complete();
+        ConfigureRenderCapacity(chart);
+
+        // 防御性清空：正常流程下 Stop 时 ResetState 已清空，
+        // 此处防止"未 Stop 就重新 Load"导致 NativeList 累积
+        taps.Clear();
+        eachLines.Clear();
+        holds.Clear();
+        slides.Clear();
+        touches.Clear();
+        touchHolds.Clear();
+        touchGroupTotalCounts.Clear();
+        touchGroupJudgedCounts.Clear();
+        touchGroupCoverResults.Clear();
+        touchHoldGroupTotalCounts.Clear();
+        touchHoldGroupPressedCounts.Clear();
+        touchHoldGroupCoverResults.Clear();
+
+        areaPoolIndex = 0;
+        posePoolIndex = 0;
+        Array.Fill(_buttonOrderIndex, 0);
+        Array.Fill(_sensorOrderIndex, 0);
+        if (slideAreaPool != null)
+            UnsafeUtility.Free(slideAreaPool, Allocator.Persistent);
+        if (slidePosePool != null)
+            UnsafeUtility.Free(slidePosePool, Allocator.Persistent);
+        for (var i = 0; i < SENSOR_COUNT; i++)
+            if (loadedTouches[i] != null)
+                loadedTouches[i].Clear();
+            else
+                loadedTouches[i] = new();
+
         foreach (var timing in chart.NoteTimings)
-            LoadTiming(timing);
+        {
+            if (timing.Timing < Ignore)
+                LoadIgnore(timing);
+            else
+                LoadTiming(timing);
+        }
+
+        MarkSlideGuideNotes();
+
+        slideAreaPool = (SlideArea*)UnsafeUtility.Malloc(
+            areaPoolIndex * sizeof(SlideArea),
+            16, Allocator.Persistent);
+        slidePosePool = (SlidePose*)UnsafeUtility.Malloc(
+            posePoolIndex * sizeof(SlidePose),
+            16, Allocator.Persistent);
+
+        for (var i = 0; i < slides.Length; i++)
+        {
+            var slide = slides[i];
+            slide.judgeQueue = slideAreaPool + slide.judgeQueueOffset;
+            slide.judgeQueueL = slideAreaPool + slide.judgeQueueLOffset;
+            slide.judgeQueueR = slideAreaPool + slide.judgeQueueROffset;
+            slide.slideArrows = slidePosePool + slide.slideArrowsOffset;
+            slides[i] = slide;
+        }
+
+        var cur1 = 0;
+        foreach (var areas in loadedSlideAreaArrays)
+        {
+            fixed (SlideArea* src = areas)
+            {
+                UnsafeUtility.MemCpy(
+                    slideAreaPool + cur1,
+                    src, areas.Length * sizeof(SlideArea));
+            }
+
+            cur1 += areas.Length;
+        }
+
+        var cur2 = 0;
+        foreach (var poses in loadedSlidePoseArrays)
+        {
+            fixed (SlidePose* src = poses)
+            {
+                UnsafeUtility.MemCpy(
+                    slidePosePool + cur2,
+                    src, poses.Length * sizeof(SlidePose));
+            }
+
+            cur2 += poses.Length;
+        }
+
+        loadedSlideAreaArrays.Clear();
+        loadedSlidePoseArrays.Clear();
+
+        MajBurst.MultTouchHandler.Load(loadedTouches);
     }
 
-    private unsafe void LoadTiming(SimaiTimingPoint timing)
-    {
-        try
-        {
-            var nonMineCount = 0;
-            var startPositions = stackalloc int[timing.Notes.Length];
+    private static int GetSlideGuideTimeKey(float timing) =>
+        (int)math.round(timing * 1000f);
 
-            foreach (var note in timing.Notes)
+    private void MarkSlideGuideNotes()
+    {
+        var tapLookup = new Dictionary<(int Time, SensorType Sensor), List<int>>();
+        var touchLookup = new Dictionary<(int Time, SensorType Sensor), List<int>>();
+
+        for (int i = 0; i < taps.Length; i++)
+        {
+            var tap = taps[i];
+            if (tap.IsMine) continue;
+
+            var key = (GetSlideGuideTimeKey(tap.Time), tap.Key);
+            if (!tapLookup.TryGetValue(key, out var indices))
+                tapLookup.Add(key, indices = new List<int>());
+            indices.Add(i);
+        }
+
+        for (int i = 0; i < touches.Length; i++)
+        {
+            var touch = touches[i];
+            if (touch.isMine) continue;
+
+            var key = (GetSlideGuideTimeKey(touch.time), touch.sensor);
+            if (!touchLookup.TryGetValue(key, out var indices))
+                touchLookup.Add(key, indices = new List<int>());
+            indices.Add(i);
+        }
+
+        for (int i = 0; i < slides.Length; i++)
+        {
+            var slide = slides[i];
+            if (slide.isMine) continue;
+
+            var sensor = (SensorType)(slide.startPos - 1);
+            var key = (GetSlideGuideTimeKey(slide.shootTime), sensor);
+
+            if (tapLookup.TryGetValue(key, out var tapIndices))
             {
-                switch (note.Type)
+                slide.hasSlideGuide = true;
+                slide.hasTapGuide = true;
+                foreach (var tapIndex in tapIndices)
                 {
-                    case SimaiNoteType.Tap:
-                        LoadTap(timing, note);
-                        if (!note.IsMine) startPositions[nonMineCount++] = note.StartPosition;
-                        break;
-                    case SimaiNoteType.Hold:
-                        LoadHold(timing, note);
-                        if (!note.IsMine) startPositions[nonMineCount++] = note.StartPosition;
-                        break;
-                    case SimaiNoteType.Touch:
-                        LoadTouch(timing, note);
-                        break;
-                    case SimaiNoteType.TouchHold:
-                        LoadTouchHold(timing, note);
-                        break;
-                    case SimaiNoteType.Slide:
-                        LoadSlideChain(timing, note);
-                        break;
+                    var tap = taps[tapIndex];
+                    tap.IsSlideGuide = true;
+                    taps[tapIndex] = tap;
                 }
             }
 
-            if (nonMineCount > 1)
+            if (touchLookup.TryGetValue(key, out var touchIndices))
             {
-                for (int i = 0; i < nonMineCount - 1; i++)
+                slide.hasSlideGuide = true;
+                foreach (var touchIndex in touchIndices)
                 {
-                    var s = (float)timing.Timing;
-                    var spd = NoteSpeed * timing.HSpeed;
-                    CreateEachLine(s, startPositions[i], startPositions[i + 1], spd);
+                    var touch = touches[touchIndex];
+                    touch.isSlideGuide = true;
+                    touches[touchIndex] = touch;
                 }
+            }
+
+            slides[i] = slide;
+        }
+    }
+    private void LoadIgnore(in SimaiTimingPoint timing)
+    {
+        var holdLength = 0d;
+        foreach (var note in timing.Notes)
+        {
+            if (note.HoldTime > holdLength)
+                holdLength = note.HoldTime;
+
+            if (note.SlideStartTime + note.SlideTime > Ignore)
+            {
+                LoadTiming(timing);
+                return;
+            }
+        }
+
+        if (timing.Timing + holdLength > Ignore)
+        {
+            LoadTiming(timing);
+            return;
+        }
+
+        _objectCounter.CountIgnoreNoteCountAsync(timing.Notes);
+    }
+
+    private void CalcEach(in SimaiTimingPoint timing, out bool isNoteEach, out bool isSlideEach)
+    {
+        var noteCount = 0;
+        var slideCount = 0;
+
+        foreach (var o in timing.Notes)
+        {
+            if (!o.IsMine)
+            {
+                if (o.Type == SimaiNoteType.Slide)
+                {
+                    if (!o.IsSlideNoHead)
+                        noteCount++;
+                }
+                else
+                {
+                    noteCount++;
+                }
+            }
+
+            if (o.Type == SimaiNoteType.Slide && !o.IsMineSlide)
+            {
+                slideCount++;
+            }
+        }
+
+        isNoteEach = noteCount > 1;
+        isSlideEach = slideCount > 1;
+    }
+
+    protected virtual void OnNoteLoadFailed(SimaiNote note, Exception e)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine($"[Note Load Failed] Exception: {e.Message}");
+        if (e.InnerException != null)
+        {
+            sb.AppendLine($"  ---> Inner Exception: {e.InnerException.Message}");
+        }
+        sb.AppendLine($"  Stack Trace:");
+        sb.AppendLine(e.StackTrace);
+        sb.AppendLine("Note Properties:");
+        try
+        {
+            foreach (var prop in typeof(SimaiNote).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
+            {
+                sb.AppendLine($"  {prop.Name}: {prop.GetValue(note)}");
+            }
+            foreach (var field in typeof(SimaiNote).GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
+            {
+                sb.AppendLine($"  {field.Name}: {field.GetValue(note)}");
             }
         }
         catch (Exception ex)
         {
+            sb.AppendLine($"  (Failed to reflect properties: {ex.Message})");
+        }
+        var errorMsg = sb.ToString();
+        Debug.LogError(errorMsg);
+        _wsServer.Error(errorMsg);
+    }
 
+    /// <remarks>
+    /// 本来isEach在isMine时应该被忽略，但实际上
+    /// isEach对判定并无影响，主要取其skin的区别，
+    /// 而且mine的tapline同样需要换为each line
+    /// 因此全部丢进LoadSkin作特判
+    /// </remarks>
+    private unsafe void LoadTiming(in SimaiTimingPoint timing)
+    {
+        int touchStartIdx = touches.Length;
+        int touchHoldStartIdx = touchHolds.Length;
+
+        CalcEach(timing, out var isNoteEach, out var isSlideEach);
+
+        var nonMineCount = 0;
+        var startPositions = stackalloc int[timing.Notes.Length];
+        bool eachLineUsingSV = false;
+        string lastSlideContent = string.Empty;
+        var sameTapCount = 0;
+        var sameHoldCount = 0;
+        var sameTouchCount = 0;
+        var sameTouchHoldCount = 0;
+        var sameSlideCount = 0;
+        foreach (var note in timing.Notes)
+        {
+            try
+            {
+                switch (note.Type)
+                {
+                    case SimaiNoteType.Tap:
+                        LoadTap(timing, note, isNoteEach, ref sameTapCount);
+                        if (!note.IsMine)
+                        {
+                            eachLineUsingSV |= note.UsingSV;
+                            startPositions[nonMineCount++] = note.StartPosition;
+                        }
+                        break;
+                    case SimaiNoteType.Hold:
+                        LoadHold(timing, note, isNoteEach, ref sameHoldCount);
+                        if (!note.IsMine)
+                        {
+                            eachLineUsingSV |= note.UsingSV;
+                            startPositions[nonMineCount++] = note.StartPosition;
+                        }
+                        break;
+                    case SimaiNoteType.Touch:
+                        LoadTouch(timing, note, isNoteEach, ref sameTouchCount);
+                        break;
+                    case SimaiNoteType.TouchHold:
+                        LoadTouchHold(timing, note, isNoteEach, ref sameTouchHoldCount);
+                        break;
+                    case SimaiNoteType.Slide:
+                        lastSlideContent = LoadSlideChain(
+                            timing,
+                            note,
+                            isNoteEach,
+                            isSlideEach,
+                            lastSlideContent,
+                            ref sameTapCount,
+                            ref sameSlideCount);
+                        if (!note.IsMine && !note.IsSlideNoHead)
+                            startPositions[nonMineCount++] = note.StartPosition;
+                        break;
+                }
+            }
+            catch (Exception e)
+            {
+                OnNoteLoadFailed(note, e);
+            }
+        }
+
+        if (nonMineCount > 1)
+        {
+            for (int i = 0; i < nonMineCount - 1; i++)
+            {
+                var s = (float)timing.Timing;
+                var spd = NoteSpeed * timing.HSpeed;
+                CreateEachLine(s, startPositions[i], startPositions[i + 1], spd, eachLineUsingSV);
+            }
+        }
+
+        int touchCount = touches.Length - touchStartIdx;
+        int thCount = touchHolds.Length - touchHoldStartIdx;
+
+        // touch 头判与 touchhold 头判分开算 group；touchhold 按下 group 另算
+        if (touchCount > 0)
+        {
+            ProcessTouchGroups(touchStartIdx, touchCount);
+        }
+        if (thCount > 0)
+        {
+            ProcessTouchHoldGroups(touchHoldStartIdx, thCount);
         }
     }
 
-    private void CreateEachLine(float time, int startPosA, int startPosB, float speed)
+    private struct TouchGroupBuild
+    {
+        public int[] MemberGroupIds;
+        public int CoverageId;
+    }
+
+    /// <summary>
+    /// 把同 timing 的一批 touch 类 note 按传感器邻接关系聚成判定 group，并算出 DJAuto 覆盖。
+    /// 算法：去重(同 sensor 合并) -> BFS 连通分量 -> 分量内 ≥5 个 sensor 才建 group(多数通过)。
+    /// group 的 totalCount 等计数由调用方传入的 list 承接，groupId 即追加时的下标。
+    /// </summary>
+    private static TouchGroupBuild BuildTouchGroups(
+        IReadOnlyList<SensorType> sensors,
+        NativeList<int> totalCountsOut,
+        NativeList<int> counterOut,
+        NativeList<CoverResult> coverResultsOut,
+        bool allowSlide)
+    {
+        int count = sensors.Count;
+        var memberGroupIds = new int[count];
+        for (int i = 0; i < count; i++) memberGroupIds[i] = -1;
+
+        // 1. 去重：同 sensor 合并为一个 unique
+        var uniqueIndices = new List<int>();      // unique -> 该 sensor 的首个 member 索引
+        var memberToUnique = new int[count];
+        for (int i = 0; i < count; i++)
+        {
+            int found = -1;
+            for (int j = 0; j < uniqueIndices.Count; j++)
+            {
+                if (sensors[uniqueIndices[j]] == sensors[i])
+                {
+                    found = j;
+                    break;
+                }
+            }
+            memberToUnique[i] = found != -1 ? found : uniqueIndices.Count;
+            if (found == -1) uniqueIndices.Add(i);
+        }
+
+        int uniqueCount = uniqueIndices.Count;
+        if (uniqueCount == 0)
+            return new TouchGroupBuild { MemberGroupIds = memberGroupIds, CoverageId = -1 };
+
+        // 2. BFS 连通分量：TOUCH_GROUPS 邻接关系
+        var visited = new bool[uniqueCount];
+        var uniqueGroupIds = new int[uniqueCount];
+        for (int i = 0; i < uniqueCount; i++) uniqueGroupIds[i] = -1;
+        var groups = new List<Group>();
+
+        for (int i = 0; i < uniqueCount; i++)
+        {
+            if (visited[i]) continue;
+
+            var component = new List<int>();
+            var queue = new Queue<int>();
+            queue.Enqueue(i);
+            visited[i] = true;
+            while (queue.Count > 0)
+            {
+                int curr = queue.Dequeue();
+                component.Add(curr);
+
+                var s1 = sensors[uniqueIndices[curr]];
+                for (int j = 0; j < uniqueCount; j++)
+                {
+                    if (visited[j]) continue;
+                    var s2 = sensors[uniqueIndices[j]];
+                    if (TouchGroupManager.TOUCH_GROUPS.TryGetValue(s1, out var adj) && adj.Contains(s2))
+                    {
+                        visited[j] = true;
+                        queue.Enqueue(j);
+                    }
+                }
+            }
+
+            // 3. ≥5 个 sensor 才算一个判定 group（多数通过阈值）
+            if (component.Count < 5) continue;
+
+            int groupId = totalCountsOut.Length;
+            // total 含同 sensor 重复的 note（每个实际 note 都计入判定计数）
+            int total = 0;
+            for (int m = 0; m < count; m++)
+            {
+                if (component.Contains(memberToUnique[m])) total++;
+            }
+            totalCountsOut.Add(total);
+            counterOut.Add(0);
+
+            var groupDef = new Group { PointIndices = new int[component.Count] };
+            for (int k = 0; k < component.Count; k++)
+            {
+                int u = component[k];
+                uniqueGroupIds[u] = groupId;
+                groupDef.PointIndices[k] = u;
+            }
+            groups.Add(groupDef);
+        }
+
+        // 4. 回填每个 member 的 groupId
+        for (int i = 0; i < count; i++)
+            memberGroupIds[i] = uniqueGroupIds[memberToUnique[i]];
+
+        // 5. 算 DJAuto 覆盖（以 unique 传感器点位求解）
+        var points = new float2[uniqueCount];
+        var pointRadii = new float[uniqueCount];
+        for (int i = 0; i < uniqueCount; i++)
+        {
+            var sensor = sensors[uniqueIndices[i]];
+            points[i] = MajPos.GetSensorWorldPos(sensor);
+            pointRadii[i] = MajPos.GetSensorRadius(sensor);
+        }
+        var cover = CoverageSolver.Solve(points, pointRadii, groups, allowSlide: allowSlide);
+
+        int coverageId = coverResultsOut.Length;
+        coverResultsOut.Add(cover);
+
+        return new TouchGroupBuild { MemberGroupIds = memberGroupIds, CoverageId = coverageId };
+    }
+
+    /// <summary>
+    /// 头判 group：仅 touch 之间多数通过。写 touch 的 groupId/coverageId。
+    /// </summary>
+    private void ProcessTouchGroups(int startIdx, int count)
+    {
+        if (count == 0) return;
+
+        var sensors = new List<SensorType>(count);
+        var idx = new List<int>(count);
+        for (int i = 0; i < count; i++)
+        {
+            if (touches[startIdx + i].isMine) continue;
+            sensors.Add(touches[startIdx + i].sensor);
+            idx.Add(i);
+        }
+
+        var build = BuildTouchGroups(sensors, touchGroupTotalCounts, touchGroupJudgedCounts, touchGroupCoverResults, allowSlide: true);
+
+        for (int k = 0; k < idx.Count; k++)
+        {
+            var t = touches[startIdx + idx[k]];
+            t.groupId = build.MemberGroupIds[k];
+            t.coverageId = build.CoverageId;
+            touches[startIdx + idx[k]] = t;
+        }
+    }
+
+    /// <summary>
+    /// touchhold 的头判 group 与按下 group 分开算（均仅 touchhold 之间，互不影响，也不与 touch 头判合并）：
+    /// 头判 group 走 touchGroup 累计计数(多数通过带飞头判)，按下 group 走 touchHoldGroup 每帧重置计数(hold 期间多数按下)。
+    /// </summary>
+    private void ProcessTouchHoldGroups(int startIdx, int count)
+    {
+        if (count == 0) return;
+
+        var sensors = new List<SensorType>(count);
+        var idx = new List<int>(count);
+        for (int i = 0; i < count; i++)
+        {
+            if (touchHolds[startIdx + i].isMine) continue;
+            sensors.Add(touchHolds[startIdx + i].sensor);
+            idx.Add(i);
+        }
+
+        // 头判 group：与 touch 头判分开，独立多数通过
+        var headBuild = BuildTouchGroups(sensors, touchGroupTotalCounts, touchGroupJudgedCounts, touchGroupCoverResults, allowSlide: true);
+        // 按下 group：hold 期间多数按下
+        var holdBuild = BuildTouchGroups(sensors, touchHoldGroupTotalCounts, touchHoldGroupPressedCounts, touchHoldGroupCoverResults, allowSlide: false);
+
+        for (int k = 0; k < idx.Count; k++)
+        {
+            var t = touchHolds[startIdx + idx[k]];
+            t.headGroupId = headBuild.MemberGroupIds[k];
+            t.headCoverageId = headBuild.CoverageId;
+            t.groupId = holdBuild.MemberGroupIds[k];
+            t.coverageId = holdBuild.CoverageId;
+            touchHolds[startIdx + idx[k]] = t;
+        }
+    }
+
+    private void CreateEachLine(float time, int startPosA, int startPosB, float speed, bool usingSV)
     {
         var startPos = startPosA;
         var endPos = startPosB;
@@ -94,12 +575,21 @@ public partial class NoteManager
             key = startPos - 1,
             curvLength = endPos - 1,
             speed = speed,
+            usingSV = usingSV
         };
+        if (eachLines.Length > 0 && eachLines[^1].IsFoldable(el))
+        {
+            return;
+        }
         el.Init();
         eachLines.Add(el);
     }
 
-    private void LoadTap(SimaiTimingPoint timing, SimaiNote note)
+    private void LoadTap(
+        in SimaiTimingPoint timing,
+        in SimaiNote note,
+        bool isEach,
+        ref int sameTapCount)
     {
         var key = (SensorType)(note.StartPosition - 1);
         var tap = new TapData
@@ -112,43 +602,65 @@ public partial class NoteManager
 
             IsStar = note.IsForceStar,
             IsDouble = false,
-            RotateSpeed = note.IsFakeRotate ? -440f : 0,
+            RotateSpeed = note.IsFakeRotate ? -3f : 0,    // (117.8)1-5[4:1] 的旋转速度
 
-            IsEach = timing.Notes.Length > 1,
+            IsEach = isEach,
             IsEx = note.IsEx,
             IsBreak = note.IsBreak,
             IsMine = note.IsMine,
             UsingSV = note.UsingSV
         };
+        sameTapCount = taps.Length > 0 && taps[^1].IsFoldable(tap)
+            ? sameTapCount + 1
+            : 1;
+        if (sameTapCount > 3)
+        {
+            taps.ElementRef(taps.Length - 3).IsFolded = true;
+        }
         tap.Init();
         taps.Add(tap);
     }
 
-    private void LoadHold(SimaiTimingPoint timing, SimaiNote note)
+    private void LoadHold(
+        in SimaiTimingPoint timing,
+        in SimaiNote note,
+        bool isEach,
+        ref int sameHoldCount)
     {
         var key = (SensorType)(note.StartPosition - 1);
         var hold = new HoldData
         {
             time = (float)timing.Timing,
-            key = key,
+            Key = key,
             speed = NoteSpeed * timing.HSpeed,
             LastFor = (float)note.HoldTime,
-            buttonOrderIndex = _buttonOrderIndex[(int)key]++,
-            sensorOrderIndex = _sensorOrderIndex[(int)key]++,
+            ButtonOrderIndex = _buttonOrderIndex[(int)key]++,
+            SensorOrderIndex = _sensorOrderIndex[(int)key]++,
 
-            isEach = timing.Notes.Length > 1,
+            isEach = isEach,
             isEx = note.IsEx,
             isBreak = note.IsBreak,
             isMine = note.IsMine,
             usingSV = note.UsingSV
         };
+        sameHoldCount = holds.Length > 0 && holds[^1].IsFoldable(hold)
+            ? sameHoldCount + 1
+            : 1;
+        if (sameHoldCount > 3)
+        {
+            holds.ElementRef(holds.Length - 3).isFolded = true;
+        }
         hold.Init();
         holds.Add(hold);
     }
 
-    private void LoadTouch(SimaiTimingPoint timing, SimaiNote note)
+    private void LoadTouch(
+        in SimaiTimingPoint timing,
+        in SimaiNote note,
+        bool isEach,
+        ref int sameTouchCount)
     {
-        var sensor = InputManager.GetSensor(note.TouchArea, note.StartPosition);
+        var sensor = GetSensor(note.TouchArea, note.StartPosition);
         var touch = new TouchData
         {
             time = (float)timing.Timing,
@@ -157,18 +669,36 @@ public partial class NoteManager
             sensorOrderIndex = _sensorOrderIndex[(int)sensor]++,
 
             isHanabi = note.IsHanabi,
-            isEach = timing.Notes.Length > 1,
+            isEach = isEach,
             isEx = note.IsEx,
             isBreak = note.IsBreak,
             isMine = note.IsMine,
+            usingSV = note.UsingSV
         };
+        sameTouchCount = touches.Length > 0 && touches[^1].IsFoldable(touch)
+            ? sameTouchCount + 1
+            : 1;
+        if (sameTouchCount > 3)
+        {
+            touches.ElementRef(touches.Length - 3).isFolded = true;
+        }
         touch.Init();
         touches.Add(touch);
+        loadedTouches[(int)sensor].Add(new()
+        {
+            IsEach = isEach,
+            IsBreak = note.IsBreak,
+            IsMine = note.IsMine
+        });
     }
 
-    private void LoadTouchHold(SimaiTimingPoint timing, SimaiNote note)
+    private void LoadTouchHold(
+        in SimaiTimingPoint timing,
+        in SimaiNote note,
+        bool isEach,
+        ref int sameTouchHoldCount)
     {
-        var sensor = InputManager.GetSensor(note.TouchArea, note.StartPosition);
+        var sensor = GetSensor(note.TouchArea, note.StartPosition);
         var th = new TouchHoldData
         {
             time = (float)timing.Timing,
@@ -178,383 +708,388 @@ public partial class NoteManager
             LastFor = (float)note.HoldTime,
 
             isHanabi = note.IsHanabi,
-            isEach = timing.Notes.Length > 1,
+            isEach = isEach,
             isEx = note.IsEx,
             isBreak = note.IsBreak,
             isMine = note.IsMine,
+            usingSV = note.UsingSV
         };
+        sameTouchHoldCount = touchHolds.Length > 0 && touchHolds[^1].IsFoldable(th)
+            ? sameTouchHoldCount + 1
+            : 1;
+        if (sameTouchHoldCount > 3)
+        {
+            touchHolds.ElementRef(touchHolds.Length - 3).isFolded = true;
+        }
         th.Init();
         touchHolds.Add(th);
     }
 
-    private void LoadSlideChain(SimaiTimingPoint timing, SimaiNote note)
+    private string LoadSlideChain(
+        in SimaiTimingPoint timing,
+        in SimaiNote note,
+        bool isNoteEach,
+        bool isSlideEach,
+        string lastContent,
+        ref int sameTapCount,
+        ref int sameSlideCount)
     {
         var noteContent = note.RawContent;
-        if (string.IsNullOrEmpty(noteContent)) return;
 
-        if (noteContent.Contains('w'))
+        if (!note.IsSlideNoHead)
         {
-            var (metadata, judgeQueueL, judgeQueueC, judgeQueueR, slidePoses, okPose) =
-                SlideTables.GetWifiTable();
+            // 统计与当前 slide 同头的所有 slide 的总长和总时间
+            var length = 0.0f;
+            var time = 0.0D;
+            var cnt = 0;
 
-            var isJustR = DetectJustType(noteContent, out var endPos);
+            // 有点丑陋，但能用
+            // 考虑到这个 method 本来就套在一层遍历里，总之是多了很多不必要的遍历
+            // TODO:使之不丑陋
+            foreach (var sn in timing.Notes)
+            {
+                if (sn.Type != SimaiNoteType.Slide) continue;
+                if (sn.IsMineSlide) continue;
+                if (sn.StartPosition != note.StartPosition) continue;
+
+                cnt++;
+                var ct = note.RawContent;
+                var meta = ct.Contains('w')
+                    ? SlideTableNeo.GetWifiSlide(ct[..3])
+                    : SlideTableNeo.MakeConnSlide(GetSlidesFromRawContent(ct, out _, out _));
+                length += meta.SlideLength;
+                time += sn.SlideTime;
+            }
+            // 注意上面的遍历也把当前正在处理的 slide 遍历到了
+            var isDouble = cnt >= 2;
+
+            // RotateSpeed = 1 时是每秒转 180 度
+            // 官机算法是 转速 = 同头星星总长 / (总时间 * 15 * pi)
+            // 长度单位像素，时间单位ms，转速单位度/帧，转速最大是 18
+            // 这里 SlideLength 是 100ppu，SlideTime 是秒
+            var rotateSpeed = math.min(6f, length / ((float)time * 2 * math.PI));
 
             var starTap = new TapData
             {
                 Time = (float)timing.Timing,
                 Key = (SensorType)(note.StartPosition - 1),
                 Speed = NoteSpeed * timing.HSpeed,
-                SensorOrderIndex = _sensorOrderIndex[note.StartPosition]++,
-                IsStar = true,
-                IsDouble = false,
-                RotateSpeed = 0,
-                IsEach = timing.Notes.Length > 1,
+                ButtonOrderIndex = _buttonOrderIndex[note.StartPosition - 1]++,
+                SensorOrderIndex = _sensorOrderIndex[note.StartPosition - 1]++,
+                IsStar = !note.IsTapHeadSlide,
+                IsDouble = isDouble,
+                RotateSpeed = rotateSpeed,
+                IsEach = isNoteEach,
                 IsEx = note.IsEx,
-                IsBreak = note.IsSlideBreak,
-                IsMine = note.IsMineSlide,
+                IsBreak = note.IsBreak,
+                IsMine = note.IsMine,
                 UsingSV = note.UsingSV,
             };
+            sameTapCount = taps.Length > 0 && taps[^1].IsFoldable(starTap)
+                ? sameTapCount + 1
+                : 1;
+            if (sameTapCount > 3)
+            {
+                taps.ElementRef(taps.Length - 3).IsFolded = true;
+            }
             starTap.Init();
             taps.Add(starTap);
+        }
 
-            unsafe
+        if (noteContent.Contains('w'))
+        {
+            var metadata = SlideTableNeo.GetWifiSlide(noteContent[0..3]);
+
+            var judgeQueueCount = metadata.JudgeAreaQueue.Length;
+            loadedSlideAreaArrays.Add(metadata.JudgeAreaQueue);
+            var judgeQueueLCount = metadata.JudgeAreaQueueL.Length;
+            loadedSlideAreaArrays.Add(metadata.JudgeAreaQueueL);
+            var judgeQueueRCount = metadata.JudgeAreaQueueR.Length;
+            loadedSlideAreaArrays.Add(metadata.JudgeAreaQueueR);
+            var slideArrowsCount = metadata.ArrowPoses.Length;
+            loadedSlidePoseArrays.Add(metadata.ArrowPoses);
+
+            var slide = new SlideData
             {
-                var slide = new SlideData
-                {
-                    tapTime = (float)timing.Timing,
-                    time = (float)note.SlideStartTime,
-                    LastFor = (float)note.SlideTime,
-                    startPosition = note.StartPosition,
-                    endPosition = endPos,
-                    speed = NoteSpeed * timing.HSpeed,
-                    sensorOrderIndex = _sensorOrderIndex[note.StartPosition]++,
+                tapTime = (float)timing.Timing,
+                shootTime = (float)note.SlideStartTime,
+                startPos = noteContent[0] - '0',
+                endPos = noteContent[2] - '0',
+                LastFor = (float)note.SlideTime,
+                speed = NoteSpeed * timing.HSpeed,
+                sensorOrderIndex = _sensorOrderIndex[note.StartPosition - 1],
 
-                    isWifi = true,
-                    isJustR = isJustR,
+                isWifi = true,
 
-                    metadata = metadata,
-                    judgeQueue = (SlideArea*)judgeQueueL.AsUnsafeNativeArrayScope().Array.GetUnsafePtr(),
-                    judgeQueueCount = judgeQueueL.Length,
-                    judgeQueueC = (SlideArea*)judgeQueueC.AsUnsafeNativeArrayScope().Array.GetUnsafePtr(),
-                    judgeQueueCCount = judgeQueueC.Length,
-                    judgeQueueR = (SlideArea*)judgeQueueR.AsUnsafeNativeArrayScope().Array.GetUnsafePtr(),
-                    judgeQueueRCount = judgeQueueR.Length,
-                    slideArrows = (SlidePose*)slidePoses.AsUnsafeNativeArrayScope().Array.GetUnsafePtr(),
-                    slideArrowsCount = slidePoses.Length,
-                    okPose = okPose,
+                judgeQueueOffset = areaPoolIndex,
+                judgeQueueCount = judgeQueueCount,
+                judgeQueueLOffset = areaPoolIndex + judgeQueueCount,
+                judgeQueueLCount = judgeQueueLCount,
+                judgeQueueROffset = areaPoolIndex + judgeQueueCount + judgeQueueLCount,
+                judgeQueueRCount = judgeQueueRCount,
+                Const = metadata.SlideConst,
+                slideArrowsOffset = posePoolIndex,
+                slideArrowsCount = slideArrowsCount,
+                noLastArrow = metadata.ConditionalLastArrow,
+                okType = metadata.OkType,
+                okPose = metadata.OkPose,
+                unskippable1 = -1,
+                unskippable2 = -1,
 
-                    isEach = timing.Notes.Length > 1,
-                    isEx = note.IsEx,
-                    isBreak = note.IsSlideBreak,
-                    isMine = note.IsMineSlide,
-                    usingSV = note.UsingSV,
-                    smoothSlideAnime = smoothSlideAnime,
-                    legacySlideLayer = legacySlideLayer,
-                };
-                slide.Init();
-                slides.Add(slide);
-            }
+                isEach = isSlideEach,
+                isEx = false,
+                isBreak = note.IsSlideBreak,
+                isMine = note.IsMineSlide,
+                smoothSlideAnime = SmoothSlideAnime,
+                legacySlideLayer = LegacySlideLayer,
+                mineAutoSlide = MineAutoSlide,
+            };
+            ApplySlideFolding(ref slide, noteContent, lastContent, ref sameSlideCount);
+            slide.Init();
+            slides.Add(slide);
+
+            areaPoolIndex += judgeQueueCount + judgeQueueLCount + judgeQueueRCount;
+            posePoolIndex += slideArrowsCount;
         }
         else
         {
-            var slideShape = DetectShapeFromText(noteContent);
-            if (string.IsNullOrEmpty(slideShape)) return;
-            var isMirror = false;
-            if (slideShape.StartsWith("-"))
+            var slideMetaDatas = GetSlidesFromRawContent(noteContent, out var startPos, out var endPos);
+            var metadata = slideMetaDatas.Count == 1 ? slideMetaDatas[0] : SlideTableNeo.MakeConnSlide(slideMetaDatas);
+
+            var unskippable1 = -1;
+            var unskippable2 = -1;
+            switch (metadata.Flag)
             {
-                isMirror = true;
-                slideShape = slideShape.Substring(1);
+                case SlideFlag.NormalV:
+                    {
+                        unskippable1 = 1;
+                        break;
+                    }
+                case SlideFlag.SpecialV:
+                    {
+                        unskippable1 = 1;
+                        unskippable2 = 3;
+                        break;
+                    }
+                default:
+                    {
+                        if (metadata.JudgeAreaQueue.Length <= 3)
+                            unskippable1 = metadata.JudgeAreaQueue.Length - 2;
+                        break;
+                    }
             }
 
-            var (metadata, judgeQueue, slidePoses, okPose) =
-                SlideTables.GetSlideTableByName(slideShape);
+            var judgeQueueCount = metadata.JudgeAreaQueue.Length;
+            loadedSlideAreaArrays.Add(metadata.JudgeAreaQueue);
+            var slideArrowsCount = metadata.ArrowPoses.Length;
+            loadedSlidePoseArrays.Add(metadata.ArrowPoses);
 
-            var justR = DetectJustType(noteContent, out var ePos);
-
-            // Per legacy InstantiateSlide(): a star Tap is always created at the slide head.
-            var starTapD = new TapData
+            //ignore start/end pos
+            var slide = new SlideData
             {
-                Time = (float)timing.Timing,
-                Key = (SensorType)(note.StartPosition - 1),
-                Speed = NoteSpeed * timing.HSpeed,
-                SensorOrderIndex = _sensorOrderIndex[note.StartPosition]++,
-                IsStar = true,
-                IsDouble = false,
-                RotateSpeed = 0,
-                IsEach = timing.Notes.Length > 1,
-                IsEx = note.IsEx,
-                IsBreak = note.IsSlideBreak,
-                IsMine = note.IsMineSlide,
-                UsingSV = note.UsingSV,
+                tapTime = (float)timing.Timing,
+                shootTime = (float)note.SlideStartTime,
+                startPos = startPos,
+                endPos = endPos,
+                LastFor = (float)note.SlideTime,
+                speed = NoteSpeed * timing.HSpeed,
+                sensorOrderIndex = _sensorOrderIndex[note.StartPosition - 1],
+
+                judgeQueueOffset = areaPoolIndex,
+                judgeQueueCount = judgeQueueCount,
+                Const = metadata.SlideConst,
+                slideArrowsOffset = posePoolIndex,
+                slideArrowsCount = slideArrowsCount,
+                noLastArrow = metadata.ConditionalLastArrow,
+                okType = metadata.OkType,
+                okPose = metadata.OkPose,
+                unskippable1 = unskippable1,
+                unskippable2 = unskippable2,
+
+                isEach = isSlideEach,
+                isEx = false,
+                isBreak = note.IsSlideBreak,
+                isMine = note.IsMineSlide,
+                smoothSlideAnime = SmoothSlideAnime,
+                legacySlideLayer = LegacySlideLayer,
+                mineAutoSlide = MineAutoSlide,
             };
-            starTapD.Init();
-            taps.Add(starTapD);
+            ApplySlideFolding(ref slide, noteContent, lastContent, ref sameSlideCount);
+            slide.Init();
+            slides.Add(slide);
 
-            unsafe
-            {
-                var slideData = new SlideData
-                {
-                    tapTime = (float)timing.Timing,
-                    time = (float)note.SlideStartTime,
-                    LastFor = (float)note.SlideTime,
-                    startPosition = note.StartPosition,
-                    endPosition = ePos,
-                    speed = NoteSpeed * timing.HSpeed,
-                    sensorOrderIndex = _sensorOrderIndex[note.StartPosition]++,
+            areaPoolIndex += judgeQueueCount;
+            posePoolIndex += slideArrowsCount;
+        }
+        return noteContent;
+    }
 
-                    isMirror = isMirror,
-                    isJustR = justR,
+    private void ApplySlideFolding(
+        ref SlideData slide,
+        string noteContent,
+        string lastContent,
+        ref int sameSlideCount)
+    {
+        var matchesPrevious =
+            lastContent == noteContent &&
+            slides.Length > 0 &&
+            slides[^1].IsFoldablePropOnly(slide);
 
-                    metadata = metadata,
-                    judgeQueue = (SlideArea*)judgeQueue.AsUnsafeNativeArrayScope().Array.GetUnsafePtr(),
-                    judgeQueueCount = judgeQueue.Length,
-                    slideArrows = (SlidePose*)slidePoses.AsUnsafeNativeArrayScope().Array.GetUnsafePtr(),
-                    slideArrowsCount = slidePoses.Length,
-                    okPose = okPose,
-
-                    isEach = timing.Notes.Length > 1,
-                    isEx = note.IsEx,
-                    isBreak = note.IsSlideBreak,
-                    isMine = note.IsMineSlide,
-                    usingSV = note.UsingSV,
-                    smoothSlideAnime = smoothSlideAnime,
-                    legacySlideLayer = legacySlideLayer,
-                };
-                slideData.Init();
-                slides.Add(slideData);
-            }
+        sameSlideCount = matchesPrevious ? sameSlideCount + 1 : 1;
+        if (sameSlideCount > 3)
+        {
+            slides.ElementRef(slides.Length - 3).isFolded = true;
         }
     }
 
     // ============== Slide shape detection ==============
-
-    private static string DetectShapeFromText(string content)
+    public static string RemoveBracketContent(string s)
     {
-        int getRelativeEndPos(int startPos, int endPos)
+        var sb = new StringBuilder(s.Length);
+        int depth = 0;
+
+        foreach (var c in s)
         {
-            endPos = endPos - startPos;
-            endPos = endPos < 0 ? endPos + 8 : endPos;
-            endPos = endPos > 8 ? endPos - 8 : endPos;
-            return endPos + 1;
+            if (c == '[')
+            {
+                depth++;
+                continue;
+            }
+
+            if (c == ']')
+            {
+                if (depth > 0)
+                    depth--;
+                continue;
+            }
+
+            if (depth == 0)
+                sb.Append(c);
         }
 
-        if (content.Contains('-'))
-        {
-            var str = content.Substring(0, 3);
-            var digits = str.Split('-');
-            if (digits.Length < 2) return "";
-            var startPos = int.Parse(digits[0]);
-            var endPos = int.Parse(digits[1]);
-            endPos = getRelativeEndPos(startPos, endPos);
-            if (endPos < 3 || endPos > 7) return "";
-            return "line" + endPos;
-        }
-        if (content.Contains('>'))
-        {
-            var str = content.Substring(0, 3);
-            var digits = str.Split('>');
-            if (digits.Length < 2) return "";
-            var startPos = int.Parse(digits[0]);
-            var endPos = int.Parse(digits[1]);
-            endPos = getRelativeEndPos(startPos, endPos);
-            if (IsUpperHalf(startPos)) return "circle" + endPos;
-            endPos = MirrorKeys(endPos);
-            return "-circle" + endPos;
-        }
-        if (content.Contains('<'))
-        {
-            var str = content.Substring(0, 3);
-            var digits = str.Split('<');
-            if (digits.Length < 2) return "";
-            var startPos = int.Parse(digits[0]);
-            var endPos = int.Parse(digits[1]);
-            endPos = getRelativeEndPos(startPos, endPos);
-            if (!IsUpperHalf(startPos)) return "circle" + endPos;
-            endPos = MirrorKeys(endPos);
-            return "-circle" + endPos;
-        }
-        if (content.Contains('^'))
-        {
-            var str = content.Substring(0, 3);
-            var digits = str.Split('^');
-            if (digits.Length < 2) return "";
-            var startPos = int.Parse(digits[0]);
-            var endPos = int.Parse(digits[1]);
-            endPos = getRelativeEndPos(startPos, endPos);
-            if (endPos == 1 || endPos == 5) return "";
-            if (endPos < 5) return "circle" + endPos;
-            if (endPos > 5) return "-circle" + MirrorKeys(endPos);
-        }
-        if (content.Contains('v'))
-        {
-            var str = content.Substring(0, 3);
-            var digits = str.Split('v');
-            if (digits.Length < 2) return "";
-            var startPos = int.Parse(digits[0]);
-            var endPos = int.Parse(digits[1]);
-            endPos = getRelativeEndPos(startPos, endPos);
-            if (endPos == 5) return "";
-            return "v" + endPos;
-        }
-        if (content.Contains("pp"))
-        {
-            var str = content.Substring(0, 4);
-            var digits = str.Split('p');
-            if (digits.Length < 3) return "";
-            var startPos = int.Parse(digits[0]);
-            var endPos = int.Parse(digits[2]);
-            endPos = getRelativeEndPos(startPos, endPos);
-            return "ppqq" + endPos;
-        }
-        if (content.Contains("qq"))
-        {
-            var str = content.Substring(0, 4);
-            var digits = str.Split('q');
-            if (digits.Length < 3) return "";
-            var startPos = int.Parse(digits[0]);
-            var endPos = int.Parse(digits[2]);
-            endPos = getRelativeEndPos(startPos, endPos);
-            endPos = MirrorKeys(endPos);
-            return "-ppqq" + endPos;
-        }
-        if (content.Contains('p'))
-        {
-            var str = content.Substring(0, 3);
-            var digits = str.Split('p');
-            if (digits.Length < 2) return "";
-            var startPos = int.Parse(digits[0]);
-            var endPos = int.Parse(digits[1]);
-            endPos = getRelativeEndPos(startPos, endPos);
-            return "pq" + endPos;
-        }
-        if (content.Contains('q'))
-        {
-            var str = content.Substring(0, 3);
-            var digits = str.Split('q');
-            if (digits.Length < 2) return "";
-            var startPos = int.Parse(digits[0]);
-            var endPos = int.Parse(digits[1]);
-            endPos = getRelativeEndPos(startPos, endPos);
-            endPos = MirrorKeys(endPos);
-            return "-pq" + endPos;
-        }
-        if (content.Contains('s'))
-        {
-            var str = content.Substring(0, 3);
-            var digits = str.Split('s');
-            if (digits.Length < 2) return "";
-            var startPos = int.Parse(digits[0]);
-            var endPos = int.Parse(digits[1]);
-            endPos = getRelativeEndPos(startPos, endPos);
-            if (endPos != 5) return "";
-            return "s";
-        }
-        if (content.Contains('z'))
-        {
-            var str = content.Substring(0, 3);
-            var digits = str.Split('z');
-            if (digits.Length < 2) return "";
-            var startPos = int.Parse(digits[0]);
-            var endPos = int.Parse(digits[1]);
-            endPos = getRelativeEndPos(startPos, endPos);
-            if (endPos != 5) return "";
-            return "-s";
-        }
-        if (content.Contains('V'))
-        {
-            var str = content.Substring(0, 4);
-            var digits = str.Split('V');
-            if (digits.Length < 2) return "";
-            var startPos = int.Parse(digits[0]);
-            var turnPos = int.Parse(digits[1][0].ToString());
-            var endPos = int.Parse(digits[1][1].ToString());
-            turnPos = getRelativeEndPos(startPos, turnPos);
-            endPos = getRelativeEndPos(startPos, endPos);
-            if (turnPos == 7)
-            {
-                if (endPos < 2 || endPos > 5) return "";
-                return "L" + endPos;
-            }
-            if (turnPos == 3)
-            {
-                if (endPos < 5) return "";
-                return "-L" + MirrorKeys(endPos);
-            }
-            return "";
-        }
-        return "";
+        return sb.ToString();
     }
 
-    private static bool DetectJustType(string content, out int endPos)
+    private static IList<SlideMetadata> GetSlidesFromRawContent(ReadOnlySpan<char> rawContent,
+        out int startPos, out int endPos)
     {
-        if (content.Contains('>'))
-        {
-            var str = content.Substring(0, 3);
-            var digits = str.Split('>');
-            var startPos = int.Parse(digits[0]);
-            endPos = int.Parse(digits[1]);
-            return IsUpperHalf(startPos);
-        }
-        if (content.Contains('<'))
-        {
-            var str = content.Substring(0, 3);
-            var digits = str.Split('<');
-            var startPos = int.Parse(digits[0]);
-            endPos = int.Parse(digits[1]);
-            return !IsUpperHalf(startPos);
-        }
-        if (content.Contains('^'))
-        {
-            var str = content.Substring(0, 3);
-            var digits = str.Split('^');
-            var startPos = int.Parse(digits[0]);
-            endPos = int.Parse(digits[1]);
-            endPos = endPos - startPos;
-            endPos = endPos < 0 ? endPos + 8 : endPos;
-            endPos = endPos > 8 ? endPos - 8 : endPos;
-            if (endPos < 4) { endPos = int.Parse(digits[1]); return true; }
-            if (endPos > 4) { endPos = int.Parse(digits[1]); return false; }
-        }
-        else if (content.Contains('V'))
-        {
-            var str = content.Substring(0, 4);
-            var digits = str.Split('V');
-            endPos = int.Parse(digits[1][1].ToString());
-            return IsRightHalf(endPos);
-        }
-        else if (content.Contains('w'))
-        {
-            var str = content.Substring(0, 3);
-            endPos = int.Parse(str.Substring(2, 1));
-            return IsUpperHalf(endPos);
-        }
-        else
-        {
-            if (content.Contains("qq") || content.Contains("pp"))
-                endPos = int.Parse(content.Substring(3, 1));
-            else
-                endPos = int.Parse(content.Substring(2, 1));
-            return IsRightHalf(endPos);
-        }
-        endPos = 0;
-        return true;
-    }
+        startPos = endPos = rawContent[0] - '0';
+        var slideMetadatas = new List<SlideMetadata>(rawContent.Length / 2);
 
-    private static bool IsUpperHalf(int key) { return key == 7 || key == 8 || key == 1 || key == 2; }
-    private static bool IsRightHalf(int key) { return key >= 1 && key <= 4; }
-    private static int MirrorKeys(int key)
-    {
-        return key switch
+        int lastKey = -1;
+        ReadOnlySpan<char> lastShape = string.Empty;
+        bool isSlideCode = false;
+        for (var i = 0; i < rawContent.Length; i++)
         {
-            1 => 1,
-            2 => 8,
-            3 => 7,
-            4 => 6,
-            5 => 5,
-            6 => 4,
-            7 => 3,
-            8 => 2,
-            _ => 1,
-        };
+            var c = rawContent[i];
+
+            if (c is '[')
+            {
+                var endIdx = rawContent[i..].IndexOf(']');
+                if (endIdx == -1) return slideMetadatas;
+
+                i += endIdx;
+                continue;
+            }
+
+            if (c is >= '0' and <= '8')
+            {
+                if (isSlideCode)
+                {
+                    var curKey = c - '0';
+                    if (lastKey != -1 && lastShape != string.Empty)
+                    {
+                        var shape = $"{lastKey}{lastShape.ToString()}{curKey}";
+                        slideMetadatas.Add(SlideTableNeo.MakeCustomSlide(shape));
+                        lastShape = string.Empty;
+                    }
+                    lastKey = curKey;
+                    endPos = curKey;
+                    isSlideCode = false;
+                }
+                else if (lastShape.Length == 1 && lastShape[0] == 'V')
+                {
+                    if (i + 1 >= rawContent.Length)
+                        return slideMetadatas;
+                    var VKey = c - '0';
+                    var curKey = rawContent[i + 1] - '0';
+                    i++;
+                    if (lastKey != -1 && lastShape != string.Empty)
+                    {
+                        var shape = $"{lastKey}{lastShape.ToString()}{VKey}{curKey}";
+                        slideMetadatas.Add(SlideTableNeo.GetStandardSlide(shape));
+                        lastShape = string.Empty;
+                    }
+                    lastKey = curKey;
+                    endPos = curKey;
+                }
+                else
+                {
+                    var curKey = c - '0';
+                    if (lastKey != -1 && !lastShape.IsEmpty)
+                    {
+                        if (lastShape.Length == 1 && lastShape[0] == '^')
+                            lastShape = TranslateAutoSlide(lastKey, curKey);
+                        var shape = $"{lastKey}{lastShape.ToString()}{curKey}";
+                        slideMetadatas.Add(SlideTableNeo.GetStandardSlide(shape));
+                        lastShape = string.Empty;
+                    }
+                    lastKey = curKey;
+                }
+            }
+            else if (c is '>' or '<' or '^' or 'v' or '-' or 'V' or 's' or 'z')
+            {
+                lastShape = c.ToString();
+            }
+            else if (c is 'p' or 'q')
+            {
+                if (i + 1 < rawContent.Length && rawContent[i + 1] == c)
+                {
+                    lastShape = new string(c, 2);
+                    i++;
+                }
+                else
+                {
+                    lastShape = c.ToString();
+                }
+            }
+            else if (SlideCodeParser.CommandChars.Contains(c))
+            {
+                var endIdx = rawContent[i..].IndexOf('K');
+                if (endIdx == -1)
+                    return slideMetadatas;
+
+                endIdx += i;
+                lastShape = rawContent[i..(endIdx + 1)];
+                isSlideCode = true;
+                i = endIdx;
+            }
+        }
+
+        return slideMetadatas;
+
+
+        static string TranslateAutoSlide(int from, int to)
+        {
+            int cw = (to - from + 8) % 8;   // 顺时针距离
+            int ccw = (from - to + 8) % 8;  // 逆时针距离
+
+            if (from is 1 or 2 or 7 or 8)
+            {
+                if (cw < ccw)
+                    return ">";
+                else if (ccw < cw)
+                    return "<";
+            }
+            else if (from is 3 or 4 or 5 or 6)
+            {
+                if (cw < ccw)
+                    return "<";
+                else if (ccw < cw)
+                    return ">";
+            }
+
+            throw new Exception("CNM");
+        }
     }
 }

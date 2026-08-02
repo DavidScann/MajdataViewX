@@ -2,17 +2,21 @@ Shader "Custom/NoteLine"
 {
     SubShader
     {
-        Tags { "Queue"="Transparent" "RenderType"="Transparent" }
+        Tags { "Queue"="Transparent" "RenderType"="Transparent" "RenderPipeline"="UniversalPipeline" }
         Pass
         {
+            Name "SRPDefaultUnlit"
+            Tags { "LightMode"="SRPDefaultUnlit" }
             Blend One OneMinusSrcAlpha
             ZWrite Off
             Cull Off
             HLSLPROGRAM
+            #pragma target 4.5
             #pragma vertex vert
             #pragma fragment frag
-            #include "UnityCG.cginc"
-            sampler2D _MainTex;
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            TEXTURE2D(_MainTex);
+            SAMPLER(sampler_MainTex);
 
             struct LineRenderData
             {
@@ -24,11 +28,11 @@ Shader "Custom/NoteLine"
 
             StructuredBuffer<LineRenderData> _NoteBuffer;
             StructuredBuffer<float4> _SpriteRects;
-            float _AtlasSize;
+            float2 _AtlasSize;
             float _PixelsPerUnit;
 
             struct appdata { float4 vertex : POSITION; float2 uv : TEXCOORD0; };
-            struct v2f   { float4 pos : SV_POSITION; float2 uv : TEXCOORD0; uint id : TEXCOORD1; };
+            struct v2f   { float4 pos : SV_POSITION; float2 uv : TEXCOORD0; float4 rect : TEXCOORD1; };
 
             v2f vert(appdata v, uint id : SV_InstanceID)
             {
@@ -39,18 +43,16 @@ Shader "Custom/NoteLine"
                 float2 p = v.vertex.xy * note.scale * worldSize;
                 float s = sin(note.angRad); float c = cos(note.angRad);
                 float2 r = float2(p.x*c - p.y*s, p.x*s + p.y*c);
-                o.pos = UnityObjectToClipPos(float4(r, 0, 1));
+                o.pos = TransformObjectToHClip(float3(r, 0));
                 o.uv = v.uv;
-                o.id = id;
+                o.rect = rect;
                 return o;
             }
 
             float4 frag(v2f i) : SV_Target
             {
-                LineRenderData note = _NoteBuffer[i.id];
-                float4 rect = _SpriteRects[note.spriteId];
-                float2 uv = lerp(rect.xy, rect.zw, i.uv);
-                float4 col = tex2D(_MainTex, uv);
+                float2 uv = lerp(i.rect.xy, i.rect.zw, i.uv);
+                float4 col = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uv);
                 col.rgb *= col.a; // premultiply (color = white by default)
                 return col;
             }

@@ -1,13 +1,10 @@
 #region
 
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using Cysharp.Threading.Tasks;
+using Cysharp.Text;
 using MajSimai;
 using TMPro;
 using UnityEngine;
-using UnityEngine.UI;
 
 using static MajCtx;
 
@@ -15,6 +12,13 @@ using static MajCtx;
 
 public partial class ObjectCounter : MonoBehaviour
 {
+    private static readonly Utf16PreparedFormat<double> AchievementFormat =
+        ZString.PrepareUtf16<double>("{0:0.0000}%");
+    private static readonly Utf16PreparedFormat<long> IntegerFormat =
+        ZString.PrepareUtf16<long>("{0}");
+
+    private Utf16ValueStringBuilder outputBuilder = ZString.CreateStringBuilder();
+
     [SerializeField]
     Color AchievementDudColor;
     [SerializeField]
@@ -31,13 +35,13 @@ public partial class ObjectCounter : MonoBehaviour
     [SerializeField]
     private GameObject legacyUIRoot;
     [SerializeField]
-    private Text timeDisplay;
+    private TextMeshProUGUI timeDisplay;
     [SerializeField]
-    private Text objectCount;
+    private TextMeshProUGUI objectCount;
     [SerializeField]
-    private Text objectRate;
+    private TextMeshProUGUI objectRate;
     [SerializeField]
-    private Text judgeResultCount;
+    private TextMeshProUGUI judgeResultCount;
 
     //Trg UI
     [SerializeField]
@@ -63,11 +67,26 @@ public partial class ObjectCounter : MonoBehaviour
 
     //Main Output
     [SerializeField]
-    private Text statusAchievement;
+    private TextMeshProUGUI statusAchievement;
     [SerializeField]
-    private Text statusCombo;
+    private TextMeshProUGUI statusCombo;
     [SerializeField]
-    private Text statusDXScore;
+    private TextMeshProUGUI statusDXScore;
+    [SerializeField]
+    private TextMeshProUGUI headerAchievement;
+    [SerializeField]
+    private TextMeshProUGUI headerCombo;
+    [SerializeField]
+    private TextMeshProUGUI headerDXScore;
+
+    [SerializeField]
+    private TMP_FontAsset LegacyUIComboFont;
+    [SerializeField]
+    private TMP_FontAsset TrgUIComboFont;
+    [SerializeField]
+    private TMP_FontAsset LegacyUIComboHeaderFont;
+    [SerializeField]
+    private TMP_FontAsset TrgUIComboHeaderFont;
 
     public void StartOutput(BgInfoDisplay mode, UIType type)
     {
@@ -97,6 +116,7 @@ public partial class ObjectCounter : MonoBehaviour
                 statusDXScore.gameObject.SetActive(false);
                 break;
             case BgInfoDisplay.DXScore:
+            case BgInfoDisplay.DXScore_Dec:
                 statusCombo.gameObject.SetActive(false);
                 statusAchievement.gameObject.SetActive(false);
                 statusDXScore.gameObject.SetActive(true);
@@ -104,12 +124,15 @@ public partial class ObjectCounter : MonoBehaviour
         }
         if (type is UIType.TrgUI)
         {
-            switch (_inputManager.Mode)
+            switch (NoteHelper.AutoPlayMode)
             {
                 case AutoPlayMode.Enable:
                     objAutoMode.text = "ENABLED\nNONE";
                     break;
-                case AutoPlayMode.DJAuto:
+                case AutoPlayMode.DJAutoButton:
+                    objAutoMode.text = "ENABLED\nDJAuto (Btn)";
+                    break;
+                case AutoPlayMode.DJAutoSensor:
                     objAutoMode.text = "ENABLED\nDJAuto";
                     break;
                 case AutoPlayMode.Random:
@@ -128,6 +151,13 @@ public partial class ObjectCounter : MonoBehaviour
                     CurrentUIType = type;
                     legacyUIRoot.SetActive(true);
                     trgUIRoot.SetActive(false);
+
+                    statusAchievement.font = LegacyUIComboFont;
+                    headerAchievement.font = LegacyUIComboHeaderFont;
+                    statusCombo.font = LegacyUIComboFont;
+                    headerCombo.font = LegacyUIComboHeaderFont;
+                    statusDXScore.font = LegacyUIComboFont;
+                    headerDXScore.font = LegacyUIComboHeaderFont;
                     break;
                 }
             case UIType.TrgUI:
@@ -135,32 +165,58 @@ public partial class ObjectCounter : MonoBehaviour
                     CurrentUIType = type;
                     legacyUIRoot.SetActive(false);
                     trgUIRoot.SetActive(true);
+
+                    statusAchievement.font = TrgUIComboFont;
+                    headerAchievement.font = TrgUIComboHeaderFont;
+                    statusCombo.font = TrgUIComboFont;
+                    headerCombo.font = TrgUIComboHeaderFont;
+                    statusDXScore.font = TrgUIComboFont;
+                    headerDXScore.font = TrgUIComboHeaderFont;
                     break;
                 }
         }
     }
 
-    public async UniTask ReportMeterBpmAsync(SimaiChart chart)
+    public void ReportMeterBpm(SimaiChart chart)
     {
-        await UniTask.RunOnThreadPool(() =>
+        meterList.Clear();
+        bpmList.Clear();
+
+        foreach (var timing in chart.CommaTimings)
         {
-            foreach (var timing in chart.CommaTimings)
+            var lastNum = 0;
+            var lastDeno = 0;
+            if (meterList.Count > 0)
             {
-                var (lastNum, lastDeno) = meterList.LastOrDefault().Value;
-                if (timing.SignatureNumerator != lastNum || timing.SignatureDenominator != lastDeno)
-                    meterList.TryAdd(timing.Timing, (timing.SignatureNumerator, timing.SignatureDenominator));
-                if (timing.Bpm != bpmList.LastOrDefault().Value)
-                    bpmList.TryAdd(timing.Timing, timing.Bpm);
+                var lastMeter = meterList[^1];
+                lastNum = lastMeter.Numerator;
+                lastDeno = lastMeter.Denominator;
             }
-        });
-        float min, max;
-        min = max = bpmList.FirstOrDefault().Value;
-        foreach (var bpm in bpmList.Values)
+
+            if (timing.SignatureNumerator != lastNum || timing.SignatureDenominator != lastDeno)
+                meterList.Add((
+                    timing.Timing,
+                    timing.SignatureNumerator,
+                    timing.SignatureDenominator));
+
+            var lastBpm = bpmList.Count > 0 ? bpmList[^1].Bpm : 0;
+            if (timing.Bpm != lastBpm)
+                bpmList.Add((timing.Timing, timing.Bpm));
+        }
+
+        var min = bpmList.Count > 0 ? bpmList[0].Bpm : 0;
+        var max = min;
+        foreach (var (_, bpm) in bpmList)
         {
             if (bpm < min) min = bpm;
             if (bpm > max) max = bpm;
         }
-        objBpmRange.text = $"{min} ～ {max}";
+
+        outputBuilder.Clear();
+        outputBuilder.Append(min);
+        outputBuilder.Append(" ～ ");
+        outputBuilder.Append(max);
+        SetOutputText(objBpmRange);
     }
 
     private void UpdateOutput()
@@ -176,43 +232,49 @@ public partial class ObjectCounter : MonoBehaviour
         {
             case BgInfoDisplay.Combo:
                 {
-                    statusCombo.text = combo > 0 ?
-                        combo.ToString() : string.Empty;
+                    outputBuilder.Clear();
+                    if (combo > 0)
+                        IntegerFormat.FormatTo(ref outputBuilder, combo);
+                    SetOutputText(statusCombo);
                 }
                 break;
             case BgInfoDisplay.Achievement_101:
                 {
-                    statusAchievement.text = $"{accRate[2]:0.0000}%";
-                    UpdateAchievementColor(accRate[2], statusAchievement);
+                    UpdateAchievement(accRate[2]);
                 }
                 break;
             case BgInfoDisplay.Achievement_100:
                 {
-                    statusAchievement.text = $"{accRate[3]:0.0000}%";
-                    UpdateAchievementColor(accRate[3], statusAchievement);
+                    UpdateAchievement(accRate[3]);
                 }
                 break;
             case BgInfoDisplay.Achievement:
                 {
-                    statusAchievement.text = $"{accRate[4]:0.0000}%";
-                    UpdateAchievementColor(accRate[4], statusAchievement);
+                    UpdateAchievement(accRate[4]);
                 }
                 break;
             case BgInfoDisplay.AchievementClassical:
                 {
-                    statusAchievement.text = $"{accRate[0]:0.0000}%";
-                    UpdateAchievementColor(accRate[0], statusAchievement);
+                    UpdateAchievement(accRate[0]);
                 }
                 break;
             case BgInfoDisplay.AchievementClassical_100:
                 {
-                    statusAchievement.text = $"{accRate[1]:0.0000}%";
-                    UpdateAchievementColor(accRate[1], statusAchievement);
+                    UpdateAchievement(accRate[1]);
                 }
                 break;
             case BgInfoDisplay.DXScore:
                 {
-                    statusDXScore.text = (totalDXScore + lostDXScore).ToString();
+                    outputBuilder.Clear();
+                    IntegerFormat.FormatTo(ref outputBuilder, curDXScore);
+                    SetOutputText(statusDXScore);
+                }
+                break;
+            case BgInfoDisplay.DXScore_Dec:
+                {
+                    outputBuilder.Clear();
+                    IntegerFormat.FormatTo(ref outputBuilder, totalDXScore + lostDXScore);
+                    SetOutputText(statusDXScore);
                 }
                 break;
             case BgInfoDisplay.S_Border:
@@ -234,7 +296,16 @@ public partial class ObjectCounter : MonoBehaviour
                 }
                 break;
         }
-        void UpdateAchievementColor(double rate, Text textElement)
+
+        void UpdateAchievement(double rate)
+        {
+            outputBuilder.Clear();
+            AchievementFormat.FormatTo(ref outputBuilder, rate);
+            SetOutputText(statusAchievement);
+            UpdateAchievementColor(rate);
+        }
+
+        void UpdateAchievementColor(double rate)
         {
             var newColor = rate switch
             {
@@ -244,26 +315,24 @@ public partial class ObjectCounter : MonoBehaviour
                 _ => AchievementDudColor
             };
 
-            if (textElement.color != newColor)
-            {
-                textElement.color = newColor;
-            }
-
-            var headerElement = textElement.transform.GetChild(0).GetComponent<Text>();
-            if (headerElement.color != newColor)
-            {
-                headerElement.color = newColor;
-            }
+            if (statusAchievement.color != newColor)
+                statusAchievement.color = newColor;
+            if (headerAchievement.color != newColor)
+                headerAchievement.color = newColor;
         }
 
-        void UpdateBorder(double rate, Text textElement)
+        void UpdateBorder(double rate, TextMeshProUGUI textElement)
         {
             if (rate <= 0)
             {
                 textElement.gameObject.SetActive(false);
                 return;
             }
-            textElement.text = $"{rate:0.0000}%";
+
+            textElement.gameObject.SetActive(true);
+            outputBuilder.Clear();
+            AchievementFormat.FormatTo(ref outputBuilder, rate);
+            SetOutputText(textElement);
         }
     }
 
@@ -271,72 +340,143 @@ public partial class ObjectCounter : MonoBehaviour
     {
         if (CurrentUIType is UIType.Legacy)
         {
-            objectCount.text = string.Format(
-                "TAP: {0} / {5}\n" +
-                "HOD: {1} / {6}\n" +
-                "SLD: {2} / {7}\n" +
-                "TOH: {3} / {8}\n" +
-                "BRK: {4} / {9}\n" +
-                "ALL: {10} / {11}\n" +
-                "MOD: {12}",
-                TapFinishedCount, HoldFinishedCount, SlideFinishedCount, TouchFinishedCount, BreakFinishedCount,
-                TapSum, HoldSum, SlideSum, TouchSum, BreakSum,
-                NoteFinishedCount, NoteSum,
-                _inputManager.Mode
-            );
+            outputBuilder.Clear();
+            outputBuilder.Append("TAP: ");
+            outputBuilder.Append(TapFinishedCount);
+            outputBuilder.Append(" / ");
+            outputBuilder.Append(TapSum);
+            outputBuilder.Append("\nHOD: ");
+            outputBuilder.Append(HoldFinishedCount);
+            outputBuilder.Append(" / ");
+            outputBuilder.Append(HoldSum);
+            outputBuilder.Append("\nSLD: ");
+            outputBuilder.Append(SlideFinishedCount);
+            outputBuilder.Append(" / ");
+            outputBuilder.Append(SlideSum);
+            outputBuilder.Append("\nTOH: ");
+            outputBuilder.Append(TouchFinishedCount);
+            outputBuilder.Append(" / ");
+            outputBuilder.Append(TouchSum);
+            outputBuilder.Append("\nBRK: ");
+            outputBuilder.Append(BreakFinishedCount);
+            outputBuilder.Append(" / ");
+            outputBuilder.Append(BreakSum);
+            outputBuilder.Append("\nALL: ");
+            outputBuilder.Append(NoteFinishedCount);
+            outputBuilder.Append(" / ");
+            outputBuilder.Append(NoteSum);
+            outputBuilder.Append("\nMOD: ");
+            outputBuilder.Append(NoteHelper.AutoPlayMode switch
+            {
+                AutoPlayMode.Enable => "Enable",
+                AutoPlayMode.DJAutoButton => "DJAuto (Btn)",
+                AutoPlayMode.DJAutoSensor => "DJAuto",
+                AutoPlayMode.Random => "Random",
+                AutoPlayMode.Disable => "Disable",
+                _ => "INVALID"
+            });
+            SetOutputText(objectCount);
 
-            objectRate.text = string.Format(
-                "FiNALE  Rate:\n" +
-                $"{ClassicRateFromCount:000.00}   %\n" +
-                "DELUXE Rate:\n" +
-                $"{DeluxeRateFromCount:000.0000} % "
-            );
+            outputBuilder.Clear();
+            outputBuilder.Append("FiNALE  Rate:\n");
+            outputBuilder.Append(ClassicRateFromCount, "000.00");
+            outputBuilder.Append("   %\nDELUXE Rate:\n");
+            outputBuilder.Append(DeluxeRateFromCount, "000.0000");
+            outputBuilder.Append(" % ");
+            SetOutputText(objectRate);
 
-            judgeResultCount.text = $"{cPerfectCount}\n" +
-                                    $"{perfectCount}\n" +
-                                    $"{greatCount}\n" +
-                                    $"{goodCount}\n" +
-                                    $"{missCount}\n\n" +
-                                    $"{fastCount}\n" +
-                                    $"{lateCount}";
+            outputBuilder.Clear();
+            outputBuilder.Append(cPerfectCount);
+            outputBuilder.Append('\n');
+            outputBuilder.Append(perfectCount);
+            outputBuilder.Append('\n');
+            outputBuilder.Append(greatCount);
+            outputBuilder.Append('\n');
+            outputBuilder.Append(goodCount);
+            outputBuilder.Append('\n');
+            outputBuilder.Append(missCount);
+            outputBuilder.Append("\n\n");
+            outputBuilder.Append(fastCount);
+            outputBuilder.Append('\n');
+            outputBuilder.Append(lateCount);
+            SetOutputText(judgeResultCount);
         }
         else
         {
-            objNoteCount.text =
-                $"{TapFinishedCount} / {TapSum}\n" +
-                $"{HoldFinishedCount} / {HoldSum}\n" +
-                $"{SlideFinishedCount} / {SlideSum}\n" +
-                $"{TouchFinishedCount} / {TouchSum}\n" +
-                $"{BreakFinishedCount} / {BreakSum}\n" +
-                $"{NoteFinishedCount} / {NoteSum}";
+            outputBuilder.Clear();
+            outputBuilder.Append(TapFinishedCount);
+            outputBuilder.Append(" / ");
+            outputBuilder.Append(TapSum);
+            outputBuilder.Append('\n');
+            outputBuilder.Append(HoldFinishedCount);
+            outputBuilder.Append(" / ");
+            outputBuilder.Append(HoldSum);
+            outputBuilder.Append('\n');
+            outputBuilder.Append(SlideFinishedCount);
+            outputBuilder.Append(" / ");
+            outputBuilder.Append(SlideSum);
+            outputBuilder.Append('\n');
+            outputBuilder.Append(TouchFinishedCount);
+            outputBuilder.Append(" / ");
+            outputBuilder.Append(TouchSum);
+            outputBuilder.Append('\n');
+            outputBuilder.Append(BreakFinishedCount);
+            outputBuilder.Append(" / ");
+            outputBuilder.Append(BreakSum);
+            outputBuilder.Append('\n');
+            outputBuilder.Append(NoteFinishedCount);
+            outputBuilder.Append(" / ");
+            outputBuilder.Append(NoteSum);
+            SetOutputText(objNoteCount);
 
             var rate = DeluxeRateFromCount;
             var intPart = (int)rate;
             var fracPart = (rate - intPart) * 10000;
-            objRate.text =
-                $"<size=7.5>{intPart:0}</size><size=5.7>.{fracPart:0000}</size> <size=3.7>%</size>";
+            outputBuilder.Clear();
+            outputBuilder.Append("<size=7.5>");
+            outputBuilder.Append(intPart);
+            outputBuilder.Append("</size><size=5.7>.");
+            outputBuilder.Append(fracPart, "0000");
+            outputBuilder.Append("</size> <size=3.7>%</size>");
+            SetOutputText(objRate);
 
-            objJudgeResult.text =
-                $"{cPerfectCount}\n{perfectCount}\n{greatCount}\n{goodCount}\n{missCount}";
+            outputBuilder.Clear();
+            outputBuilder.Append(cPerfectCount);
+            outputBuilder.Append('\n');
+            outputBuilder.Append(perfectCount);
+            outputBuilder.Append('\n');
+            outputBuilder.Append(greatCount);
+            outputBuilder.Append('\n');
+            outputBuilder.Append(goodCount);
+            outputBuilder.Append('\n');
+            outputBuilder.Append(missCount);
+            SetOutputText(objJudgeResult);
 
-            objCombo.text = combo.ToString();
+            outputBuilder.Clear();
+            IntegerFormat.FormatTo(ref outputBuilder, combo);
+            SetOutputText(objCombo);
 
             var time = _timeProvider.NoteTime;
             for (var i = meterList.Count - 1; i >= 0; i--)
             {
-                var meter = meterList.ElementAt(i);
-                if (meter.Key > time) continue;
+                var meter = meterList[i];
+                if (meter.Timing > time) continue;
 
-                var (num, deno) = meter.Value;
-                objMeter.text = $"{num}\n{deno}";
+                outputBuilder.Clear();
+                outputBuilder.Append(meter.Numerator);
+                outputBuilder.Append('\n');
+                outputBuilder.Append(meter.Denominator);
+                SetOutputText(objMeter);
                 break;
             }
             for (var i = bpmList.Count - 1; i >= 0; i--)
             {
-                var bpm = bpmList.ElementAt(i);
-                if (bpm.Key > time) continue;
+                var bpm = bpmList[i];
+                if (bpm.Timing > time) continue;
 
-                objBpm.text = bpm.Value.ToString();
+                outputBuilder.Clear();
+                outputBuilder.Append(bpm.Bpm);
+                SetOutputText(objBpm);
                 break;
             }
         }
@@ -349,22 +489,37 @@ public partial class ObjectCounter : MonoBehaviour
         var second = timeNowInt - 60 * minute;
         double milli = (ctime - timeNowInt) * 10000;
 
-        string target;
+        outputBuilder.Clear();
         if (ctime < 0)
         {
             minute = Math.Abs(minute);
             second = Math.Abs(second);
             milli = Math.Abs(milli);
-            target = string.Format("-{0}:{1:00}.{2:000}", minute, second, milli / 10);
+            outputBuilder.Append('-');
+            outputBuilder.Append(minute);
+            outputBuilder.Append(':');
+            outputBuilder.Append(second, "00");
+            outputBuilder.Append('.');
+            outputBuilder.Append(milli / 10, "000");
         }
         else
         {
-            target = string.Format("{0}:{1:00}.{2:0000}", minute, second, milli);
+            outputBuilder.Append(minute);
+            outputBuilder.Append(':');
+            outputBuilder.Append(second, "00");
+            outputBuilder.Append('.');
+            outputBuilder.Append(milli, "0000");
         }
 
         if (CurrentUIType == UIType.Legacy)
-            timeDisplay.text = target;
+            SetOutputText(timeDisplay);
         else
-            objTime.text = target;
+            SetOutputText(objTime);
+    }
+
+    private void SetOutputText(TMP_Text text)
+    {
+        var chars = outputBuilder.AsArraySegment();
+        text.SetCharArray(chars.Array, chars.Offset, chars.Count);
     }
 }

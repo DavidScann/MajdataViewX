@@ -12,8 +12,9 @@ using MajSimai;
 using Unity.Properties;
 using UnityEngine;
 
+using Notes.SlideUtils;
+
 using static MajCtx;
-using static MajBurst;
 
 #endregion
 
@@ -34,13 +35,15 @@ public class PlayManager : MonoBehaviour
     private static string _errMsg = string.Empty;
     private static float _thisFrameSec = 0f;
 
-    private static double? _trackTime;
-    private static double? _offset;
+    private static Thread? _audioManagerThread;
+    private static int _audioManagerThreadRunning;
+
     private static float? _speed;
 
     private static MajViewSetting _setting = new();
 
     private SpriteRenderer bgCover;
+    private SpriteRenderer bgOutsideCover;
     private GameObject canvasButtons;
 
     private void Awake()
@@ -52,25 +55,43 @@ public class PlayManager : MonoBehaviour
     private void Start()
     {
         IsReloading = false;
-        _ = new AudioManager();
 
-        bgCover = GameObject.Find("BackgroundCover").GetComponent<SpriteRenderer>();
+        bgCover = GameObject.Find("BgCover").GetComponent<SpriteRenderer>();
+        bgOutsideCover = GameObject.Find("BgOutsideCover").GetComponent<SpriteRenderer>();
         canvasButtons = GameObject.Find("CanvasButtons");
 
-        new Thread(() =>
+        _ = new AudioManager();
+        Volatile.Write(ref _audioManagerThreadRunning, 1);
+        _audioManagerThread = new Thread(() =>
         {
-            while (true)
+            while (Volatile.Read(ref _audioManagerThreadRunning) != 0)
             {
                 _audioManager.OnUpdate();
                 Thread.Sleep(1);
             }
-        }).Start();
+        })
+        {
+            IsBackground = true,
+            Name = "Majdata SFX Trigger",
+            Priority = System.Threading.ThreadPriority.AboveNormal,
+        };
+        _audioManagerThread.Start();
+
         MajBurst.__DataSS.Data = new MajBurstData
         {
-            TimeData = new TimeDataB(),
-            InputData = new InputDataB()
+            TimeData = new(),
+            InputData = new(),
+            MultTouchHandler = new(),
+            GlobalRandom = new((uint)"MajdataX".GetHashCode()),
         };
+        //MajBurst.TimeData.Init();
         MajBurst.InputData.Init();
+        MajBurst.MultTouchHandler.Init();
+
+        _ = new InputManager();
+
+
+        SlideTableNeo.InitializeStandardSlideTable();
 
         _state = CheckIsLoaded() ? ViewStatus.Loaded : ViewStatus.Idle;
     }
@@ -126,7 +147,6 @@ public class PlayManager : MonoBehaviour
         {
             _errMsg = ex.ToString();
             _state = ViewStatus.Error;
-            throw;
         }
     }
 
@@ -140,7 +160,9 @@ public class PlayManager : MonoBehaviour
         while (_state is ViewStatus.Busy)
             await UniTask.Yield();
 
-        var lastState = _state;
+        if (_state is not ViewStatus.Loaded)
+            return false;
+
         _state = ViewStatus.Busy;
         try
         {
@@ -152,17 +174,16 @@ public class PlayManager : MonoBehaviour
             var noteSpeed = (float)(107.25 / (71.4184491 * Mathf.Pow(_setting.TapSpeed + 0.9975f, -0.985558604f)));
             var touchSpeed = _setting.TouchSpeed;
             var ignoreOffset = startAt - offset;
+            //simulate
+            NoteHelper.AutoPlayModeSS.Data = _setting.AutoMode;
+            _inputManager.ShowHand = _setting.ShowHand;
             //UI
             _objectCounter.StartOutput(_setting.ComboStatusType, _setting.UIType);
-            _effectManager.SetDisplayMode(_setting.JudgeDisplayMode);
-            //simulate
-            _inputManager.Mode = _setting.AutoMode;
-            NoteHelper.AutoPlayModeSS.Data = _setting.AutoMode;
-            _inputManager.ButtonFirst = _setting.ButtonFirst;
             //bg
             bgCover.color = new Color(0f, 0f, 0f, _setting.BackgroundDim);
+            bgOutsideCover.color = new Color(0f, 0f, 0f, _setting.BackgroundOutsideDim);
             _bgManager.ShowBG();
-            _bgManager.ShowVideo();
+            _bgManager.ShowVideo(_setting.ResizeBg);
             //sfx
             var clockCount = 0;
             if (playmode != PlaybackMode.Normal)
@@ -179,7 +200,9 @@ public class PlayManager : MonoBehaviour
                         _chart, ignoreOffset,
                         title, artist, difficulty,
                         noteSpeed, touchSpeed,
-                        _setting.SmoothSlideAnime, _setting.LegacySlideLayer);
+                        _setting.SmoothSlideAnime,
+                        _setting.LegacySlideLayer,
+                        _setting.MineAutoSlide);
 
                     _allPerfectManager.enabled = false;
                     _timeProvider.SetStartTime(startAt, offset, speed, playmode);
@@ -190,7 +213,9 @@ public class PlayManager : MonoBehaviour
                         _chart, ignoreOffset,
                         title, artist, difficulty,
                         noteSpeed, touchSpeed,
-                        _setting.SmoothSlideAnime, _setting.LegacySlideLayer);
+                        _setting.SmoothSlideAnime,
+                        _setting.LegacySlideLayer,
+                        _setting.MineAutoSlide);
 
                     _bgManager.PlaySongDetail();
                     _audioManager.noteSfxPlaybackRequests[AudioManager.TRACK_START] = true; //track_start
@@ -210,15 +235,16 @@ public class PlayManager : MonoBehaviour
                         _chart, ignoreOffset,
                         title, artist, difficulty,
                         noteSpeed, touchSpeed,
-                        _setting.SmoothSlideAnime, _setting.LegacySlideLayer);
+                        _setting.SmoothSlideAnime,
+                        _setting.LegacySlideLayer,
+                        _setting.MineAutoSlide);
 
                     _bgManager.PlaySongDetail();
 
                     _allPerfectManager.enabled = true;
                     _state = ViewStatus.Playing;
                     _screenRecorder.StartRecording(maidataPath,
-                        _setting.OutputFps,
-                        _setting.ResizeBg,
+                        _setting.OutputFps, _setting.ExportQuality,
                         () =>
                         {
                             _timeProvider.SetStartTime(startAt, offset, speed, playmode, _setting.OutputFps);
@@ -240,7 +266,7 @@ public class PlayManager : MonoBehaviour
         {
             _errMsg = ex.ToString();
             _state = ViewStatus.Error;
-            throw;
+            return false;
         }
     }
 
@@ -253,6 +279,9 @@ public class PlayManager : MonoBehaviour
     {
         while (_state is ViewStatus.Busy)
             await UniTask.Yield();
+
+        if (_state is not ViewStatus.Paused)
+            return;
 
         _state = ViewStatus.Busy;
         try
@@ -272,7 +301,6 @@ public class PlayManager : MonoBehaviour
         {
             _errMsg = ex.ToString();
             _state = ViewStatus.Error;
-            throw;
         }
     }
 
@@ -280,6 +308,9 @@ public class PlayManager : MonoBehaviour
     {
         while (_state is ViewStatus.Busy)
             await UniTask.Yield();
+
+        if (_state is not ViewStatus.Playing)
+            return;
 
         _state = ViewStatus.Busy;
         try
@@ -299,7 +330,6 @@ public class PlayManager : MonoBehaviour
         {
             _errMsg = ex.ToString();
             _state = ViewStatus.Error;
-            throw;
         }
     }
 
@@ -307,6 +337,9 @@ public class PlayManager : MonoBehaviour
     {
         while (_state is ViewStatus.Busy)
             await UniTask.Yield();
+
+        if (_state is not (ViewStatus.Playing or ViewStatus.Paused or ViewStatus.Error))
+            return;
 
         _state = ViewStatus.Busy;
         try
@@ -326,7 +359,6 @@ public class PlayManager : MonoBehaviour
         {
             _errMsg = ex.ToString();
             _state = ViewStatus.Error;
-            throw;
         }
     }
 
@@ -338,7 +370,6 @@ public class PlayManager : MonoBehaviour
         _noteManager.ResetState();
         _timeProvider.ResetState();
         _audioManager.ResetState();
-        _screenRecorder.ResetState();
         _bgManager.ResetState();
         _effectManager.ResetState();
         _inputManager.ResetState();
@@ -353,7 +384,16 @@ public class PlayManager : MonoBehaviour
 
     private void OnDestroy()
     {
+        Volatile.Write(ref _audioManagerThreadRunning, 0);
+        if (_audioManagerThread is { IsAlive: true } &&
+            _audioManagerThread != Thread.CurrentThread)
+        {
+            _audioManagerThread.Join();
+        }
+        _audioManagerThread = null;
+
         _audioManager.OnDestroy();
+        _inputManager.OnDestroy();
         MajBurst.InputData.Dispose();
     }
 }

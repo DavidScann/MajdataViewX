@@ -1,4 +1,3 @@
-#pragma warning disable CS8500
 using System.Threading;
 using MajSimai;
 using Unity.Burst;
@@ -7,7 +6,7 @@ using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
 
-using static NoteSkinManager;
+using static SkinManager;
 using static MajBurst;
 
 [BurstCompile]
@@ -33,52 +32,113 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
     public EffectData* JudgeEffectRequests;
     public NativeList<ReportResultEntry>.ParallelWriter ReportResults;
 
+    [ReadOnly] public NativeArray<int> touchGroupTotalCounts;
+    [NativeDisableParallelForRestriction] public NativeArray<int> touchGroupJudgedCounts;
+    [ReadOnly] public NativeArray<CoverResult> touchGroupCoverResults;
+    [ReadOnly] public NativeArray<int> touchHoldGroupTotalCounts;
+    [ReadOnly] public NativeArray<int> touchHoldGroupPressedCounts;
+    [ReadOnly] public NativeArray<CoverResult> touchHoldGroupCoverResults;
+
     public void Execute(int index)
     {
-        var th = touchHolds[index];
+        ref var th = ref touchHolds.ElementRef(index);
         TransformUpdate(ref th, index);
         AutoplayUpdate(ref th);
         CheckUpdate(ref th);
-        touchHolds[index] = th;
     }
 
     private void TransformUpdate(ref TouchHoldData th, int index)
     {
+        if (th.isFolded) return;
         if (th.isEnd) return;
 
-        var timing = TimeData.NoteTime - th.time;
-        var fakeTiming = TimeData.FakeNoteTime - TimeData.GetPositionAtTime(th.time);
+        // sortTime (30 bits): [19 bits: time (87 mins wrap)] + [11 bits: index tie-breaker (2048 wrap)]
+        var timePart = ((uint)math.max(0f, th.time * 100f)) & 0x7FFFF;
+        var sortTime = ((timePart << 11) | (uint)(index & 0x7FF)) & 0x3FFFFFFF;
+
+        var timing = th.usingSV
+            ? TimeData.FakeNoteTime - TimeData.GetPositionAtTime(th.time)
+            : TimeData.NoteTime - th.time;
+        var lastFor = th.usingSV
+            ? TimeData.GetPositionAtTime(th.time + th.LastFor) - TimeData.GetPositionAtTime(th.time)
+            : th.LastFor;
 
         var wholeDuration = 3.209385682f * math.pow(th.speed, -0.9549621752f);
         var moveDuration = 0.8f * wholeDuration;
         var displayDuration = 0.2f * wholeDuration;
 
-        var pow = -math.exp(8f * (fakeTiming * 0.43f / moveDuration) - 0.85f) + 0.42f;
+        var pow = -math.exp(8f * (timing * 0.43f / moveDuration) - 0.85f) + 0.42f;
         var fanDist = math.clamp(pow, 0f, 0.4f);
-        th.fanProgress = fanDist;
 
-        if (-fakeTiming <= wholeDuration && -fakeTiming > moveDuration)
+        if (-timing > wholeDuration)
         {
-            var fadeT = (-fakeTiming - moveDuration) / displayDuration;
-            th.fanAlpha = math.saturate(fadeT);
-            th.show = true;
+            return;
         }
-        else if (-fakeTiming < moveDuration)
+        else if (-timing <= wholeDuration && -timing > moveDuration)
+        {
+            var fadeT = (-timing - moveDuration) / displayDuration;
+            th.fanAlpha = math.saturate(1f - fadeT);
+        }
+        else if (-timing <= moveDuration)
         {
             th.fanAlpha = 1f;
-            th.show = true;
         }
 
-        var fakeLastFor = TimeData.FakeNoteTime - TimeData.GetPositionAtTime(th.time + th.LastFor);
-        if (th.isJudged && fakeTiming >= 0)
+        if (timing >= 0)
         {
-            th.maskProgress = math.clamp((fakeLastFor - fakeTiming) / math.max(fakeLastFor, 0.001f), 0f, 1f);
+            th.maskProgress = math.clamp(timing / lastFor, 0f, 1f);
         }
 
-        if (!th.show) return;
+        // ---- hold effect ----
+        NoteHelper.SetHoldEffect(JudgeEffectRequests,
+            (int)th.sensor + 8,
+            th.judgeGrade,
+            th.isHolding
+        );
+        // NoteHelper.SetTouchHoldSound(SfxRequests, th.isHolding);
+
+        // ---- hold on/off skin ----
+        if (th.LastFor > (NoteHelper.HOLD_HEAD_IGNORE_LENGTH_SEC + NoteHelper.HOLD_TAIL_IGNORE_LENGTH_SEC) && // 忽略短hold
+            timing >= NoteHelper.HOLD_HEAD_IGNORE_LENGTH_SEC &&    // 忽略头6帧
+            !th.isMine)          // 忽略mine
+        {
+            if (th.isHolding)
+            {
+                th.borderSprite = th._borderOnSpriteCache;
+            }
+            else
+            {
+                th.borderSprite = NoteSp.TOUCH_HOLD_BORDER_MISS;
+            }
+        }
 
         var centerPos = th.centerPos;
-        var color = new float4(th.fanAlpha, th.fanAlpha, th.fanAlpha, 1);
+        var color = new float4(1, 1, 1, th.fanAlpha);
+
+        var radius = 0.226f + fanDist;
+        var c = math.SQRT2 / 2f;
+        var fanPositions = stackalloc float2[4]
+        {
+            centerPos + new float2(radius * c, radius * c),
+            centerPos + new float2(radius * c, -radius * c),
+            centerPos + new float2(-radius * c, -radius * c),
+            centerPos + new float2(-radius * c, radius * c),
+        };
+
+        for (int i = 0; i < 4; i++)
+        {
+            var tIdx = Interlocked.Increment(ref *SimpleWriteCountPtr) - 1;
+            simpleRender[tIdx] = new SimpleRenderData
+            {
+                pos = fanPositions[i],
+                angRad = math.radians(135f - 90f * i),
+                scale = new float2(1, 1),
+                spriteId = th.fanSprite + (uint)i,
+                color = color,
+                brightness = 1f,
+                sort = (sortTime << 2) | 0x3,
+            };
+        }
 
         var ptIdx = Interlocked.Increment(ref *SimpleWriteCountPtr) - 1;
         simpleRender[ptIdx] = new SimpleRenderData
@@ -88,37 +148,9 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
             scale = new float2(1, 1),
             spriteId = th.pointSprite,
             color = color,
-            sort = (uint)index,
+            brightness = 1f,
+            sort = (sortTime << 2) | 0x2,
         };
-
-        var fanPositions = stackalloc float2[4]
-        {
-            centerPos + new float2(0.226f + fanDist, 0),
-            centerPos + new float2(0, 0.226f + fanDist),
-            centerPos + new float2(-(0.226f + fanDist), 0),
-            centerPos + new float2(0, -(0.226f + fanDist)),
-        };
-
-        for (int i = 0; i < 4; i++)
-        {
-            var tIdx = Interlocked.Increment(ref *SimpleWriteCountPtr) - 1;
-            simpleRender[tIdx] = new SimpleRenderData
-            {
-                pos = fanPositions[i],
-                angRad = 0,
-                scale = new float2(1, 1),
-                spriteId = th.fanSprite + (uint)math.min(i, 3),
-                color = color,
-                sort = (uint)index + (uint)i * 0x10000u,
-            };
-        }
-
-        float maskCutoff = 0;
-        if (th.isJudged && fakeTiming >= 0)
-        {
-            var progress = (fakeLastFor - fakeTiming) / math.max(fakeLastFor, 0.001f);
-            maskCutoff = math.clamp(0.91f * (1f - progress), 0f, 1f);
-        }
 
         var borderIdx = Interlocked.Increment(ref *MaskWriteCountPtr) - 1;
         maskRender[borderIdx] = new MaskRenderData
@@ -128,113 +160,155 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
             scale = new float2(1, 1),
             spriteId = th.borderSprite,
             color = color,
-            maskCutoff = maskCutoff,
-            sort = (uint)index + 8u * 0x10000u,
+            maskCutoff = th.maskProgress,
+            sort = sortTime,
         };
     }
 
     private void AutoplayUpdate(ref TouchHoldData th)
     {
         if (th.isEnd) return;
+        if (NoteHelper.AutoPlayMode is AutoPlayMode.Disable) return;
 
         var timing = TimeData.NoteTime - th.time;
-        if (timing < -0.01f) return;
+        if (timing < InputManager.DJAUTO_AUTOPLAY_START_SEC) return;
 
         switch (NoteHelper.AutoPlayMode)
         {
             case AutoPlayMode.Enable:
-                if (!th.isJudged)
+                if (!th.isHeadJudged)
                 {
-                    th.judgeGrade = th.isMine ? JudgeGrade.Miss : JudgeGrade.Perfect;
-                    th.isJudged = true;
+                    th.judgeGrade = JudgeGrade.LateCritical;
+                    th.isHeadJudged = true;
                     th.isHolding = true;
                     th.headDiff = 0;
                 }
-                if (th.isJudged)
+                if (th.isHeadJudged)
                 {
                     var remaining = math.max(th.LastFor - timing, 0);
                     if (remaining <= 0)
                     {
                         th.holdPercent = 1f;
                         EndNote(ref th);
+                        return;
                     }
                 }
                 break;
             case AutoPlayMode.Random:
-                if (!th.isJudged)
+                if (!th.isHeadJudged)
                 {
-                    var gradeIndex = new Random(114514).NextInt(1, 14);
+                    var grade = (JudgeGrade)GlobalRandom.NextInt((int)JudgeGrade.FastGood, (int)JudgeGrade.Miss);
                     th.judgeGrade = th.isMine
-                        ? (gradeIndex > 4 ? JudgeGrade.Miss : JudgeGrade.Perfect)
-                        : (JudgeGrade)gradeIndex;
-                    th.isJudged = true;
+                        ? (grade < JudgeGrade.FastPerfect3rd ? JudgeGrade.Miss : JudgeGrade.LateCritical)
+                        : grade;
+                    th.isHeadJudged = true;
                     th.isHolding = true;
-                    th.headDiff = gradeIndex > 7 ? 11.4514f : -11.4514f;
+                    th.headDiff = grade >= JudgeGrade.LateCritical ? 11.4514f : -11.4514f;
                 }
-                if (th.isJudged)
+                if (th.isHeadJudged)
                 {
                     var remaining = math.max(th.LastFor - timing, 0);
                     if (remaining <= 0)
                     {
                         th.holdPercent = 1f;
                         EndNote(ref th);
+                        return;
                     }
                 }
                 break;
-            case AutoPlayMode.DJAuto:
+            case AutoPlayMode.DJAutoButton:
+            case AutoPlayMode.DJAutoSensor:
                 if (th.isMine) break;
-                MajBurst.InputData.SetSensorState(th.sensor, true);
+                // 头判阶段用 touchGroup 覆盖(和 touch 共享)，hold 阶段用 touchHoldGroup 覆盖
+                if (!th.isHeadJudged)
+                {
+                    if (th.headCoverageId >= 0)
+                        InputData.DJAutoAddGroupCoverage(touchGroupCoverResults[th.headCoverageId], timing);
+                }
+                else if (math.max(th.LastFor - timing, 0) > 0)
+                {
+                    if (th.coverageId >= 0)
+                        InputData.DJAutoAddGroupCoverage(touchHoldGroupCoverResults[th.coverageId]);
+                }
                 break;
         }
     }
 
     private void CheckUpdate(ref TouchHoldData th)
     {
-        if (NoteHelper.AutoPlayMode is AutoPlayMode.Enable or AutoPlayMode.Random) return;
         if (th.isEnd) return;
+        if (!NoteHelper.IsSimulated) return;
 
         var noteTime = TimeData.NoteTime;
         var timing = noteTime - th.time;
 
-        if (!th.isJudged)
+        if (th.isMine)
         {
-            if (th.isMine && timing >= 0.016667f)
-            {
-                th.judgeGrade = JudgeGrade.Perfect;
-                th.isJudged = true;
-                th.isHolding = true;
-                return;
-            }
-            if (!th.isMine && timing > 0.316667f)
+            var mineClicked = InputData.GetSensorState(th.sensor).IsPadDown;
+            if (mineClicked &&
+                timing >= -NoteHelper.TOUCH_JUDGE_GOOD_AREA_MSEC / 1000f)
             {
                 th.judgeGrade = JudgeGrade.Miss;
-                th.isJudged = true;
-                th.headDiff = 0.316667f;
+                th.isHeadJudged = true;
+                th.headDiff = timing;
+                EndNote(ref th);
+                return;
+            }
+            if (timing >= th.LastFor)
+            {
+                th.judgeGrade = JudgeGrade.LateCritical;
+                th.isHeadJudged = true;
+                th.holdPercent = 1f;
+                EndNote(ref th);
+            }
+            return;
+        }
+
+        if (!th.isHeadJudged)
+        {
+            if (timing > NoteHelper.TOUCH_JUDGE_GOOD_AREA_MSEC / 1000f)
+            {
+                th.judgeGrade = JudgeGrade.Miss;
+                th.isHeadJudged = true;
+                th.headDiff = NoteHelper.TOUCH_JUDGE_GOOD_AREA_MSEC / 1000f;
                 return;
             }
 
-            var stateOn = MajBurst.InputData.GetSensorState(th.sensor).Status;
-            if (!stateOn) return;
+            var clicked = InputData.GetSensorState(th.sensor).IsPadDown;
+            if (th.headGroupId != -1)
+            {
+                if (touchGroupJudgedCounts[th.headGroupId] * 2 > touchGroupTotalCounts[th.headGroupId])
+                {
+                    clicked = true;
+                }
+            }
 
-            var diffMSec = math.abs(timing * 1000);
-            if (diffMSec > 150f && timing < 0) return;
-            if (!MajBurst.InputData.CanJudgeSensor(th.sensor, th.sensorOrderIndex)) return;
+            if (!clicked) return;
+            var diffMSec = timing * 1000;
+            if (diffMSec < -NoteHelper.TOUCH_JUDGE_SEG_1ST_PERFECT_MSEC) return;
+            if (!InputData.CanJudgeSensor(th.sensor, th.sensorOrderIndex)) return;
 
-            th.judgeGrade = diffMSec <= 150 ? JudgeGrade.Perfect
-                : diffMSec <= 200 ? JudgeGrade.LatePerfect2nd
-                : diffMSec <= 250 ? JudgeGrade.LateGreat
-                : JudgeGrade.LateGood;
-            th.isJudged = true;
-            th.isHolding = true;
+            th.judgeGrade = NoteHelper.GetTouchJudge(timing);
+            th.isHeadJudged = true;
             th.headDiff = timing;
+
+            if (th.headGroupId != -1 && th.judgeGrade != JudgeGrade.Miss)
+            {
+                unsafe
+                {
+                    var ptr = (int*)touchGroupJudgedCounts.GetUnsafePtr();
+                    Interlocked.Increment(ref ptr[th.headGroupId]);
+                }
+            }
+
             return;
         }
 
         var remainingTime = math.max(th.LastFor - timing, 0);
         if (remainingTime <= 0)
         {
-            var realityHT = th.LastFor - 0.45f - math.max(th.headDiff, 0f);
-            var pct = math.clamp((realityHT - th.playerIdleTime) / math.max(realityHT, 0.001f), 0f, 1f);
+            var realityHT = th.LastFor - (NoteHelper.TOUCH_HOLD_HEAD_IGNORE_LENGTH_SEC + NoteHelper.TOUCH_HOLD_TAIL_IGNORE_LENGTH_SEC) - math.max(th.headDiff, 0f);
+            var pct = math.clamp((realityHT - th.playerIdleTimeSec) / math.max(realityHT, 0.001f), 0f, 1f);
             th.holdPercent = pct;
             if (!th.isMine)
                 th.judgeGrade = NoteHelper.GetHoldFinalGrade(th.judgeGrade, pct, realityHT);
@@ -244,15 +318,43 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
 
         if (!TimeData.IsStart) return;
 
-        var on = MajBurst.InputData.GetSensorState(th.sensor).Status;
+        var on = InputData.GetSensorState(th.sensor).Status;
 
-        if (timing > 0.25f && remainingTime > 0.2f && !on)
-            th.playerIdleTime += TimeData.deltaTime;
+        if (th.groupId != -1)
+        {
+            if (touchHoldGroupPressedCounts[th.groupId] * 2 > touchHoldGroupTotalCounts[th.groupId])
+            {
+                on = true;
+            }
+        }
+
+        if (on)
+        {
+            th.lastReleaseTimeSec = 0f;
+            th.isHolding = true;
+
+            // touchHoldGroupPressedCount在外部处理
+        }
+        else
+        {
+            if (th.lastReleaseTimeSec <= NoteHelper.DELUXE_HOLD_RELEASE_IGNORE_TIME_SEC)
+            {
+                th.lastReleaseTimeSec += TimeData.deltaTime;
+                th.isHolding = true;
+            }
+            else
+            {
+                th.isHolding = false;
+                if (timing > NoteHelper.TOUCH_HOLD_HEAD_IGNORE_LENGTH_SEC && remainingTime > NoteHelper.TOUCH_HOLD_TAIL_IGNORE_LENGTH_SEC)
+                    th.playerIdleTimeSec += TimeData.deltaTime;
+            }
+        }
     }
 
     private void EndNote(ref TouchHoldData th)
     {
-        NoteHelper.SetTouchHoldSound(SfxRequests, false);
+        // NoteHelper.SetTouchHoldSound(SfxRequests, false);
+        th.isHolding = false;
 
         if (th.isBreak)
             NoteHelper.PlayTapSound(SfxRequests,
@@ -262,16 +364,26 @@ public unsafe struct TouchHoldUpdateJob : IJobParallelFor
                 false,
                 th.headDiff
             );
-        else if (th.isHanabi)
-            NoteHelper.PlayHanabiSound(SfxRequests);
         else
-            NoteHelper.PlayTouchSound(SfxRequests);
+            NoteHelper.PlayTouchSound(SfxRequests,
+                th.judgeGrade,
+                th.isMine,
+                th.isHanabi
+            );
+        NoteHelper.PlayTouchEffect(JudgeEffectRequests,
+            (int)th.sensor + 8,
+            th.judgeGrade,
+            th.isBreak,
+            th.isHanabi,
+            th.isMine
+        );
+        NoteHelper.ReportResult(ReportResults,
+            th.judgeGrade,
+            th.isBreak,
+            SimaiNoteType.TouchHold
+        );
 
-        NoteHelper.PlayEffect(JudgeEffectRequests, (int)th.sensor, th.judgeGrade, th.isBreak);
-        NoteHelper.ReportResult(ReportResults, th.judgeGrade, th.isBreak, SimaiNoteType.TouchHold);
-
-        MajBurst.InputData.NextTouch(th.sensor);
-        th.show = false;
+        InputData.NextTouch(th.sensor);
         th.isEnd = true;
     }
 }

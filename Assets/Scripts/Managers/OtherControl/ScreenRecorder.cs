@@ -2,8 +2,10 @@
 
 using System;
 using System.IO;
+using System.Runtime.InteropServices;
 using Cysharp.Threading.Tasks;
 using JetBrains.Annotations;
+using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -13,6 +15,31 @@ using static MajCtx;
 
 public class ScreenRecorder : MonoBehaviour
 {
+    private const string EncoderDllName = "RenderingOut";
+
+    [DllImport(EncoderDllName, CallingConvention = CallingConvention.StdCall)]
+    private static extern IntPtr video_encoder_create(
+        int quality,
+        int width,
+        int height,
+        int fps,
+        [MarshalAs(UnmanagedType.LPStr)] string filename);
+
+    [DllImport(EncoderDllName, CallingConvention = CallingConvention.StdCall)]
+    private static extern int video_encoder_submit_frame(
+        IntPtr encoder,
+        IntPtr nativeTexture);
+
+    [DllImport(EncoderDllName, CallingConvention = CallingConvention.StdCall)]
+    private static extern int video_encoder_mux_audio(
+        IntPtr encoder,
+        IntPtr pcmData,
+        int pcmLengthBytes,
+        int sampleRate,
+        int channels);
+
+    [DllImport(EncoderDllName, CallingConvention = CallingConvention.StdCall)]
+    private static extern void video_encoder_free(IntPtr encoder);
 
     Text errText;
 
@@ -29,9 +56,17 @@ public class ScreenRecorder : MonoBehaviour
     }
 
     public async UniTask StartRecording(string maidataPath,
-        int fps, bool resizeBg, [CanBeNull] Action onStart = null)
+        int fps, ExportQuality quality, [CanBeNull] Action onStart = null)
     {
-        await CaptureScreen(maidataPath, fps, resizeBg, onStart);
+        QualitySettings.vSyncCount = 0;
+        try
+        {
+            await CaptureScreen(maidataPath, fps, quality, onStart);
+        }
+        finally
+        {
+            QualitySettings.vSyncCount = 1;
+        }
     }
 
     public void StopRecording()
@@ -46,170 +81,193 @@ public class ScreenRecorder : MonoBehaviour
     }
 
     private async UniTask CaptureScreen(string maidataPath,
-        int fps, bool resizeBg, [CanBeNull] Action onStart = null)
+        int fps, ExportQuality quality, [CanBeNull] Action onStart = null)
     {
-        if (Screen.width % 2 != 0 || Screen.height % 2 != 0)
+        if (fps <= 0)
         {
-            errText.text = $"无法渲染：分辨率 {Screen.width}x{Screen.height} 不是偶数。";
+            errText.text = "Encoding cannot start: Output frame rate must be greater than zero.";
             return;
         }
 
-        // 1. args
-        const string wavName = "temp.wav";
-        const string videoName = "temp.mp4";
+        if (Screen.width % 2 != 0 || Screen.height % 2 != 0)
+        {
+            errText.text = $"Encoding cannot start: Resolution width and height must be even numbers. Current: {Screen.width}x{Screen.height}.";
+            return;
+        }
+
         const string finalName = "out.mp4";
 
-        const string videoCodecArgs = "-c:v libx264 -preset veryfast -crf 18 -pix_fmt yuv420p -movflags +faststart ";
-        const string vfArgs = "-vf vflip ";
-
-        var outArgs =
-            "-hide_banner -y -report " +
-            $"-f rawvideo -pix_fmt rgba -s {Screen.width}x{Screen.height} -r {fps} " +
-            "-i - " +
-            vfArgs +
-            videoCodecArgs +
-            $"\"{videoName}\"";
-
-        var muxArgs =
-            "-hide_banner -y " +
-            $"-i \"{videoName}\" -i \"{wavName}\" " +
-            "-c:v copy -c:a aac -b:a 320k -shortest " +
-            $"\"{finalName}\"";
-
-        // 2. vars
-        var rt = new RenderTexture(Screen.width, Screen.height, 24, RenderTextureFormat.ARGB32);
-        rt.Create();
-        var cpuTex = new Texture2D(Screen.width, Screen.height, TextureFormat.RGBA32, false);
-
         IsRecording = true;
-
-        var isTouchHoldRising = false;
-
-        var deltaTime = 1.0f / fps;
-        var recordingElapsedTime = 0f;
-        var videoEncodeSucceeded = false;
+        var width = Screen.width;
+        var height = Screen.height;
+        var frameDuration = 1.0 / fps;
+        var recordingElapsedTime = 0.0;
+        var outputSucceeded = false;
+        var captureTexture = new RenderTexture(
+            width,
+            height,
+            0,
+            RenderTextureFormat.BGRA32)
+        {
+            name = "Screen Recorder Capture",
+            antiAliasing = 1,
+            useMipMap = false,
+            autoGenerateMips = false
+        };
+        var encoder = IntPtr.Zero;
 
         try
         {
-            // 3. launch ffmpeg pipe
-            var cmd = $"cd \"{maidataPath}\" && ffmpeg {outArgs}";
-            var proc = FFmpegPipe.Spawn(cmd);
-            if (!proc.IsValid)
-            {
-                errText.text = "无法启动 FFmpeg";
-                return;
-            }
+            if (!captureTexture.Create())
+                throw new InvalidOperationException(
+                    "Could not create the screen recorder render target.");
 
-            // 4. prepare
+            var outPath = Path.Combine(maidataPath, finalName);
+            if (File.Exists(outPath)) File.Delete(outPath);
+
+            encoder = video_encoder_create(
+                (int)quality,
+                width,
+                height,
+                fps,
+                outPath);
+            if (encoder == IntPtr.Zero)
+                throw new InvalidOperationException(
+                    "RenderingOut could not create the video encoder.");
+
             onStart?.Invoke();
-            _audioManager.PrepareRecordingBuffer(_timeProvider.AudioTime, _timeProvider.CurrentSpeed);
+            _audioManager.BeginRecordingAudio(_timeProvider.AudioTime, _timeProvider.CurrentSpeed);
 
             while (IsRecording)
             {
-                // 5. recording
                 await UniTask.WaitForEndOfFrame(this);
-                ProcessSfx(deltaTime, recordingElapsedTime, ref isTouchHoldRising);
-                RenderTexture.active = null;
-                cpuTex.ReadPixels(new Rect(0, 0, Screen.width, Screen.height), 0, 0);
-                var raw = cpuTex.GetRawTextureData();
-                if (FFmpegPipe.Write(proc, raw, raw.Length) < 0)
-                    break;
-                recordingElapsedTime += deltaTime;
+                var frameEndTime = recordingElapsedTime + frameDuration;
+                _audioManager.UpdateRecordingAudioFrame(recordingElapsedTime, frameEndTime);
+
+                ScreenCapture.CaptureScreenshotIntoRenderTexture(captureTexture);
+                var nativeTexture = captureTexture.GetNativeTexturePtr();
+                if (nativeTexture == IntPtr.Zero)
+                    throw new InvalidOperationException(
+                        "The screen recorder render target has no native texture.");
+
+                var submitResult = video_encoder_submit_frame(encoder, nativeTexture);
+                if (submitResult < 0)
+                    throw new InvalidOperationException(
+                        $"RenderingOut failed to encode a video frame ({submitResult}).");
+
+                recordingElapsedTime = frameEndTime;
             }
 
-            // 6. clean up
-            FFmpegPipe.ClosePipe(proc);
-            var exitCode = FFmpegPipe.Wait(proc);
-            videoEncodeSucceeded = exitCode == 0;
+            _audioManager.EndRecordingAudio((float)recordingElapsedTime);
+            MuxRecordingAudio(encoder);
+            FreeEncoder(ref encoder);
+            outputSucceeded = true;
+        }
+        catch (Exception e)
+        {
+            Debug.LogException(e);
+            errText.text = $"Encoding failed: {e.Message}";
         }
         finally
         {
+            IsRecording = false;
+            try
+            {
+                FreeEncoder(ref encoder);
+            }
+            catch (Exception ex)
+            {
+                outputSucceeded = false;
+                Debug.LogException(ex);
+                errText.text = $"Finalizing the recording failed: {ex.Message}";
+            }
+
+            _audioManager.ReleaseRecordingAudio();
+            var resultPath = Path.Combine(maidataPath, finalName);
+            if (outputSucceeded && File.Exists(resultPath))
+                OpenFileLocation(resultPath);
+
             RenderTexture.active = null;
-            rt.Release();
-            Destroy(rt);
-            Destroy(cpuTex);
+            captureTexture.Release();
+            Destroy(captureTexture);
         }
-
-        if (!videoEncodeSucceeded)
-        {
-            errText.text = "video encode failed";
-            return;
-        }
-
-        // 7. wav
-        _audioManager.ExportFinalWav(Path.Combine(maidataPath, wavName));
-
-        // 8. mux
-        var muxCmd = $"cd \"{maidataPath}\" && ffmpeg {muxArgs}";
-        var muxProc = FFmpegPipe.SpawnSimple(muxCmd);
-        if (!muxProc.IsValid)
-        {
-            errText.text = "无法启动 Muxing 进程";
-            return;
-        }
-        FFmpegPipe.Wait(muxProc);
-
-        var outPath = Path.Combine(maidataPath, finalName);
-        if (File.Exists(outPath))
-        {
-            OpenFileLocation(outPath);
-        }
-
-        _timeProvider.Pause();
-        _bgManager.PauseVideo();
     }
 
-    private void ProcessSfx(float deltaTime, float recordingElapsedTime, ref bool isTouchHoldRising)
+    private static unsafe void MuxRecordingAudio(IntPtr encoder)
     {
-        if (_audioManager.IsShowingSongDetail)
+        var pcmData = _audioManager.GetRecordingBuffer(out var sampleCount);
+        if (sampleCount == 0)
             return;
 
-        _audioManager.UpdateAnswerSfx();
-        for (var i = 0; i < _audioManager.noteSfxPlaybackRequests.Length; i++)
-        {
-            if (i == AudioManager.TRACK_START) continue;
-
-            if (i == AudioManager.TOUCHHOLD)
-            {
-                var isRequested = _audioManager.noteSfxPlaybackRequests[i];
-                if (isRequested)
-                {
-                    if (!isTouchHoldRising)
-                    {
-                        isTouchHoldRising = true;
-                        _audioManager.TriggerSfxRecording(AudioManager.TOUCHHOLD);
-                    }
-                }
-                else
-                {
-                    if (isTouchHoldRising)
-                    {
-                        isTouchHoldRising = false;
-                        _audioManager.StopSfxRecording(AudioManager.TOUCHHOLD);
-                    }
-                }
-            }
-            else if (_audioManager.noteSfxPlaybackRequests[i])
-            {
-                _audioManager.TriggerSfxRecording(i);
-                _audioManager.noteSfxPlaybackRequests[i] = false;
-            }
-        }
-        _audioManager.UpdateSfxRecording(deltaTime, recordingElapsedTime);
+        var pcmDataPointer = (IntPtr)NativeArrayUnsafeUtility.GetUnsafeReadOnlyPtr(pcmData);
+        var muxResult = video_encoder_mux_audio(
+            encoder,
+            pcmDataPointer,
+            checked(sampleCount * sizeof(float)),
+            _audioManager.SampleRate,
+            _audioManager.Channels);
+        if (muxResult < 0)
+            throw new InvalidOperationException(
+                $"RenderingOut failed to mux the recorded audio ({muxResult}).");
     }
 
+    private static void FreeEncoder(ref IntPtr encoder)
+    {
+        if (encoder == IntPtr.Zero)
+            return;
+
+        var encoderToFree = encoder;
+        encoder = IntPtr.Zero;
+        video_encoder_free(encoderToFree);
+    }
+
+
+
+#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+    private static extern IntPtr ShellExecuteW(
+        IntPtr window,
+        string operation,
+        string file,
+        string parameters,
+        string directory,
+        int showCommand);
+#elif UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX
+    [DllImport("libSystem.dylib", EntryPoint = "system")]
+    private static extern int RunSystemCommand(string command);
+#elif UNITY_EDITOR_LINUX || UNITY_STANDALONE_LINUX
+    [DllImport("libc", EntryPoint = "system")]
+    private static extern int RunSystemCommand(string command);
+#endif
     private static void OpenFileLocation(string filePath)
     {
-#if UNITY_EDITOR_WIN
-        System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{filePath}\"");
-#elif UNITY_EDITOR_OSX
-        System.Diagnostics.Process.Start("open", $"-R \"{filePath}\"");
-#elif UNITY_STANDALONE_WIN
-        FFmpegPipe.SpawnSimple($"explorer /select,\"{filePath}\"");
-#elif UNITY_STANDALONE_OSX
-        FFmpegPipe.SpawnSimple($"open -R \"{filePath}\"");
-#elif UNITY_STANDALONE_LINUX
-        FFmpegPipe.SpawnSimple($"xdg-open \"{Path.GetDirectoryName(filePath)}\"");
+        var fullPath = Path.GetFullPath(filePath);
+
+#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
+        var result = ShellExecuteW(
+            IntPtr.Zero,
+            "open",
+            "explorer.exe",
+            $"/select,\"{fullPath}\"",
+            string.Empty,
+            1);
+        if (result.ToInt64() > 32) return;
+#elif UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX
+        if (RunSystemCommand($"open -R {QuoteShellArgument(fullPath)}") == 0) return;
+#elif UNITY_EDITOR_LINUX || UNITY_STANDALONE_LINUX
+        var linuxDirectory = Path.GetDirectoryName(fullPath);
+        if (linuxDirectory is not null &&
+            RunSystemCommand($"xdg-open {QuoteShellArgument(linuxDirectory)} >/dev/null 2>&1 &") == 0)
+            return;
 #endif
+
+        var directoryPath = Path.GetDirectoryName(fullPath);
+        if (directoryPath is not null)
+            Application.OpenURL(new Uri(directoryPath + Path.DirectorySeparatorChar).AbsoluteUri);
     }
+
+#if UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX || UNITY_EDITOR_LINUX || UNITY_STANDALONE_LINUX
+    private static string QuoteShellArgument(string value) =>
+        $"'{value.Replace("'", "'\"'\"'")}'";
+#endif
 }
