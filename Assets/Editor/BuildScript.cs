@@ -16,7 +16,7 @@ public static class BuildScript
             "StandaloneOSX" => BuildTarget.StandaloneOSX,
             _ => BuildTarget.StandaloneLinux64
         };
-        var outputPath = Environment.GetEnvironmentVariable("BUILD_OUTPUT_PATH") ?? "build/Linux/MajdataView";
+        var outputPath = Environment.GetEnvironmentVariable("BUILD_OUTPUT_PATH") ?? "build/Linux/MajdataViewX";
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(outputPath))!);
 
         // IL2CPP compiler config: "release" (no LTO, ~30s link) or "master" (full LTO, ~5min link, single-threaded)

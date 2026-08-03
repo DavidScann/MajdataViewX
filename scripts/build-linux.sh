@@ -140,21 +140,21 @@ if [[ -z "${SKIP_UNITY:-}" ]]; then
     -logFile '$BUILD_LOG' \
     -buildTarget StandaloneLinux64"
 
-  # Unity 6.3 (6000.3) names the player "MajdataView"; older versions used
-  # "MajdataView.x86_64". Accept either.
+  # The player binary is "MajdataViewX" (matches what the editor launches).
+  # Unity 6.3 (6000.3) omits the ".x86_64" suffix; older versions used it.
   PLAYER_BIN=""
-  for cand in "$UNITY_BUILD_DIR/MajdataView" "$UNITY_BUILD_DIR/MajdataView.x86_64"; do
+  for cand in "$UNITY_BUILD_DIR/MajdataViewX" "$UNITY_BUILD_DIR/MajdataViewX.x86_64"; do
     if [[ -x "$cand" ]]; then PLAYER_BIN="$cand"; break; fi
   done
   [[ -n "$PLAYER_BIN" ]] \
-    || die "Unity build did not produce a MajdataView binary in $UNITY_BUILD_DIR — see $BUILD_LOG"
+    || die "Unity build did not produce a MajdataViewX binary in $UNITY_BUILD_DIR — see $BUILD_LOG"
 
   log "Unity build OK: $UNITY_BUILD_DIR"
 else
   log "SKIP_UNITY set; reusing existing Unity build at $REPO_ROOT/build/Linux/"
   UNITY_BUILD_DIR="$REPO_ROOT/build/Linux"
   PLAYER_BIN=""
-  for cand in "$UNITY_BUILD_DIR/MajdataView" "$UNITY_BUILD_DIR/MajdataView.x86_64"; do
+  for cand in "$UNITY_BUILD_DIR/MajdataViewX" "$UNITY_BUILD_DIR/MajdataViewX.x86_64"; do
     if [[ -x "$cand" ]]; then PLAYER_BIN="$cand"; break; fi
   done
   [[ -n "$PLAYER_BIN" ]] \
@@ -194,11 +194,11 @@ run "rsync -a --exclude='*.pdb' \
       '$EDITOR_PUBLISH_DIR/' '$BUNDLE_DIR/'"
 
 # 4c. Ensure libbassopus.so is in Plugins/AnyCPU/ where BASS expects it
-if check "[[ -f '$BUNDLE_DIR/MajdataView_Data/Plugins/AnyCPU/libbassopus.so' ]]"; then
+if check "[[ -f '$BUNDLE_DIR/MajdataViewX_Data/Plugins/AnyCPU/libbassopus.so' ]]"; then
   log "libbassopus.so already in Plugins/AnyCPU/ ✓"
 else
   warn "libbassopus.so not in Plugins/AnyCPU/ — BASS will not decode Opus"
-  warn "Place it at: $BUNDLE_DIR/MajdataView_Data/Plugins/AnyCPU/libbassopus.so"
+  warn "Place it at: $BUNDLE_DIR/MajdataViewX_Data/Plugins/AnyCPU/libbassopus.so"
 fi
 
 # 4d. Copy bundled assets (Skin + SFX) from the editor's BinaryAssets submodule
@@ -211,18 +211,13 @@ else
 fi
 
 # 4d2. Remove Unity build-only artifacts
-run "rm -rf '$BUNDLE_DIR/MajdataView_BackUpThisFolder_ButDontShipItWithYourGame'"
-run "rm -rf '$BUNDLE_DIR/MajdataView_BurstDebugInformation_DoNotShip'"
+run "rm -rf '$BUNDLE_DIR/MajdataViewX_BackUpThisFolder_ButDontShipItWithYourGame'"
+run "rm -rf '$BUNDLE_DIR/MajdataViewX_BurstDebugInformation_DoNotShip'"
 
-# 4e. Ensure a plain "MajdataView" launcher exists next to the player binary.
-# If the build produced "MajdataView.x86_64", symlink it so callers that
-# expect "MajdataView" still work.
-if ! check "[[ -x '$BUNDLE_DIR/MajdataView' ]]"; then
-  if check "[[ -x '$BUNDLE_DIR/MajdataView.x86_64' ]]"; then
-    run "ln -sf 'MajdataView.x86_64' '$BUNDLE_DIR/MajdataView'"
-  else
-    die "No player launcher (MajdataView) and no MajdataView.x86_64 in bundle"
-  fi
+# 4e. The player binary is already named "MajdataViewX" (what the editor
+# launches). Nothing to alias.
+if ! check "[[ -x '$BUNDLE_DIR/MajdataViewX' ]]"; then
+  die "No player launcher (MajdataViewX) in bundle"
 fi
 
 # 4f. Write a manifest
