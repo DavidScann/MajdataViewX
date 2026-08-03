@@ -193,25 +193,6 @@ public partial class NoteManager
     }
     private void LoadIgnore(in SimaiTimingPoint timing)
     {
-        var holdLength = 0d;
-        foreach (var note in timing.Notes)
-        {
-            if (note.HoldTime > holdLength)
-                holdLength = note.HoldTime;
-
-            if (note.SlideStartTime + note.SlideTime > Ignore)
-            {
-                LoadTiming(timing);
-                return;
-            }
-        }
-
-        if (timing.Timing + holdLength > Ignore)
-        {
-            LoadTiming(timing);
-            return;
-        }
-
         _objectCounter.CountIgnoreNoteCountAsync(timing.Notes);
     }
 

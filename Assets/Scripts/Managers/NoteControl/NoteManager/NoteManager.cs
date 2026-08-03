@@ -27,9 +27,6 @@ public partial class NoteManager : MonoBehaviour
     NativeList<TouchData> touches = new(1024, Allocator.Persistent);
     NativeList<TouchHoldData> touchHolds = new(1024, Allocator.Persistent);
 
-    /// <summary>
-    /// 这个包含touchhold的头判
-    /// </summary>
     NativeList<int> touchGroupTotalCounts = new(256, Allocator.Persistent);
     NativeList<int> touchGroupJudgedCounts = new(256, Allocator.Persistent);
     NativeList<CoverResult> touchGroupCoverResults = new(256, Allocator.Persistent);
