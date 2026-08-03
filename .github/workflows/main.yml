@@ -4,6 +4,7 @@ on: [push]
 jobs:
   build:
     runs-on: ubuntu-latest
+    if: ${{ secrets.UNITY_LICENSE != '' }}
     strategy:
       fail-fast: false
       matrix:

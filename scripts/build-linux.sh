@@ -9,7 +9,7 @@
 #   scripts/build-linux.sh --release --dry-run      # show what would happen
 #
 # Environment overrides:
-#   UNITY_PATH       Path to the Unity editor binary (default: /home/davidscann/Unity/Hub/Editor/6000.3.17f1/Editor/Unity)
+#   UNITY_PATH       Path to the Unity editor binary (default: /home/davidscann/Unity/Hub/Editor/6000.3.19f1/Editor/Unity)
 #   DOTNET_PATH      Path to dotnet (default: dotnet on $PATH)
 #   EDITOR_REPO      Path to MajdataEdit-Neo checkout (default: ../MajdataEdit-Neo-Linux)
 #   BUNDLE_NAME      Output bundle dir name (default: MajdataX-Linux-<VERSION>)
@@ -26,7 +26,7 @@ set -euo pipefail
 # ---------- Defaults ----------
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-UNITY_PATH="${UNITY_PATH:-/home/davidscann/Unity/Hub/Editor/6000.3.17f1/Editor/Unity}"
+UNITY_PATH="${UNITY_PATH:-/home/davidscann/Unity/Hub/Editor/6000.3.19f1/Editor/Unity}"
 DOTNET_PATH="${DOTNET_PATH:-dotnet}"
 EDITOR_REPO="${EDITOR_REPO:-$(cd "$REPO_ROOT/.." && pwd)/MajdataEdit-Neo-Linux}"
 VERSION_BASE="${VERSION_BASE:-v6.0.0-linux}"
@@ -140,14 +140,24 @@ if [[ -z "${SKIP_UNITY:-}" ]]; then
     -logFile '$BUILD_LOG' \
     -buildTarget StandaloneLinux64"
 
-  [[ -f "$UNITY_BUILD_DIR/MajdataView.x86_64" ]] \
-    || die "Unity build did not produce $UNITY_BUILD_DIR/MajdataView.x86_64 — see $BUILD_LOG"
+  # Unity 6.3 (6000.3) names the player "MajdataView"; older versions used
+  # "MajdataView.x86_64". Accept either.
+  PLAYER_BIN=""
+  for cand in "$UNITY_BUILD_DIR/MajdataView" "$UNITY_BUILD_DIR/MajdataView.x86_64"; do
+    if [[ -x "$cand" ]]; then PLAYER_BIN="$cand"; break; fi
+  done
+  [[ -n "$PLAYER_BIN" ]] \
+    || die "Unity build did not produce a MajdataView binary in $UNITY_BUILD_DIR — see $BUILD_LOG"
 
   log "Unity build OK: $UNITY_BUILD_DIR"
 else
   log "SKIP_UNITY set; reusing existing Unity build at $REPO_ROOT/build/Linux/"
   UNITY_BUILD_DIR="$REPO_ROOT/build/Linux"
-  [[ -f "$UNITY_BUILD_DIR/MajdataView.x86_64" ]] \
+  PLAYER_BIN=""
+  for cand in "$UNITY_BUILD_DIR/MajdataView" "$UNITY_BUILD_DIR/MajdataView.x86_64"; do
+    if [[ -x "$cand" ]]; then PLAYER_BIN="$cand"; break; fi
+  done
+  [[ -n "$PLAYER_BIN" ]] \
     || die "SKIP_UNITY set but no existing build at $UNITY_BUILD_DIR"
 fi
 
@@ -191,15 +201,28 @@ else
   warn "Place it at: $BUNDLE_DIR/MajdataView_Data/Plugins/AnyCPU/libbassopus.so"
 fi
 
-# 4d. Remove Unity build-only artifacts
+# 4d. Copy bundled assets (Skin + SFX) from the editor's BinaryAssets submodule
+if check "[[ -d '$EDITOR_REPO/BinaryAssets/Skin' && -d '$EDITOR_REPO/BinaryAssets/SFX' ]]"; then
+  log "Copying BinaryAssets (Skin/SFX) from $EDITOR_REPO"
+  run "cp -a '$EDITOR_REPO/BinaryAssets/Skin' '$EDITOR_REPO/BinaryAssets/SFX' '$BUNDLE_DIR/'"
+else
+  warn "BinaryAssets/Skin or BinaryAssets/SFX missing in $EDITOR_REPO — bundle will lack skin/SFX"
+  warn "Run: git -C '$EDITOR_REPO' submodule update --init --recursive"
+fi
+
+# 4d2. Remove Unity build-only artifacts
 run "rm -rf '$BUNDLE_DIR/MajdataView_BackUpThisFolder_ButDontShipItWithYourGame'"
 run "rm -rf '$BUNDLE_DIR/MajdataView_BurstDebugInformation_DoNotShip'"
 
-# 4e. Strip the .x86_64 suffix on the player binary, leave launcher as 'MajdataView'
-# (we keep the .x86_64 because some users/launchers expect it; just make sure the
-# launcher script exists for the editor to call)
+# 4e. Ensure a plain "MajdataView" launcher exists next to the player binary.
+# If the build produced "MajdataView.x86_64", symlink it so callers that
+# expect "MajdataView" still work.
 if ! check "[[ -x '$BUNDLE_DIR/MajdataView' ]]"; then
-  run "ln -sf 'MajdataView.x86_64' '$BUNDLE_DIR/MajdataView'"
+  if check "[[ -x '$BUNDLE_DIR/MajdataView.x86_64' ]]"; then
+    run "ln -sf 'MajdataView.x86_64' '$BUNDLE_DIR/MajdataView'"
+  else
+    die "No player launcher (MajdataView) and no MajdataView.x86_64 in bundle"
+  fi
 fi
 
 # 4f. Write a manifest
@@ -259,7 +282,7 @@ cd $BUNDLE_NAME
 Built automatically by \`scripts/build-linux.sh\`."
   run "'$GH_BIN' release create '$VERSION' \
     --repo '$(git -C "$REPO_ROOT" config --get remote.origin.url | sed 's|.*github.com[:/]||;s|\.git$||')' \
-    --title 'MajdataEdit-Neo $VERSION' \
+    --title 'MajdataX Linux $VERSION' \
     --notes \"$RELEASE_NOTES\" \
     '$ZIP_PATH#${BUNDLE_NAME}.zip'"
 
