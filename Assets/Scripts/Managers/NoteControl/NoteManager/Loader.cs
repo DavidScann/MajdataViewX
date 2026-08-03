@@ -289,9 +289,16 @@ public partial class NoteManager
 
         CalcEach(timing, out var isNoteEach, out var isSlideEach);
 
-        var nonMineCount = 0;
         var startPositions = stackalloc int[timing.Notes.Length];
+        var nonMineCount = 0;
+
+        var loadedStarIndex = stackalloc int[timing.Notes.Length];
+        var loadedStarCount = stackalloc int[8];
+        var loadedSlideLength = stackalloc float[8];
+        var loadedSlideTime = stackalloc double[8];
+
         bool eachLineUsingSV = false;
+
         string lastSlideContent = string.Empty;
         var sameTapCount = 0;
         var sameHoldCount = 0;
@@ -334,9 +341,17 @@ public partial class NoteManager
                             isSlideEach,
                             lastSlideContent,
                             ref sameTapCount,
-                            ref sameSlideCount);
-                        if (!note.IsMine && !note.IsSlideNoHead)
-                            startPositions[nonMineCount++] = note.StartPosition;
+                            ref sameSlideCount,
+                            ref loadedSlideLength[note.StartPosition - 1],
+                            ref loadedSlideTime[note.StartPosition - 1]);
+                        if (!note.IsSlideNoHead)
+                        {
+                            loadedStarIndex[loadedStarCount[note.StartPosition - 1]++] = taps.Length - 1;
+                            if (!note.IsMine)
+                            {
+                                startPositions[nonMineCount++] = note.StartPosition;
+                            }
+                        }
                         break;
                 }
             }
@@ -346,6 +361,7 @@ public partial class NoteManager
             }
         }
 
+        // each line
         if (nonMineCount > 1)
         {
             for (int i = 0; i < nonMineCount - 1; i++)
@@ -356,9 +372,34 @@ public partial class NoteManager
             }
         }
 
+        // star rotate
+        var curStarCount = 0;
+        for (var pos = 0; pos < 8; pos++)
+        {
+            for (var i = 0; i < loadedStarCount[pos]; i++)
+            {
+                ref var starTap = ref taps.ElementRef(loadedStarIndex[curStarCount + i]);
+                var startPos = (int)starTap.Key;
+                var cnt = loadedStarCount[pos];
+                var length = loadedSlideLength[pos];
+                var time = loadedSlideTime[pos];
+                if (time > 0)
+                {
+                    // RotateSpeed = 1 时是每秒转 180 度
+                    // 官机算法是 转速 = 同头星星总长 / (总时间 * 15 * pi)
+                    // 长度单位像素，时间单位ms，转速单位度/帧，转速最大是 18
+                    // 这里 SlideLength 是 100ppu，SlideTime 是秒
+                    starTap.IsDouble = cnt >= 2;
+                    starTap.RotateSpeed = math.min(6f, length / ((float)time * 2 * math.PI));
+                }
+            }
+            curStarCount += loadedStarCount[pos];
+        }
+
+
+        // touch group
         int touchCount = touches.Length - touchStartIdx;
         int thCount = touchHolds.Length - touchHoldStartIdx;
-
         // touch 头判与 touchhold 头判分开算 group；touchhold 按下 group 另算
         if (touchCount > 0)
         {
@@ -732,43 +773,14 @@ public partial class NoteManager
         bool isSlideEach,
         string lastContent,
         ref int sameTapCount,
-        ref int sameSlideCount)
+        ref int sameSlideCount,
+        ref float loadedSlideLength,
+        ref double loadedSlideTime)
     {
         var noteContent = note.RawContent;
 
         if (!note.IsSlideNoHead)
         {
-            // 统计与当前 slide 同头的所有 slide 的总长和总时间
-            var length = 0.0f;
-            var time = 0.0D;
-            var cnt = 0;
-
-            // 有点丑陋，但能用
-            // 考虑到这个 method 本来就套在一层遍历里，总之是多了很多不必要的遍历
-            // TODO:使之不丑陋
-            foreach (var sn in timing.Notes)
-            {
-                if (sn.Type != SimaiNoteType.Slide) continue;
-                if (sn.IsMineSlide) continue;
-                if (sn.StartPosition != note.StartPosition) continue;
-
-                cnt++;
-                var ct = note.RawContent;
-                var meta = ct.Contains('w')
-                    ? SlideTableNeo.GetWifiSlide(ct[..3])
-                    : SlideTableNeo.MakeConnSlide(GetSlidesFromRawContent(ct, out _, out _));
-                length += meta.SlideLength;
-                time += sn.SlideTime;
-            }
-            // 注意上面的遍历也把当前正在处理的 slide 遍历到了
-            var isDouble = cnt >= 2;
-
-            // RotateSpeed = 1 时是每秒转 180 度
-            // 官机算法是 转速 = 同头星星总长 / (总时间 * 15 * pi)
-            // 长度单位像素，时间单位ms，转速单位度/帧，转速最大是 18
-            // 这里 SlideLength 是 100ppu，SlideTime 是秒
-            var rotateSpeed = math.min(6f, length / ((float)time * 2 * math.PI));
-
             var starTap = new TapData
             {
                 Time = (float)timing.Timing,
@@ -777,8 +789,8 @@ public partial class NoteManager
                 ButtonOrderIndex = _buttonOrderIndex[note.StartPosition - 1]++,
                 SensorOrderIndex = _sensorOrderIndex[note.StartPosition - 1]++,
                 IsStar = !note.IsTapHeadSlide,
-                IsDouble = isDouble,
-                RotateSpeed = rotateSpeed,
+                //IsDouble = isDouble,
+                //RotateSpeed = rotateSpeed,
                 IsEach = isNoteEach,
                 IsEx = note.IsEx,
                 IsBreak = note.IsBreak,
@@ -796,9 +808,11 @@ public partial class NoteManager
             taps.Add(starTap);
         }
 
+
+        SlideMetadata metadata;
         if (noteContent.Contains('w'))
         {
-            var metadata = SlideTableNeo.GetWifiSlide(noteContent[0..3]);
+            metadata = SlideTableNeo.GetWifiSlide(noteContent[0..3]);
 
             var judgeQueueCount = metadata.JudgeAreaQueue.Length;
             loadedSlideAreaArrays.Add(metadata.JudgeAreaQueue);
@@ -854,7 +868,7 @@ public partial class NoteManager
         else
         {
             var slideMetaDatas = GetSlidesFromRawContent(noteContent, out var startPos, out var endPos);
-            var metadata = slideMetaDatas.Count == 1 ? slideMetaDatas[0] : SlideTableNeo.MakeConnSlide(slideMetaDatas);
+            metadata = slideMetaDatas.Count == 1 ? slideMetaDatas[0] : SlideTableNeo.MakeConnSlide(slideMetaDatas);
 
             var unskippable1 = -1;
             var unskippable2 = -1;
@@ -921,6 +935,10 @@ public partial class NoteManager
             areaPoolIndex += judgeQueueCount;
             posePoolIndex += slideArrowsCount;
         }
+
+        loadedSlideLength += metadata.SlideLength;
+        loadedSlideTime += note.SlideTime;
+
         return noteContent;
     }
 

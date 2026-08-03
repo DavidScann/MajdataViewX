@@ -17,8 +17,8 @@ public struct TapData
 
     // attrs
     public bool IsStar { get; init; }
-    public bool IsDouble { get; init; }
-    public float RotateSpeed { get; init; }     // RotateSpeed = 1 时是每秒转 180 度
+    public bool IsDouble { get; set; }
+    public float RotateSpeed { get; set; }     // RotateSpeed = 1 时是每秒转 180 度
 
     public bool IsEach { get; init; }
     public bool IsEx { get; init; }
