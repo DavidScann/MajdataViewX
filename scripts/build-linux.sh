@@ -189,8 +189,8 @@ log "Assembling bundle at $BUNDLE_DIR ..."
 # 4a. Copy Unity Linux player output
 run "cp -a '$UNITY_BUILD_DIR/.' '$BUNDLE_DIR/'"
 
-# 4b. Copy dotnet-published editor (skips MajdataEdit-Neo runtimeconfig duplicate)
-run "rsync -a --exclude='*.pdb' --exclude='*.runtimeconfig.json' \
+# 4b. Copy dotnet-published editor
+run "rsync -a --exclude='*.pdb' \
       '$EDITOR_PUBLISH_DIR/' '$BUNDLE_DIR/'"
 
 # 4c. Ensure libbassopus.so is in Plugins/AnyCPU/ where BASS expects it
