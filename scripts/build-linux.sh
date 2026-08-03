@@ -193,11 +193,18 @@ run "cp -a '$UNITY_BUILD_DIR/.' '$BUNDLE_DIR/'"
 run "rsync -a --exclude='*.pdb' \
       '$EDITOR_PUBLISH_DIR/' '$BUNDLE_DIR/'"
 
-# 4c. Ensure libbassopus.so is in Plugins/AnyCPU/ where BASS expects it
+# 4c. Ensure libbassopus.so is where BASS needs it in BOTH places:
+#   - bundle root: the editor (MajdataEdit-Neo) loads libbass.so + libbassopus.so
+#     from its own directory (TrackReader.cs: Bass.PluginLoad("libbassopus"))
+#   - MajdataViewX_Data/Plugins/AnyCPU/: the Unity player's BASS
 if check "[[ -f '$BUNDLE_DIR/MajdataViewX_Data/Plugins/AnyCPU/libbassopus.so' ]]"; then
-  log "libbassopus.so already in Plugins/AnyCPU/ ✓"
+  log "libbassopus.so in Plugins/AnyCPU/ ✓"
+  run "cp -a '$BUNDLE_DIR/MajdataViewX_Data/Plugins/AnyCPU/libbassopus.so' '$BUNDLE_DIR/libbassopus.so'"
+  log "libbassopus.so copied to bundle root for the editor ✓"
+elif check "[[ -f '$BUNDLE_DIR/libbassopus.so' ]]"; then
+  log "libbassopus.so already at bundle root ✓"
 else
-  warn "libbassopus.so not in Plugins/AnyCPU/ — BASS will not decode Opus"
+  warn "libbassopus.so not found — BASS will not decode Opus"
   warn "Place it at: $BUNDLE_DIR/MajdataViewX_Data/Plugins/AnyCPU/libbassopus.so"
 fi
 

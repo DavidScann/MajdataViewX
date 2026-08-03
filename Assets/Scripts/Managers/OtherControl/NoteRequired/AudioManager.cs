@@ -101,7 +101,8 @@ public class AudioManager
         //Bass.Configure(Configuration.UpdatePeriod, 20);
         //Bass.Configure(Configuration.PlaybackBufferLength, 40);
 #if UNITY_STANDALONE_LINUX
-        Bass.PluginLoad("libbassopus");
+        // ManagedBASS on Linux requires the full filename including ".so".
+        Bass.PluginLoad("libbassopus.so");
 #endif
         Bass.Init(-1, 48000);
 
