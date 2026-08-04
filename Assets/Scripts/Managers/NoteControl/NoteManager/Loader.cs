@@ -274,7 +274,8 @@ public partial class NoteManager
         var nonMineCount = 0;
 
         var loadedStarIndex = stackalloc int[timing.Notes.Length];
-        var loadedStarCount = stackalloc int[8];
+        var loadedStarCount = 0;
+        var loadedSlideCount = stackalloc int[8];
         var loadedSlideLength = stackalloc float[8];
         var loadedSlideTime = stackalloc double[8];
 
@@ -325,9 +326,10 @@ public partial class NoteManager
                             ref sameSlideCount,
                             ref loadedSlideLength[note.StartPosition - 1],
                             ref loadedSlideTime[note.StartPosition - 1]);
+                        loadedSlideCount[note.StartPosition - 1]++;
                         if (!note.IsSlideNoHead)
                         {
-                            loadedStarIndex[loadedStarCount[note.StartPosition - 1]++] = taps.Length - 1;
+                            loadedStarIndex[loadedStarCount++] = taps.Length - 1;
                             if (!note.IsMine)
                             {
                                 startPositions[nonMineCount++] = note.StartPosition;
@@ -354,27 +356,24 @@ public partial class NoteManager
         }
 
         // star rotate
-        var curStarCount = 0;
-        for (var pos = 0; pos < 8; pos++)
+        // loadedStarIndex 按 star 创建顺序连续写入；pos 由 starTap.Key 反推（star 的 Key 必为 A1–A8 = 0–7），
+        // 再用 per-pos 的 loadedStarCount/loadedSlideLength/loadedSlideTime 回填
+        for (var i = 0; i < loadedStarCount; i++)
         {
-            for (var i = 0; i < loadedStarCount[pos]; i++)
+            ref var starTap = ref taps.ElementRef(loadedStarIndex[i]);
+            var pos = (int)starTap.Key;
+            var cnt = loadedSlideCount[pos];
+            var length = loadedSlideLength[pos];
+            var time = loadedSlideTime[pos];
+            if (time > 0)
             {
-                ref var starTap = ref taps.ElementRef(loadedStarIndex[curStarCount + i]);
-                var startPos = (int)starTap.Key;
-                var cnt = loadedStarCount[pos];
-                var length = loadedSlideLength[pos];
-                var time = loadedSlideTime[pos];
-                if (time > 0)
-                {
-                    // RotateSpeed = 1 时是每秒转 180 度
-                    // 官机算法是 转速 = 同头星星总长 / (总时间 * 15 * pi)
-                    // 长度单位像素，时间单位ms，转速单位度/帧，转速最大是 18
-                    // 这里 SlideLength 是 100ppu，SlideTime 是秒
-                    starTap.IsDouble = cnt >= 2;
-                    starTap.RotateSpeed = math.min(6f, length / ((float)time * 2 * math.PI));
-                }
+                // RotateSpeed = 1 时是每秒转 180 度
+                // 官机算法是 转速 = 同头星星总长 / (总时间 * 15 * pi)
+                // 长度单位像素，时间单位ms，转速单位度/帧，转速最大是 18
+                // 这里 SlideLength 是 100ppu，SlideTime 是秒
+                starTap.IsDouble = cnt >= 2;
+                starTap.RotateSpeed = math.min(6f, length / ((float)time * 2 * math.PI));
             }
-            curStarCount += loadedStarCount[pos];
         }
 
 
