@@ -28,8 +28,6 @@ public class TimeProvider : MonoBehaviour
     public float FakeNoteTime => TimeData.GetPositionAtTime(NoteTime);
     public float CurrentSpeed => IsRecord ? Time.timeScale : speed;
 
-    private NativeArray<TimeDataB> _timeDataContainer = new(1, Allocator.Persistent); // == Native Reference
-
     private static NativeList<(float time, float sVeloc)> SVList = new(20, Allocator.Persistent);
     private static NativeArray<(float k, float b)> SVFuncArgs;
 
@@ -39,6 +37,7 @@ public class TimeProvider : MonoBehaviour
     private float speed;
     //for pause and resume
     private double accumulated;
+
     private readonly Stopwatch playbackClock = new();
 
 
@@ -86,19 +85,10 @@ public class TimeProvider : MonoBehaviour
         }
         else
         {
-            // Keep one monotonic clock as the source of truth. Audio and video are
-            // followers; an exhausted audio stream must never pull NoteTime back
-            // to its final sample.
             AudioTime = (float)(startAt + accumulated + playbackClock.Elapsed.TotalSeconds * speed);
             NoteTime = AudioTime - offset;
-
-            double trackOffset =
-                AudioManager.TRACK_ANSWER_PLAYBACK_OFFSET_SEC +
-                _audioManager.GlobalAudioOffset;
-            _audioManager.SynchronizeTrack(AudioTime - trackOffset, speed);
         }
 
-        // The shared-memory clock uses the same monotonic timeline as NoteTime.
         mmvAudioTime.Write(0, AudioTime);
 
         TimeData.NoteTime = NoteTime;
@@ -241,7 +231,6 @@ public class TimeProvider : MonoBehaviour
         mmvAudioTime?.Dispose();
         mmfAudioTime?.Dispose();
 
-        if (_timeDataContainer.IsCreated) _timeDataContainer.Dispose();
         if (SVList.IsCreated) SVList.Dispose();
         if (SVFuncArgs.IsCreated) SVFuncArgs.Dispose();
     }

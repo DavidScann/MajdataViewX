@@ -204,8 +204,8 @@ public class ScreenRecorder : MonoBehaviour
             encoder,
             pcmDataPointer,
             checked(sampleCount * sizeof(float)),
-            _audioManager.SampleRate,
-            _audioManager.Channels);
+            AudioManager.SAMPLERATE,
+            AudioManager.CHANNELS);
         if (muxResult < 0)
             throw new InvalidOperationException(
                 $"RenderingOut failed to mux the recorded audio ({muxResult}).");

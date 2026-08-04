@@ -25,23 +25,23 @@ public class AudioManager
     public const int SFX_COUNT = 16;
 
     [CanBeNull] private AudioSample TrackSample;
-    [CanBeNull] private float[] TrackSampleData;
     [CanBeNull] private string _trackPath;
     private float TrackSampleVolume;
+    [CanBeNull] private float[] TrackSampleData;
     // TrackSampleData 仅导出(Record)模式混音用，普通播放无需加载，
     // 故 IsTrackLoaded 只取决于 Bass 流是否就绪
     public bool IsTrackLoaded => TrackSample != null;
     public bool IsTrackPlaying => TrackSample != null && TrackSample.IsPlaying;
     public double TrackCurrentSec => TrackSample != null ? TrackSample.CurrentSec : 0;
 
-    //answer SFX
-    List<AnswerTimingPoint> answerTimingPoints = new();
+    //answer SFX gen
+    private readonly List<AnswerTimingPoint> answerTimingPoints = new();
     private readonly object answerSfxLock = new();
     //note SFX
-    //DO NOT USE THIS IN THIS FILE, MAY CAUSE AtomicSafetyHandle Exception, WE DONT CARE THIS
+    //DO NOT USE THIS WHEN PLAY STARTED, MAY CAUSE AtomicSafetyHandle Exception, WE DONT CARE THIS
     public NativeArray<bool> noteSfxPlaybackRequests = new(SFX_COUNT, Allocator.Persistent);
-    public unsafe bool* SfxRequestsPtr => (bool*)noteSfxPlaybackRequests.GetUnsafePtr();
-    private unsafe bool* _sfxPtr;    // USE THIS INSTEAD
+    // USE THIS
+    public unsafe bool* SfxRequestsPtr;
 
     List<AudioSample> NoteSfxs = new(SFX_COUNT);
 
@@ -55,15 +55,13 @@ public class AudioManager
     private float recordingInitialNoteTime;
     private int[][] sfxPlayPointers = new int[SFX_COUNT][]; //-1 is not playing
 
+    /// <summary>
+    /// 只用于调整音频的延迟，视频/note/时间轴显示均不变化
+    /// </summary>
     public double GlobalAudioOffset { get; private set; }
 
-    public bool IsShowingSongDetail => _timeProvider.AudioTime <= recordingInitialAudioTime + TimeProvider.SONG_DETAIL_OFFSET;
-    const int SAMPLERATE = 44100;
-    const int CHANNELS = 2;
-    const double TRACK_HARD_SYNC_THRESHOLD_SEC = 0.1;
-    const double TRACK_SYNC_DEAD_ZONE_SEC = 0.002;
-    const float TRACK_MAX_SPEED_CORRECTION = 0.02f;
-    const float TRACK_SYNC_GAIN = 0.1f;
+    public const int SAMPLERATE = 44100;
+    public const int CHANNELS = 2;
 
     public const float TRACK_ANSWER_PLAYBACK_OFFSET_SEC = (16.66666f * 1) / 1000;
 
@@ -85,6 +83,7 @@ public class AudioManager
     public const int ALL_PERFECT = 15;
 
     private bool waitingForTrackAudioStart;
+    public bool IsShowingSongDetail => _timeProvider.AudioTime <= recordingInitialAudioTime + TimeProvider.SONG_DETAIL_OFFSET;
 
     private bool isInited;
 
@@ -94,13 +93,8 @@ public class AudioManager
     public unsafe AudioManager()
     {
         _audioManager = this;
-        _sfxPtr = SfxRequestsPtr;
-        // DO NOT USE THIS, MAY CAUSE PROBLEMS
-        // Keep the track's output queue short so it stays responsive to
-        // dynamically triggered SFX. Bundled SFX assets are 48 kHz.
-        //Bass.Configure(Configuration.UpdatePeriod, 20);
-        //Bass.Configure(Configuration.PlaybackBufferLength, 40);
-        Bass.Init(-1, 48000);
+        SfxRequestsPtr = (bool*)noteSfxPlaybackRequests.GetUnsafePtr();
+        Bass.Init(-1, SAMPLERATE);
 
         //Note SFX
         var sfxPath = MajEnv.GetPath("SFX");
@@ -146,7 +140,7 @@ public class AudioManager
                 "touch.wav" => 65535,
                 _ => 1
             };
-            var sample = new AudioSample(path, AudioMode.Sample, maxNoOfPlaybacks) { SampleType = type };
+            var sample = new AudioSample(path, maxNoOfPlaybacks) { SampleType = type };
             sfxPlayPointers[sfxIndex] = new int[maxNoOfPlaybacks];
             sfxIndex++;
 
@@ -195,8 +189,8 @@ public class AudioManager
                 var delta = thisFrameSec - (timing.Timing + TRACK_ANSWER_PLAYBACK_OFFSET_SEC);
                 if (delta > 0)
                 {
-                    if (timing.IsClock) _sfxPtr[ANSWER_CLOCK] = true;
-                    else _sfxPtr[ANSWER] = true;
+                    if (timing.IsClock) SfxRequestsPtr[ANSWER_CLOCK] = true;
+                    else SfxRequestsPtr[ANSWER] = true;
 
                     timing.IsPlayed = true;
                 }
@@ -212,11 +206,11 @@ public class AudioManager
 
         for (var i = 0; i < SFX_COUNT; i++)
         {
-            var isRequested = _sfxPtr[i];
+            var isRequested = SfxRequestsPtr[i];
 
             if (i != TOUCHHOLD && isRequested)
             {
-                _sfxPtr[i] = false;
+                SfxRequestsPtr[i] = false;
             }
 
             switch (i)
@@ -305,7 +299,7 @@ public class AudioManager
     {
         _trackPath = path;
         TrackSample?.Dispose();
-        TrackSample = new AudioSample(path, AudioMode.Stream)
+        TrackSample = new AudioSample(path, 1)
         {
             SampleType = SampleType.Track,
         };
@@ -338,42 +332,6 @@ public class AudioManager
         }
     }
 
-    public void SynchronizeTrack(double targetSec, float playbackSpeed)
-    {
-        var track = TrackSample;
-        if (track == null || !track.IsPlaying)
-            return;
-
-        // Once the stopwatch timeline is outside the audio, the stream no longer
-        // participates in synchronization. In particular, its final sample must
-        // not clamp the note timeline at the end of a song.
-        if (targetSec < 0 || targetSec >= track.Length)
-        {
-            track.Speed = playbackSpeed;
-            return;
-        }
-
-        var driftSec = targetSec - track.CurrentSec;
-        if (Math.Abs(driftSec) >= TRACK_HARD_SYNC_THRESHOLD_SEC)
-        {
-            track.CurrentSec = targetSec;
-            track.Speed = playbackSpeed;
-            return;
-        }
-
-        if (Math.Abs(driftSec) <= TRACK_SYNC_DEAD_ZONE_SEC)
-        {
-            track.Speed = playbackSpeed;
-            return;
-        }
-
-        var correction = Mathf.Clamp(
-            (float)driftSec * TRACK_SYNC_GAIN,
-            -TRACK_MAX_SPEED_CORRECTION,
-            TRACK_MAX_SPEED_CORRECTION);
-        track.Speed = playbackSpeed * (1f + correction);
-    }
-
     public void PauseTrack() => TrackSample?.Pause();
 
     public void StopTrack()
@@ -402,7 +360,7 @@ public class AudioManager
         TrackSample = null;
         TrackSampleData = null;
         //StopTouchHoldSound();
-        //_sfxPtr[TOUCHHOLD] = false;
+        //SfxRequestsPtr[TOUCHHOLD] = false;
         ActiveTouchHoldCount = 0;
         _prevActiveTouchHoldCount = 0;
         NoteSfxs[TOUCHHOLD].Stop();
@@ -410,7 +368,7 @@ public class AudioManager
         lock (answerSfxLock)
             answerTimingPoints.Clear();
         for (var i = 0; i < SFX_COUNT; i++)
-            _sfxPtr[i] = false;
+            SfxRequestsPtr[i] = false;
     }
 
 
@@ -528,10 +486,10 @@ public class AudioManager
                 if (i == TRACK_START || i == TOUCHHOLD || i == ANSWER || i == ANSWER_CLOCK)
                     continue;
 
-                if (_sfxPtr[i])
+                if (SfxRequestsPtr[i])
                 {
                     TriggerSfxRecording(i);
-                    _sfxPtr[i] = false;
+                    SfxRequestsPtr[i] = false;
                 }
             }
 
@@ -772,11 +730,6 @@ public class AudioManager
         recordingSampleCount = 0;
         recordingPreviousTouchHoldCount = 0;
     }
-
-    public int SampleRate => SAMPLERATE;
-    public int Channels => CHANNELS;
-
-
 
     private float[] GetSampleDataFromFile(string path)
     {
