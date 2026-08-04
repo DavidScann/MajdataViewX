@@ -125,10 +125,11 @@ public class AudioManager
             {
                 "track_start.wav" or "all_perfect.wav" => SampleType.Track,
                 "answer.wav" or "answer_clock.wav" => SampleType.Answer,
-                "tap_perfect.wav" or "tap_great.wav" or "tap_good.wav" or "tap_ex.wav" => SampleType.Tap,
+                "tap_perfect.wav" or "tap_great.wav" or "tap_good.wav" => SampleType.Tap,
                 "break_tap.wav" or "break.wav" => SampleType.Break,
                 "slide.wav" => SampleType.Slide,
                 "slide_break_start.wav" or "slide_break_slide.wav" => SampleType.BreakSlide,
+                "tap_ex.wav" => SampleType.Ex,
                 "touch.wav" or "touch_Hold_riser.wav" => SampleType.Touch,
                 "touch_hanabi.wav" => SampleType.Hanabi,
                 _ => SampleType.Track
