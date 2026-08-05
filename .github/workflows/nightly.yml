@@ -1,0 +1,150 @@
+name: Nightly Build
+
+on:
+  workflow_dispatch:
+
+# 同一 nightly 只保留最新一次构建，新的取消旧的
+concurrency:
+  group: nightly
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+env:
+  UNITY_VERSION: '6000.3.19f1'
+  EDITOR_REPO: 're-poem/MajdataEdit-Neo'
+  EDITOR_REF: 'main'
+
+jobs:
+  # ────────────────────────────────────────────────────────────
+  # 1. 构建 Unity 项目（MajdataViewX, StandaloneWindows64）
+  #    授权用 game-ci 账号密码方式：UNITY_EMAIL/PASSWORD/LICENSE
+  # ────────────────────────────────────────────────────────────
+  build-unity:
+    runs-on: ubuntu-latest
+    env:
+      UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+      UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+      UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+    steps:
+      - name: Checkout MajdataViewX
+        uses: actions/checkout@v4
+
+      - name: Cache Unity Library
+        uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-StandaloneWindows64-${{ hashFiles('ProjectSettings/ProjectSettings.asset', 'Packages/manifest.json') }}
+          restore-keys: |
+            Library-StandaloneWindows64-
+
+      - name: Build Unity project
+        uses: game-ci/unity-builder@v4
+        with:
+          unityVersion: ${{ env.UNITY_VERSION }}
+          targetPlatform: StandaloneWindows64
+          projectPath: .
+          buildName: MajdataViewX
+          buildsPath: build
+          # bundleVersion 为非标准值（v6），用 None 不让 builder 改版本号
+          versioning: None
+
+      # 用户已关 D3D12，但构建仍会生成一个名为 D3D12 的文件夹，打包前删掉
+      - name: Remove leftover D3D12 folder
+        run: find build -type d -name D3D12 -print -exec rm -rf {} +
+
+      - name: Upload Unity build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: unity-build
+          path: build/StandaloneWindows64/MajdataViewX
+          if-no-files-found: error
+          retention-days: 7
+
+  # ────────────────────────────────────────────────────────────
+  # 2. 构建 MajdataEdit-Neo（Avalonia, net10.0, win-x64）
+  #    与 Unity 构建并行。发布形态完全由仓库内 FolderProfile.pubxml
+  #    决定（win-x64 / framework-dependent / single-file），CI 只传
+  #    -c Release 与输出目录。
+  # ────────────────────────────────────────────────────────────
+  build-editor:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout MajdataEdit-Neo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.EDITOR_REPO }}
+          ref: ${{ env.EDITOR_REF }}
+          path: MajdataEdit-Neo
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Read version from csproj
+        id: version
+        run: |
+          v=$(sed -n 's/.*<Version>\([^<]*\)<\/Version>.*/\1/p' MajdataEdit-Neo/MajdataEdit-Neo.csproj | head -1)
+          echo "Detected version: ${v}"
+          echo "version=${v}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish MajdataEdit-Neo
+        run: |
+          dotnet publish MajdataEdit-Neo/MajdataEdit-Neo.csproj \
+            -c Release \
+            -p:PublishProfile=FolderProfile \
+            -o publish
+
+      - name: Upload Editor build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: editor-build
+          path: publish
+          if-no-files-found: error
+          retention-days: 7
+
+  # ────────────────────────────────────────────────────────────
+  # 3. 合并两个产物 -> 平铺打成一个 MajdataX-v<version>.zip -> 发布 nightly
+  # ────────────────────────────────────────────────────────────
+  publish-nightly:
+    needs: [build-unity, build-editor]
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.build-editor.outputs.version }}
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Assemble package (flat layout)
+        run: |
+          set -eux
+          SHORT=${GITHUB_SHA::7}
+          mkdir -p pkg
+          # 根目录直接平铺：Unity 与 Editor 产物混在同一层
+          cp -rT artifacts/unity-build  pkg/
+          cp -rT artifacts/editor-build pkg/
+          ( cd pkg && zip -r "../MajdataX-v${VERSION}-${SHORT}.zip" . )
+
+      - name: Publish to nightly release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eux
+          SHORT=${GITHUB_SHA::7}
+          # 删除旧的 nightly release 及其 tag（移动 tag 到当前 commit）
+          gh release delete nightly --cleanup-tag -y || true
+          notes="Nightly build of MajdataViewX + MajdataEdit-Neo.
+
+          Version: v${VERSION}
+          Commit:  ${SHORT}
+          Built:   $(date -u +'%Y-%m-%d %H:%M UTC')"
+          gh release create nightly "MajdataX-v${VERSION}-${SHORT}.zip" \
+            --title "Nightly (v${VERSION}-${SHORT})" \
+            --notes "$notes" \
+            --prerelease
