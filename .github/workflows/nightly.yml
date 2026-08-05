@@ -22,7 +22,7 @@ jobs:
   #    授权用 game-ci 账号密码方式：UNITY_EMAIL/PASSWORD/LICENSE
   # ────────────────────────────────────────────────────────────
   build-unity:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     env:
       UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
       UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
@@ -52,7 +52,12 @@ jobs:
 
       # 用户已关 D3D12，但构建仍会生成一个名为 D3D12 的文件夹，打包前删掉
       - name: Remove leftover D3D12 folder
-        run: find build -type d -name D3D12 -print -exec rm -rf {} +
+        shell: pwsh
+        run: |
+          Get-ChildItem -Path build -Recurse -Directory -Filter 'D3D12' -ErrorAction SilentlyContinue | ForEach-Object {
+            Write-Host "Removing $($_.FullName)"
+            Remove-Item $_.FullName -Recurse -Force
+          }
 
       - name: Upload Unity build artifact
         uses: actions/upload-artifact@v4
