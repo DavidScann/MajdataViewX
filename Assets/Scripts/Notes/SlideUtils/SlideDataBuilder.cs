@@ -56,7 +56,7 @@ namespace Notes.SlideUtils
         /// 此外官机的实践是：如果最后一个箭头距离路径终点的距离不足 23.556 px 则只在 conn-slide 中显示，
         /// 因此拿到返回值以后还需要进行简单的后处理
         /// </p>
-        /// <p>请使用<c>MajGeometry.DefaultDistance / 2</c>代替 23.556</p>
+        /// <p>请使用<c>MajGeo.DefaultDistance / 2</c>代替 23.556</p>
         /// </summary>
         public static SlideArrowRawData[] BuildArrowData(ParametricSlidePath path)
         {
@@ -96,7 +96,7 @@ namespace Notes.SlideUtils
                         // SmoothAlign 标志的意思是，调节本段箭头间距使得结束时箭头位置恰好在本段终点
                         // P.S. 这种情况出现在 ppqq 圈进入判定线大圆，可以把转移轨道的箭头间距微调一下，让大圆的箭头对齐
                         var delta = path.AccumulatedLengths[segIdx + 1] - currentLength;
-                        var n = Math.Round(delta / MajGeometry.DefaultDistance);
+                        var n = Math.Round(delta / MajGeo.DefaultDistance);
                         path.Segments[segIdx + 1].SetArrowDistance(delta / n);
                         nextLength = currentLength + delta / n;
                     }
@@ -302,17 +302,17 @@ namespace Notes.SlideUtils
         }
 
         // 判定区探测算法的参数，不要动
-        public const double HitAreaCalcStep = MajGeometry.MainRadius / 48.0;
+        public const double HitAreaCalcStep = MajGeo.MainRadius / 48.0;
 
-        public const double HitAreaARadius = MajGeometry.MainRadius * 80.0 / 480.0;
-        public const double HitAreaADistance = MajGeometry.MainRadius * 440.0 / 480.0;
-        public const double HitAreaBRadius = MajGeometry.MainRadius * 45.0 / 480.0;
-        public const double HitAreaBDistance = MajGeometry.MainRadius * 210.0 / 480.0;
-        public const double HitAreaCRadius = MajGeometry.MainRadius * 55.0 / 480.0;
+        public const double HitAreaARadius = MajGeo.MainRadius * 80.0 / 480.0;
+        public const double HitAreaADistance = MajGeo.MainRadius * 440.0 / 480.0;
+        public const double HitAreaBRadius = MajGeo.MainRadius * 45.0 / 480.0;
+        public const double HitAreaBDistance = MajGeo.MainRadius * 210.0 / 480.0;
+        public const double HitAreaCRadius = MajGeo.MainRadius * 55.0 / 480.0;
 
-        public const double LastDistanceCircle = MajGeometry.MainRadius * 175.0 / 480.0;
-        public const double LastDistanceShort = MajGeometry.MainRadius * 130.0 / 480.0;
-        public const double LastDistanceLong = MajGeometry.MainRadius * 159.0 / 480.0;
+        public const double LastDistanceCircle = MajGeo.MainRadius * 175.0 / 480.0;
+        public const double LastDistanceShort = MajGeo.MainRadius * 130.0 / 480.0;
+        public const double LastDistanceLong = MajGeo.MainRadius * 159.0 / 480.0;
 
         /// <summary>
         /// 计算指定 slide 路径的判定区序列

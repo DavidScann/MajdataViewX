@@ -24,7 +24,7 @@ namespace Notes.SlideUtils
             };
             return obj;
         }
-        
+
         /// <summary>
         /// 从指定按键开始构造 slide 路径
         /// </summary>
@@ -32,9 +32,9 @@ namespace Notes.SlideUtils
         /// <returns><c>this</c></returns>
         public static SlidePathConstructor BeginAt(int sensorIdx)
         {
-            return BeginAt(MajGeometry.GetPoint(sensorIdx));
+            return BeginAt(MajGeo.GetPoint(sensorIdx));
         }
-        
+
         /// <summary>
         /// <p>为上一个路径片段添加控制箭头对齐的标志</p>
         /// </summary>
@@ -63,7 +63,7 @@ namespace Notes.SlideUtils
         /// <returns><c>this</c></returns>
         public SlidePathConstructor LineToPoint(int sensorIdx)
         {
-            return LineToPoint(MajGeometry.GetPoint(sensorIdx));
+            return LineToPoint(MajGeo.GetPoint(sensorIdx));
         }
 
         /// <summary>
@@ -72,18 +72,18 @@ namespace Notes.SlideUtils
         /// <returns><c>this</c></returns>
         public SlidePathConstructor TangentToCircle(CircleStruct circle, bool isCcw)
         {
-            var inAngle = MajGeometry.CalcTangentAngle(CurrentEndPoint, circle, isCcw);
+            var inAngle = MajGeo.CalcTangentAngle(CurrentEndPoint, circle, isCcw);
             var inPoint = Complex.FromPolarCoordinates(circle.Radius, inAngle) + circle.Center;
             return LineToPoint(inPoint);
         }
 
         /// <summary>
-        /// <p>添加一条沿切线前往指定圆周的路径，圆周定义见<c>MajGeometry.GetCircle</c></p>
+        /// <p>添加一条沿切线前往指定圆周的路径，圆周定义见<c>MajGeo.GetCircle</c></p>
         /// </summary>
         /// <returns><c>this</c></returns>
         public SlidePathConstructor TangentToCircle(int circleIdx, bool isCcw)
         {
-            return TangentToCircle(MajGeometry.GetCircle(circleIdx), isCcw);
+            return TangentToCircle(MajGeo.GetCircle(circleIdx), isCcw);
         }
 
         /// <summary>
@@ -103,12 +103,12 @@ namespace Notes.SlideUtils
             // startAngle and endAngle in range [-PI, PI]
             if (isCcw)
             {
-                if (Math.Abs(endRad - startRad) < MajGeometry.EpsilonRad)
+                if (Math.Abs(endRad - startRad) < MajGeo.EpsilonRad)
                 {
                     if (skipIfZero) return this;
                     endRad += 2 * Math.PI;
                 }
-                
+
                 if (startRad > endRad)
                 {
                     startRad -= 2 * Math.PI;
@@ -116,18 +116,18 @@ namespace Notes.SlideUtils
             }
             else
             {
-                if (Math.Abs(endRad - startRad) < MajGeometry.EpsilonRad)
+                if (Math.Abs(endRad - startRad) < MajGeo.EpsilonRad)
                 {
                     if (skipIfZero) return this;
                     endRad -= 2 * Math.PI;
                 }
-                
+
                 if (startRad < endRad)
                 {
                     startRad += 2 * Math.PI;
                 }
             }
-        
+
             var seg = new ArcSegment(circle, startRad, endRad);
             PathSegments.Add(seg);
             CurrentEndPoint = seg.GetPointAt(1f);
@@ -138,16 +138,16 @@ namespace Notes.SlideUtils
         /// <p>添加一条沿指定圆心绕行到指定辐角的路径</p>
         /// <p>P.S. 目标辐角是绝对坐标，以正右方向为 0</p>
         /// </summary>
-        /// <param name="circleIdx">相关圆，只会用圆心，见<c>MajGeometry.GetCircle</c></param>
+        /// <param name="circleIdx">相关圆，只会用圆心，见<c>MajGeo.GetCircle</c></param>
         /// <param name="endRad">目标辐角，应在 -pi ~ pi</param>
         /// <param name="isCcw">true 为逆时针绕行</param>
         /// <param name="skipIfZero">true 表示当目标辐角和当前位置相等时不进行操作，false 会多绕一圈</param>
         /// <returns><c>this</c></returns>
         public SlidePathConstructor ArcToAngle(int circleIdx, double endRad, bool isCcw, bool skipIfZero)
         {
-            return  ArcToAngle(MajGeometry.GetCircle(circleIdx).Center, endRad, isCcw, skipIfZero);
+            return ArcToAngle(MajGeo.GetCircle(circleIdx).Center, endRad, isCcw, skipIfZero);
         }
-        
+
         /// <summary>
         /// <p>添加一条沿指定圆心绕行的圆弧，直到恰好达到前往指定目标点的切点</p>
         /// </summary>
@@ -159,20 +159,20 @@ namespace Notes.SlideUtils
         {
             var diff = CurrentEndPoint - center;
             var endRad =
-                MajGeometry.CalcTangentAngle(target, new CircleStruct(center, diff.Magnitude), !isCcw);
+                MajGeo.CalcTangentAngle(target, new CircleStruct(center, diff.Magnitude), !isCcw);
             return ArcToAngle(center, endRad, isCcw, false);
         }
 
         /// <summary>
         /// <p>添加一条沿指定圆心绕行的圆弧，直到恰好达到前往指定判定区的切点</p>
         /// </summary>
-        /// <param name="circleIdx">相关圆，只会用圆心，见<c>MajGeometry.GetCircle</c></param>
+        /// <param name="circleIdx">相关圆，只会用圆心，见<c>MajGeo.GetCircle</c></param>
         /// <param name="sensorIdx">目标判定区，仅支持 A、B、C 区且不是 Touch 的位置</param>
         /// <param name="isCcw">true 为逆时针绕行</param>
         /// <returns><c>this</c></returns>
         public SlidePathConstructor ArcToTangentTowards(int sensorIdx, int circleIdx, bool isCcw)
         {
-            return ArcToTangentTowards(MajGeometry.GetPoint(sensorIdx), MajGeometry.GetCircle(circleIdx).Center, isCcw);
+            return ArcToTangentTowards(MajGeo.GetPoint(sensorIdx), MajGeo.GetCircle(circleIdx).Center, isCcw);
         }
 
         /// <summary>
@@ -194,7 +194,7 @@ namespace Notes.SlideUtils
         /// <returns><c>this</c></returns>
         public SlidePathConstructor FullCircle(int circleIdx, bool isCcw)
         {
-            return FullCircle(MajGeometry.GetCircle(circleIdx).Center, isCcw);
+            return FullCircle(MajGeo.GetCircle(circleIdx).Center, isCcw);
         }
 
         /// <summary>
@@ -210,7 +210,7 @@ namespace Notes.SlideUtils
         {
             var diff = CurrentEndPoint - currentCenter;
             double endRad;
-            if (Math.Abs(diff.Magnitude - targetCircle.Radius) < MajGeometry.Epsilon)
+            if (Math.Abs(diff.Magnitude - targetCircle.Radius) < MajGeo.Epsilon)
             {
                 // 两个圆半径差不多相等
                 var vector = targetCircle.Center - currentCenter;
@@ -221,12 +221,12 @@ namespace Notes.SlideUtils
             {
                 // 目标圆更大
                 var helperCircle = new CircleStruct(targetCircle.Center, targetCircle.Radius - diff.Magnitude);
-                endRad = MajGeometry.CalcTangentAngle(currentCenter, helperCircle, isCcw);
+                endRad = MajGeo.CalcTangentAngle(currentCenter, helperCircle, isCcw);
             }
             else
             {
                 var helperCircle = new CircleStruct(currentCenter, diff.Magnitude - targetCircle.Radius);
-                endRad = MajGeometry.CalcTangentAngle(targetCircle.Center, helperCircle, !isCcw);
+                endRad = MajGeo.CalcTangentAngle(targetCircle.Center, helperCircle, !isCcw);
             }
             ArcToAngle(currentCenter, endRad, isCcw, false);
             var inPoint = Complex.FromPolarCoordinates(targetCircle.Radius, endRad) + targetCircle.Center;

@@ -95,11 +95,11 @@ namespace Notes.SlideUtils
             {
                 case CommandType.NodeA:
                 case CommandType.NodeEnd:
-                    return MajGeometry.PointGroupA(cmd.Value);
+                    return MajGeo.PointGroupA(cmd.Value);
                 case CommandType.NodeB:
-                    return MajGeometry.PointGroupB(cmd.Value);
+                    return MajGeo.PointGroupB(cmd.Value);
                 case CommandType.NodeC:
-                    return MajGeometry.PointCenter();
+                    return MajGeo.PointCenter();
                 default:
                     throw new ArgumentException($"invalid type for node: {cmd.Type}");
             }
@@ -115,7 +115,7 @@ namespace Notes.SlideUtils
         {
             var isCcw = (current.Type == CommandType.OrbitCcw);
             var node = GetNodePosition(last);
-            var orbit = MajGeometry.GetCircle(current.Value);
+            var orbit = MajGeo.GetCircle(current.Value);
             var diff = node - orbit.Center;
             if (Math.Abs(diff.Magnitude - orbit.Radius) < 0.1)
             {
@@ -136,7 +136,7 @@ namespace Notes.SlideUtils
         {
             var isCcw = (last.Type == CommandType.OrbitCcw);
             var node = GetNodePosition(current);
-            var orbit = MajGeometry.GetCircle(last.Value);
+            var orbit = MajGeo.GetCircle(last.Value);
             var diff = node - orbit.Center;
             if (Math.Abs(diff.Magnitude - orbit.Radius) < 0.1)
             {
@@ -155,8 +155,8 @@ namespace Notes.SlideUtils
             if (current.Type != last.Type) throw new ArgumentException($"orbit type mismatch");
 
             var isCcw = (last.Type == CommandType.OrbitCcw);
-            var lastOrbit = MajGeometry.GetCircle(last.Value);
-            var currentOrbit = MajGeometry.GetCircle(current.Value);
+            var lastOrbit = MajGeo.GetCircle(last.Value);
+            var currentOrbit = MajGeo.GetCircle(current.Value);
             if (current.Value == last.Value)
             {
                 constructor.FullCircle(lastOrbit.Center, isCcw);
@@ -168,7 +168,7 @@ namespace Notes.SlideUtils
 
             if (current.Value == 9)
             {
-                var data = MajGeometry.TransferOutData(last.Value, isCcw);
+                var data = MajGeo.TransferOutData(last.Value, isCcw);
                 constructor.ArcToAngle(lastOrbit.Center, data.Item2, isCcw, false)
                     .ArcToAngle(data.Item1.Center, data.Item3, isCcw, false)
                     .TrySetLastParseMarker(SlideParseMarker.SmoothAlign);
@@ -177,7 +177,7 @@ namespace Notes.SlideUtils
 
             if (last.Value == 9)
             {
-                var data = MajGeometry.TransferOutData(current.Value, !isCcw);
+                var data = MajGeo.TransferOutData(current.Value, !isCcw);
                 constructor.ArcToAngle(lastOrbit.Center, data.Item3, isCcw, true)
                     .ArcToAngle(data.Item1.Center, data.Item2, isCcw, false);
                 return;
@@ -200,7 +200,7 @@ namespace Notes.SlideUtils
                 var commands = ParseCommands(code);
                 var lastCmd = commands[0];
                 // The first command is guarantee to be 'A'
-                var generator = SlidePathConstructor.BeginAt(MajGeometry.PointGroupA(lastCmd.Value));
+                var generator = SlidePathConstructor.BeginAt(MajGeo.PointGroupA(lastCmd.Value));
 
                 for (var i = 1; i < commands.Count; i++)
                 {
