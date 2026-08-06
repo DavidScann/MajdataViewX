@@ -1,8 +1,11 @@
-public enum SensorGroup
+namespace MajdataViewX.Types.Input
 {
-    A,
-    B,
-    C,
-    D,
-    E
+    public enum SensorGroup
+    {
+        A,
+        B,
+        C,
+        D,
+        E
+    }
 }

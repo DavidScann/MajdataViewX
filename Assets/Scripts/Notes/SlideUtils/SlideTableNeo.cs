@@ -1,8 +1,10 @@
-﻿using System;
+﻿using MajdataViewX.Base;
+using MajdataViewX.Types.Input;
+using System;
 using System.Collections.Generic;
 using System.Numerics;
 
-namespace Notes.SlideUtils
+namespace MajdataViewX.Notes.SlideUtils
 {
     /// <summary>
     /// slide 判定段信息

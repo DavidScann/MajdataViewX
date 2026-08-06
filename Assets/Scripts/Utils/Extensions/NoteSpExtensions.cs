@@ -1,14 +1,14 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Runtime.CompilerServices;
-using System.Text;
-using static SkinManager;
+﻿using System.Runtime.CompilerServices;
+using static MajdataViewX.Managers.SkinManager;
 
-public static class NoteSpExtensions
+namespace MajdataViewX.Utils.Extensions
 {
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static NoteSp Offset(this NoteSp value, int offset)
+    public static class NoteSpExtensions
     {
-        return (NoteSp)((uint)value + offset);
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static NoteSp Offset(this NoteSp value, int offset)
+        {
+            return (NoteSp)((uint)value + offset);
+        }
     }
 }

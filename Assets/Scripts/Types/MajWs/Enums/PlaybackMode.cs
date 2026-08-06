@@ -1,6 +1,9 @@
-﻿public enum PlaybackMode
+﻿namespace MajdataViewX.Types.Enums
 {
-    Normal,
-    IncludeOp,
-    Record
+    public enum PlaybackMode
+    {
+        Normal,
+        IncludeOp,
+        Record
+    }
 }

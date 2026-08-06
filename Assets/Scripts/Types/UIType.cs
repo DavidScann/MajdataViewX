@@ -1,5 +1,8 @@
-﻿public enum UIType
+﻿namespace MajdataViewX.Types
 {
-    Legacy,
-    TrgUI
+    public enum UIType
+    {
+        Legacy,
+        TrgUI
+    }
 }

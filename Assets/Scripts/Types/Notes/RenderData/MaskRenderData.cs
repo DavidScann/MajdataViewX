@@ -1,16 +1,19 @@
-using System;
+using MajdataViewX.Types.Rendering;
 using Unity.Mathematics;
-using static SkinManager;
+using static MajdataViewX.Managers.SkinManager;
 
-public struct MaskRenderData : ISortableRenderData
+namespace MajdataViewX.Types.Notes.RenderData
 {
-    public float2 pos;
-    public float angRad;
-    public float2 scale;
-    public NoteSp spriteId;
-    public float4 color;
-    public float maskCutoff;
-    public uint sort;
+    public struct MaskRenderData : ISortableRenderData
+    {
+        public float2 pos;
+        public float angRad;
+        public float2 scale;
+        public NoteSp spriteId;
+        public float4 color;
+        public float maskCutoff;
+        public uint sort;
 
-    public readonly uint SortKey => sort;
+        public readonly uint SortKey => sort;
+    }
 }

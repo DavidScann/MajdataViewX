@@ -1,12 +1,15 @@
-public enum SampleType
+namespace MajdataViewX.Types.Audio
 {
-    Track,
-    Answer,
-    Tap,
-    Slide,
-    Break,
-    BreakSlide,
-    Ex,
-    Touch,
-    Hanabi
+    public enum SampleType
+    {
+        Track,
+        Answer,
+        Tap,
+        Slide,
+        Break,
+        BreakSlide,
+        Ex,
+        Touch,
+        Hanabi
+    }
 }

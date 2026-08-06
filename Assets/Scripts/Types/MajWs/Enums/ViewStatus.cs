@@ -1,9 +1,12 @@
-﻿public enum ViewStatus
+﻿namespace MajdataViewX.Types.Enums
 {
-    Idle,
-    Loaded,
-    Error,
-    Playing,
-    Paused,
-    Busy
+    public enum ViewStatus
+    {
+        Idle,
+        Loaded,
+        Error,
+        Playing,
+        Paused,
+        Busy
+    }
 }

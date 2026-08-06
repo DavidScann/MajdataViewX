@@ -1,9 +1,10 @@
-﻿using System;
+﻿using MajdataViewX.Base;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 
-namespace Notes.SlideUtils
+namespace MajdataViewX.Notes.SlideUtils
 {
     public static class SlideCodeParser
     {

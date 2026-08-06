@@ -1,19 +1,22 @@
-public enum JudgeGrade
+namespace MajdataViewX.Types.Notes
 {
-    TooFast,
-    FastGood,
-    FastGreat3rd,
-    FastGreat2nd,
-    FastGreat1st,
-    FastPerfect3rd,
-    FastPerfect2nd,
-    FastCritical,
-    LateCritical,
-    LatePerfect2nd,
-    LatePerfect3rd,
-    LateGreat1st,
-    LateGreat2nd,
-    LateGreat3rd,
-    LateGood,
-    Miss
+    public enum JudgeGrade
+    {
+        TooFast,
+        FastGood,
+        FastGreat3rd,
+        FastGreat2nd,
+        FastGreat1st,
+        FastPerfect3rd,
+        FastPerfect2nd,
+        FastCritical,
+        LateCritical,
+        LatePerfect2nd,
+        LatePerfect3rd,
+        LateGreat1st,
+        LateGreat2nd,
+        LateGreat3rd,
+        LateGood,
+        Miss
+    }
 }

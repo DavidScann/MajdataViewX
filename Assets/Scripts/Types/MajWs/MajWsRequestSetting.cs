@@ -1,5 +1,10 @@
-internal readonly struct MajWsRequestSetting
+using MajdataViewX.Types.MajSetting;
+
+namespace MajdataViewX.Types.MajWs
 {
-    public MajViewSetting ViewSetting { get; init; }
-    public MajVolumeSetting VolumeSetting { get; init; }
+    internal readonly struct MajWsRequestSetting
+    {
+        public MajViewSetting ViewSetting { get; init; }
+        public MajVolumeSetting VolumeSetting { get; init; }
+    }
 }

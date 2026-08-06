@@ -1,4 +1,7 @@
-public interface ISortableRenderData
+namespace MajdataViewX.Types.Rendering
 {
-    uint SortKey { get; }
+    public interface ISortableRenderData
+    {
+        uint SortKey { get; }
+    }
 }

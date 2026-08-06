@@ -1,8 +1,9 @@
-﻿using System;
+﻿using MajdataViewX.Base;
+using System;
 using System.Collections.Generic;
 using System.Numerics;
 
-namespace Notes.SlideUtils
+namespace MajdataViewX.Notes.SlideUtils
 {
     /// <summary>
     /// 支持链式调用的 slide 路径构造工具
