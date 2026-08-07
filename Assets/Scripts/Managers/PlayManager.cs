@@ -261,6 +261,10 @@ namespace MajdataViewX.Managers
                         {
                             canvasButtons.SetActive(true);
                             _state = ViewStatus.Loaded;
+                            // The AP finish no longer stops the record (it runs
+                            // to the track end), so tell the editor the export
+                            // is complete here.
+                            _wsServer.SendStopResponse();
                         }).Forget();
                         return true; //directly return
                 }

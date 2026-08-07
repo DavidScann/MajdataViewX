@@ -31,6 +31,11 @@ namespace MajdataViewX.Managers
             if (PlayManager.Summary.State is not ViewStatus.Playing)
                 return;
 
+            // In record (export) mode the capture loop ends itself at the
+            // track end; the AP finish must not cut the export short.
+            if (_timeProvider.IsRecord)
+                return;
+
             if (_objectCounter.AllFinished)
             {
                 if (isPlayed)
