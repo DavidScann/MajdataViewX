@@ -4,6 +4,7 @@ using MajdataViewX.Base;
 using MajdataViewX.Native;
 using System;
 using System.Globalization;
+using System.IO;
 using System.Threading;
 using UnityEngine;
 
@@ -19,6 +20,11 @@ namespace MajdataViewX.Managers
     {
         const int MaxDimension = 1920; // cap to bound memory/bandwidth
         const float BaseWorldSize = 10.8f; // Bg SpriteRenderer base world size
+
+        // Verified once per session: -hwaccels probing can list decoders that
+        // still fail at runtime (driver/session issues), so the first video
+        // does a 3-frame test decode and falls back to CPU if it errors.
+        static bool _hwDecodeChecked;
 
         FFmpegPipe.PipeProcess _proc;
         Thread? _readerThread;
@@ -104,6 +110,21 @@ namespace MajdataViewX.Managers
         /// </summary>
         public static (int Width, int Height, double Fps) ProbeVideoInfo(string videoPath)
         {
+            // One-time per-session check that the detected hw decoder works.
+            if (!_hwDecodeChecked)
+            {
+                _hwDecodeChecked = true;
+                if (FfmpegEncoder.HwDecodePrefix.Length > 0 && !VerifyHwDecode(videoPath))
+                {
+                    Debug.Log("[BgVideoPipe] hardware decode unavailable, falling back to CPU");
+                    FfmpegEncoder.DisableHwDecode();
+                }
+                else if (FfmpegEncoder.HwDecodePrefix.Length > 0)
+                {
+                    Debug.Log($"[BgVideoPipe] using hw decode: {FfmpegEncoder.HwDecodePrefix.Trim()}");
+                }
+            }
+
             int nativeW = 1280, nativeH = 720;
             double fps = 30;
             try
@@ -179,6 +200,38 @@ namespace MajdataViewX.Managers
             return fps is > 1 and < 240;
         }
 
+        /// <summary>
+        /// Verifies that the detected hardware decoder actually decodes this
+        /// file (3 frames to null). Runs on the background preload thread.
+        /// </summary>
+        static bool VerifyHwDecode(string videoPath)
+        {
+            try
+            {
+                var quoted = QuoteShellArgument(videoPath);
+                var errFile = Path.Combine(Application.temporaryCachePath, "ffmpeg_hwdecode_test.txt");
+                if (File.Exists(errFile)) File.Delete(errFile);
+                var cmd = $"{FfmpegEncoder.Binary} -hide_banner -loglevel error " +
+                    $"{FfmpegEncoder.HwDecodePrefix}-i {quoted} -frames:v 3 -f null - " +
+                    $"> \"{errFile}\" 2>&1";
+                var proc = FFmpegPipe.SpawnSimple(cmd);
+                if (!proc.IsValid) return false;
+                var code = FFmpegPipe.Wait(proc);
+                if (code != 0 && File.Exists(errFile))
+                {
+                    var err = File.ReadAllText(errFile).Trim();
+                    if (err.Length > 0)
+                        Debug.LogWarning($"[BgVideoPipe] hw decode test failed: {err}");
+                }
+                return code == 0;
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[BgVideoPipe] hw decode test error: {e.Message}");
+                return false;
+            }
+        }
+
         /// <summary>Spawns ffmpeg and starts the reader. Call on the main thread.</summary>
         public bool TryStart(string videoPath, double startSec)
         {
@@ -193,7 +246,7 @@ namespace MajdataViewX.Managers
                 // fast-forward through the gap after a pause (audio stayed put
                 // while its wall clock kept running), desyncing the video.
                 var cmd =
-                    $"{FfmpegEncoder.Binary} -hide_banner -loglevel error {seek}-i {quoted} " +
+                    $"{FfmpegEncoder.Binary} -hide_banner -loglevel error {seek}{FfmpegEncoder.HwDecodePrefix}-i {quoted} " +
                     $"-vf scale={Width}:{Height},vflip " +
                     $"-f rawvideo -pix_fmt rgba -vcodec rawvideo -";
                 _proc = FFmpegPipe.SpawnIo(cmd);

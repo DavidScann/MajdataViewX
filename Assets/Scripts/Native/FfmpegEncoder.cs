@@ -29,6 +29,9 @@ namespace MajdataViewX.Native
 
         private static string _encodersOutput;
         private static string _vaapiDevice;
+        private static string _hwaccelsOutput;
+        private static string _decoderPrefix;
+        private static bool _decoderProbed;
 
         /// <summary>Binary resolved from PATH, matching the editor's ffmpeg usage.</summary>
         public static string Binary => "ffmpeg";
@@ -109,6 +112,90 @@ namespace MajdataViewX.Native
                     return candidate;
             }
             return null;
+        }
+
+        /// <summary>
+        /// ffmpeg args enabling hardware decode of the background video
+        /// ("-hwaccel cuda -hwaccel_output_format yuv420p " etc.), or "" when
+        /// no usable GPU decoder was detected. Decoded frames are downloaded
+        /// to system memory so the existing scale/vflip/rawvideo chain keeps
+        /// working unchanged.
+        /// </summary>
+        public static string HwDecodePrefix
+        {
+            get
+            {
+                if (!_decoderProbed)
+                {
+                    _decoderProbed = true;
+                    _decoderPrefix = DetectHwDecode();
+                }
+                return _decoderPrefix;
+            }
+        }
+
+        /// <summary>Falls back to CPU decoding for the rest of the session.</summary>
+        public static void DisableHwDecode()
+        {
+            _decoderProbed = true;
+            _decoderPrefix = string.Empty;
+        }
+
+        private static string DetectHwDecode()
+        {
+            try
+            {
+                var hwaccels = GetHwaccelsOutput();
+                if (string.IsNullOrEmpty(hwaccels))
+                    return string.Empty;
+
+                if (hwaccels.Contains("cuda"))
+                    return "-hwaccel cuda -hwaccel_output_format yuv420p ";
+
+                var vaapiDevice = FindVaapiDevice();
+                if (hwaccels.Contains("vaapi") && vaapiDevice != null)
+                    return $"-init_hw_device vaapi=va:{vaapiDevice} " +
+                        "-hwaccel vaapi -hwaccel_output_format yuv420p ";
+
+                if (hwaccels.Contains("qsv") && vaapiDevice != null)
+                    return "-hwaccel qsv -hwaccel_output_format yuv420p ";
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[FfmpegEncoder] hw decode probe failed: {ex.Message}");
+            }
+            return string.Empty;
+        }
+
+        private static string GetHwaccelsOutput()
+        {
+            if (_hwaccelsOutput != null)
+                return _hwaccelsOutput;
+
+            try
+            {
+                // IL2CPP on Linux cannot spawn processes via System.Diagnostics
+                // (that's why the pipe plugin exists), so run the probe through
+                // FFmpegPipe's shell spawn and capture output via redirection.
+                var probeFile = Path.Combine(Application.temporaryCachePath, "ffmpeg_hwaccels.txt");
+                if (File.Exists(probeFile)) File.Delete(probeFile);
+                var probeCmd = $"{Binary} -hide_banner -hwaccels > \"{probeFile}\" 2>&1";
+                var proc = FFmpegPipe.SpawnSimple(probeCmd);
+                if (proc.IsValid)
+                {
+                    FFmpegPipe.Wait(proc);
+                    if (File.Exists(probeFile))
+                        _hwaccelsOutput = File.ReadAllText(probeFile);
+                }
+                if (_hwaccelsOutput == null)
+                    _hwaccelsOutput = string.Empty;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[FfmpegEncoder] hwaccels probe failed: {ex.Message}");
+                _hwaccelsOutput = string.Empty;
+            }
+            return _hwaccelsOutput;
         }
 
         private static string GetEncodersOutput()
