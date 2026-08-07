@@ -163,12 +163,13 @@ namespace MajdataViewX.Managers
 
         public async UniTask StartRecording(string maidataPath,
             int fps, ExportQuality quality, int exportWidth, int exportHeight, ExportCodec codec,
+            double recordEndTime,
             [CanBeNull] Action onStart = null)
         {
             QualitySettings.vSyncCount = 0;
             try
             {
-                await CaptureScreen(maidataPath, fps, quality, exportWidth, exportHeight, codec, onStart);
+                await CaptureScreen(maidataPath, fps, quality, exportWidth, exportHeight, codec, recordEndTime, onStart);
             }
             finally
             {
@@ -189,6 +190,7 @@ namespace MajdataViewX.Managers
 
         private async UniTask CaptureScreen(string maidataPath,
             int fps, ExportQuality quality, int exportWidth, int exportHeight, ExportCodec codec,
+            double recordEndTime,
             [CanBeNull] Action onStart = null)
         {
             if (fps <= 0)
@@ -282,13 +284,13 @@ namespace MajdataViewX.Managers
                 onStart?.Invoke();
                 _audioManager.BeginRecordingAudio(_timeProvider.AudioTime, _timeProvider.CurrentSpeed);
 
-                // The record covers the song from the starting position to the
-                // track end. The overlay percentage counts up to 100% for this
-                // segment, not the whole track (a "from here" export otherwise
-                // stalls at ~16% even though it finishes the song).
+                // The record covers the song from the starting position to
+                // recordEndTime (last note + All Perfect banner, capped at the
+                // track end). The overlay percentage counts up to 100% for this
+                // segment, not the whole track.
                 var recordStartTime = Math.Max(0, (double)_timeProvider.AudioTime);
                 var totalTime = Math.Max(0.01,
-                    _audioManager.TrackLength / Math.Max(_timeProvider.CurrentSpeed, 0.01f) -
+                    recordEndTime / Math.Max(_timeProvider.CurrentSpeed, 0.01f) -
                     recordStartTime);
                 exportFpsWindowAccum = 0f;
                 exportFpsWindowFrames = 0;
