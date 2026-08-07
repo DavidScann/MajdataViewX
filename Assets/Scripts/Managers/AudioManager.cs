@@ -35,6 +35,7 @@ namespace MajdataViewX.Managers
         public bool IsTrackLoaded => TrackSample != null;
         public bool IsTrackPlaying => TrackSample != null && TrackSample.IsPlaying;
         public double TrackCurrentSec => TrackSample != null ? TrackSample.CurrentSec : 0;
+        public double TrackLength => TrackSample != null ? TrackSample.Length : 0;
 
         //answer SFX gen
         private readonly List<AnswerTimingPoint> answerTimingPoints = new();

@@ -44,6 +44,11 @@ namespace MajdataViewX.Managers
         private static extern void video_encoder_free(IntPtr encoder);
 
         Text errText;
+        Canvas exportOverlayCanvas;
+        Text exportOverlayText;
+        float exportFpsWindowAccum;
+        int exportFpsWindowFrames;
+        float exportFps;
 
         public bool IsRecording { get; private set; }
 
@@ -55,6 +60,69 @@ namespace MajdataViewX.Managers
         private void Start()
         {
             errText = GameObject.Find("ErrText").GetComponent<Text>();
+            CreateExportOverlay();
+        }
+
+        private void CreateExportOverlay()
+        {
+            // Screen Space Overlay renders to the window regardless of the main
+            // camera's target texture, so it stays visible while the scene is
+            // being rendered into the export render target. It is not part of
+            // the recorded video.
+            var overlayGo = new GameObject("ExportOverlay");
+            DontDestroyOnLoad(overlayGo);
+            exportOverlayCanvas = overlayGo.AddComponent<Canvas>();
+            exportOverlayCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            exportOverlayCanvas.sortingOrder = 999;
+
+            var scaler = overlayGo.AddComponent<UnityEngine.UI.CanvasScaler>();
+            scaler.uiScaleMode = UnityEngine.UI.CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920, 1080);
+            scaler.matchWidthOrHeight = 0.5f;
+
+            var textGo = new GameObject("ExportStatusText");
+            textGo.transform.SetParent(overlayGo.transform, false);
+            exportOverlayText = textGo.AddComponent<Text>();
+            exportOverlayText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            exportOverlayText.fontSize = 48;
+            exportOverlayText.fontStyle = FontStyle.Bold;
+            exportOverlayText.alignment = TextAnchor.MiddleCenter;
+            exportOverlayText.color = Color.white;
+            exportOverlayText.horizontalOverflow = HorizontalWrapMode.Overflow;
+            exportOverlayText.verticalOverflow = VerticalWrapMode.Overflow;
+
+            var shadow = textGo.AddComponent<Shadow>();
+            shadow.effectColor = new Color(0, 0, 0, 0.8f);
+            shadow.effectDistance = new Vector2(2, -2);
+
+            var rect = (RectTransform)exportOverlayText.transform;
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+
+            exportOverlayCanvas.enabled = false;
+        }
+
+        private void UpdateExportOverlay(double recordingElapsedTime, double totalTime)
+        {
+            if (exportOverlayCanvas == null) return;
+
+            exportFpsWindowAccum += Time.unscaledDeltaTime;
+            exportFpsWindowFrames++;
+            if (exportFpsWindowAccum >= 0.5f)
+            {
+                exportFps = exportFpsWindowFrames / exportFpsWindowAccum;
+                exportFpsWindowAccum = 0f;
+                exportFpsWindowFrames = 0;
+            }
+
+            var percent = totalTime > 0
+                ? Math.Clamp(recordingElapsedTime / totalTime, 0, 1) * 100
+                : 0;
+
+            exportOverlayText.text =
+                $"Exporting...\n{percent:F2}%\n{exportFps:F0} FPS";
         }
 
         public async UniTask StartRecording(string maidataPath,
@@ -178,11 +246,20 @@ namespace MajdataViewX.Managers
                 onStart?.Invoke();
                 _audioManager.BeginRecordingAudio(_timeProvider.AudioTime, _timeProvider.CurrentSpeed);
 
+                var totalTime = _audioManager.TrackLength / Math.Max(_timeProvider.CurrentSpeed, 0.01f);
+                exportFpsWindowAccum = 0f;
+                exportFpsWindowFrames = 0;
+                exportFps = fps;
+                if (exportOverlayCanvas != null)
+                    exportOverlayCanvas.enabled = true;
+
                 while (IsRecording)
                 {
                     await UniTask.WaitForEndOfFrame(this);
                     var frameEndTime = recordingElapsedTime + frameDuration;
                     _audioManager.UpdateRecordingAudioFrame(recordingElapsedTime, frameEndTime);
+
+                    UpdateExportOverlay(recordingElapsedTime, totalTime);
 
 #if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
                     // The main camera renders directly into captureTexture at the
@@ -294,6 +371,9 @@ namespace MajdataViewX.Managers
                 // Restore the main camera to its original render target.
                 if (mainCamera != null)
                     mainCamera.targetTexture = prevTargetTexture;
+
+                if (exportOverlayCanvas != null)
+                    exportOverlayCanvas.enabled = false;
 
                 _audioManager.ReleaseRecordingAudio();
                 var resultPath = Path.Combine(maidataPath, finalName);
