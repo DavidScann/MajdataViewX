@@ -1,9 +1,12 @@
 ﻿#nullable enable
 
 
+using MajdataViewX.Native;
 using MajdataViewX.Utils;
 using System;
 using System.Collections;
+using System.IO;
+using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.Video;
@@ -31,6 +34,7 @@ namespace MajdataViewX.Managers
         private Animator detailAnim;
         private SpriteRenderer spriteRender;
         private VideoPlayer videoPlayer;
+        private BgVideoPipe? videoPipe;
 
         private float smoothRDelta;
         private double _recordLastRealTime;
@@ -40,6 +44,8 @@ namespace MajdataViewX.Managers
 
         private Sprite? Bg { get; set; }
         private string? VideoUrl { get; set; }
+        private string? VideoPath { get; set; }
+        private bool _resizeBg;
 
         public static bool hasBg;
         public static bool hasVideo;
@@ -68,6 +74,15 @@ namespace MajdataViewX.Managers
 
         private void Update()
         {
+#if UNITY_STANDALONE_LINUX || UNITY_EDITOR_LINUX
+            if (videoPipe != null)
+            {
+                videoPipe.UpdateFrame();
+                spriteRender.sprite = videoPipe.Sprite;
+                return;
+            }
+#endif
+
             var delta = (float)videoPlayer.clockTime - _timeProvider.AudioTime;
             smoothRDelta += (Time.unscaledDeltaTime - smoothRDelta) * 0.01f;
             if (_timeProvider.AudioTime < 0) return;
@@ -157,9 +172,24 @@ namespace MajdataViewX.Managers
             // spaces/unicode (e.g. "起死開戦 (Kishi Kaisen)/pv.mp4"). Build a
             // percent-encoded file URL instead.
             VideoUrl = new Uri(path).AbsoluteUri;
+            VideoPath = path;
         }
 
         public void ShowVideo(bool resizeBg)
+        {
+            if (!hasVideo) return;
+            _resizeBg = resizeBg;
+
+#if UNITY_STANDALONE_LINUX || UNITY_EDITOR_LINUX
+            // Unity's VideoPlayer has no H.264 decoder on Linux; decode with
+            // ffmpeg into a texture instead.
+            ShowVideoPipe(resizeBg);
+#else
+            ShowVideoPlayer(resizeBg);
+#endif
+        }
+
+        void ShowVideoPlayer(bool resizeBg)
         {
             if (!hasVideo) return;
 
@@ -204,21 +234,74 @@ namespace MajdataViewX.Managers
             }
         }
 
+        void ShowVideoPipe(bool resizeBg)
+        {
+            StopVideoPipe();
+
+            var startSec = Math.Max(0, (double)_timeProvider.AudioTime);
+            videoPipe = BgVideoPipe.Start(VideoPath, startSec);
+            if (videoPipe == null)
+            {
+                Debug.LogError($"[BgManager] ffmpeg video failed to start: {VideoPath}");
+                return;
+            }
+
+            // Scale the sprite to the pipe's fixed 1280x720 output (16:9),
+            // matching the VideoPlayer branch's aspect logic.
+            const float aspect = (float)BgVideoPipe.Height / BgVideoPipe.Width;
+            if (resizeBg)
+            {
+                gameObject.transform.localScale = new Vector3(FULLSCREEN_SCALE_X, FULLSCREEN_SCALE_X * aspect);
+                spriteRender.material = fullscreenBgMaterial;
+            }
+            else
+            {
+                gameObject.transform.localScale = new Vector3(CIRCLED_SCALE_X, CIRCLED_SCALE_X * aspect);
+                spriteRender.material = circledBgMaterial;
+            }
+        }
+
+        void StopVideoPipe()
+        {
+            if (videoPipe != null)
+            {
+                videoPipe.Dispose();
+                videoPipe = null;
+            }
+            spriteRender.sprite = null;
+        }
+
         public void PauseVideo()
         {
             if (!hasVideo) return;
+#if UNITY_STANDALONE_LINUX || UNITY_EDITOR_LINUX
+            StopVideoPipe();
+            return;
+#else
             videoPlayer.Pause();
+#endif
         }
 
         public void ContinueVideo()
         {
             if (!hasVideo) return;
+#if UNITY_STANDALONE_LINUX || UNITY_EDITOR_LINUX
+            // Restart the pipe from the current audio time (cheap enough on resume).
+            if (videoPipe == null && !string.IsNullOrEmpty(VideoPath))
+                ShowVideoPipe(_resizeBg);
+            return;
+#else
             videoPlayer.Play();
+#endif
         }
 
         public void ResetState()
         {
+#if UNITY_STANDALONE_LINUX || UNITY_EDITOR_LINUX
+            StopVideoPipe();
+#else
             videoPlayer.Stop();
+#endif
             // 销毁上一曲背景图(Texture2D/Sprite)，避免滞留到下次 LoadBG
             DestroyLoadedBackground();
             gameObject.transform.localScale = new Vector3(CIRCLED_SCALE_X, CIRCLED_SCALE_X, CIRCLED_SCALE_X);
@@ -232,6 +315,7 @@ namespace MajdataViewX.Managers
 
         private void OnDestroy()
         {
+            StopVideoPipe();
             DestroyLoadedBackground();
             if (_emptySprite != null)
             {
