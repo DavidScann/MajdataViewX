@@ -282,7 +282,14 @@ namespace MajdataViewX.Managers
                 onStart?.Invoke();
                 _audioManager.BeginRecordingAudio(_timeProvider.AudioTime, _timeProvider.CurrentSpeed);
 
-                var totalTime = _audioManager.TrackLength / Math.Max(_timeProvider.CurrentSpeed, 0.01f);
+                // The record covers the song from the starting position to the
+                // track end. The overlay percentage counts up to 100% for this
+                // segment, not the whole track (a "from here" export otherwise
+                // stalls at ~16% even though it finishes the song).
+                var recordStartTime = Math.Max(0, (double)_timeProvider.AudioTime);
+                var totalTime = Math.Max(0.01,
+                    _audioManager.TrackLength / Math.Max(_timeProvider.CurrentSpeed, 0.01f) -
+                    recordStartTime);
                 exportFpsWindowAccum = 0f;
                 exportFpsWindowFrames = 0;
                 exportFps = fps;
@@ -294,7 +301,7 @@ namespace MajdataViewX.Managers
                     exportOverlayCanvas.enabled = true;
                 }
 
-                while (IsRecording)
+                while (IsRecording && recordingElapsedTime < totalTime)
                 {
                     await UniTask.WaitForEndOfFrame(this);
                     var frameEndTime = recordingElapsedTime + frameDuration;
@@ -341,12 +348,15 @@ namespace MajdataViewX.Managers
                 MuxRecordingAudio(encoder);
                 FreeEncoder(ref encoder);
 #elif UNITY_STANDALONE_LINUX || UNITY_EDITOR_LINUX
+                var tEnc = Time.realtimeSinceStartup;
                 FFmpegPipe.ClosePipe(pipeProc);
                 var exitCode = FFmpegPipe.Wait(pipeProc);
+                Debug.Log($"[ScreenRecorder] encoder done in {(Time.realtimeSinceStartup - tEnc) * 1000:F0}ms (exit {exitCode})");
                 if (exitCode != 0)
                     throw new InvalidOperationException(
                         $"FFmpeg video encode failed (exit code {exitCode}).");
 
+                var tWav = Time.realtimeSinceStartup;
                 var pcmData = _audioManager.GetRecordingBuffer(out var sampleCount);
                 if (sampleCount > 0)
                 {
@@ -356,7 +366,9 @@ namespace MajdataViewX.Managers
                         AudioManager.CHANNELS,
                         pcmData.ToArray());
                 }
+                Debug.Log($"[ScreenRecorder] wav written in {(Time.realtimeSinceStartup - tWav) * 1000:F0}ms");
 
+                var tMux = Time.realtimeSinceStartup;
                 var muxCmd = $"cd \"{maidataPath}\" && {FfmpegEncoder.Binary} " +
                     FfmpegEncoder.BuildMuxArgs(tempVideoName, tempWavName, finalName);
                 var muxProc = FFmpegPipe.SpawnSimple(muxCmd);
@@ -364,6 +376,7 @@ namespace MajdataViewX.Managers
                     throw new InvalidOperationException(
                         "FFmpeg could not be started for audio muxing.");
                 var muxExit = FFmpegPipe.Wait(muxProc);
+                Debug.Log($"[ScreenRecorder] mux done in {(Time.realtimeSinceStartup - tMux) * 1000:F0}ms (exit {muxExit})");
                 if (muxExit != 0)
                     throw new InvalidOperationException(
                         $"FFmpeg audio mux failed (exit code {muxExit}).");
