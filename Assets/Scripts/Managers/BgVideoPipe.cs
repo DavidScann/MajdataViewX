@@ -2,6 +2,7 @@
 
 using MajdataViewX.Native;
 using System;
+using System.Globalization;
 using System.Threading;
 using UnityEngine;
 
@@ -15,35 +16,37 @@ namespace MajdataViewX.Managers
     /// </summary>
     public class BgVideoPipe : IDisposable
     {
-        public const int Width = 1280;
-        public const int Height = 720;
-
-        const int FrameBytes = Width * Height * 4;
+        const int MaxDimension = 1920; // cap to bound memory/bandwidth
 
         FFmpegPipe.PipeProcess _proc;
         Thread? _readerThread;
         volatile bool _running;
+        volatile bool _paused;
 
-        // Double buffering: the reader publishes freshly decoded frames into
-        // _latestBuffer; the main thread copies under the lock so the reader
-        // can immediately start filling the other buffer again.
-        readonly byte[] _frameA = new byte[FrameBytes];
-        readonly byte[] _frameB = new byte[FrameBytes];
+        byte[] _frameA;
+        byte[] _frameB;
         volatile byte[] _latestBuffer;
         readonly object _swapLock = new();
 
         Texture2D _texture;
         Sprite _sprite;
 
+        public int Width { get; }
+        public int Height { get; }
         public Texture2D Texture => _texture;
         public Sprite Sprite => _sprite;
 
         public bool IsRunning => _running && _proc.IsValid;
-        public bool HasFrame => _latestBuffer != null;
 
-        private BgVideoPipe()
+        BgVideoPipe(int width, int height)
         {
+            Width = width;
+            Height = height;
+            var frameBytes = width * height * 4;
+            _frameA = new byte[frameBytes];
+            _frameB = new byte[frameBytes];
             _latestBuffer = _frameA;
+
             _texture = new Texture2D(Width, Height, TextureFormat.RGBA32, false)
             {
                 filterMode = FilterMode.Bilinear,
@@ -57,7 +60,8 @@ namespace MajdataViewX.Managers
 
         public static BgVideoPipe? Start(string videoPath, double startSec)
         {
-            var player = new BgVideoPipe();
+            var (width, height) = ProbeScaledSize(videoPath);
+            var player = new BgVideoPipe(width, height);
             if (!player.TryStart(videoPath, startSec))
             {
                 player.Dispose();
@@ -66,13 +70,65 @@ namespace MajdataViewX.Managers
             return player;
         }
 
+        /// <summary>
+        /// Probes the video's native dimensions with ffprobe and computes a
+        /// scaled size that preserves the aspect ratio (max dimension 1920,
+        /// even dimensions for ffmpeg).
+        /// </summary>
+        static (int Width, int Height) ProbeScaledSize(string videoPath)
+        {
+            int nativeW = 1280, nativeH = 720;
+            try
+            {
+                var quoted = QuoteShellArgument(videoPath);
+                var cmd = $"ffprobe -v error -select_streams v:0 " +
+                    $"-show_entries stream=width,height -of csv=s=x:p=0 {quoted}";
+                var proc = FFmpegPipe.SpawnIo(cmd);
+                if (proc.IsValid)
+                {
+                    var buf = new byte[64];
+                    int got = FFmpegPipe.ReadFrame(proc, buf, buf.Length);
+                    FFmpegPipe.Kill(proc);
+                    FFmpegPipe.Wait(proc);
+                    FFmpegPipe.ClosePipe(proc);
+                    if (got > 0)
+                    {
+                        var text = System.Text.Encoding.UTF8.GetString(buf, 0, got).Trim();
+                        var parts = text.Split('x');
+                        if (parts.Length == 2 &&
+                            int.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out nativeW) &&
+                            int.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out nativeH) &&
+                            nativeW > 0 && nativeH > 0)
+                        {
+                            Debug.Log($"[BgVideoPipe] probed {nativeW}x{nativeH}");
+                        }
+                        else
+                        {
+                            nativeW = 1280; nativeH = 720;
+                        }
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[BgVideoPipe] probe failed, using 1280x720: {e.Message}");
+                nativeW = 1280; nativeH = 720;
+            }
+
+            // Scale to fit MaxDimension while keeping aspect; force even numbers.
+            float scale = Mathf.Min(1f, MaxDimension / (float)Math.Max(nativeW, nativeH));
+            int w = Mathf.Clamp((int)(nativeW * scale) & ~1, 2, MaxDimension);
+            int h = Mathf.Clamp((int)(nativeH * scale) & ~1, 2, MaxDimension);
+            return (w, h);
+        }
+
         bool TryStart(string videoPath, double startSec)
         {
             try
             {
                 var quoted = QuoteShellArgument(videoPath);
                 var seek = startSec > 0
-                    ? $"-ss {startSec.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)} "
+                    ? $"-ss {startSec.ToString("0.###", CultureInfo.InvariantCulture)} "
                     : "";
                 var cmd =
                     $"{FfmpegEncoder.Binary} -hide_banner -loglevel error -re {seek}-i {quoted} " +
@@ -82,6 +138,7 @@ namespace MajdataViewX.Managers
                 if (!_proc.IsValid) return false;
 
                 _running = true;
+                _paused = false;
                 _readerThread = new Thread(ReaderLoop) { IsBackground = true };
                 _readerThread.Start();
                 return true;
@@ -93,17 +150,28 @@ namespace MajdataViewX.Managers
             }
         }
 
+        public void Pause() => _paused = true;
+
+        public void Resume() => _paused = false;
+
         void ReaderLoop()
         {
             var buffer = _frameA;
+            var frameBytes = _frameA.Length;
             var consecutiveEof = 0;
             while (_running)
             {
-                int got = FFmpegPipe.ReadFrame(_proc, buffer, FrameBytes);
-                if (got != FrameBytes)
+                // Paused: stop reading so ffmpeg's pipe fills and it blocks —
+                // a natural pause that keeps the last frame on screen.
+                if (_paused)
                 {
-                    // EOF (video ended or ffmpeg died). Give up after a few
-                    // consecutive short reads; Dispose() also stops the loop.
+                    Thread.Sleep(10);
+                    continue;
+                }
+
+                int got = FFmpegPipe.ReadFrame(_proc, buffer, frameBytes);
+                if (got != frameBytes)
+                {
                     consecutiveEof++;
                     if (consecutiveEof >= 5) break;
                     Thread.Sleep(10);
@@ -123,12 +191,9 @@ namespace MajdataViewX.Managers
         /// <summary>Uploads the newest frame to the texture. Call on the main thread.</summary>
         public void UpdateFrame()
         {
-            if (_latestBuffer == null) return;
-
             byte[] frame;
             lock (_swapLock)
             {
-                // Copy out so the reader can overwrite the buffer immediately.
                 frame = (byte[])_latestBuffer.Clone();
             }
 
@@ -139,6 +204,7 @@ namespace MajdataViewX.Managers
         public void Dispose()
         {
             _running = false;
+            _paused = false;
             try
             {
                 if (_proc.IsValid)
