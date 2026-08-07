@@ -1,6 +1,8 @@
 using Cysharp.Threading.Tasks;
 using JetBrains.Annotations;
+using MajdataViewX.Native;
 using MajdataViewX.Types.Rendering;
+using MajdataViewX.Utils;
 using System;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -115,6 +117,15 @@ namespace MajdataViewX.Managers
             };
             var encoder = IntPtr.Zero;
 
+#if UNITY_STANDALONE_LINUX || UNITY_EDITOR_LINUX
+            const string tempVideoName = "temp.mp4";
+            const string tempWavName = "temp.wav";
+            var tempVideoPath = Path.Combine(maidataPath, tempVideoName);
+            var tempWavPath = Path.Combine(maidataPath, tempWavName);
+            var pipeProc = default(FFmpegPipe.PipeProcess);
+            Texture2D cpuTex = null;
+#endif
+
             try
             {
                 if (!captureTexture.Create())
@@ -124,6 +135,7 @@ namespace MajdataViewX.Managers
                 var outPath = Path.Combine(maidataPath, finalName);
                 if (File.Exists(outPath)) File.Delete(outPath);
 
+#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
                 encoder = video_encoder_create(
                     (int)quality,
                     width,
@@ -133,6 +145,23 @@ namespace MajdataViewX.Managers
                 if (encoder == IntPtr.Zero)
                     throw new InvalidOperationException(
                         "RenderingOut could not create the video encoder.");
+#elif UNITY_STANDALONE_LINUX || UNITY_EDITOR_LINUX
+                if (File.Exists(tempVideoPath)) File.Delete(tempVideoPath);
+                if (File.Exists(tempWavPath)) File.Delete(tempWavPath);
+
+                var videoArgs = FfmpegEncoder.BuildVideoArgs(width, height, fps, quality);
+                var videoCmd = $"cd \"{maidataPath}\" && {FfmpegEncoder.Binary} " +
+                    $"-hide_banner -y -f rawvideo -pix_fmt rgba -s {width}x{height} -r {fps} -i - " +
+                    $"{videoArgs} -movflags +faststart \"{tempVideoName}\"";
+                pipeProc = FFmpegPipe.Spawn(videoCmd);
+                if (!pipeProc.IsValid)
+                    throw new InvalidOperationException(
+                        "FFmpeg could not be started. Make sure ffmpeg is installed and in PATH.");
+                cpuTex = new Texture2D(width, height, TextureFormat.RGBA32, false);
+#else
+                throw new PlatformNotSupportedException(
+                    "Video export is only supported on Windows and Linux.");
+#endif
 
                 onStart?.Invoke();
                 _audioManager.BeginRecordingAudio(_timeProvider.AudioTime, _timeProvider.CurrentSpeed);
@@ -143,6 +172,7 @@ namespace MajdataViewX.Managers
                     var frameEndTime = recordingElapsedTime + frameDuration;
                     _audioManager.UpdateRecordingAudioFrame(recordingElapsedTime, frameEndTime);
 
+#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
                     ScreenCapture.CaptureScreenshotIntoRenderTexture(captureTexture);
                     var nativeTexture = captureTexture.GetNativeTexturePtr();
                     if (nativeTexture == IntPtr.Zero)
@@ -153,13 +183,63 @@ namespace MajdataViewX.Managers
                     if (submitResult < 0)
                         throw new InvalidOperationException(
                             $"RenderingOut failed to encode a video frame ({submitResult}).");
+#elif UNITY_STANDALONE_LINUX || UNITY_EDITOR_LINUX
+                    // Backbuffer readback matches the legacy Linux flow:
+                    // - ReadPixels is bottom-up, hence the vflip in the ffmpeg args
+                    // - backbuffer is RGBA, matching -pix_fmt rgba (no channel swap)
+                    RenderTexture.active = null;
+                    cpuTex.ReadPixels(new Rect(0, 0, width, height), 0, 0);
+                    var raw = cpuTex.GetRawTextureData();
+                    if (FFmpegPipe.Write(pipeProc, raw, raw.Length) < 0)
+                        throw new InvalidOperationException(
+                            "FFmpeg pipe write failed.");
+#else
+                    throw new PlatformNotSupportedException(
+                        "Video export is only supported on Windows and Linux.");
+#endif
 
                     recordingElapsedTime = frameEndTime;
                 }
 
                 _audioManager.EndRecordingAudio((float)recordingElapsedTime);
+
+#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
                 MuxRecordingAudio(encoder);
                 FreeEncoder(ref encoder);
+#elif UNITY_STANDALONE_LINUX || UNITY_EDITOR_LINUX
+                FFmpegPipe.ClosePipe(pipeProc);
+                var exitCode = FFmpegPipe.Wait(pipeProc);
+                if (exitCode != 0)
+                    throw new InvalidOperationException(
+                        $"FFmpeg video encode failed (exit code {exitCode}).");
+
+                var pcmData = _audioManager.GetRecordingBuffer(out var sampleCount);
+                if (sampleCount > 0)
+                {
+                    WavFileWriter.WriteFile(
+                        tempWavPath,
+                        AudioManager.SAMPLERATE,
+                        AudioManager.CHANNELS,
+                        pcmData.ToArray());
+                }
+
+                var muxCmd = $"cd \"{maidataPath}\" && {FfmpegEncoder.Binary} " +
+                    FfmpegEncoder.BuildMuxArgs(tempVideoName, tempWavName, finalName);
+                var muxProc = FFmpegPipe.SpawnSimple(muxCmd);
+                if (!muxProc.IsValid)
+                    throw new InvalidOperationException(
+                        "FFmpeg could not be started for audio muxing.");
+                var muxExit = FFmpegPipe.Wait(muxProc);
+                if (muxExit != 0)
+                    throw new InvalidOperationException(
+                        $"FFmpeg audio mux failed (exit code {muxExit}).");
+
+                if (File.Exists(tempVideoPath)) File.Delete(tempVideoPath);
+                if (File.Exists(tempWavPath)) File.Delete(tempWavPath);
+#else
+                throw new PlatformNotSupportedException(
+                    "Video export is only supported on Windows and Linux.");
+#endif
                 outputSucceeded = true;
             }
             catch (Exception e)
@@ -180,6 +260,23 @@ namespace MajdataViewX.Managers
                     Debug.LogException(ex);
                     errText.text = $"Finalizing the recording failed: {ex.Message}";
                 }
+
+#if UNITY_STANDALONE_LINUX || UNITY_EDITOR_LINUX
+                if (pipeProc.IsValid)
+                {
+                    try
+                    {
+                        FFmpegPipe.Kill(pipeProc);
+                        FFmpegPipe.ClosePipe(pipeProc);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.LogException(ex);
+                    }
+                }
+                if (cpuTex != null)
+                    Destroy(cpuTex);
+#endif
 
                 _audioManager.ReleaseRecordingAudio();
                 var resultPath = Path.Combine(maidataPath, finalName);
