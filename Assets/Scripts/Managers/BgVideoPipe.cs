@@ -17,6 +17,7 @@ namespace MajdataViewX.Managers
     public class BgVideoPipe : IDisposable
     {
         const int MaxDimension = 1920; // cap to bound memory/bandwidth
+        const float BaseWorldSize = 10.8f; // Bg SpriteRenderer base world size
 
         FFmpegPipe.PipeProcess _proc;
         Thread? _readerThread;
@@ -52,10 +53,15 @@ namespace MajdataViewX.Managers
                 filterMode = FilterMode.Bilinear,
                 wrapMode = TextureWrapMode.Clamp,
             };
+            // The Bg SpriteRenderer's base size is 10.8 world units (camera
+            // ortho size 5.4 * 2, matching Default_Background.png at 100 ppu).
+            // Create the sprite at that world size so BgManager's existing
+            // localScale + circle-material framing matches the static bg.
             _sprite = Sprite.Create(
                 _texture,
                 new Rect(0, 0, Width, Height),
-                new Vector2(0.5f, 0.5f));
+                new Vector2(0.5f, 0.5f),
+                pixelsPerUnit: Width / BaseWorldSize);
         }
 
         public static BgVideoPipe? Start(string videoPath, double startSec)
