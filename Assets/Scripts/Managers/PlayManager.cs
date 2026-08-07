@@ -251,9 +251,18 @@ namespace MajdataViewX.Managers
 
                         _allPerfectManager.enabled = true;
                         _state = ViewStatus.Playing;
+                        // The export ends at the last note plus the All Perfect
+                        // banner (the end marker), never running into the tail
+                        // of a longer PV. 4.5s = last-note tail + 3.5s AP show.
+                        const float ExportEndTailSec = 4.5f;
+                        var lastNoteEnd = _chart.NoteTimings.Length > 0
+                            ? _chart.NoteTimings[^1].Timing + ExportEndTailSec
+                            : double.MaxValue;
+                        var recordEndTime = Math.Min(_audioManager.TrackLength, lastNoteEnd);
                         _screenRecorder.StartRecording(maidataPath,
                             _setting.OutputFps, _setting.ExportQuality,
                             _setting.ExportWidth, _setting.ExportHeight, _setting.ExportCodec,
+                            recordEndTime,
                             () =>
                             {
                                 _timeProvider.SetStartTime(startAt, offset, speed, playmode, _setting.OutputFps);

@@ -11,10 +11,15 @@ namespace MajdataViewX.Managers
     public class AllPerfectManager : MonoBehaviour
     {
         private static readonly int PlayAllPerfectHash = Animator.StringToHash("playAllPerfect");
+        // Show.anim is 3.13s plus a 0.25s transition; wait it out before
+        // stopping (the animator holds the last frame, so the game object
+        // never deactivates on its own).
+        const float AP_SHOW_DURATION = 3.5f;
         [SerializeField]
         private Animator AllPerfect;
 
         private bool isPlayed;
+        private float apStartedAt;
 
         private void Awake()
         {
@@ -31,16 +36,15 @@ namespace MajdataViewX.Managers
             if (PlayManager.Summary.State is not ViewStatus.Playing)
                 return;
 
-            // In record (export) mode the capture loop ends itself at the
-            // track end; the AP finish must not cut the export short.
-            if (_timeProvider.IsRecord)
-                return;
-
+            // The AP banner is the end marker for every play, including
+            // Record/export mode: it triggers once all notes are judged,
+            // regardless of whether a Perfect was lost, and the export stops
+            // when the banner has played out.
             if (_objectCounter.AllFinished)
             {
                 if (isPlayed)
                 {
-                    if (!AllPerfect.gameObject.activeSelf)
+                    if (Time.time - apStartedAt >= AP_SHOW_DURATION)
                     {
                         _playManager.StopAsync().Forget();
                         _wsServer.SendStopResponse();
@@ -52,6 +56,7 @@ namespace MajdataViewX.Managers
                     AllPerfect.SetTrigger(PlayAllPerfectHash);
                     _audioManager.noteSfxPlaybackRequests[AudioManager.ALL_PERFECT] = true;
                     isPlayed = true;
+                    apStartedAt = Time.time;
                 }
             }
         }
@@ -60,6 +65,7 @@ namespace MajdataViewX.Managers
         {
             AllPerfect.gameObject.SetActive(false);
             isPlayed = false;
+            apStartedAt = 0f;
         }
     }
 }
