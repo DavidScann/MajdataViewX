@@ -73,7 +73,7 @@ namespace MajdataViewX.Managers
         public static BgVideoPipe? Start(string videoPath, double startSec)
         {
             var (width, height, fps) = ProbeVideoInfo(videoPath);
-            var player = new BgVideoPipe(width, height, fps);
+            var player = Create(width, height, fps);
             if (!player.TryStart(videoPath, startSec))
             {
                 player.Dispose();
@@ -82,12 +82,20 @@ namespace MajdataViewX.Managers
             return player;
         }
 
+        /// <summary>Creates the texture and sprite. Call on the main thread.</summary>
+        public static BgVideoPipe Create(int width, int height, double fps)
+        {
+            var player = new BgVideoPipe(width, height, fps);
+            return player;
+        }
+
         /// <summary>
         /// Probes the video's native dimensions and frame rate with ffprobe and
         /// computes a scaled size that preserves the aspect ratio (max dimension
-        /// 1920, even dimensions for ffmpeg).
+        /// 1920, even dimensions for ffmpeg). Spawns a process, so call it off
+        /// the main thread (Task.Run) to keep the game loop responsive.
         /// </summary>
-        static (int Width, int Height, double Fps) ProbeVideoInfo(string videoPath)
+        public static (int Width, int Height, double Fps) ProbeVideoInfo(string videoPath)
         {
             int nativeW = 1280, nativeH = 720;
             double fps = 30;
@@ -164,7 +172,8 @@ namespace MajdataViewX.Managers
             return fps is > 1 and < 240;
         }
 
-        bool TryStart(string videoPath, double startSec)
+        /// <summary>Spawns ffmpeg and starts the reader. Call on the main thread.</summary>
+        public bool TryStart(string videoPath, double startSec)
         {
             try
             {

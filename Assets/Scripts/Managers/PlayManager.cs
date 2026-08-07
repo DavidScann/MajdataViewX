@@ -185,7 +185,7 @@ namespace MajdataViewX.Managers
                 bgCover.color = new Color(0f, 0f, 0f, _setting.BackgroundDim);
                 bgOutsideCover.color = new Color(0f, 0f, 0f, _setting.BackgroundOutsideDim);
                 _bgManager.ShowBG();
-                _bgManager.ShowVideo(_setting.ResizeBg, startAt);
+                await _bgManager.ShowVideoAsync(_setting.ResizeBg, startAt);
                 //sfx
                 var clockCount = 0;
                 if (playmode != PlaybackMode.Normal)
