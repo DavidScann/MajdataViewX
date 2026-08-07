@@ -180,8 +180,7 @@ namespace MajdataViewX.Managers
                 {
                     if (Time.realtimeSinceStartup > timeout)
                     {
-                        Debug.LogError($"[BgManager] Video prepare timed out: {videoPlayer.url} " +
-                            $"(error: {videoPlayer.error}, errorCode: {videoPlayer.errorCode})");
+                        Debug.LogError($"[BgManager] Video prepare timed out: {videoPlayer.url}");
                         yield break;
                     }
                     yield return new WaitForEndOfFrame();
