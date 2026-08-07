@@ -36,6 +36,13 @@ namespace MajdataViewX.Managers
         private VideoPlayer videoPlayer;
         private BgVideoPipe? videoPipe;
 
+        // Preloaded while the chart loads so pressing play starts the video
+        // instantly instead of probing + spawning ffmpeg on the play path.
+        private BgVideoPipe? _idlePipe;
+        private (int Width, int Height, double Fps)? _probedInfo;
+        private Task? _preloadTask;
+        private int _preloadGeneration;
+
         private float smoothRDelta;
         private double _recordLastRealTime;
 
@@ -173,19 +180,52 @@ namespace MajdataViewX.Managers
             // percent-encoded file URL instead.
             VideoUrl = new Uri(path).AbsoluteUri;
             VideoPath = path;
+
+            // Untie the ffmpeg process from play: probe (spawns ffprobe, slow)
+            // and spawn the pipe on a background task while the chart loads,
+            // so the first play starts the video with no delay.
+            _preloadTask = PreloadVideoAsync(path);
         }
 
-        public void ShowVideo(bool resizeBg, double startAt = 0)
+        async Task PreloadVideoAsync(string path)
         {
-            if (!hasVideo) return;
+            var gen = ++_preloadGeneration;
+            try
+            {
+                var info = await Task.Run(() => BgVideoPipe.ProbeVideoInfo(path));
+                if (gen != _preloadGeneration)
+                    return; // superseded by a newer load/preload
+                _probedInfo = info;
+                var pipe = BgVideoPipe.Create(info.Width, info.Height, info.Fps);
+                if (pipe.TryStart(path, 0))
+                {
+                    _idlePipe?.Dispose();
+                    _idlePipe = pipe;
+                }
+                else
+                {
+                    pipe.Dispose();
+                    Debug.LogError($"[BgManager] ffmpeg video preload failed to start: {path}");
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[BgManager] video preload failed: {e.Message}");
+            }
+        }
+
+        public Task ShowVideoAsync(bool resizeBg, double startAt = 0)
+        {
+            if (!hasVideo) return Task.CompletedTask;
             _resizeBg = resizeBg;
 
 #if UNITY_STANDALONE_LINUX || UNITY_EDITOR_LINUX
             // Unity's VideoPlayer has no H.264 decoder on Linux; decode with
             // ffmpeg into a texture instead.
-            ShowVideoPipe(resizeBg, startAt);
+            return ShowVideoPipeAsync(resizeBg, startAt);
 #else
             ShowVideoPlayer(resizeBg);
+            return Task.CompletedTask;
 #endif
         }
 
@@ -234,7 +274,7 @@ namespace MajdataViewX.Managers
             }
         }
 
-        void ShowVideoPipe(bool resizeBg, double startAt = 0)
+        async Task ShowVideoPipeAsync(bool resizeBg, double startAt = 0)
         {
             StopVideoPipe();
 
@@ -242,30 +282,48 @@ namespace MajdataViewX.Managers
             // use the play's start time directly: seek there and pace the video
             // from it, matching the song clock.
             var startSec = Math.Max(0, startAt);
-            videoPipe = BgVideoPipe.Start(VideoPath, startSec);
-            if (videoPipe == null)
+
+            BgVideoPipe? pipe = null;
+            if (startSec <= 0.05 && _idlePipe != null)
+            {
+                // Playing from the top: the preloaded pipe is already decoded
+                // and parked at 0:00 — instant.
+                pipe = _idlePipe;
+                _idlePipe = null;
+            }
+            else
+            {
+                // Mid-song play: spawn a fresh pipe seeking to the start time.
+                // The probe is cached (or runs in a background task), so this
+                // only costs an ffmpeg spawn, not a main-thread stall.
+                _idlePipe?.Dispose();
+                _idlePipe = null;
+                var info = _probedInfo ??
+                    await Task.Run(() => BgVideoPipe.ProbeVideoInfo(VideoPath));
+                _probedInfo = info;
+                pipe = BgVideoPipe.Create(info.Width, info.Height, info.Fps);
+                if (!pipe.TryStart(VideoPath, startSec))
+                {
+                    pipe.Dispose();
+                    pipe = null;
+                }
+            }
+
+            if (pipe == null)
             {
                 Debug.LogError($"[BgManager] ffmpeg video failed to start: {VideoPath}");
                 return;
             }
+            videoPipe = pipe;
 
-            // The sprite is 10.8 world units base; scale it so the video covers
-            // the camera view (16:9 -> 19.2 x 10.8). The material decides the
-            // look: circledBgMaterial clips to the play circle (diameter 10.8,
-            // i.e. the video fills the circle), fullscreenBgMaterial shows the
-            // whole screen. A smaller (aspect-scaled) box would leave the video
-            // smaller than the circle, showing empty bands around it.
+            // The video is always limited to the playfield: the circled
+            // material clips it to the play circle. Uniform scale so the
+            // sprite covers the circle in both dimensions without stretching
+            // (the sprite base already carries the video's aspect ratio).
             var aspect = (float)videoPipe.Height / videoPipe.Width;
-            if (resizeBg)
-            {
-                gameObject.transform.localScale = new Vector3(FULLSCREEN_SCALE_X, FULLSCREEN_SCALE_X * aspect);
-                spriteRender.material = fullscreenBgMaterial;
-            }
-            else
-            {
-                gameObject.transform.localScale = new Vector3(FULLSCREEN_SCALE_X, FULLSCREEN_SCALE_X * aspect);
-                spriteRender.material = circledBgMaterial;
-            }
+            var s = 1f / Mathf.Min(1f, aspect);
+            gameObject.transform.localScale = new Vector3(s, s);
+            spriteRender.material = circledBgMaterial;
         }
 
         void StopVideoPipe()
@@ -306,6 +364,10 @@ namespace MajdataViewX.Managers
         {
 #if UNITY_STANDALONE_LINUX || UNITY_EDITOR_LINUX
             StopVideoPipe();
+            // Re-arm a parked pipe in the background so the next play is
+            // instant too (the stopped pipe is consumed, not reusable).
+            if (!string.IsNullOrWhiteSpace(VideoPath))
+                _preloadTask = PreloadVideoAsync(VideoPath);
 #else
             videoPlayer.Stop();
 #endif
@@ -323,6 +385,11 @@ namespace MajdataViewX.Managers
         private void OnDestroy()
         {
             StopVideoPipe();
+            if (_idlePipe != null)
+            {
+                _idlePipe.Dispose();
+                _idlePipe = null;
+            }
             DestroyLoadedBackground();
             if (_emptySprite != null)
             {
