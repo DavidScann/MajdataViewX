@@ -316,12 +316,15 @@ namespace MajdataViewX.Managers
                             $"RenderingOut failed to encode a video frame ({submitResult}).");
 #elif UNITY_STANDALONE_LINUX || UNITY_EDITOR_LINUX
                     // ReadPixels from the camera's render target (bottom-up,
-                    // hence the vflip in the ffmpeg args).
+                    // hence the vflip in the ffmpeg args). The generic
+                    // GetRawTextureData<byte> returns a zero-copy NativeArray
+                    // view; the non-generic overload would allocate an 8MB
+                    // copy per frame and stall the export in a GC spiral.
                     RenderTexture.active = captureTexture;
                     cpuTex.ReadPixels(new Rect(0, 0, width, height), 0, 0);
                     RenderTexture.active = null;
-                    var raw = cpuTex.GetRawTextureData();
-                    if (FFmpegPipe.Write(pipeProc, raw, raw.Length) < 0)
+                    var raw = cpuTex.GetRawTextureData<byte>();
+                    if (FFmpegPipe.Write(pipeProc, raw) < 0)
                         throw new InvalidOperationException(
                             "FFmpeg pipe write failed.");
 #else
