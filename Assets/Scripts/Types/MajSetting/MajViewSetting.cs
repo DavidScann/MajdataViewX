@@ -16,6 +16,9 @@ namespace MajdataViewX.Types.MajSetting
         public bool ShowHand { get; set; } = false;
         public int OutputFps { get; set; } = 60;
         public ExportQuality ExportQuality { get; set; } = ExportQuality.High;
+        public int ExportWidth { get; set; } = 0;
+        public int ExportHeight { get; set; } = 0;
+        public ExportCodec ExportCodec { get; set; } = ExportCodec.H264;
         public bool ResizeBg { get; set; } = false;
         public UIType UIType { get; set; } = UIType.Legacy;
         public double GlobalAudioOffset { get; set; } = 0;

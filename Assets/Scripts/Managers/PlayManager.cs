@@ -247,6 +247,7 @@ namespace MajdataViewX.Managers
                         _state = ViewStatus.Playing;
                         _screenRecorder.StartRecording(maidataPath,
                             _setting.OutputFps, _setting.ExportQuality,
+                            _setting.ExportWidth, _setting.ExportHeight, _setting.ExportCodec,
                             () =>
                             {
                                 _timeProvider.SetStartTime(startAt, offset, speed, playmode, _setting.OutputFps);

@@ -1,6 +1,7 @@
 using Cysharp.Threading.Tasks;
 using JetBrains.Annotations;
 using MajdataViewX.Native;
+using MajdataViewX.Types.Enums;
 using MajdataViewX.Types.Rendering;
 using MajdataViewX.Utils;
 using System;
@@ -57,12 +58,13 @@ namespace MajdataViewX.Managers
         }
 
         public async UniTask StartRecording(string maidataPath,
-            int fps, ExportQuality quality, [CanBeNull] Action onStart = null)
+            int fps, ExportQuality quality, int exportWidth, int exportHeight, ExportCodec codec,
+            [CanBeNull] Action onStart = null)
         {
             QualitySettings.vSyncCount = 0;
             try
             {
-                await CaptureScreen(maidataPath, fps, quality, onStart);
+                await CaptureScreen(maidataPath, fps, quality, exportWidth, exportHeight, codec, onStart);
             }
             finally
             {
@@ -82,7 +84,8 @@ namespace MajdataViewX.Managers
         }
 
         private async UniTask CaptureScreen(string maidataPath,
-            int fps, ExportQuality quality, [CanBeNull] Action onStart = null)
+            int fps, ExportQuality quality, int exportWidth, int exportHeight, ExportCodec codec,
+            [CanBeNull] Action onStart = null)
         {
             if (fps <= 0)
             {
@@ -90,17 +93,18 @@ namespace MajdataViewX.Managers
                 return;
             }
 
-            if (Screen.width % 2 != 0 || Screen.height % 2 != 0)
+            var width = exportWidth > 0 ? exportWidth : Screen.width;
+            var height = exportHeight > 0 ? exportHeight : Screen.height;
+
+            if (width % 2 != 0 || height % 2 != 0)
             {
-                errText.text = $"Encoding cannot start: Resolution width and height must be even numbers. Current: {Screen.width}x{Screen.height}.";
+                errText.text = $"Encoding cannot start: Resolution width and height must be even numbers. Current: {width}x{height}.";
                 return;
             }
 
             const string finalName = "out.mp4";
 
             IsRecording = true;
-            var width = Screen.width;
-            var height = Screen.height;
             var frameDuration = 1.0 / fps;
             var recordingElapsedTime = 0.0;
             var outputSucceeded = false;
@@ -125,12 +129,20 @@ namespace MajdataViewX.Managers
             var pipeProc = default(FFmpegPipe.PipeProcess);
             Texture2D cpuTex = null;
 #endif
+            var mainCamera = Camera.main;
+            var prevTargetTexture = mainCamera != null ? mainCamera.targetTexture : null;
 
             try
             {
                 if (!captureTexture.Create())
                     throw new InvalidOperationException(
                         "Could not create the screen recorder render target.");
+
+                // Render the scene natively into the capture target at the export
+                // resolution (e.g. 3840x2160) instead of capturing the window at
+                // its current size. The main camera is restored in the finally block.
+                if (mainCamera != null)
+                    mainCamera.targetTexture = captureTexture;
 
                 var outPath = Path.Combine(maidataPath, finalName);
                 if (File.Exists(outPath)) File.Delete(outPath);
@@ -149,7 +161,7 @@ namespace MajdataViewX.Managers
                 if (File.Exists(tempVideoPath)) File.Delete(tempVideoPath);
                 if (File.Exists(tempWavPath)) File.Delete(tempWavPath);
 
-                var videoArgs = FfmpegEncoder.BuildVideoArgs(width, height, fps, quality);
+                var videoArgs = FfmpegEncoder.BuildVideoArgs(width, height, fps, quality, codec);
                 var videoCmd = $"cd \"{maidataPath}\" && {FfmpegEncoder.Binary} " +
                     $"-hide_banner -y -f rawvideo -pix_fmt rgba -s {width}x{height} -r {fps} -i - " +
                     $"{videoArgs} -movflags +faststart \"{tempVideoName}\"";
@@ -173,7 +185,8 @@ namespace MajdataViewX.Managers
                     _audioManager.UpdateRecordingAudioFrame(recordingElapsedTime, frameEndTime);
 
 #if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
-                    ScreenCapture.CaptureScreenshotIntoRenderTexture(captureTexture);
+                    // The main camera renders directly into captureTexture at the
+                    // export resolution; hand its native texture to the encoder.
                     var nativeTexture = captureTexture.GetNativeTexturePtr();
                     if (nativeTexture == IntPtr.Zero)
                         throw new InvalidOperationException(
@@ -184,11 +197,11 @@ namespace MajdataViewX.Managers
                         throw new InvalidOperationException(
                             $"RenderingOut failed to encode a video frame ({submitResult}).");
 #elif UNITY_STANDALONE_LINUX || UNITY_EDITOR_LINUX
-                    // Backbuffer readback matches the legacy Linux flow:
-                    // - ReadPixels is bottom-up, hence the vflip in the ffmpeg args
-                    // - backbuffer is RGBA, matching -pix_fmt rgba (no channel swap)
-                    RenderTexture.active = null;
+                    // ReadPixels from the camera's render target (bottom-up,
+                    // hence the vflip in the ffmpeg args).
+                    RenderTexture.active = captureTexture;
                     cpuTex.ReadPixels(new Rect(0, 0, width, height), 0, 0);
+                    RenderTexture.active = null;
                     var raw = cpuTex.GetRawTextureData();
                     if (FFmpegPipe.Write(pipeProc, raw, raw.Length) < 0)
                         throw new InvalidOperationException(
@@ -277,6 +290,10 @@ namespace MajdataViewX.Managers
                 if (cpuTex != null)
                     Destroy(cpuTex);
 #endif
+
+                // Restore the main camera to its original render target.
+                if (mainCamera != null)
+                    mainCamera.targetTexture = prevTargetTexture;
 
                 _audioManager.ReleaseRecordingAudio();
                 var resultPath = Path.Combine(maidataPath, finalName);

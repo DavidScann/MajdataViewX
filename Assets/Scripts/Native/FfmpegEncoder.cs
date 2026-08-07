@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
+using MajdataViewX.Types.Enums;
 using MajdataViewX.Types.Rendering;
 using UnityEngine;
 
@@ -10,8 +11,11 @@ namespace MajdataViewX.Native
 {
     /// <summary>
     /// Picks the best available video encoder for the Linux pipe pipeline.
-    /// Probes the ffmpeg binary once (cached) and prefers hardware encoders:
-    /// h264_nvenc &gt; h264_vaapi &gt; h264_qsv &gt; h264_videotoolbox &gt; libx264.
+    /// Probes the ffmpeg binary once (cached) and prefers hardware encoders
+    /// per selected codec:
+    ///   H264: h264_nvenc &gt; h264_vaapi &gt; h264_qsv &gt; h264_videotoolbox &gt; libx264
+    ///   HEVC: hevc_nvenc &gt; hevc_vaapi &gt; hevc_qsv &gt; hevc_videotoolbox &gt; libx265
+    ///   AV1 : av1_nvenc &gt; av1_vaapi &gt; libsvtav1 (CPU)
     /// </summary>
     public static class FfmpegEncoder
     {
@@ -24,19 +28,17 @@ namespace MajdataViewX.Native
             VideoToolbox,
         }
 
-        private static HwKind? _probed;
+        private static string _encodersOutput;
         private static string _vaapiDevice;
 
         /// <summary>Binary resolved from PATH, matching the editor's ffmpeg usage.</summary>
         public static string Binary => "ffmpeg";
 
-        public static HwKind ProbedKind => _probed ??= Probe();
-
         /// <summary>
         /// ffmpeg arguments (everything between the rawvideo input and the output file)
         /// for encoding piped RGBA frames at the given settings.
         /// </summary>
-        public static string BuildVideoArgs(int width, int height, int fps, ExportQuality quality)
+        public static string BuildVideoArgs(int width, int height, int fps, ExportQuality quality, ExportCodec codec)
         {
             var qp = quality switch
             {
@@ -46,24 +48,39 @@ namespace MajdataViewX.Native
                 _ => 14,
             };
 
-            switch (ProbedKind)
+            var encoder = PickEncoder(codec);
+            if (encoder == null)
+                throw new InvalidOperationException(
+                    $"No usable video encoder found for codec {codec}. " +
+                    "Check that ffmpeg is installed with the required encoders.");
+
+            Debug.Log($"[FfmpegEncoder] using {encoder}");
+            switch (encoder)
             {
-                case HwKind.Nvenc:
-                    Debug.Log("[FfmpegEncoder] using h264_nvenc");
-                    return $"-vf vflip -c:v h264_nvenc -preset p5 -tune hq -cq {qp} -pix_fmt yuv420p";
-                case HwKind.Vaapi:
-                    Debug.Log($"[FfmpegEncoder] using h264_vaapi ({_vaapiDevice})");
-                    return $"-init_hw_device vaapi=va:{_vaapiDevice} -filter_hw_device va " +
-                        $"-vf vflip,format=nv12,hwupload -c:v h264_vaapi -qp {qp}";
-                case HwKind.Qsv:
-                    Debug.Log("[FfmpegEncoder] using h264_qsv");
-                    return $"-vf vflip,format=nv12 -c:v h264_qsv -global_quality {qp}";
-                case HwKind.VideoToolbox:
-                    Debug.Log("[FfmpegEncoder] using h264_videotoolbox");
-                    return $"-vf vflip -c:v h264_videotoolbox -q:v {qp} -pix_fmt yuv420p";
-                default:
-                    Debug.Log("[FfmpegEncoder] using libx264");
+                case "libx264":
                     return $"-vf vflip -c:v libx264 -preset veryfast -crf {qp} -pix_fmt yuv420p";
+                case "libx265":
+                    return $"-vf vflip -c:v libx265 -preset veryfast -crf {qp} -pix_fmt yuv420p";
+                case "libsvtav1":
+                    return $"-vf vflip -c:v libsvtav1 -preset 8 -crf {qp} -pix_fmt yuv420p";
+                case "h264_nvenc":
+                case "hevc_nvenc":
+                case "av1_nvenc":
+                    return $"-vf vflip -c:v {encoder} -preset p5 -tune hq -cq {qp} -pix_fmt yuv420p";
+                case "h264_vaapi":
+                case "hevc_vaapi":
+                case "av1_vaapi":
+                    return $"-init_hw_device vaapi=va:{_vaapiDevice} -filter_hw_device va " +
+                        $"-vf vflip,format=nv12,hwupload -c:v {encoder} -qp {qp}";
+                case "h264_qsv":
+                case "hevc_qsv":
+                    return $"-vf vflip,format=nv12 -c:v {encoder} -global_quality {qp}";
+                case "h264_videotoolbox":
+                case "hevc_videotoolbox":
+                    return $"-vf vflip -c:v {encoder} -q:v {qp} -pix_fmt yuv420p";
+                default:
+                    throw new InvalidOperationException(
+                        $"Unhandled encoder {encoder} for codec {codec}.");
             }
         }
 
@@ -72,8 +89,34 @@ namespace MajdataViewX.Native
             "-c:v copy -c:a aac -b:a 320k -shortest " +
             $"\"{finalName}\"";
 
-        private static HwKind Probe()
+        private static string PickEncoder(ExportCodec codec)
         {
+            var output = GetEncodersOutput();
+            return codec switch
+            {
+                ExportCodec.HEVC => FirstOf(output, "hevc_nvenc", "hevc_vaapi", "hevc_qsv", "hevc_videotoolbox", "libx265"),
+                ExportCodec.AV1 => FirstOf(output, "av1_nvenc", "av1_vaapi", "libsvtav1"),
+                _ => FirstOf(output, "h264_nvenc", "h264_vaapi", "h264_qsv", "h264_videotoolbox", "libx264"),
+            };
+        }
+
+        private static string FirstOf(string encodersOutput, params string[] candidates)
+        {
+            foreach (var candidate in candidates)
+            {
+                if (candidate.Contains("vaapi") && _vaapiDevice == null)
+                    continue;
+                if (encodersOutput.Contains(candidate))
+                    return candidate;
+            }
+            return null;
+        }
+
+        private static string GetEncodersOutput()
+        {
+            if (_encodersOutput != null)
+                return _encodersOutput;
+
             _vaapiDevice = FindVaapiDevice();
             try
             {
@@ -94,21 +137,18 @@ namespace MajdataViewX.Native
                 if (!proc.WaitForExit((int)TimeSpan.FromSeconds(5).TotalMilliseconds))
                 {
                     proc.Kill();
-                    return HwKind.None;
+                    _encodersOutput = string.Empty;
+                    return _encodersOutput;
                 }
-                var output = stdoutTask.GetAwaiter().GetResult() +
-                             stderrTask.GetAwaiter().GetResult();
-
-                if (output.Contains("h264_nvenc")) return HwKind.Nvenc;
-                if (output.Contains("h264_vaapi") && _vaapiDevice != null) return HwKind.Vaapi;
-                if (output.Contains("h264_qsv")) return HwKind.Qsv;
-                if (output.Contains("h264_videotoolbox")) return HwKind.VideoToolbox;
+                _encodersOutput = stdoutTask.GetAwaiter().GetResult() +
+                                  stderrTask.GetAwaiter().GetResult();
             }
             catch (Exception ex)
             {
                 Debug.LogWarning($"[FfmpegEncoder] encoder probe failed: {ex.Message}");
+                _encodersOutput = string.Empty;
             }
-            return HwKind.None;
+            return _encodersOutput;
         }
 
         private static string FindVaapiDevice()
