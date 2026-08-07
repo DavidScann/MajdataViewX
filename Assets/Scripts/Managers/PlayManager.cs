@@ -104,6 +104,7 @@ namespace MajdataViewX.Managers
         public void Setting(MajViewSetting setting, MajVolumeSetting volumeSetting)
         {
             _setting = setting;
+            _effectManager.SetDisplayMode(setting.JudgeDisplayMode);
             _audioManager.Setting(setting.GlobalAudioOffset, volumeSetting);
         }
 

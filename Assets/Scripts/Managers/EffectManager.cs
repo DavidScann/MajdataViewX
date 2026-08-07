@@ -44,6 +44,9 @@ namespace MajdataViewX.Managers
 
         private readonly SpriteRenderer[] fastLateRenderers = new SpriteRenderer[EFFECT_COUNT];
 
+        private bool showFL;
+        private bool showLevel;
+
         private GameObject fireworkEffect;
         private Animator fireworkAnimator;
 
@@ -147,6 +150,30 @@ namespace MajdataViewX.Managers
                 judgeEffectRequests[i] = default;
         }
 
+        public void SetDisplayMode(JudgeDisplayMode mode)
+        {
+            switch (mode)
+            {
+                case JudgeDisplayMode.None:
+                    showFL = showLevel = false;
+                    break;
+                case JudgeDisplayMode.FastLate:
+                    showFL = true;
+                    showLevel = false;
+                    break;
+                case JudgeDisplayMode.Level:
+                    showFL = false;
+                    showLevel = true;
+                    break;
+                case JudgeDisplayMode.Both:
+                    showFL = showLevel = true;
+                    break;
+                default:
+                    showFL = showLevel = true;
+                    break;
+            }
+        }
+
         private void PlayTapEffect(int pos, JudgeGrade judge, bool isBreak)
         {
             // Effect & Judge Text
@@ -154,7 +181,8 @@ namespace MajdataViewX.Managers
             {
                 case JudgeGrade.LateGood:
                 case JudgeGrade.FastGood:
-                    judgeRenderers[pos].sprite = _noteSkinManager.JudgeText[1];
+                    if (showLevel)
+                        judgeRenderers[pos].sprite = _noteSkinManager.JudgeText[1];
                     if (isBreak)
                     {
                         tapAnimators[pos].speed = 0.9f;
@@ -172,7 +200,8 @@ namespace MajdataViewX.Managers
                 case JudgeGrade.FastGreat3rd:
                 case JudgeGrade.FastGreat2nd:
                 case JudgeGrade.FastGreat1st:
-                    judgeRenderers[pos].sprite = _noteSkinManager.JudgeText[2];
+                    if (showLevel)
+                        judgeRenderers[pos].sprite = _noteSkinManager.JudgeText[2];
                     if (isBreak)
                     {
                         tapAnimators[pos].speed = 0.9f;
@@ -188,7 +217,8 @@ namespace MajdataViewX.Managers
                 case JudgeGrade.LatePerfect2nd:
                 case JudgeGrade.FastPerfect3rd:
                 case JudgeGrade.FastPerfect2nd:
-                    judgeRenderers[pos].sprite = _noteSkinManager.JudgeText[3];
+                    if (showLevel)
+                        judgeRenderers[pos].sprite = _noteSkinManager.JudgeText[3];
                     if (isBreak)
                     {
                         tapAnimators[pos].speed = 0.9f;
@@ -202,7 +232,8 @@ namespace MajdataViewX.Managers
                     break;
                 case JudgeGrade.LateCritical:
                 case JudgeGrade.FastCritical:
-                    judgeRenderers[pos].sprite = _noteSkinManager.JudgeText[4];
+                    if (showLevel)
+                        judgeRenderers[pos].sprite = _noteSkinManager.JudgeText[4];
                     if (isBreak)
                     {
                         tapAnimators[pos].speed = 0.9f;
@@ -215,28 +246,35 @@ namespace MajdataViewX.Managers
                     }
                     break;
                 default:
-                    judgeRenderers[pos].sprite = _noteSkinManager.JudgeText[0];
+                    if (showLevel)
+                        judgeRenderers[pos].sprite = _noteSkinManager.JudgeText[0];
                     break;
             }
 
             // Judge Anim
-            if (isBreak && (judge is JudgeGrade.LateCritical or JudgeGrade.FastCritical))
-                judgeAnimators[pos].SetTrigger(BPerfectHash);
-            else
-                judgeAnimators[pos].SetTrigger(PerfectHash);
+            if (showLevel)
+            {
+                if (isBreak && (judge is JudgeGrade.LateCritical or JudgeGrade.FastCritical))
+                    judgeAnimators[pos].SetTrigger(BPerfectHash);
+                else
+                    judgeAnimators[pos].SetTrigger(PerfectHash);
+            }
 
             // Fast / Late
-            if (judge is JudgeGrade.Miss or JudgeGrade.LateCritical or JudgeGrade.FastCritical)
+            if (showFL)
             {
-                fastLateRenderers[pos].sprite = null;
-            }
-            else
-            {
-                var isFast = judge <= JudgeGrade.FastCritical;
-                if (isFast)
-                    fastLateRenderers[pos].sprite = _noteSkinManager.FastText;
+                if (judge is JudgeGrade.Miss or JudgeGrade.LateCritical or JudgeGrade.FastCritical)
+                {
+                    fastLateRenderers[pos].sprite = null;
+                }
                 else
-                    fastLateRenderers[pos].sprite = _noteSkinManager.LateText;
+                {
+                    var isFast = judge <= JudgeGrade.FastCritical;
+                    if (isFast)
+                        fastLateRenderers[pos].sprite = _noteSkinManager.FastText;
+                    else
+                        fastLateRenderers[pos].sprite = _noteSkinManager.LateText;
+                }
             }
         }
 
@@ -247,7 +285,8 @@ namespace MajdataViewX.Managers
             {
                 case JudgeGrade.LateGood:
                 case JudgeGrade.FastGood:
-                    judgeRenderers[pos].sprite = _noteSkinManager.JudgeText[1];
+                    if (showLevel)
+                        judgeRenderers[pos].sprite = _noteSkinManager.JudgeText[1];
                     touchAnimators[pos].SetTrigger(GoodHash);
                     break;
                 case JudgeGrade.LateGreat3rd:
@@ -256,44 +295,54 @@ namespace MajdataViewX.Managers
                 case JudgeGrade.FastGreat3rd:
                 case JudgeGrade.FastGreat2nd:
                 case JudgeGrade.FastGreat1st:
-                    judgeRenderers[pos].sprite = _noteSkinManager.JudgeText[2];
+                    if (showLevel)
+                        judgeRenderers[pos].sprite = _noteSkinManager.JudgeText[2];
                     touchAnimators[pos].SetTrigger(GreatHash);
                     break;
                 case JudgeGrade.LatePerfect3rd:
                 case JudgeGrade.LatePerfect2nd:
                 case JudgeGrade.FastPerfect3rd:
                 case JudgeGrade.FastPerfect2nd:
-                    judgeRenderers[pos].sprite = _noteSkinManager.JudgeText[3];
+                    if (showLevel)
+                        judgeRenderers[pos].sprite = _noteSkinManager.JudgeText[3];
                     touchAnimators[pos].SetTrigger(PerfectHash);
                     break;
                 case JudgeGrade.LateCritical:
                 case JudgeGrade.FastCritical:
-                    judgeRenderers[pos].sprite = _noteSkinManager.JudgeText[4];
+                    if (showLevel)
+                        judgeRenderers[pos].sprite = _noteSkinManager.JudgeText[4];
                     touchAnimators[pos].SetTrigger(PerfectHash);
                     break;
                 default:
-                    judgeRenderers[pos].sprite = _noteSkinManager.JudgeText[0];
+                    if (showLevel)
+                        judgeRenderers[pos].sprite = _noteSkinManager.JudgeText[0];
                     break;
             }
 
             // Judge Anim
-            if (isBreak && (judge is JudgeGrade.LateCritical or JudgeGrade.FastCritical))
-                judgeAnimators[pos].SetTrigger(BPerfectHash);
-            else
-                judgeAnimators[pos].SetTrigger(PerfectHash);
+            if (showLevel)
+            {
+                if (isBreak && (judge is JudgeGrade.LateCritical or JudgeGrade.FastCritical))
+                    judgeAnimators[pos].SetTrigger(BPerfectHash);
+                else
+                    judgeAnimators[pos].SetTrigger(PerfectHash);
+            }
 
             // Fast / Late
-            if (judge is JudgeGrade.Miss or JudgeGrade.LateCritical or JudgeGrade.FastCritical)
+            if (showFL)
             {
-                fastLateRenderers[pos].sprite = null;
-            }
-            else
-            {
-                var isFast = judge <= JudgeGrade.FastCritical;
-                if (isFast)
-                    fastLateRenderers[pos].sprite = _noteSkinManager.FastText;
+                if (judge is JudgeGrade.Miss or JudgeGrade.LateCritical or JudgeGrade.FastCritical)
+                {
+                    fastLateRenderers[pos].sprite = null;
+                }
                 else
-                    fastLateRenderers[pos].sprite = _noteSkinManager.LateText;
+                {
+                    var isFast = judge <= JudgeGrade.FastCritical;
+                    if (isFast)
+                        fastLateRenderers[pos].sprite = _noteSkinManager.FastText;
+                    else
+                        fastLateRenderers[pos].sprite = _noteSkinManager.LateText;
+                }
             }
         }
 

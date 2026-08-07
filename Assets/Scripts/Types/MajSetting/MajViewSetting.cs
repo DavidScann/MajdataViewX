@@ -11,6 +11,7 @@ namespace MajdataViewX.Types.MajSetting
         public float BackgroundDim { get; set; } = 0.7f;
         public float BackgroundOutsideDim { get; set; } = 0.3f;
         public BgInfoDisplay ComboStatusType { get; set; } = BgInfoDisplay.Combo;
+        public JudgeDisplayMode JudgeDisplayMode { get; set; } = JudgeDisplayMode.Both;
         public AutoPlayMode AutoMode { get; set; } = AutoPlayMode.Enable;
         public bool ShowHand { get; set; } = false;
         public int OutputFps { get; set; } = 60;
