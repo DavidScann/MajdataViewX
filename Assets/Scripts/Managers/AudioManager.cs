@@ -97,7 +97,7 @@ namespace MajdataViewX.Managers
         {
             _audioManager = this;
             SfxRequestsPtr = (bool*)noteSfxPlaybackRequests.GetUnsafePtr();
-#if UNITY_STANDALONE_LINUX
+#if UNITY_STANDALONE_LINUX || UNITY_EDITOR_LINUX
             // ManagedBASS on Linux requires the full filename including ".so".
             Bass.PluginLoad("libbassopus.so");
 #endif
