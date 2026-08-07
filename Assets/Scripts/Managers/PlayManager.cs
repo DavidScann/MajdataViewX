@@ -251,14 +251,32 @@ namespace MajdataViewX.Managers
 
                         _allPerfectManager.enabled = true;
                         _state = ViewStatus.Playing;
-                        // The export ends at the last note plus the All Perfect
-                        // banner (the end marker), never running into the tail
-                        // of a longer PV. 4.5s = last-note tail + 3.5s AP show.
-                        const float ExportEndTailSec = 4.5f;
-                        var lastNoteEnd = _chart.NoteTimings.Length > 0
-                            ? _chart.NoteTimings[^1].Timing + ExportEndTailSec
-                            : double.MaxValue;
-                        var recordEndTime = Math.Min(_audioManager.TrackLength, lastNoteEnd);
+                        // The export ends at the last note's END plus the All
+                        // Perfect banner (the end marker): AllPerfectManager
+                        // stops the record there, so the record always includes
+                        // the full last note (holds/slides extend past their
+                        // timing). The loop's own cap is only a safety net for
+                        // the case where the banner never fires.
+                        const float ApShowSec = 3.5f;
+                        double lastNoteEnd = 0;
+                        for (var ti = 0; ti < _chart.NoteTimings.Length; ti++)
+                        {
+                            var timing = _chart.NoteTimings[ti];
+                            for (var ni = 0; ni < timing.Notes.Length; ni++)
+                            {
+                                var note = timing.Notes[ni];
+                                var end = note.Type switch
+                                {
+                                    SimaiNoteType.Hold or SimaiNoteType.TouchHold =>
+                                        timing.Timing + note.HoldTime,
+                                    SimaiNoteType.Slide =>
+                                        timing.Timing + note.SlideStartTime + note.SlideTime,
+                                    _ => timing.Timing,
+                                };
+                                if (end > lastNoteEnd) lastNoteEnd = end;
+                            }
+                        }
+                        var recordEndTime = Math.Min(_audioManager.TrackLength, lastNoteEnd + ApShowSec);
                         _screenRecorder.StartRecording(maidataPath,
                             _setting.OutputFps, _setting.ExportQuality,
                             _setting.ExportWidth, _setting.ExportHeight, _setting.ExportCodec,

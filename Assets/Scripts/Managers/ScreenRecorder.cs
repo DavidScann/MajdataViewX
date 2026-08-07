@@ -285,9 +285,9 @@ namespace MajdataViewX.Managers
                 _audioManager.BeginRecordingAudio(_timeProvider.AudioTime, _timeProvider.CurrentSpeed);
 
                 // The record covers the song from the starting position to
-                // recordEndTime (last note + All Perfect banner, capped at the
-                // track end). The overlay percentage counts up to 100% for this
-                // segment, not the whole track.
+                // recordEndTime (last note end + All Perfect banner, capped at
+                // the track end). The overlay percentage counts up to 100% for
+                // this segment, not the whole track.
                 var recordStartTime = Math.Max(0, (double)_timeProvider.AudioTime);
                 var totalTime = Math.Max(0.01,
                     recordEndTime / Math.Max(_timeProvider.CurrentSpeed, 0.01f) -
@@ -303,7 +303,9 @@ namespace MajdataViewX.Managers
                     exportOverlayCanvas.enabled = true;
                 }
 
-                while (IsRecording && recordingElapsedTime < totalTime)
+                // The All Perfect stop normally ends the loop; allow a small
+                // overrun so a missing/late banner cannot cut the last note.
+                while (IsRecording && recordingElapsedTime < totalTime + 1.0)
                 {
                     await UniTask.WaitForEndOfFrame(this);
                     var frameEndTime = recordingElapsedTime + frameDuration;
