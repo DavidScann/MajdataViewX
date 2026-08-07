@@ -70,6 +70,19 @@ namespace MajdataViewX.Managers
             // camera's target texture, so it stays visible while the scene is
             // being rendered into the export render target. It is not part of
             // the recorded video.
+            // Reuse an existing overlay if one survived a scene reload.
+            var existing = GameObject.Find("ExportOverlay");
+            if (existing != null)
+            {
+                exportOverlayCanvas = existing.GetComponent<Canvas>();
+                exportOverlayText = existing.transform.Find("ExportStatusText")?.GetComponent<Text>();
+                if (exportOverlayCanvas != null && exportOverlayText != null)
+                {
+                    exportOverlayCanvas.enabled = false;
+                    return;
+                }
+            }
+
             var overlayGo = new GameObject("ExportOverlay");
             DontDestroyOnLoad(overlayGo);
             exportOverlayCanvas = overlayGo.AddComponent<Canvas>();
@@ -186,7 +199,7 @@ namespace MajdataViewX.Managers
             var captureTexture = new RenderTexture(
                 width,
                 height,
-                0,
+                24,
                 RenderTextureFormat.BGRA32)
             {
                 name = "Screen Recorder Capture",
