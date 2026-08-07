@@ -45,6 +45,7 @@ namespace MajdataViewX.Managers
 
         Text errText;
         Canvas exportOverlayCanvas;
+        RawImage exportPreviewImage;
         Text exportOverlayText;
         float exportFpsWindowAccum;
         int exportFpsWindowFrames;
@@ -75,6 +76,7 @@ namespace MajdataViewX.Managers
             if (existing != null)
             {
                 exportOverlayCanvas = existing.GetComponent<Canvas>();
+                exportPreviewImage = existing.transform.Find("ExportPreviewImage")?.GetComponent<RawImage>();
                 exportOverlayText = existing.transform.Find("ExportStatusText")?.GetComponent<Text>();
                 if (exportOverlayCanvas != null && exportOverlayText != null)
                 {
@@ -93,6 +95,20 @@ namespace MajdataViewX.Managers
             scaler.uiScaleMode = UnityEngine.UI.CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1920, 1080);
             scaler.matchWidthOrHeight = 0.5f;
+
+            // Full-screen preview of the export render target. While the main
+            // camera renders into the RT, the screen backbuffer is never
+            // repainted (stale idle frame + overlay text ghosting on top of
+            // itself). Drawing the RT here repaints the whole window every frame.
+            var imageGo = new GameObject("ExportPreviewImage");
+            imageGo.transform.SetParent(overlayGo.transform, false);
+            exportPreviewImage = imageGo.AddComponent<RawImage>();
+            exportPreviewImage.raycastTarget = false;
+            var imageRect = (RectTransform)exportPreviewImage.transform;
+            imageRect.anchorMin = Vector2.zero;
+            imageRect.anchorMax = Vector2.one;
+            imageRect.offsetMin = Vector2.zero;
+            imageRect.offsetMax = Vector2.zero;
 
             var textGo = new GameObject("ExportStatusText");
             textGo.transform.SetParent(overlayGo.transform, false);
@@ -272,7 +288,11 @@ namespace MajdataViewX.Managers
                 exportFps = fps;
                 _exportOverlayLastRealTime = Time.realtimeSinceStartupAsDouble;
                 if (exportOverlayCanvas != null)
+                {
+                    if (exportPreviewImage != null)
+                        exportPreviewImage.texture = captureTexture;
                     exportOverlayCanvas.enabled = true;
+                }
 
                 while (IsRecording)
                 {
@@ -394,7 +414,11 @@ namespace MajdataViewX.Managers
                     mainCamera.targetTexture = prevTargetTexture;
 
                 if (exportOverlayCanvas != null)
+                {
+                    if (exportPreviewImage != null)
+                        exportPreviewImage.texture = null;
                     exportOverlayCanvas.enabled = false;
+                }
 
                 _audioManager.ReleaseRecordingAudio();
                 var resultPath = Path.Combine(maidataPath, finalName);
