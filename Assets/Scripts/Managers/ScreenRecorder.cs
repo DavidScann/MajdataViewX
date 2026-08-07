@@ -346,6 +346,12 @@ namespace MajdataViewX.Managers
                     recordingElapsedTime = frameEndTime;
                 }
 
+                // The loop ends at the All Perfect stop (all notes judged +
+                // banner), which can differ slightly from the chart-derived
+                // estimate (record start also subtracts the 5s song-detail
+                // intro), so snap the counter to 100% on completion.
+                UpdateExportOverlay(totalTime, totalTime);
+
                 _audioManager.EndRecordingAudio((float)recordingElapsedTime);
 
 #if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
