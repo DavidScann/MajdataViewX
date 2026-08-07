@@ -278,6 +278,12 @@ namespace MajdataViewX.Managers
         {
             StopVideoPipe();
 
+            // Invalidate any in-flight preload: it must not spawn a second
+            // decoder while this play takes/spawns the pipe (a leaked process
+            // also kept the export encoder's stdin write end open, blocking
+            // its EOF and hanging the finalize's waitpid).
+            _preloadGeneration++;
+
             // AudioTime is reset by SetStartTime AFTER ShowVideo is called, so
             // use the play's start time directly: seek there and pace the video
             // from it, matching the song clock.
