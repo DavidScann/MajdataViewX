@@ -116,7 +116,7 @@ namespace MajdataViewX.Native
 
         /// <summary>
         /// ffmpeg args enabling hardware decode of the background video
-        /// ("-hwaccel cuda -hwaccel_output_format yuv420p " etc.), or "" when
+        /// ("-hwaccel cuda -hwaccel_output_format nv12 " etc.), or "" when
         /// no usable GPU decoder was detected. Decoded frames are downloaded
         /// to system memory so the existing scale/vflip/rawvideo chain keeps
         /// working unchanged.
@@ -150,15 +150,15 @@ namespace MajdataViewX.Native
                     return string.Empty;
 
                 if (hwaccels.Contains("cuda"))
-                    return "-hwaccel cuda -hwaccel_output_format yuv420p ";
+                    return "-hwaccel cuda -hwaccel_output_format nv12 ";
 
                 var vaapiDevice = FindVaapiDevice();
                 if (hwaccels.Contains("vaapi") && vaapiDevice != null)
                     return $"-init_hw_device vaapi=va:{vaapiDevice} " +
-                        "-hwaccel vaapi -hwaccel_output_format yuv420p ";
+                        "-hwaccel vaapi -hwaccel_output_format nv12 ";
 
                 if (hwaccels.Contains("qsv") && vaapiDevice != null)
-                    return "-hwaccel qsv -hwaccel_output_format yuv420p ";
+                    return "-hwaccel qsv -hwaccel_output_format nv12 ";
             }
             catch (Exception ex)
             {
