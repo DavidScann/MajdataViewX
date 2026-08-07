@@ -193,20 +193,22 @@ run "cp -a '$UNITY_BUILD_DIR/.' '$BUNDLE_DIR/'"
 run "rsync -a --exclude='*.pdb' \
       '$EDITOR_PUBLISH_DIR/' '$BUNDLE_DIR/'"
 
-# 4c. Ensure libbassopus.so is where BASS needs it in BOTH places:
+# 4c. Ensure libbass.so + libbassopus.so are where BASS needs them in BOTH places:
 #   - bundle root: the editor (MajdataEdit-Neo) loads libbass.so + libbassopus.so
 #     from its own directory (TrackReader.cs: Bass.PluginLoad("libbassopus"))
 #   - MajdataViewX_Data/Plugins/AnyCPU/: the Unity player's BASS
-if check "[[ -f '$BUNDLE_DIR/MajdataViewX_Data/Plugins/AnyCPU/libbassopus.so' ]]"; then
-  log "libbassopus.so in Plugins/AnyCPU/ ✓"
-  run "cp -a '$BUNDLE_DIR/MajdataViewX_Data/Plugins/AnyCPU/libbassopus.so' '$BUNDLE_DIR/libbassopus.so'"
-  log "libbassopus.so copied to bundle root for the editor ✓"
-elif check "[[ -f '$BUNDLE_DIR/libbassopus.so' ]]"; then
-  log "libbassopus.so already at bundle root ✓"
-else
-  warn "libbassopus.so not found — BASS will not decode Opus"
-  warn "Place it at: $BUNDLE_DIR/MajdataViewX_Data/Plugins/AnyCPU/libbassopus.so"
-fi
+for basslib in libbass.so libbassopus.so; do
+  if check "[[ -f '$BUNDLE_DIR/MajdataViewX_Data/Plugins/AnyCPU/$basslib' ]]"; then
+    log "$basslib in Plugins/AnyCPU/ ✓"
+    run "cp -a '$BUNDLE_DIR/MajdataViewX_Data/Plugins/AnyCPU/$basslib' '$BUNDLE_DIR/$basslib'"
+    log "$basslib copied to bundle root for the editor ✓"
+  elif check "[[ -f '$BUNDLE_DIR/$basslib' ]]"; then
+    log "$basslib already at bundle root ✓"
+  else
+    warn "$basslib not found — BASS will be missing at bundle root"
+    warn "Place it at: $BUNDLE_DIR/MajdataViewX_Data/Plugins/AnyCPU/$basslib"
+  fi
+done
 
 # 4d. Copy bundled assets (Skin + SFX) from the editor's BinaryAssets submodule
 if check "[[ -d '$EDITOR_REPO/BinaryAssets/Skin' && -d '$EDITOR_REPO/BinaryAssets/SFX' ]]"; then
