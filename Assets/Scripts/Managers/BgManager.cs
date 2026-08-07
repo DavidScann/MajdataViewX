@@ -31,6 +31,7 @@ namespace MajdataViewX.Managers
         private VideoPlayer videoPlayer;
 
         private float smoothRDelta;
+        private double _recordLastRealTime;
 
         const float CIRCLED_SCALE_X = 1.1f;
         const float FULLSCREEN_SCALE_X = 1.777f;
@@ -68,6 +69,31 @@ namespace MajdataViewX.Managers
             var delta = (float)videoPlayer.clockTime - _timeProvider.AudioTime;
             smoothRDelta += (Time.unscaledDeltaTime - smoothRDelta) * 0.01f;
             if (_timeProvider.AudioTime < 0) return;
+
+            if (_timeProvider.IsRecord)
+            {
+                // Export advances the song timeline by frame count and can run
+                // faster than real time. Track it with playbackSpeed (VideoPlayer
+                // caps at 16x); beyond that, seek directly.
+                // Time.unscaledDeltaTime is pinned by Time.captureDeltaTime during
+                // export, so measure real time via realtimeSinceStartupAsDouble.
+                var now = Time.realtimeSinceStartupAsDouble;
+                var realTimeStep = (float)(now - _recordLastRealTime);
+                _recordLastRealTime = now;
+                var songSpeed = realTimeStep > 0.0001f
+                    ? TimeData.deltaTime / realTimeStep
+                    : 1f;
+                if (songSpeed <= 16f)
+                {
+                    videoPlayer.playbackSpeed = Mathf.Clamp(songSpeed, 0.05f, 16f);
+                }
+                else if (Mathf.Abs(delta) > 0.05f)
+                {
+                    videoPlayer.time = Mathf.Max(0, _timeProvider.AudioTime);
+                }
+                return;
+            }
+
             var realSpeed = Time.deltaTime / smoothRDelta;
 
             if (Time.captureFramerate != 0)

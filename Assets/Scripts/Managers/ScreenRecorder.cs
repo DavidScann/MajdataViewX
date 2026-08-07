@@ -49,6 +49,7 @@ namespace MajdataViewX.Managers
         float exportFpsWindowAccum;
         int exportFpsWindowFrames;
         float exportFps;
+        double _exportOverlayLastRealTime;
 
         public bool IsRecording { get; private set; }
 
@@ -108,7 +109,13 @@ namespace MajdataViewX.Managers
         {
             if (exportOverlayCanvas == null) return;
 
-            exportFpsWindowAccum += Time.unscaledDeltaTime;
+            // Time.unscaledDeltaTime is pinned by Time.captureDeltaTime during
+            // export, so measure real time for the actual render/export speed.
+            var now = Time.realtimeSinceStartupAsDouble;
+            var delta = (float)(now - _exportOverlayLastRealTime);
+            _exportOverlayLastRealTime = now;
+
+            exportFpsWindowAccum += delta;
             exportFpsWindowFrames++;
             if (exportFpsWindowAccum >= 0.5f)
             {
@@ -250,6 +257,7 @@ namespace MajdataViewX.Managers
                 exportFpsWindowAccum = 0f;
                 exportFpsWindowFrames = 0;
                 exportFps = fps;
+                _exportOverlayLastRealTime = Time.realtimeSinceStartupAsDouble;
                 if (exportOverlayCanvas != null)
                     exportOverlayCanvas.enabled = true;
 

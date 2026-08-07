@@ -35,6 +35,11 @@ namespace MajdataViewX.Managers
         //for pause and resume
         private double accumulated;
 
+        // Export (record) mode advances the song timeline by exactly one export
+        // frame per RENDERED frame instead of by wall clock, so the export runs
+        // as fast as the machine can render instead of in real time.
+        private float recordFrameStep = 1f / 60;
+
         private readonly Stopwatch playbackClock = new();
 
 
@@ -72,12 +77,15 @@ namespace MajdataViewX.Managers
         private void Update()
         {
             TimeData.IsStart = IsStart;
-            TimeData.deltaTime = IsRecord ? FRAME_LENGTH_SEC : Time.deltaTime;
+            TimeData.deltaTime = IsRecord ? recordFrameStep : Time.deltaTime;
             if (!IsStart) return;
 
             if (IsRecord)
             {
-                AudioTime = (float)(startAt + accumulated + (Time.timeAsDouble - startRealtime));
+                // One export frame of song time per rendered frame: export speed
+                // = rendered FPS / export FPS, so faster than real time whenever
+                // the machine can render faster than the export rate.
+                AudioTime += recordFrameStep;
                 NoteTime = AudioTime - offset;
             }
             else
@@ -169,7 +177,15 @@ namespace MajdataViewX.Managers
                         startRealtime = Time.timeAsDouble;
                         startAt -= SONG_DETAIL_OFFSET;
                         Time.timeScale = _speed;
-                        Time.captureFramerate = fps;
+                        // Frame-count driven: each rendered frame advances the
+                        // timeline by one export frame. captureFramerate would
+                        // pace rendering to real time, so leave it 0 and instead
+                        // pin deltaTime via captureDeltaTime so animators advance
+                        // one export frame per rendered frame too.
+                        Time.captureFramerate = 0;
+                        Time.captureDeltaTime = 1f / Mathf.Max(fps, 1);
+                        recordFrameStep = 1f / Mathf.Max(fps, 1);
+                        AudioTime = startAt;
                         // 防止帧率对“下一帧应用”的机制产生过大影响
                         InputManager.DJAUTO_AUTOPLAY_START_SEC_SS.Data = -1f / fps;
                     }
@@ -221,6 +237,7 @@ namespace MajdataViewX.Managers
             playbackClock.Reset();
             Time.timeScale = 1f;
             Time.captureFramerate = 0;
+            Time.captureDeltaTime = 0;
         }
 
         private void OnDestroy()
