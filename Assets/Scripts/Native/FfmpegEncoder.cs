@@ -1,8 +1,6 @@
 using System;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Threading;
 using MajdataViewX.Types.Enums;
 using MajdataViewX.Types.Rendering;
 using UnityEngine;
@@ -121,28 +119,21 @@ namespace MajdataViewX.Native
             _vaapiDevice = FindVaapiDevice();
             try
             {
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-                using var proc = new Process
+                // IL2CPP on Linux cannot spawn processes via System.Diagnostics
+                // (that's why the pipe plugin exists), so run the probe through
+                // FFmpegPipe's shell spawn and capture output via redirection.
+                var probeFile = Path.Combine(Application.temporaryCachePath, "ffmpeg_encoders.txt");
+                if (File.Exists(probeFile)) File.Delete(probeFile);
+                var probeCmd = $"{Binary} -hide_banner -encoders > \"{probeFile}\" 2>&1";
+                var proc = FFmpegPipe.SpawnSimple(probeCmd);
+                if (proc.IsValid)
                 {
-                    StartInfo = new ProcessStartInfo(Binary, "-hide_banner -encoders")
-                    {
-                        UseShellExecute = false,
-                        CreateNoWindow = true,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true,
-                    }
-                };
-                proc.Start();
-                var stdoutTask = proc.StandardOutput.ReadToEndAsync();
-                var stderrTask = proc.StandardError.ReadToEndAsync();
-                if (!proc.WaitForExit((int)TimeSpan.FromSeconds(5).TotalMilliseconds))
-                {
-                    proc.Kill();
-                    _encodersOutput = string.Empty;
-                    return _encodersOutput;
+                    FFmpegPipe.Wait(proc);
+                    if (File.Exists(probeFile))
+                        _encodersOutput = File.ReadAllText(probeFile);
                 }
-                _encodersOutput = stdoutTask.GetAwaiter().GetResult() +
-                                  stderrTask.GetAwaiter().GetResult();
+                if (_encodersOutput == null)
+                    _encodersOutput = string.Empty;
             }
             catch (Exception ex)
             {
