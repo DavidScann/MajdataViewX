@@ -23,7 +23,7 @@ namespace MajdataViewX.Native
         [DllImport(DllName)] static extern IntPtr ffmpeg_spawn_io(string command, out IntPtr stdin_fd, out IntPtr stdout_fd);
         [DllImport(DllName)] static extern int ffmpeg_write(IntPtr fd, byte[] buf, int len);
         [DllImport(DllName)] static extern int ffmpeg_read(IntPtr fd, byte[] buf, int len);
-        [DllImport(DllName)] static extern unsafe int ffmpeg_read_ptr(IntPtr fd, IntPtr buf, int len);
+        [DllImport(DllName)] static extern int ffmpeg_read(IntPtr fd, IntPtr buf, int len);
         [DllImport(DllName)] static extern void ffmpeg_close(IntPtr fd);
         [DllImport(DllName)] static extern int ffmpeg_wait(IntPtr handle);
         [DllImport(DllName)] static extern void ffmpeg_kill(IntPtr handle);
@@ -158,7 +158,7 @@ namespace MajdataViewX.Native
             {
                 fixed (byte* p = &buf[offset])
                 {
-                    return ffmpeg_read_ptr(proc.StdoutFd, (IntPtr)p, len);
+                    return ffmpeg_read(proc.StdoutFd, (IntPtr)p, len);
                 }
             }
 #endif

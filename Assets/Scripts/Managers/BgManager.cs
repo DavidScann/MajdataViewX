@@ -246,9 +246,9 @@ namespace MajdataViewX.Managers
                 return;
             }
 
-            // Scale the sprite to the pipe's fixed 1280x720 output (16:9),
-            // matching the VideoPlayer branch's aspect logic.
-            const float aspect = (float)BgVideoPipe.Height / BgVideoPipe.Width;
+            // Scale the sprite to the pipe's output aspect ratio (preserved by
+            // the ffmpeg scale filter), matching the VideoPlayer branch's logic.
+            var aspect = (float)videoPipe.Height / videoPipe.Width;
             if (resizeBg)
             {
                 gameObject.transform.localScale = new Vector3(FULLSCREEN_SCALE_X, FULLSCREEN_SCALE_X * aspect);
@@ -275,7 +275,9 @@ namespace MajdataViewX.Managers
         {
             if (!hasVideo) return;
 #if UNITY_STANDALONE_LINUX || UNITY_EDITOR_LINUX
-            StopVideoPipe();
+            // Stopping the read lets ffmpeg's pipe fill and block: the video
+            // freezes on its last frame without killing the process.
+            videoPipe?.Pause();
             return;
 #else
             videoPlayer.Pause();
@@ -286,9 +288,7 @@ namespace MajdataViewX.Managers
         {
             if (!hasVideo) return;
 #if UNITY_STANDALONE_LINUX || UNITY_EDITOR_LINUX
-            // Restart the pipe from the current audio time (cheap enough on resume).
-            if (videoPipe == null && !string.IsNullOrEmpty(VideoPath))
-                ShowVideoPipe(_resizeBg);
+            videoPipe?.Resume();
             return;
 #else
             videoPlayer.Play();
