@@ -170,8 +170,10 @@ namespace MajdataViewX.Managers
             {
                 await UniTask.SwitchToMainThread();
 
+                var t0 = Time.realtimeSinceStartup;
                 //chart
                 _chart = await SimaiParser.ParseChartAsync(level, designer, fumen);
+                var t1 = Time.realtimeSinceStartup;
 
                 var noteSpeed = (float)(107.25 / (71.4184491 * Mathf.Pow(_setting.TapSpeed + 0.9975f, -0.985558604f)));
                 var touchSpeed = _setting.TouchSpeed;
@@ -186,6 +188,7 @@ namespace MajdataViewX.Managers
                 bgOutsideCover.color = new Color(0f, 0f, 0f, _setting.BackgroundOutsideDim);
                 _bgManager.ShowBG();
                 await _bgManager.ShowVideoAsync(_setting.ResizeBg, startAt);
+                var t2 = Time.realtimeSinceStartup;
                 //sfx
                 var clockCount = 0;
                 if (playmode != PlaybackMode.Normal)
@@ -194,6 +197,7 @@ namespace MajdataViewX.Managers
                     if (clockCommand != default) int.TryParse(clockCommand.Value, out clockCount);
                 }
                 _audioManager.GenerateAnswerSFX(_chart, ignoreOffset, clockCount);
+                var t3 = Time.realtimeSinceStartup;
 
                 switch (playmode)
                 {
@@ -205,6 +209,8 @@ namespace MajdataViewX.Managers
                             _setting.SmoothSlideAnime,
                             _setting.LegacySlideLayer,
                             _setting.MineAutoSlide);
+                        var t4 = Time.realtimeSinceStartup;
+                        Debug.Log($"[PlayManager] play timing: parse={(t1 - t0) * 1000:F0}ms bg={(t2 - t1) * 1000:F0}ms sfx={(t3 - t2) * 1000:F0}ms noteLoad={(t4 - t3) * 1000:F0}ms");
 
                         _allPerfectManager.enabled = false;
                         _timeProvider.SetStartTime(startAt, offset, speed, playmode);
