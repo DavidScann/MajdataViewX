@@ -7,6 +7,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.Video;
 
+using static MajdataViewX.Base.MajBurst;
 using static MajdataViewX.Base.MajCtx;
 
 namespace MajdataViewX.Managers

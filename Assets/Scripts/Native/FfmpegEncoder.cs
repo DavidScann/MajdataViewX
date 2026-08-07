@@ -6,6 +6,7 @@ using System.Threading;
 using MajdataViewX.Types.Enums;
 using MajdataViewX.Types.Rendering;
 using UnityEngine;
+using Debug = UnityEngine.Debug;
 
 namespace MajdataViewX.Native
 {
