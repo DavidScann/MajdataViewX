@@ -2,6 +2,7 @@
 
 
 using MajdataViewX.Utils;
+using System;
 using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
@@ -152,7 +153,10 @@ namespace MajdataViewX.Managers
 
         public void LoadVideo(string path)
         {
-            VideoUrl = "file://" + path;
+            // VideoPlayer requires a proper URL; "file://" + raw path breaks on
+            // spaces/unicode (e.g. "起死開戦 (Kishi Kaisen)/pv.mp4"). Build a
+            // percent-encoded file URL instead.
+            VideoUrl = new Uri(path).AbsoluteUri;
         }
 
         public void ShowVideo(bool resizeBg)
@@ -169,7 +173,21 @@ namespace MajdataViewX.Managers
                 spriteRender.sprite = _emptySprite;
 
                 while (_timeProvider.AudioTime <= 0) yield return new WaitForEndOfFrame();
-                while (!videoPlayer.isPrepared) yield return new WaitForEndOfFrame();
+
+                // Don't hang forever if Prepare() fails (bad URL, unsupported codec).
+                var timeout = Time.realtimeSinceStartup + 15f;
+                while (!videoPlayer.isPrepared)
+                {
+                    if (Time.realtimeSinceStartup > timeout)
+                    {
+                        Debug.LogError($"[BgManager] Video prepare timed out: {videoPlayer.url} " +
+                            $"(error: {videoPlayer.error}, errorCode: {videoPlayer.errorCode})");
+                        yield break;
+                    }
+                    yield return new WaitForEndOfFrame();
+                }
+                if (videoPlayer.isPlaying) videoPlayer.Stop();
+
                 videoPlayer.Play();
                 videoPlayer.time = _timeProvider.AudioTime;
 
