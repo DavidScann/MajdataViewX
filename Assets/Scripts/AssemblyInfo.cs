@@ -1,5 +1,8 @@
-﻿using Unity.Jobs;
+﻿using MajdataViewX.Types.Notes.RenderData;
+using MajdataViewX.Types.Rendering;
+using MajdataViewX.Utils;
 using Unity.IL2CPP.CompilerServices;
+using Unity.Jobs;
 
 [assembly: Il2CppSetOption(Option.NullChecks, false)]
 [assembly: Il2CppSetOption(Option.ArrayBoundsChecks, false)]

@@ -1,17 +1,19 @@
 #nullable enable
-
-internal readonly struct MajWsRequestBase
+namespace MajdataViewX.Types.MajWs
 {
-    public MajWsRequestType requestType { get; init; }
-    public object? requestData { get; init; }
-}
-public enum MajWsRequestType 
-{
-    Setting,
-    Load,
-    Play,
-    Pause,
-    Resume,
-    Stop,
-    State
+    internal readonly struct MajWsRequestBase
+    {
+        public MajWsRequestType requestType { get; init; }
+        public object? requestData { get; init; }
+    }
+    public enum MajWsRequestType
+    {
+        Setting,
+        Load,
+        Play,
+        Pause,
+        Resume,
+        Stop,
+        State
+    }
 }

@@ -1,20 +1,23 @@
-using System;
+using MajdataViewX.Types.Rendering;
 using Unity.Mathematics;
-using static SkinManager;
+using static MajdataViewX.Managers.SkinManager;
 
-public struct NotesRenderData : ISortableRenderData
+namespace MajdataViewX.Types.Notes.RenderData
 {
-    public float2 pos;
-    public float angRad;
-    public float scale;
-    public float stretchY;
-    public NoteSp spriteId;
-    public float4 color;
-    public float brightness;
-    public NoteSp exSprite;
-    public float4 exColor;
-    public float2 sliceBorder;   // (topFrac, botFrac), (0,0) = normal
-    public uint sort;
+    public struct NotesRenderData : ISortableRenderData
+    {
+        public float2 pos;
+        public float angRad;
+        public float scale;
+        public float stretchY;
+        public NoteSp spriteId;
+        public float4 color;
+        public float brightness;
+        public NoteSp exSprite;
+        public float4 exColor;
+        public float2 sliceBorder;   // (topFrac, botFrac), (0,0) = normal
+        public uint sort;
 
-    public readonly uint SortKey => sort;
+        public readonly uint SortKey => sort;
+    }
 }

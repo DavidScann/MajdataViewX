@@ -2261,7 +2261,7 @@ MonoBehaviour:
   - {r: 0.73333335, g: 0.43921572, b: 1, a: 1}
   - {r: 0.94856584, g: 0.7028302, b: 1, a: 1}
   - {r: 1, g: 0.6608349, b: 0.3443396, a: 1}
-  errText: {fileID: 0}
+  errText: {fileID: 753237956}
 --- !u!4 &410561410
 Transform:
   m_ObjectHideFlags: 0

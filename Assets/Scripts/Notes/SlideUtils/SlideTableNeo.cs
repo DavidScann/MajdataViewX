@@ -1,8 +1,10 @@
-﻿using System;
+﻿using MajdataViewX.Base;
+using MajdataViewX.Types.Input;
+using System;
 using System.Collections.Generic;
 using System.Numerics;
 
-namespace Notes.SlideUtils
+namespace MajdataViewX.Notes.SlideUtils
 {
     /// <summary>
     /// slide 判定段信息
@@ -63,7 +65,7 @@ namespace Notes.SlideUtils
         WifiU,
         WifiD,
     }
-    
+
     public enum SlideFlag
     {
         None,
@@ -75,7 +77,7 @@ namespace Notes.SlideUtils
     {
         /// <summary>slide 最后一个区占全长的比例，0~1 间的小数</summary>
         public readonly float SlideConst;
-        /// <summary>slide 路径全长，单位取决于<c>MajGeometry.MainRadius</c></summary>
+        /// <summary>slide 路径全长，单位取决于<c>MajGeo.MainRadius</c></summary>
         public readonly float SlideLength;
         /// <summary>这个参数为 true 表示最后一个箭头距离终点太近，只在 conn-slide 的非最终段显示</summary>
         public readonly bool ConditionalLastArrow;
@@ -168,9 +170,9 @@ namespace Notes.SlideUtils
         }
 
         /// <summary>需要贴图尺寸 410x140</summary>
-        public const double CircleOkRadius = MajGeometry.MainRadius * 462.0 / 480.0;
+        public const double CircleOkRadius = MajGeo.MainRadius * 462.0 / 480.0;
         /// <summary>需要贴图尺寸 410x140</summary>
-        public const double StraightOkDistance = MajGeometry.MainRadius * 205.0 / 480.0;
+        public const double StraightOkDistance = MajGeo.MainRadius * 205.0 / 480.0;
 
         /// <summary>
         /// 获取圆弧 slide 的 slideOK 姿势
@@ -242,7 +244,7 @@ namespace Notes.SlideUtils
 
             // 如果最后一个箭头距离终点太近，就只在 conn-slide 里显示
             var conditionalLastArrow =
-                arrowRawData[^1].PathLength - arrowRawData[^2].PathLength <= MajGeometry.DefaultDistance / 2.0;
+                arrowRawData[^1].PathLength - arrowRawData[^2].PathLength <= MajGeo.DefaultDistance / 2.0;
 
             // ========== ========== ========== ========== ========== ========== ==========
             // 整理判定区数据
@@ -252,7 +254,7 @@ namespace Notes.SlideUtils
             var arrowIdx = 1;
             var lastLength = 0.0;
             var firstAreaMinIdx = 2;    // 第一个区至少删两个箭头
-            var finalAreaMaxIdx = conditionalLastArrow? arrowCount - 7 : arrowCount - 6;  // 最后一个区至少留四个箭头
+            var finalAreaMaxIdx = conditionalLastArrow ? arrowCount - 7 : arrowCount - 6;  // 最后一个区至少留四个箭头
             SensorType sensorA;
             SensorType sensorB;
             for (var i = 0; i <= areaRawData.Length - 2; i++) // 最后一个判定段要特殊处理
@@ -261,12 +263,12 @@ namespace Notes.SlideUtils
                 while (arrowRawData[arrowIdx].PathLength <= targetLength) arrowIdx++;
                 lastLength = areaRawData[i].LengthAfterPush;
                 var push = Math.Max(arrowIdx - 1, firstAreaMinIdx);   // 扣掉本来就不显示的路径起点
-                
+
                 targetLength = lastLength + 0.33 * (areaRawData[i].LengthAfterFinish - lastLength);
                 while (arrowRawData[arrowIdx].PathLength <= targetLength) arrowIdx++;
                 var finish = Math.Min(arrowIdx - 1, finalAreaMaxIdx);   // 扣掉本来就不显示的路径起点
                 lastLength = areaRawData[i].LengthAfterFinish;
-                
+
                 sensorA = (SensorType)areaRawData[i].SensorA;
                 sensorB = (SensorType)areaRawData[i].SensorB;
                 areaList.Add(new SlideArea(push, finish, sensorA, sensorB));
@@ -327,7 +329,7 @@ namespace Notes.SlideUtils
         };
 
         /// <summary>需要贴图尺寸 668x200</summary>
-        public const double WifiOkRadius = MajGeometry.MainRadius * 424.0 / 480.0;
+        public const double WifiOkRadius = MajGeo.MainRadius * 424.0 / 480.0;
 
         /// <summary>
         /// Wifi 打表
@@ -336,7 +338,7 @@ namespace Notes.SlideUtils
         public static SlideMetadata CreateWifiEntry(int start)
         {
             var arrowPoseList = new List<SlidePose>();
-            var startPoint = MajGeometry.PointGroupA(start);
+            var startPoint = MajGeo.PointGroupA(start);
             var phase = startPoint.Phase;
 
             for (var i = 0; i < WifiPos.Length; i++)
@@ -344,9 +346,9 @@ namespace Notes.SlideUtils
                 // // magic
                 // var l = 57.63636 + 23.13636 * i + 0.5 * i * i;
                 // var y = 5.79371 - 2.62793 * l / 100;
-                // var radius = y / 4.8 * MajGeometry.MainRadius;
-                var radius = WifiPos[i] / 4.8 * MajGeometry.MainRadius;
-                var length = MajGeometry.MainRadius - radius;
+                // var radius = y / 4.8 * MajGeo.MainRadius;
+                var radius = WifiPos[i] / 4.8 * MajGeo.MainRadius;
+                var length = MajGeo.MainRadius - radius;
                 var pos = Complex.FromPolarCoordinates(radius, phase);
                 var rotZ = (float)(360 - 45 * start);    // should be 0 ~ 360
                 arrowPoseList.Add(new SlidePose((float)pos.Real, (float)pos.Imaginary, rotZ, (float)length));
@@ -393,7 +395,7 @@ namespace Notes.SlideUtils
             };
 
             return new SlideMetadata(
-                judgeL, judgeC, judgeR, 0.162870f, (float)(MajGeometry.MainRadius * 2),
+                judgeL, judgeC, judgeR, 0.162870f, (float)(MajGeo.MainRadius * 2),
                 arrowPoseList.ToArray(), false,
                 okPose, okType, SlideFlag.None);
         }
@@ -524,10 +526,10 @@ namespace Notes.SlideUtils
             for (var diff = 0; diff <= 7; diff++)
             {
                 // 大圆逆时针
-                var phaseNudge = ((diff is 1 or 5 or 7) ? -1 : 1) * MajGeometry.EpsilonRad / 2;
+                var phaseNudge = ((diff is 1 or 5 or 7) ? -1 : 1) * MajGeo.EpsilonRad / 2;
                 // 官机上 1<2 1<6 1<8 会在 conn-slide 里有缝，剩下 5 种无缝，还原一下
                 var pathCircle = SlidePathConstructor.BeginAt((int)SensorType.A1)
-                    .ArcToAngle(9, MajGeometry.GetPoint(diff).Phase + phaseNudge, true, false)
+                    .ArcToAngle(9, MajGeo.GetPoint(diff).Phase + phaseNudge, true, false)
                     .GeneratePath();
 
                 // p slide
@@ -547,7 +549,7 @@ namespace Notes.SlideUtils
                     pathP = SlidePathConstructor.BeginAt((int)SensorType.A1)
                         .TangentToCircle(0, true)
                         .ArcToTangentTowards(diff, 0, true)
-                        .LineToPoint(MajGeometry.GetPoint(diff) + new Complex(-MajGeometry.MainRadius / 960f, 0))
+                        .LineToPoint(MajGeo.GetPoint(diff) + new Complex(-MajGeo.MainRadius / 960f, 0))
                         .GeneratePath();
                 }
                 else

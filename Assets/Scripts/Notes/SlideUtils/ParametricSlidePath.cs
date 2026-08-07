@@ -1,9 +1,10 @@
-﻿using System;
+﻿using MajdataViewX.Base;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 
-namespace Notes.SlideUtils
+namespace MajdataViewX.Notes.SlideUtils
 {
     /// <summary>
     /// <p>用来控制箭头对齐的标志</p>
@@ -47,7 +48,7 @@ namespace Notes.SlideUtils
         /// <p>这个参数表示这段路径上每隔多少距离放一个箭头</p>
         /// <p>默认值是判定圆周长的 1/64</p>
         /// </summary>
-        public double ArrowDistance { get; private set; } = MajGeometry.DefaultDistance;
+        public double ArrowDistance { get; private set; } = MajGeo.DefaultDistance;
 
         public abstract bool IsCurve { get; }
 
@@ -306,7 +307,7 @@ namespace Notes.SlideUtils
         /// <p>计算路径总长</p>
         /// </summary>
         public double GetPathLength() => AccumulatedLengths[^1];
-        
+
         /// <summary>
         /// 是否关于“A1 - C - A5”反射路径
         /// </summary>
@@ -315,7 +316,7 @@ namespace Notes.SlideUtils
         /// 顺时针旋转路径，多少个 45 度
         /// </summary>
         public int Rotated45CW { get; private set; } = 0;
-        
+
         private Complex _rotor = Complex.One;
 
         /// <summary>
@@ -357,7 +358,7 @@ namespace Notes.SlideUtils
             var segment = GetSegmentAt(t, out var segT);
             return CalcRotoreflection(segment.GetTangentAt(segT));
         }
-        
+
         public virtual SlideEndShape GetEndShape()
         {
             var lastSegment = Segments[^1];

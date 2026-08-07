@@ -1,7 +1,10 @@
-﻿public enum JudgeDisplayMode
+﻿namespace MajdataViewX.Types.Enums
 {
-    None,
-    FastLate,
-    Level,
-    Both
+    public enum JudgeDisplayMode
+    {
+        None,
+        FastLate,
+        Level,
+        Both
+    }
 }

@@ -1,6 +1,9 @@
-﻿internal readonly struct MajWsRequestParse
+﻿namespace MajdataViewX.Types.MajWs
 {
-    //public double StartAt { get; init; }
-    //public string SimaiFumen { get; init; }
-    //public double Offset { get; init; }
+    internal readonly struct MajWsRequestParse
+    {
+        //public double StartAt { get; init; }
+        //public string SimaiFumen { get; init; }
+        //public double Offset { get; init; }
+    }
 }
