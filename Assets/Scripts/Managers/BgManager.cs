@@ -317,11 +317,11 @@ namespace MajdataViewX.Managers
             videoPipe = pipe;
 
             // The video is always limited to the playfield: the circled
-            // material clips it to the play circle. Uniform scale so the
-            // sprite covers the circle in both dimensions without stretching
-            // (the sprite base already carries the video's aspect ratio).
+            // material clips it to the play circle. Best-fit scale: the whole
+            // video stays visible inside the playfield (no crop), with black
+            // bars on the short sides where the aspect doesn't fill.
             var aspect = (float)videoPipe.Height / videoPipe.Width;
-            var s = 1f / Mathf.Min(1f, aspect);
+            var s = Mathf.Min(1f, 1f / aspect);
             gameObject.transform.localScale = new Vector3(s, s);
             spriteRender.material = circledBgMaterial;
         }

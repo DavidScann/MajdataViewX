@@ -25,10 +25,14 @@ namespace MajdataViewX.Managers
         volatile bool _running;
         volatile bool _paused;
 
-        byte[] _frameA;
-        byte[] _frameB;
-        volatile byte[] _latestBuffer;
-        readonly object _swapLock = new();
+        // Triple-buffered frame storage: the reader writes into free buffers
+        // and publishes them; the main thread uploads the newest published one
+        // without copying. No per-frame allocations (a clone of an 8MB frame
+        // every frame was churning the LOH and causing GC hitches).
+        readonly byte[][] _buffers;
+        int _writeIndex;
+        volatile int _published = -1;
+        volatile int _consumed = -1;
 
         readonly double _fps;
         double _startSec;
@@ -50,9 +54,12 @@ namespace MajdataViewX.Managers
             _fps = fps > 1 ? fps : 30;
             _startSec = 0;
             var frameBytes = width * height * 4;
-            _frameA = new byte[frameBytes];
-            _frameB = new byte[frameBytes];
-            _latestBuffer = _frameA;
+            _buffers = new[]
+            {
+                new byte[frameBytes],
+                new byte[frameBytes],
+                new byte[frameBytes],
+            };
 
             _texture = new Texture2D(Width, Height, TextureFormat.RGBA32, false)
             {
@@ -211,8 +218,6 @@ namespace MajdataViewX.Managers
 
         void ReaderLoop()
         {
-            var buffer = _frameA;
-            var frameBytes = _frameA.Length;
             var consecutiveEof = 0;
             var frameIndex = 0;
             var halfFrame = 0.5 / _fps;
@@ -237,8 +242,17 @@ namespace MajdataViewX.Managers
                     continue;
                 }
 
-                int got = FFmpegPipe.ReadFrame(_proc, buffer, frameBytes);
-                if (got != frameBytes)
+                // Never write into a buffer the main thread is consuming or
+                // hasn't consumed yet (with 3 buffers this only spins briefly
+                // if decoding outpaces the display).
+                if (_writeIndex == _consumed || _writeIndex == _published)
+                {
+                    Thread.Sleep(2);
+                    continue;
+                }
+                var idx = _writeIndex;
+                int got = FFmpegPipe.ReadFrame(_proc, _buffers[idx], _buffers[idx].Length);
+                if (got != _buffers[idx].Length)
                 {
                     consecutiveEof++;
                     if (consecutiveEof >= 5) break;
@@ -247,12 +261,8 @@ namespace MajdataViewX.Managers
                 }
                 consecutiveEof = 0;
                 frameIndex++;
-
-                lock (_swapLock)
-                {
-                    _latestBuffer = buffer;
-                }
-                buffer = ReferenceEquals(buffer, _frameA) ? _frameB : _frameA;
+                _writeIndex = (idx + 1) % _buffers.Length;
+                _published = idx;
             }
             _running = false;
         }
@@ -260,14 +270,12 @@ namespace MajdataViewX.Managers
         /// <summary>Uploads the newest frame to the texture. Call on the main thread.</summary>
         public void UpdateFrame()
         {
-            byte[] frame;
-            lock (_swapLock)
-            {
-                frame = (byte[])_latestBuffer.Clone();
-            }
-
-            _texture.LoadRawTextureData(frame);
+            int pub = _published;
+            if (pub == _consumed)
+                return; // nothing new since the last upload
+            _texture.LoadRawTextureData(_buffers[pub]);
             _texture.Apply();
+            _consumed = pub;
         }
 
         public void Dispose()
