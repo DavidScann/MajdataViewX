@@ -1,5 +1,6 @@
 #nullable enable
 
+using MajdataViewX.Base;
 using MajdataViewX.Native;
 using System;
 using System.Globalization;
@@ -29,6 +30,9 @@ namespace MajdataViewX.Managers
         volatile byte[] _latestBuffer;
         readonly object _swapLock = new();
 
+        readonly double _fps;
+        double _startSec;
+
         Texture2D _texture;
         Sprite _sprite;
 
@@ -39,10 +43,12 @@ namespace MajdataViewX.Managers
 
         public bool IsRunning => _running && _proc.IsValid;
 
-        BgVideoPipe(int width, int height)
+        BgVideoPipe(int width, int height, double fps)
         {
             Width = width;
             Height = height;
+            _fps = fps > 1 ? fps : 30;
+            _startSec = 0;
             var frameBytes = width * height * 4;
             _frameA = new byte[frameBytes];
             _frameB = new byte[frameBytes];
@@ -66,8 +72,8 @@ namespace MajdataViewX.Managers
 
         public static BgVideoPipe? Start(string videoPath, double startSec)
         {
-            var (width, height) = ProbeScaledSize(videoPath);
-            var player = new BgVideoPipe(width, height);
+            var (width, height, fps) = ProbeVideoInfo(videoPath);
+            var player = new BgVideoPipe(width, height, fps);
             if (!player.TryStart(videoPath, startSec))
             {
                 player.Dispose();
@@ -77,22 +83,23 @@ namespace MajdataViewX.Managers
         }
 
         /// <summary>
-        /// Probes the video's native dimensions with ffprobe and computes a
-        /// scaled size that preserves the aspect ratio (max dimension 1920,
-        /// even dimensions for ffmpeg).
+        /// Probes the video's native dimensions and frame rate with ffprobe and
+        /// computes a scaled size that preserves the aspect ratio (max dimension
+        /// 1920, even dimensions for ffmpeg).
         /// </summary>
-        static (int Width, int Height) ProbeScaledSize(string videoPath)
+        static (int Width, int Height, double Fps) ProbeVideoInfo(string videoPath)
         {
             int nativeW = 1280, nativeH = 720;
+            double fps = 30;
             try
             {
                 var quoted = QuoteShellArgument(videoPath);
                 var cmd = $"ffprobe -v error -select_streams v:0 " +
-                    $"-show_entries stream=width,height -of csv=s=x:p=0 {quoted}";
+                    $"-show_entries stream=width,height,r_frame_rate -of csv=s=x:p=0 {quoted}";
                 var proc = FFmpegPipe.SpawnIo(cmd);
                 if (proc.IsValid)
                 {
-                    var buf = new byte[64];
+                    var buf = new byte[128];
                     int got = FFmpegPipe.ReadFrame(proc, buf, buf.Length);
                     FFmpegPipe.Kill(proc);
                     FFmpegPipe.Wait(proc);
@@ -101,12 +108,14 @@ namespace MajdataViewX.Managers
                     {
                         var text = System.Text.Encoding.UTF8.GetString(buf, 0, got).Trim();
                         var parts = text.Split('x');
-                        if (parts.Length == 2 &&
+                        if (parts.Length >= 2 &&
                             int.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out nativeW) &&
                             int.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out nativeH) &&
                             nativeW > 0 && nativeH > 0)
                         {
-                            Debug.Log($"[BgVideoPipe] probed {nativeW}x{nativeH}");
+                            if (parts.Length >= 3 && TryParseFrameRate(parts[2], out var parsedFps))
+                                fps = parsedFps;
+                            Debug.Log($"[BgVideoPipe] probed {nativeW}x{nativeH} @ {fps:0.###}fps");
                         }
                         else
                         {
@@ -117,7 +126,7 @@ namespace MajdataViewX.Managers
             }
             catch (Exception e)
             {
-                Debug.LogWarning($"[BgVideoPipe] probe failed, using 1280x720: {e.Message}");
+                Debug.LogWarning($"[BgVideoPipe] probe failed, using 1280x720@30: {e.Message}");
                 nativeW = 1280; nativeH = 720;
             }
 
@@ -125,7 +134,34 @@ namespace MajdataViewX.Managers
             float scale = Mathf.Min(1f, MaxDimension / (float)Math.Max(nativeW, nativeH));
             int w = Mathf.Clamp((int)(nativeW * scale) & ~1, 2, MaxDimension);
             int h = Mathf.Clamp((int)(nativeH * scale) & ~1, 2, MaxDimension);
-            return (w, h);
+            return (w, h, fps);
+        }
+
+        /// <summary>Parses an ffprobe frame rate like "24000/1001" or "29.97".</summary>
+        static bool TryParseFrameRate(string value, out double fps)
+        {
+            fps = 0;
+            try
+            {
+                var slash = value.IndexOf('/');
+                if (slash > 0)
+                {
+                    var num = double.Parse(value.Substring(0, slash),
+                        NumberStyles.Float, CultureInfo.InvariantCulture);
+                    var den = double.Parse(value.Substring(slash + 1),
+                        NumberStyles.Float, CultureInfo.InvariantCulture);
+                    if (den > 0) fps = num / den;
+                }
+                else
+                {
+                    fps = double.Parse(value, NumberStyles.Float, CultureInfo.InvariantCulture);
+                }
+            }
+            catch
+            {
+                fps = 0;
+            }
+            return fps is > 1 and < 240;
         }
 
         bool TryStart(string videoPath, double startSec)
@@ -136,15 +172,19 @@ namespace MajdataViewX.Managers
                 var seek = startSec > 0
                     ? $"-ss {startSec.ToString("0.###", CultureInfo.InvariantCulture)} "
                     : "";
+                // No -re: real-time pacing is done on our side by reading frames
+                // at the song clock (AudioTime). ffmpeg's wall-clock -re would
+                // fast-forward through the gap after a pause (audio stayed put
+                // while its wall clock kept running), desyncing the video.
                 var cmd =
-                    $"{FfmpegEncoder.Binary} -hide_banner -loglevel error -re {seek}-i {quoted} " +
+                    $"{FfmpegEncoder.Binary} -hide_banner -loglevel error {seek}-i {quoted} " +
                     $"-vf scale={Width}:{Height},vflip " +
                     $"-f rawvideo -pix_fmt rgba -vcodec rawvideo -";
                 _proc = FFmpegPipe.SpawnIo(cmd);
                 if (!_proc.IsValid) return false;
 
                 _running = true;
-                _paused = false;
+                _startSec = Math.Max(0, startSec);
                 _readerThread = new Thread(ReaderLoop) { IsBackground = true };
                 _readerThread.Start();
                 return true;
@@ -165,6 +205,8 @@ namespace MajdataViewX.Managers
             var buffer = _frameA;
             var frameBytes = _frameA.Length;
             var consecutiveEof = 0;
+            var frameIndex = 0;
+            var halfFrame = 0.5 / _fps;
             while (_running)
             {
                 // Paused: stop reading so ffmpeg's pipe fills and it blocks —
@@ -172,6 +214,17 @@ namespace MajdataViewX.Managers
                 if (_paused)
                 {
                     Thread.Sleep(10);
+                    continue;
+                }
+
+                // Pace by the song clock: read frame N only when the song time
+                // has reached the frame's timestamp. AudioTime freezes while
+                // paused, so this also covers pause without the _paused flag.
+                var due = _startSec + frameIndex / _fps;
+                var audioTime = (double)MajCtx._timeProvider.AudioTime;
+                if (audioTime < due - halfFrame)
+                {
+                    Thread.Sleep(5);
                     continue;
                 }
 
@@ -184,6 +237,7 @@ namespace MajdataViewX.Managers
                     continue;
                 }
                 consecutiveEof = 0;
+                frameIndex++;
 
                 lock (_swapLock)
                 {

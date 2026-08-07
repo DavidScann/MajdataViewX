@@ -175,7 +175,7 @@ namespace MajdataViewX.Managers
             VideoPath = path;
         }
 
-        public void ShowVideo(bool resizeBg)
+        public void ShowVideo(bool resizeBg, double startAt = 0)
         {
             if (!hasVideo) return;
             _resizeBg = resizeBg;
@@ -183,7 +183,7 @@ namespace MajdataViewX.Managers
 #if UNITY_STANDALONE_LINUX || UNITY_EDITOR_LINUX
             // Unity's VideoPlayer has no H.264 decoder on Linux; decode with
             // ffmpeg into a texture instead.
-            ShowVideoPipe(resizeBg);
+            ShowVideoPipe(resizeBg, startAt);
 #else
             ShowVideoPlayer(resizeBg);
 #endif
@@ -234,11 +234,14 @@ namespace MajdataViewX.Managers
             }
         }
 
-        void ShowVideoPipe(bool resizeBg)
+        void ShowVideoPipe(bool resizeBg, double startAt = 0)
         {
             StopVideoPipe();
 
-            var startSec = Math.Max(0, (double)_timeProvider.AudioTime);
+            // AudioTime is reset by SetStartTime AFTER ShowVideo is called, so
+            // use the play's start time directly: seek there and pace the video
+            // from it, matching the song clock.
+            var startSec = Math.Max(0, startAt);
             videoPipe = BgVideoPipe.Start(VideoPath, startSec);
             if (videoPipe == null)
             {
@@ -246,8 +249,12 @@ namespace MajdataViewX.Managers
                 return;
             }
 
-            // Scale the sprite to the pipe's output aspect ratio (preserved by
-            // the ffmpeg scale filter), matching the VideoPlayer branch's logic.
+            // The sprite is 10.8 world units base; scale it so the video covers
+            // the camera view (16:9 -> 19.2 x 10.8). The material decides the
+            // look: circledBgMaterial clips to the play circle (diameter 10.8,
+            // i.e. the video fills the circle), fullscreenBgMaterial shows the
+            // whole screen. A smaller (aspect-scaled) box would leave the video
+            // smaller than the circle, showing empty bands around it.
             var aspect = (float)videoPipe.Height / videoPipe.Width;
             if (resizeBg)
             {
@@ -256,7 +263,7 @@ namespace MajdataViewX.Managers
             }
             else
             {
-                gameObject.transform.localScale = new Vector3(CIRCLED_SCALE_X, CIRCLED_SCALE_X * aspect);
+                gameObject.transform.localScale = new Vector3(FULLSCREEN_SCALE_X, FULLSCREEN_SCALE_X * aspect);
                 spriteRender.material = circledBgMaterial;
             }
         }
