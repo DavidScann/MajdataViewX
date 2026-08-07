@@ -2,6 +2,8 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
+using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 
 namespace MajdataViewX.Native
 {
@@ -22,6 +24,7 @@ namespace MajdataViewX.Native
         [DllImport(DllName)] static extern IntPtr ffmpeg_spawn_simple(string command);
         [DllImport(DllName)] static extern IntPtr ffmpeg_spawn_io(string command, out IntPtr stdin_fd, out IntPtr stdout_fd);
         [DllImport(DllName)] static extern int ffmpeg_write(IntPtr fd, byte[] buf, int len);
+        [DllImport(DllName)] static extern int ffmpeg_write(IntPtr fd, IntPtr buf, int len);
         [DllImport(DllName)] static extern int ffmpeg_read(IntPtr fd, byte[] buf, int len);
         [DllImport(DllName)] static extern int ffmpeg_read(IntPtr fd, IntPtr buf, int len);
         [DllImport(DllName)] static extern void ffmpeg_close(IntPtr fd);
@@ -118,6 +121,30 @@ namespace MajdataViewX.Native
             return len;
 #else
             return ffmpeg_write(proc.StdinFd, buf, len);
+#endif
+        }
+
+        /// <summary>
+        /// Writes a NativeArray view of texture data to the pipe without
+        /// copying (the non-generic Texture2D.GetRawTextureData() allocates an
+        /// 8MB copy per call, which churns the GC and stalls the export).
+        /// </summary>
+        public static int Write(PipeProcess proc, NativeArray<byte> buf)
+        {
+#if UNITY_EDITOR
+            unsafe
+            {
+                var span = new ReadOnlySpan<byte>(
+                    (byte*)NativeArrayUnsafeUtility.GetUnsafeReadOnlyPtr(buf), buf.Length);
+                proc.StdinStream?.Write(span);
+            }
+            return buf.Length;
+#else
+            unsafe
+            {
+                return ffmpeg_write(proc.StdinFd,
+                    (IntPtr)NativeArrayUnsafeUtility.GetUnsafeReadOnlyPtr(buf), buf.Length);
+            }
 #endif
         }
 
