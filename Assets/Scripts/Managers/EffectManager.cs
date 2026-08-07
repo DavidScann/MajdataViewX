@@ -1,6 +1,7 @@
 #nullable enable
 
 using MajdataViewX.Base;
+using MajdataViewX.Types.Enums;
 using MajdataViewX.Types.Input;
 using MajdataViewX.Types.Notes;
 using System;
