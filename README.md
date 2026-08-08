@@ -1,3 +1,11 @@
+Fork note: This is an opinionated Linux port of the MajdataViewX project by re-poem. It aims to retain feature parity with upstream, while adding a couple of features that I personally want in the fork.
+
+Credit goes to re-poem and bbben for maintaining this project for so long, as well as doing the bulk of the work to have it work cross-platform; I just cleaned it up a bit and added a bit of my own taste.
+
+Below is the original description/README of the project.
+
+---
+
 <div align="center">
   <img src="https://github.com/user-attachments/assets/383a065e-b9a4-40b6-a06f-720857de883c" width="160px" />
   
