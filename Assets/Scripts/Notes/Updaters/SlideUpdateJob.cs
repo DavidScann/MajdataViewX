@@ -41,6 +41,12 @@ namespace MajdataViewX.Notes.Updaters
         public const float SlideOKKeepDuration = 17 * MajCtx.FRAME_LENGTH_SEC;
         public const float SlideOKFadeOutDuration = 8 * MajCtx.FRAME_LENGTH_SEC;
 
+        /// <summary>
+        /// Fast/Late display mode: CRITICAL PERFECT slide ends show no SlideOK
+        /// (only the off-perfect grades keep theirs).
+        /// </summary>
+        public bool HideCriticalSlideOk;
+
         public void Execute(int index)
         {
             ref var slide = ref slides.ElementRef(index);
@@ -757,6 +763,12 @@ namespace MajdataViewX.Notes.Updaters
                 bool flag = ((int)(timing / MajCtx.FRAME_LENGTH_SEC) / 2) % 2 == 0;
                 if (flag) off = 42; // 偏移到Break Skin
             }
+
+            // Fast/Late mode: a CRITICAL PERFECT slide end shows no SlideOK
+            // (the lifecycle above still runs so the slide still ends).
+            if (HideCriticalSlideOk &&
+                (slide.judgeGrade is JudgeGrade.FastCritical or JudgeGrade.LateCritical))
+                return;
 
             var idx = Interlocked.Increment(ref *SlidesWriteCountPtr) - 1;
             slidesRender[idx] = new SimpleRenderData
