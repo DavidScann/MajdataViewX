@@ -226,7 +226,8 @@ namespace MajdataViewX.Notes.Updaters
                 (int)tap.Key,
                 tap.JudgeGrade,
                 tap.IsBreak,
-                tap.IsMine
+                tap.IsMine,
+                tap.IsStar
             );
             NoteHelper.ReportResult(ReportResults,
                 tap.JudgeGrade,

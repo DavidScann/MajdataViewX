@@ -128,7 +128,7 @@ namespace MajdataViewX.Managers
                 {
                     if (req.Effect.HasFlag(EffectType.Tap))
                     {
-                        PlayTapEffect(i, req.JudgeGrade, req.IsBreak);
+                        PlayTapEffect(i, req.JudgeGrade, req.IsBreak, req.IsStar);
                     }
                     if (req.Effect.HasFlag(EffectType.Touch))
                     {
@@ -175,7 +175,7 @@ namespace MajdataViewX.Managers
             }
         }
 
-        private void PlayTapEffect(int pos, JudgeGrade judge, bool isBreak)
+        private void PlayTapEffect(int pos, JudgeGrade judge, bool isBreak, bool isStar = false)
         {
             // Effect & Judge Text
             switch (judge)
@@ -261,8 +261,9 @@ namespace MajdataViewX.Managers
                     judgeAnimators[pos].SetTrigger(PerfectHash);
             }
 
-            // Fast / Late
-            if (showFL)
+            // Fast / Late (slides never show it: their judgment is settled by
+            // the whole slide, not the head tap)
+            if (showFL && !isStar)
             {
                 if (judge is JudgeGrade.Miss or JudgeGrade.LateCritical or JudgeGrade.FastCritical)
                 {
@@ -370,6 +371,7 @@ namespace MajdataViewX.Managers
         public JudgeGrade JudgeGrade;
         public bool IsBreak;
         public bool IsMine;
+        public bool IsStar;
         public bool HasHolding;
         public Color HoldingColor;
     }
