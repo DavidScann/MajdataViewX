@@ -235,6 +235,7 @@ namespace MajdataViewX.Managers
                         NotesWriteCountPtr = _notesGroup.WriteCountPtr,
                         SfxRequests = _audioManager.SfxRequestsPtr,
                         ReportResults = _objectCounter.ReportRequestsWriter,
+                        HideCriticalSlideOk = _effectManager.HideCriticalSlideOk,
                     }.Schedule(slides.Length, 32, h);
 
                 if (touchHolds.Length > 0)

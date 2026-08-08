@@ -47,6 +47,13 @@ namespace MajdataViewX.Managers
 
         private bool showFL;
         private bool showLevel;
+        private JudgeDisplayMode displayMode = JudgeDisplayMode.Both;
+
+        /// <summary>
+        /// In Fast/Late mode the slide-end SlideOK is hidden for CRITICAL
+        /// PERFECT judgments (only the off-perfect grades keep their OK).
+        /// </summary>
+        public bool HideCriticalSlideOk => displayMode == JudgeDisplayMode.FastLate;
 
         private GameObject fireworkEffect;
         private Animator fireworkAnimator;
@@ -128,7 +135,7 @@ namespace MajdataViewX.Managers
                 {
                     if (req.Effect.HasFlag(EffectType.Tap))
                     {
-                        PlayTapEffect(i, req.JudgeGrade, req.IsBreak, req.IsStar);
+                        PlayTapEffect(i, req.JudgeGrade, req.IsBreak);
                     }
                     if (req.Effect.HasFlag(EffectType.Touch))
                     {
@@ -153,6 +160,7 @@ namespace MajdataViewX.Managers
 
         public void SetDisplayMode(JudgeDisplayMode mode)
         {
+            displayMode = mode;
             switch (mode)
             {
                 case JudgeDisplayMode.None:
@@ -175,7 +183,7 @@ namespace MajdataViewX.Managers
             }
         }
 
-        private void PlayTapEffect(int pos, JudgeGrade judge, bool isBreak, bool isStar = false)
+        private void PlayTapEffect(int pos, JudgeGrade judge, bool isBreak)
         {
             // Effect & Judge Text
             switch (judge)
@@ -261,9 +269,8 @@ namespace MajdataViewX.Managers
                     judgeAnimators[pos].SetTrigger(PerfectHash);
             }
 
-            // Fast / Late (slides never show it: their judgment is settled by
-            // the whole slide, not the head tap)
-            if (showFL && !isStar)
+            // Fast / Late
+            if (showFL)
             {
                 if (judge is JudgeGrade.Miss or JudgeGrade.LateCritical or JudgeGrade.FastCritical)
                 {
@@ -371,7 +378,6 @@ namespace MajdataViewX.Managers
         public JudgeGrade JudgeGrade;
         public bool IsBreak;
         public bool IsMine;
-        public bool IsStar;
         public bool HasHolding;
         public Color HoldingColor;
     }

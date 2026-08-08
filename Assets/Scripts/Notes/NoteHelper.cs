@@ -351,12 +351,11 @@ namespace MajdataViewX.Notes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void PlayTapEffect(
             EffectData* JudgeEffectRequests,
-            int key, JudgeGrade judge, bool isBreak, bool isMine, bool isStar = false)
+            int key, JudgeGrade judge, bool isBreak, bool isMine)
         {
             JudgeEffectRequests[key].Effect = EffectType.Tap;
             JudgeEffectRequests[key].IsBreak = isBreak;
             JudgeEffectRequests[key].IsMine = isMine;
-            JudgeEffectRequests[key].IsStar = isStar;
             JudgeEffectRequests[key].JudgeGrade = judge;
         }
 
