@@ -52,6 +52,22 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# ---------- Stray-instance guard ----------
+# A running MajdataEdit-Neo/MajdataViewX pair (the editor auto-launches the
+# View and neither terminates reliably) can block the build - e.g. dotnet
+# publish/zip touching files the editor has loaded. Kill strays by exact
+# process name (-x: never matches this script, whose argv contains the names
+# as paths).
+kill_strays() {
+  for proc in MajdataEdit-Neo MajdataViewX; do
+    if pgrep -x "$proc" >/dev/null 2>&1; then
+      log "Killing running $proc instance(s) - they can block the build"
+      pkill -9 -x "$proc" || true
+    fi
+  done
+}
+kill_strays
+
 # ---------- Helpers ----------
 log()  { printf '\033[1;34m[build]\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m[warn]\033[0m %s\n' "$*" >&2; }
