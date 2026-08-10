@@ -94,12 +94,107 @@ namespace MajdataViewX.Native
         private static string PickEncoder(ExportCodec codec)
         {
             var output = GetEncodersOutput();
-            return codec switch
+            var candidates = codec switch
             {
-                ExportCodec.HEVC => FirstOf(output, "hevc_nvenc", "hevc_vaapi", "hevc_qsv", "hevc_videotoolbox", "libx265"),
-                ExportCodec.AV1 => FirstOf(output, "av1_nvenc", "av1_vaapi", "libsvtav1"),
-                _ => FirstOf(output, "h264_nvenc", "h264_vaapi", "h264_qsv", "h264_videotoolbox", "libx264"),
+                ExportCodec.HEVC => new[] { "hevc_nvenc", "hevc_vaapi", "hevc_qsv", "hevc_videotoolbox", "libx265" },
+                ExportCodec.AV1 => new[] { "av1_nvenc", "av1_vaapi", "libsvtav1" },
+                _ => new[] { "h264_nvenc", "h264_vaapi", "h264_qsv", "h264_videotoolbox", "libx264" },
             };
+            foreach (var candidate in candidates)
+            {
+                if (!output.Contains(candidate))
+                    continue;
+                // Free hardware-presence check (no process spawn): skips
+                // encoders whose GPU is not present at all, e.g. h264_nvenc
+                // on a machine without an NVIDIA GPU.
+                if (!HwEncoderPresent(candidate))
+                    continue;
+                // CPU encoders always work if listed - no test needed.
+                if (IsCpuEncoder(candidate) || VerifyEncoder(candidate))
+                    return candidate;
+                Debug.LogWarning($"[FfmpegEncoder] {candidate} failed verification, trying next");
+            }
+            return null;
+        }
+
+        private static bool IsCpuEncoder(string encoder) =>
+            encoder is "libx264" or "libx265" or "libsvtav1";
+
+        private static bool HwEncoderPresent(string encoder)
+        {
+            if (encoder.Contains("vaapi") || encoder.Contains("qsv"))
+                return _vaapiDevice != null;
+            if (encoder.Contains("nvenc"))
+                return HasNvidia();
+            if (encoder.Contains("videotoolbox"))
+#if UNITY_STANDALONE_OSX || UNITY_EDITOR_OSX
+                return true;
+#else
+                return false;
+#endif
+            return true;
+        }
+
+        /// <summary>True when an NVIDIA driver is present (Linux exposes its version here).</summary>
+        public static bool HasNvidia()
+        {
+            try
+            {
+                return File.Exists("/proc/driver/nvidia/version");
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Encodes one test frame to confirm the encoder actually works on
+        /// this machine. ffmpeg -encoders lists encoders that are compiled in
+        /// but unusable here (e.g. h264_nvenc with a stale driver), which made
+        /// the export fail with "FFmpeg pipe write failed". The success result
+        /// is cached on disk, so this spawns at most once per machine.
+        /// </summary>
+        private static bool VerifyEncoder(string encoder)
+        {
+            try
+            {
+                var cacheFile = Path.Combine(Application.temporaryCachePath, $"ffmpeg_enc_ok_{encoder}.txt");
+                if (File.Exists(cacheFile))
+                    return true;
+
+                var errFile = Path.Combine(Application.temporaryCachePath, $"ffmpeg_enc_test_{encoder}.txt");
+                if (File.Exists(errFile)) File.Delete(errFile);
+                var deviceArgs = encoder.Contains("vaapi") && _vaapiDevice != null
+                    ? $"-init_hw_device vaapi=va:{_vaapiDevice} -filter_hw_device va "
+                    : string.Empty;
+                var filterArgs = encoder.Contains("vaapi")
+                    ? " -vf format=nv12,hwupload"
+                    : string.Empty;
+                var cmd = $"{Binary} -hide_banner -loglevel error {deviceArgs}" +
+                    $"-f lavfi -i testsrc=s=128x72:r=30:d=0.05 -frames:v 1" +
+                    $"{filterArgs} -c:v {encoder} -f null - > \"{errFile}\" 2>&1";
+                var proc = FFmpegPipe.SpawnSimple(cmd);
+                if (!proc.IsValid) return false;
+                var code = FFmpegPipe.Wait(proc);
+                if (code != 0)
+                {
+                    if (File.Exists(errFile))
+                    {
+                        var err = File.ReadAllText(errFile).Trim();
+                        if (err.Length > 0)
+                            Debug.LogWarning($"[FfmpegEncoder] {encoder} verification failed: {err}");
+                    }
+                    return false;
+                }
+                File.WriteAllText(cacheFile, "ok");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[FfmpegEncoder] {encoder} verification error: {ex.Message}");
+                return false;
+            }
         }
 
         private static string FirstOf(string encodersOutput, params string[] candidates)
@@ -149,7 +244,7 @@ namespace MajdataViewX.Native
                 if (string.IsNullOrEmpty(hwaccels))
                     return string.Empty;
 
-                if (hwaccels.Contains("cuda"))
+                if (HasNvidia() && hwaccels.Contains("cuda"))
                     return "-hwaccel cuda -hwaccel_output_format nv12 ";
 
                 var vaapiDevice = FindVaapiDevice();
