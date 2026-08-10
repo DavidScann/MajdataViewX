@@ -29,6 +29,9 @@ Rules:
 4. The build script (`scripts/build-linux.sh`) never launches the apps;
    if an app window appears during a build, it came from somewhere else
    (usually a stray instance from a previous run).
+5. The build script kills stray `MajdataEdit-Neo`/`MajdataViewX` instances
+   at startup (exact-name `pgrep -x`/`pkill -9 -x`, so the script itself is
+   never matched), because a running pair can block the build.
 
 ## Release conventions
 
