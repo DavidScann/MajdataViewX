@@ -48,6 +48,11 @@ namespace MajdataViewX.Notes.NoteDatas
         public float Diff { get; set; }
         public JudgeGrade JudgeGrade { get; set; }
 
+        // DJAuto simulation records the exact tick time the press was issued;
+        // the render jobs judge with this instead of the render-frame time.
+        public bool DjAutoPressed { get; set; }
+        public float DjAutoPressTime { get; set; }
+
         public bool IsEnd { get; set; }
 
         public void Init()

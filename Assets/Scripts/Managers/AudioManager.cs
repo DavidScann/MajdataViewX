@@ -26,6 +26,8 @@ namespace MajdataViewX.Managers
     {
         public const int SFX_COUNT = 16;
 
+        private int _dbgOnUpdateCount;
+
         [CanBeNull] private AudioSample TrackSample;
         [CanBeNull] private string _trackPath;
         private float TrackSampleVolume;
@@ -209,6 +211,9 @@ namespace MajdataViewX.Managers
         public unsafe void OnUpdate()
         {
             if (!isInited || _timeProvider.IsRecord) return;
+
+            if ((++_dbgOnUpdateCount & 1023) == 0)
+                Debug.Log($"[dbg][audio] thread alive");
 
             UpdateAnswerSfx();
 

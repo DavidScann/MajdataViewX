@@ -42,7 +42,6 @@ namespace MajdataViewX.Notes.Updaters
         {
             ref var touch = ref touches.ElementRef(index);
             TransformUpdate(ref touch, index);
-            AutoplayUpdate(ref touch);
             CheckUpdate(ref touch);
         }
 
@@ -167,55 +166,21 @@ namespace MajdataViewX.Notes.Updaters
             }
         }
 
-        private void AutoplayUpdate(ref TouchData touch)
-        {
-            if (touch.isEnd) return;
-            if (NoteHelper.AutoPlayMode is AutoPlayMode.Disable) return;
-
-            var timing = TimeData.NoteTime - touch.time;
-            if (touch.coverageId < 0 && NoteHelper.IsSimulated) return;
-            var autoplayStart = NoteHelper.AutoPlayMode is AutoPlayMode.DJAutoButton or AutoPlayMode.DJAutoSensor &&
-                                touchGroupCoverResults[touch.coverageId].Mode == CoverMode.DoubleCircleSlide
-                    ? InputManager.DJAUTO_TOUCH_DOUBLE_CIRCLE_SLIDE_START_SEC
-                    : InputManager.DJAUTO_AUTOPLAY_START_SEC;
-
-            if (timing < autoplayStart) return;
-
-            switch (NoteHelper.AutoPlayMode)
-            {
-                case AutoPlayMode.Enable:
-                    touch.judgeGrade = JudgeGrade.LateCritical;
-                    touch.isJudged = true;
-                    touch.diff = 0;
-                    EndNote(ref touch);
-                    break;
-                case AutoPlayMode.Random:
-                    var grade = (JudgeGrade)GlobalRandom.NextInt((int)JudgeGrade.FastGood, (int)JudgeGrade.Miss); ;
-                    touch.judgeGrade = touch.isMine
-                        ? (grade < JudgeGrade.FastPerfect3rd ? JudgeGrade.Miss : JudgeGrade.LateCritical)
-                        : grade;
-                    touch.isJudged = true;
-                    touch.diff = grade >= JudgeGrade.LateCritical ? 11.4514f : -11.4514f;
-                    EndNote(ref touch);
-                    break;
-                case AutoPlayMode.DJAutoButton:
-                case AutoPlayMode.DJAutoSensor:
-                    if (touch.isMine) break;
-                    if (!touch.isJudged)
-                    {
-                        if (!touch.isSlideGuide)
-                        {
-                            InputData.DJAutoAddGroupCoverage(touchGroupCoverResults[touch.coverageId], timing);
-                        }
-                    }
-                    break;
-            }
-        }
-
         private void CheckUpdate(ref TouchData touch)
         {
             if (touch.isJudged || touch.isEnd) return;
-            if (!NoteHelper.IsSimulated) return;
+            // DJAuto modes are judged by DJAutoSim on the sim tick; the render job only judges in Disable (human play).
+            if (NoteHelper.AutoPlayMode != AutoPlayMode.Disable) return;
+
+            // DJAuto input is emitted by DJAutoSim at exact times; judge with the recorded press time, render-FPS independent.
+            if (touch.DjAutoPressed && !touch.isJudged)
+            {
+                touch.judgeGrade = NoteHelper.GetTouchJudge(touch.DjAutoPressTime - touch.time);
+                touch.isJudged = true;
+                touch.diff = touch.DjAutoPressTime - touch.time;
+                EndNote(ref touch);
+                return;
+            }
 
             var noteTime = TimeData.NoteTime;
             var diffSec = noteTime - touch.time;

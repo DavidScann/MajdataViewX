@@ -40,7 +40,6 @@ namespace MajdataViewX.Notes.Updaters
         {
             ref var tap = ref taps.ElementRef(index);
             TransformUpdate(ref tap, index);
-            AutoplayUpdate(ref tap);
             CheckUpdate(ref tap);
         }
 
@@ -113,54 +112,21 @@ namespace MajdataViewX.Notes.Updaters
             };
         }
 
-        private void AutoplayUpdate(ref TapData tap)
-        {
-            if (tap.IsEnd) return;
-            if (NoteHelper.AutoPlayMode is AutoPlayMode.Disable) return;
-
-            var timing = TimeData.NoteTime - tap.Time;
-            if (timing < InputManager.DJAUTO_AUTOPLAY_START_SEC) return;
-            switch (NoteHelper.AutoPlayMode)
-            {
-                case AutoPlayMode.Enable:
-                    tap.JudgeGrade = JudgeGrade.LateCritical;
-                    tap.IsJudged = true;
-                    tap.Diff = 0;
-                    EndNote(ref tap);
-                    break;
-                case AutoPlayMode.Random:
-                    var grade = (JudgeGrade)GlobalRandom.NextInt((int)JudgeGrade.FastGood, (int)JudgeGrade.Miss);
-                    tap.JudgeGrade = tap.IsMine
-                        ? (grade < JudgeGrade.FastPerfect3rd ? JudgeGrade.Miss : JudgeGrade.LateCritical)
-                        : grade;
-                    tap.IsJudged = true;
-                    tap.Diff = grade >= JudgeGrade.LateCritical ? 11.4514f : -11.4514f;
-                    EndNote(ref tap);
-                    break;
-                case AutoPlayMode.DJAutoButton:
-                    if (tap.IsMine) break;
-                    if (!tap.IsJudged)
-                    {
-                        InputData.DJAutoSetButtonOn(tap.Key);
-                    }
-                    break;
-                case AutoPlayMode.DJAutoSensor:
-                    if (tap.IsMine) break;
-                    if (!tap.IsJudged)
-                    {
-                        if (!tap.IsSlideGuide)
-                        {
-                            InputData.DJAutoSetSensorOn(tap.Key);
-                        }
-                    }
-                    break;
-            }
-        }
-
         private void CheckUpdate(ref TapData tap)
         {
             if (tap.IsEnd) return;
-            if (!NoteHelper.IsSimulated) return;
+            // DJAuto modes are judged by DJAutoSim on the sim tick; the render job only judges in Disable (human play).
+            if (NoteHelper.AutoPlayMode != AutoPlayMode.Disable) return;
+
+            // DJAuto input is emitted by DJAutoSim at exact times; judge with the recorded press time, render-FPS independent.
+            if (tap.DjAutoPressed && !tap.IsJudged)
+            {
+                tap.JudgeGrade = NoteHelper.GetTapJudge(tap.DjAutoPressTime - tap.Time, tap.IsEx);
+                tap.IsJudged = true;
+                tap.Diff = tap.DjAutoPressTime - tap.Time;
+                EndNote(ref tap);
+                return;
+            }
 
             var diffSec = TimeData.NoteTime - tap.Time;
 

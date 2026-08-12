@@ -186,8 +186,6 @@ namespace MajdataViewX.Managers
                         Time.captureDeltaTime = 1f / Mathf.Max(fps, 1);
                         recordFrameStep = 1f / Mathf.Max(fps, 1);
                         AudioTime = startAt;
-                        // 防止帧率对“下一帧应用”的机制产生过大影响
-                        InputManager.DJAUTO_AUTOPLAY_START_SEC_SS.Data = -1f / fps;
                     }
                     break;
             }

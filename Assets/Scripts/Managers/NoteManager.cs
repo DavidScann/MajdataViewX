@@ -1,4 +1,5 @@
 using MajdataViewX.Base;
+using MajdataViewX.Notes;
 using MajdataViewX.Notes.NoteDatas;
 using MajdataViewX.Notes.Updaters;
 using MajdataViewX.Types.Notes.RenderData;
@@ -60,6 +61,9 @@ namespace MajdataViewX.Managers
 
         JobHandle _prevChain;
         bool _isJobScheduledThisFrame;
+        float _lastDbgLog;
+
+        readonly DJAutoSim _djAutoSim = new();
 
         void Awake()
         {
@@ -153,14 +157,35 @@ namespace MajdataViewX.Managers
 
         void Update()
         {
-            _prevChain.Complete();
-            if (!_timeProvider.IsRecord)
+            if (Time.unscaledTime - _lastDbgLog >= 1f)
             {
-                // 防止帧率对“下一帧应用”的机制产生过大影响
-                // Record模式下在TimeProvider中设定
-                InputManager.DJAUTO_AUTOPLAY_START_SEC_SS.Data = -Time.unscaledDeltaTime;
+                _lastDbgLog = Time.unscaledTime;
+                Debug.Log($"[dbg] f={Time.frameCount} t={_timeProvider.NoteTime:F3} " +
+                          $"mode={(int)NoteHelper.AutoPlayMode} " +
+                          $"n={taps.Length + holds.Length + slides.Length + touches.Length + touchHolds.Length} " +
+                          $"simTicks={_djAutoSim.TotalTicks}");
             }
+            _prevChain.Complete();
             _inputManager.BeginHandler(); // 这里牵扯到用户输入，需要一直调用
+
+            unsafe
+            {
+                _djAutoSim.Step(_timeProvider.NoteTime, new DJAutoSim.SimContext
+                {
+                    Taps = taps,
+                    Holds = holds,
+                    Slides = slides,
+                    Touches = touches,
+                    TouchHolds = touchHolds,
+                TouchGroupCoverResults = touchGroupCoverResults,
+                TouchHoldGroupCoverResults = touchHoldGroupCoverResults,
+                TouchGroupTotalCounts = touchGroupTotalCounts,
+                TouchGroupJudgedCounts = touchGroupJudgedCounts,
+                    SfxRequests = _audioManager.SfxRequestsPtr,
+                    JudgeEffectRequests = _effectManager.JudgeEffectRequestsPtr,
+                    ReportResults = _objectCounter.ReportRequestsWriter,
+                });
+            }
 
             if (taps.Length + eachLines.Length + holds.Length + slides.Length + touches.Length + touchHolds.Length == 0) return;
 
@@ -211,7 +236,7 @@ namespace MajdataViewX.Managers
 
                 JobHandle h = default;
 
-                // DJAuto持续输入必须先续占下一帧的手，Tap/Touch 只能使用剩余额度，因此hold/slide类note先update
+                // DJAuto continuous inputs claim this tick's hands first; taps/touches use the rest, so holds/slides update first.
                 if (holds.Length > 0)
                     h = new HoldUpdateJob
                     {
@@ -381,6 +406,7 @@ namespace MajdataViewX.Managers
         public void ResetState()
         {
             _prevChain.Complete();
+            _djAutoSim.Reset();
             taps.Clear();
             eachLines.Clear();
             holds.Clear();

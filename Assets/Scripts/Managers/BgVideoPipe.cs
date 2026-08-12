@@ -45,6 +45,7 @@ namespace MajdataViewX.Managers
 
         Texture2D _texture;
         Sprite _sprite;
+        int _dbgFrameUploads;
 
         public int Width { get; }
         public int Height { get; }
@@ -274,6 +275,7 @@ namespace MajdataViewX.Managers
             var consecutiveEof = 0;
             var frameIndex = 0;
             var halfFrame = 0.5 / _fps;
+            var lastLog = 0;
             while (_running)
             {
                 // Paused: stop reading so ffmpeg's pipe fills and it blocks —
@@ -316,6 +318,11 @@ namespace MajdataViewX.Managers
                 frameIndex++;
                 _writeIndex = (idx + 1) % _buffers.Length;
                 _published = idx;
+                if (frameIndex - lastLog >= _fps * 2)
+                {
+                    lastLog = frameIndex;
+                    Debug.Log($"[dbg][video] reader frame={frameIndex} audioTime={MajCtx._timeProvider.AudioTime:F2}");
+                }
             }
             _running = false;
         }
@@ -329,6 +336,8 @@ namespace MajdataViewX.Managers
             _texture.LoadRawTextureData(_buffers[pub]);
             _texture.Apply();
             _consumed = pub;
+            if ((++_dbgFrameUploads & 255) == 0)
+                Debug.Log($"[dbg][video] UpdateFrame uploads={_dbgFrameUploads}");
         }
 
         public void Dispose()

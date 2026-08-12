@@ -51,7 +51,6 @@ namespace MajdataViewX.Notes.Updaters
         {
             ref var th = ref touchHolds.ElementRef(index);
             TransformUpdate(ref th, index);
-            AutoplayUpdate(ref th);
             CheckUpdate(ref th);
         }
 
@@ -173,79 +172,29 @@ namespace MajdataViewX.Notes.Updaters
             };
         }
 
-        private void AutoplayUpdate(ref TouchHoldData th)
-        {
-            if (th.isEnd) return;
-            if (NoteHelper.AutoPlayMode is AutoPlayMode.Disable) return;
-
-            var timing = TimeData.NoteTime - th.time;
-            if (timing < InputManager.DJAUTO_AUTOPLAY_START_SEC) return;
-
-            switch (NoteHelper.AutoPlayMode)
-            {
-                case AutoPlayMode.Enable:
-                    if (!th.isHeadJudged)
-                    {
-                        th.judgeGrade = JudgeGrade.LateCritical;
-                        th.isHeadJudged = true;
-                        th.isHolding = true;
-                        th.headDiff = 0;
-                    }
-                    if (th.isHeadJudged)
-                    {
-                        var remaining = math.max(th.LastFor - timing, 0);
-                        if (remaining <= 0)
-                        {
-                            th.holdPercent = 1f;
-                            EndNote(ref th);
-                            return;
-                        }
-                    }
-                    break;
-                case AutoPlayMode.Random:
-                    if (!th.isHeadJudged)
-                    {
-                        var grade = (JudgeGrade)GlobalRandom.NextInt((int)JudgeGrade.FastGood, (int)JudgeGrade.Miss);
-                        th.judgeGrade = th.isMine
-                            ? (grade < JudgeGrade.FastPerfect3rd ? JudgeGrade.Miss : JudgeGrade.LateCritical)
-                            : grade;
-                        th.isHeadJudged = true;
-                        th.isHolding = true;
-                        th.headDiff = grade >= JudgeGrade.LateCritical ? 11.4514f : -11.4514f;
-                    }
-                    if (th.isHeadJudged)
-                    {
-                        var remaining = math.max(th.LastFor - timing, 0);
-                        if (remaining <= 0)
-                        {
-                            th.holdPercent = 1f;
-                            EndNote(ref th);
-                            return;
-                        }
-                    }
-                    break;
-                case AutoPlayMode.DJAutoButton:
-                case AutoPlayMode.DJAutoSensor:
-                    if (th.isMine) break;
-                    // 头判阶段用 touchGroup 覆盖(和 touch 共享)，hold 阶段用 touchHoldGroup 覆盖
-                    if (!th.isHeadJudged)
-                    {
-                        if (th.headCoverageId >= 0)
-                            InputData.DJAutoAddGroupCoverage(touchGroupCoverResults[th.headCoverageId], timing);
-                    }
-                    else if (math.max(th.LastFor - timing, 0) > 0)
-                    {
-                        if (th.coverageId >= 0)
-                            InputData.DJAutoAddGroupCoverage(touchHoldGroupCoverResults[th.coverageId]);
-                    }
-                    break;
-            }
-        }
-
         private void CheckUpdate(ref TouchHoldData th)
         {
             if (th.isEnd) return;
-            if (!NoteHelper.IsSimulated) return;
+            // DJAuto modes are judged by DJAutoSim on the sim tick; the render job only judges in Disable (human play).
+            if (NoteHelper.AutoPlayMode != AutoPlayMode.Disable) return;
+
+            // DJAuto input is emitted by DJAutoSim at exact times; judge with the recorded press time, render-FPS independent.
+            if (th.DjAutoPressed && !th.isHeadJudged && !th.isMine)
+            {
+                th.judgeGrade = NoteHelper.GetTouchJudge(th.DjAutoPressTime - th.time);
+                th.isHeadJudged = true;
+                th.isHolding = true;
+                th.headDiff = th.DjAutoPressTime - th.time;
+
+                if (th.headGroupId != -1 && th.judgeGrade != JudgeGrade.Miss)
+                {
+                    unsafe
+                    {
+                        var ptr = (int*)touchGroupJudgedCounts.GetUnsafePtr();
+                        Interlocked.Increment(ref ptr[th.headGroupId]);
+                    }
+                }
+            }
 
             var noteTime = TimeData.NoteTime;
             var timing = noteTime - th.time;

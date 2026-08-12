@@ -276,6 +276,7 @@ namespace MajdataViewX.Managers
 
         async Task ShowVideoPipeAsync(bool resizeBg, double startAt = 0)
         {
+            Debug.Log($"[dbg][video] ShowVideoPipeAsync enter startAt={startAt:F2}");
             StopVideoPipe();
 
             // Invalidate any in-flight preload: it must not spawn a second
@@ -321,6 +322,7 @@ namespace MajdataViewX.Managers
                 return;
             }
             videoPipe = pipe;
+            Debug.Log($"[dbg][video] ShowVideoPipeAsync done, pipe={pipe != null}");
 
             // The video is always limited to the playfield: the circled
             // material clips it to the play circle. Best-fit scale: the whole

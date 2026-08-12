@@ -41,7 +41,6 @@ namespace MajdataViewX.Notes.Updaters
         {
             ref var hold = ref holds.ElementRef(index);
             TransformUpdate(ref hold, index);
-            AutoplayUpdate(ref hold);
             CheckUpdate(ref hold);
         }
 
@@ -217,82 +216,11 @@ namespace MajdataViewX.Notes.Updaters
             }
         }
 
-        private void AutoplayUpdate(ref HoldData hold)
-        {
-            if (hold.isEnd) return;
-            if (NoteHelper.AutoPlayMode is AutoPlayMode.Disable) return;
-
-            var timing = TimeData.NoteTime - hold.time;
-            if (timing < InputManager.DJAUTO_AUTOPLAY_START_SEC) return;
-
-            switch (NoteHelper.AutoPlayMode)
-            {
-                case AutoPlayMode.Enable:
-                    if (!hold.isHeadJudged)
-                    {
-                        hold.judgeGrade = JudgeGrade.LateCritical;
-                        hold.isHeadJudged = true;
-                        hold.isHolding = true;
-                        hold.headDiff = 0;
-                        NoteHelper.PlayHoldSound(SfxRequests,
-                            hold.judgeGrade,
-                            hold.isBreak,
-                            hold.isEx,
-                            hold.isMine,
-                            hold.headDiff
-                        );
-                    }
-                    if (hold.isHeadJudged && math.max(hold.LastFor - timing, 0) <= 0)
-                    {
-                        hold.holdPercent = 1f;
-                        EndNote(ref hold);
-                    }
-                    break;
-                case AutoPlayMode.Random:
-                    if (!hold.isHeadJudged)
-                    {
-                        var grade = (JudgeGrade)GlobalRandom.NextInt((int)JudgeGrade.FastGood, (int)JudgeGrade.Miss);
-                        hold.judgeGrade = hold.isMine
-                            ? (grade < JudgeGrade.FastPerfect3rd ? JudgeGrade.Miss : JudgeGrade.LateCritical)
-                            : grade;
-                        hold.isHeadJudged = true;
-                        hold.isHolding = true;
-                        hold.headDiff = grade >= JudgeGrade.LateCritical ? 11.4514f : -11.4514f;
-                        NoteHelper.PlayHoldSound(SfxRequests,
-                            hold.judgeGrade,
-                            hold.isBreak,
-                            hold.isEx,
-                            hold.isMine,
-                            hold.headDiff
-                        );
-                    }
-                    if (hold.isHeadJudged && hold.LastFor - timing <= 0)
-                    {
-                        hold.holdPercent = 1f;
-                        EndNote(ref hold);
-                    }
-                    break;
-                case AutoPlayMode.DJAutoButton:
-                    if (hold.isMine) break;
-                    if (!hold.isHeadJudged || math.max(hold.LastFor - timing, 0) > 0)
-                    {
-                        InputData.DJAutoSetButtonOn(hold.Key);
-                    }
-                    break;
-                case AutoPlayMode.DJAutoSensor:
-                    if (hold.isMine) break;
-                    if (!hold.isHeadJudged || math.max(hold.LastFor - timing, 0) > 0)
-                    {
-                        InputData.DJAutoSetSensorOn(hold.Key);
-                    }
-                    break;
-            }
-        }
-
         private void CheckUpdate(ref HoldData hold)
         {
             if (hold.isEnd) return;
-            if (!NoteHelper.IsSimulated) return;
+            // DJAuto modes are judged by DJAutoSim on the sim tick; the render job only judges in Disable (human play).
+            if (NoteHelper.AutoPlayMode != AutoPlayMode.Disable) return;
 
             var noteTime = TimeData.NoteTime;
             var timing = noteTime - hold.time;
@@ -318,6 +246,18 @@ namespace MajdataViewX.Notes.Updaters
                     EndNote(ref hold);
                 }
                 return;
+            }
+
+            // DJAuto input is emitted by DJAutoSim at exact times; judge with the recorded press time, render-FPS independent.
+            // The judged head falls into the hold-tracking logic below (isHolding/release/percent), same path as a real press.
+            if (hold.DjAutoPressed && !hold.isHeadJudged && !hold.isMine)
+            {
+                hold.judgeGrade = NoteHelper.GetTapJudge(hold.DjAutoPressTime - hold.time, hold.isEx);
+                hold.isHeadJudged = true;
+                hold.isHolding = true;
+                hold.headDiff = hold.DjAutoPressTime - hold.time;
+                NoteHelper.PlayHoldSound(SfxRequests,
+                    hold.judgeGrade, hold.isBreak, hold.isEx, hold.isMine, hold.headDiff);
             }
 
             // ---- Head judgment ----

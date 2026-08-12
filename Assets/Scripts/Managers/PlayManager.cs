@@ -181,6 +181,7 @@ namespace MajdataViewX.Managers
                 //simulate
                 NoteHelper.AutoPlayModeSS.Data = _setting.AutoMode;
                 _inputManager.ShowHand = _setting.ShowHand;
+                InputManager.WideHands = _setting.WideHands;
                 //UI
                 _objectCounter.StartOutput(_setting.ComboStatusType, _setting.UIType);
                 //bg

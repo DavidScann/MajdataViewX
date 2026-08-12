@@ -50,6 +50,11 @@ namespace MajdataViewX.Notes.NoteDatas
         public float playerIdleTimeSec;
         public float lastReleaseTimeSec;
 
+        // DJAuto simulation records the exact tick time the press was issued;
+        // the render jobs judge with this instead of the render-frame time.
+        public bool DjAutoPressed { get; set; }
+        public float DjAutoPressTime { get; set; }
+
         public void Init()
         {
             pos = float2.zero;
