@@ -24,7 +24,7 @@ namespace MajdataViewX.Managers
         // Slide默认尺寸
         public const float DJAUTO_HAND_RADIUS = 0.45f;
         // Wide-hand mode slide hand size: closer to a real palm, more likely to sweep adjacent sensors (realistic DJAuto).
-        public const float DJAUTO_WIDE_HAND_RADIUS = 0.75f;
+        public const float DJAUTO_WIDE_HAND_RADIUS = 0.70f;
         // Wifi默认尺寸
         public const float DJAUTO_WIFI_RADIUS = 1.00f;
         // Touch/TouchHold 覆盖圆的最小指尖尺寸；需要更少误触时可单独调小。
