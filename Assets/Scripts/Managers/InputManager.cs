@@ -583,9 +583,10 @@ namespace MajdataViewX.Managers
         {
             _showHandThisFrame = showHandThisFrame;
 
-            // 必须在 _prevChain.Complete() 之后、DJAutoSim tick 与渲染 job 之前调用；用户输入在下方读取。
-            // DJAuto 输入不再走 next-frame 缓冲：DJAutoSim 在 BeginHandler 之后以固定
-            // 步长直接写入当前状态。这里只做每帧的边沿推进，供 IsPadDown 使用。
+            // Must run after _prevChain.Complete(), before the DJAutoSim ticks and the render
+            // jobs; user input is read below. DJAuto input no longer uses the next-frame buffer:
+            // DJAutoSim writes the current state at a fixed step after BeginHandler; only the
+            // per-frame edge advance (for IsPadDown) happens here.
             for (int i = 0; i < BUTTON_COUNT; i++)
             {
                 ref var button = ref _buttonStates.ElementRef(i);

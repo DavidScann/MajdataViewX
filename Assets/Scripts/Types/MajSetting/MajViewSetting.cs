@@ -14,7 +14,7 @@ namespace MajdataViewX.Types.MajSetting
         public JudgeDisplayMode JudgeDisplayMode { get; set; } = JudgeDisplayMode.Both;
         public AutoPlayMode AutoMode { get; set; } = AutoPlayMode.Enable;
         public bool ShowHand { get; set; } = false;
-        /// <summary>宽手：DJAuto 的手更容易扫到相邻传感器（拟真滑动，仅影响 DJAuto）。</summary>
+        /// <summary>Wide hands: DJAuto's hands sweep adjacent sensors more easily (realistic sliding, DJAuto only).</summary>
         public bool WideHands { get; set; } = false;
         public int OutputFps { get; set; } = 60;
         public ExportQuality ExportQuality { get; set; } = ExportQuality.High;
