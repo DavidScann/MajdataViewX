@@ -18,6 +18,7 @@ namespace MajdataViewX.Managers
     public class ScreenRecorder : MonoBehaviour
     {
         private const string EncoderDllName = "RenderingOut";
+        private static Material? _flipMaterial;
 
         [DllImport(EncoderDllName, CallingConvention = CallingConvention.StdCall)]
         private static extern IntPtr video_encoder_create(
@@ -235,6 +236,34 @@ namespace MajdataViewX.Managers
             var pipeProc = default(FFmpegPipe.PipeProcess);
             Texture2D cpuTex = null;
 #endif
+#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
+            // The camera renders into captureTexture bottom-up; RenderingOut
+            // reads texture rows top-down. Blit through the ExportFlip shader
+            // (inverts the V coordinate) so the encoder receives upright
+            // frames - the Windows equivalent of the Linux ffmpeg vflip.
+            var flipTexture = new RenderTexture(
+                width,
+                height,
+                0,
+                RenderTextureFormat.BGRA32)
+            {
+                name = "Screen Recorder Flip",
+                antiAliasing = 1,
+                useMipMap = false,
+                autoGenerateMips = false
+            };
+            if (_flipMaterial == null)
+            {
+                // The shader lives in Resources/ so it ships in player builds;
+                // Shader.Find would fail because Unity strips unreferenced
+                // shaders from standalone builds.
+                var flipShader = Resources.Load<Shader>("ExportFlip");
+                if (flipShader == null)
+                    throw new InvalidOperationException(
+                        "ExportFlip shader not found; export pipeline cannot correct frame orientation.");
+                _flipMaterial = new Material(flipShader);
+            }
+#endif
             var mainCamera = Camera.main;
             var prevTargetTexture = mainCamera != null ? mainCamera.targetTexture : null;
 
@@ -243,6 +272,11 @@ namespace MajdataViewX.Managers
                 if (!captureTexture.Create())
                     throw new InvalidOperationException(
                         "Could not create the screen recorder render target.");
+#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
+                if (!flipTexture.Create())
+                    throw new InvalidOperationException(
+                        "Could not create the screen recorder flip target.");
+#endif
 
                 // Render the scene natively into the capture target at the export
                 // resolution (e.g. 3840x2160) instead of capturing the window at
@@ -314,12 +348,14 @@ namespace MajdataViewX.Managers
                     UpdateExportOverlay(recordingElapsedTime, totalTime);
 
 #if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
-                    // The main camera renders directly into captureTexture at the
-                    // export resolution; hand its native texture to the encoder.
-                    var nativeTexture = captureTexture.GetNativeTexturePtr();
+                    // Flip the freshly rendered frame upright before the
+                    // encoder's top-down read.
+                    Graphics.Blit(captureTexture, flipTexture, _flipMaterial);
+
+                    var nativeTexture = flipTexture.GetNativeTexturePtr();
                     if (nativeTexture == IntPtr.Zero)
                         throw new InvalidOperationException(
-                            "The screen recorder render target has no native texture.");
+                            "The screen recorder flip target has no native texture.");
 
                     var submitResult = video_encoder_submit_frame(encoder, nativeTexture);
                     if (submitResult < 0)
@@ -454,6 +490,10 @@ namespace MajdataViewX.Managers
                 RenderTexture.active = null;
                 captureTexture.Release();
                 Destroy(captureTexture);
+#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
+                flipTexture.Release();
+                Destroy(flipTexture);
+#endif
             }
         }
 
