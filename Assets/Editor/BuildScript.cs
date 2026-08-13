@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using UnityEditor;
+using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
 using UnityEngine;
 
@@ -19,20 +20,31 @@ public static class BuildScript
         var outputPath = Environment.GetEnvironmentVariable("BUILD_OUTPUT_PATH") ?? "build/Linux/MajdataViewX";
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(outputPath))!);
 
-        // IL2CPP compiler config: "release" (no LTO, ~30s link) or "master" (full LTO, ~5min link, single-threaded)
-        // Default to "release" for fast iteration; set IL2CPP_CONFIG=master for production builds.
-        var il2cppConfig = Environment.GetEnvironmentVariable("IL2CPP_CONFIG");
-        if (string.IsNullOrEmpty(il2cppConfig) || il2cppConfig == "release")
+        // Windows builds use the Mono backend (the Windows Build Support (Mono)
+        // module has no IL2CPP toolchain); Linux keeps IL2CPP.
+        var namedTarget = NamedBuildTarget.Standalone;
+        var useIl2Cpp = target is BuildTarget.StandaloneLinux64 or BuildTarget.StandaloneOSX;
+        PlayerSettings.SetScriptingBackend(
+            namedTarget,
+            useIl2Cpp ? ScriptingImplementation.IL2CPP : ScriptingImplementation.Mono2x);
+
+        if (useIl2Cpp)
         {
-            PlayerSettings.SetIl2CppCompilerConfiguration(
-                BuildTargetGroup.Standalone,
-                Il2CppCompilerConfiguration.Release);
-        }
-        else if (il2cppConfig == "master")
-        {
-            PlayerSettings.SetIl2CppCompilerConfiguration(
-                BuildTargetGroup.Standalone,
-                Il2CppCompilerConfiguration.Master);
+            // IL2CPP compiler config: "release" (no LTO, ~30s link) or "master" (full LTO, ~5min link, single-threaded)
+            // Default to "release" for fast iteration; set IL2CPP_CONFIG=master for production builds.
+            var il2cppConfig = Environment.GetEnvironmentVariable("IL2CPP_CONFIG");
+            if (string.IsNullOrEmpty(il2cppConfig) || il2cppConfig == "release")
+            {
+                PlayerSettings.SetIl2CppCompilerConfiguration(
+                    BuildTargetGroup.Standalone,
+                    Il2CppCompilerConfiguration.Release);
+            }
+            else if (il2cppConfig == "master")
+            {
+                PlayerSettings.SetIl2CppCompilerConfiguration(
+                    BuildTargetGroup.Standalone,
+                    Il2CppCompilerConfiguration.Master);
+            }
         }
 
         var options = new BuildPlayerOptions
