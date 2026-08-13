@@ -270,14 +270,36 @@ namespace MajdataViewX.Managers
                                 {
                                     SimaiNoteType.Hold or SimaiNoteType.TouchHold =>
                                         timing.Timing + note.HoldTime,
+                                    // SlideStartTime is an absolute time (the
+                                    // loader uses it directly as shootTime),
+                                    // not an offset from timing.Timing.
                                     SimaiNoteType.Slide =>
-                                        timing.Timing + note.SlideStartTime + note.SlideTime,
+                                        note.SlideStartTime + note.SlideTime,
                                     _ => timing.Timing,
                                 };
                                 if (end > lastNoteEnd) lastNoteEnd = end;
                             }
                         }
-                        var recordEndTime = Math.Min(_audioManager.TrackLength, lastNoteEnd + ApShowSec);
+                        // lastNoteEnd is in chart time (first note = 0); the
+                        // record window runs in AudioTime (NoteTime + offset,
+                        // starting at startAt minus the 5s song-detail intro).
+                        // Convert both caps into AudioTime so the window ends
+                        // at the audio end or right after the AP banner tail.
+                        var recordEndTime = Math.Min(
+                            _audioManager.TrackLength + offset,
+                            lastNoteEnd + ApShowSec + offset);
+                        Debug.Log($"[PlayManager] record: TrackLength={_audioManager.TrackLength:F2}s " +
+                                  $"lastNoteEnd={lastNoteEnd:F2}s recordEndTime={recordEndTime:F2}s");
+                        if (recordEndTime <= 0)
+                        {
+                            // A failed track decode collapses the record window to
+                            // zero and ends the export after ~1s with no notes
+                            // judged. Run to the chart-derived end instead of
+                            // silently truncating the video.
+                            recordEndTime = lastNoteEnd + ApShowSec;
+                            Debug.LogWarning($"[PlayManager] track length unavailable ({_audioManager.TrackLength:F2}s); " +
+                                             $"export will run to the chart end ({recordEndTime:F2}s)");
+                        }
                         _screenRecorder.StartRecording(maidataPath,
                             _setting.OutputFps, _setting.ExportQuality,
                             _setting.ExportWidth, _setting.ExportHeight, _setting.ExportCodec,

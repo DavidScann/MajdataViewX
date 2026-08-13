@@ -46,6 +46,12 @@ namespace MajdataViewX.Managers
                 {
                     if (Time.time - apStartedAt >= AP_SHOW_DURATION)
                     {
+                        // In record mode the capture loop runs to
+                        // recordEndTime (last note + banner tail) and its
+                        // natural end sends PlayStopped; stopping here would
+                        // cut the export at the same instant the counter
+                        // fills, before the banner frames are captured.
+                        if (_timeProvider.IsRecord) return;
                         _playManager.StopAsync().Forget();
                         _wsServer.SendStopResponse();
                     }
