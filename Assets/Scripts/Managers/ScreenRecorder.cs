@@ -320,12 +320,14 @@ namespace MajdataViewX.Managers
 
                 // The record covers the song from the starting position to
                 // recordEndTime (last note end + All Perfect banner, capped at
-                // the track end). The overlay percentage counts up to 100% for
-                // this segment, not the whole track.
-                var recordStartTime = Math.Max(0, (double)_timeProvider.AudioTime);
-                var totalTime = Math.Max(0.01,
-                    recordEndTime / Math.Max(_timeProvider.CurrentSpeed, 0.01f) -
-                    recordStartTime);
+                // the track end), both in AudioTime (song timeline) units.
+                // In Record mode AudioTime starts at startAt minus the 5s
+                // song-detail intro, so the start can be negative - keep it
+                // as-is: the loop advances one export frame per rendered frame
+                // in lockstep with TimeProvider's record-mode clock, so the
+                // window must span the full AudioTime range.
+                var recordStartTime = (double)_timeProvider.AudioTime;
+                var totalTime = Math.Max(0.01, recordEndTime - recordStartTime);
                 exportFpsWindowAccum = 0f;
                 exportFpsWindowFrames = 0;
                 exportFps = fps;

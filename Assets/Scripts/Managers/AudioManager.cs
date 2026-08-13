@@ -102,6 +102,22 @@ namespace MajdataViewX.Managers
 #if UNITY_STANDALONE_LINUX || UNITY_EDITOR_LINUX
             // ManagedBASS on Linux requires the full filename including ".so".
             Bass.PluginLoad("libbassopus.so");
+#elif UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
+            // Opus support on Windows. The plugin ships next to bass.dll in
+            // MajdataViewX_Data/Plugins/x86_64/ and is resolved via the
+            // application base directory so it loads regardless of the
+            // process working directory.
+            var bassopusPath = Path.Combine(
+                AppDomain.CurrentDomain.BaseDirectory,
+                "MajdataViewX_Data",
+                "Plugins",
+                "x86_64",
+                "bassopus.dll");
+            if (File.Exists(bassopusPath))
+                Bass.PluginLoad(bassopusPath);
+            else
+                Debug.LogWarning(
+                    $"bassopus.dll not found at {bassopusPath}; Opus tracks may not decode.");
 #endif
             Bass.Init(-1, SAMPLERATE);
 
@@ -316,6 +332,7 @@ namespace MajdataViewX.Managers
             {
                 SampleType = SampleType.Track,
             };
+            Debug.Log($"[AudioManager] LoadTrack '{path}' -> length {TrackSample.Length:F2}s");
             // 整首PCM(数十MB,落LOH)仅导出模式混音用，延迟到 BeginRecordingAudio 按需加载，
             // 避免普通播放模式持有大数组、切歌时靠GC延迟回收(表现为内存几十秒后才回落)
             TrackSampleData = null;
