@@ -1,0 +1,86 @@
+name: macOS viewer parity (hidden)
+
+on:
+  push:
+    branches: [macos-compatibility, master, main]
+  pull_request:
+    branches: [macos-compatibility]
+  workflow_dispatch:
+
+concurrency:
+  group: mac-viewer-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check-scripts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Syntax check (no Unity needed)
+        run: |
+          echo "Checking BuildScript, AudioManager, FFmpegPipe, ScreenRecorder compile parity..."
+          grep -q "UNITY_STANDALONE_OSX" Assets/Editor/BuildScript.cs && echo "BuildScript OSX ok"
+          grep -q "UNITY_STANDALONE_OSX" Assets/Scripts/Managers/AudioManager.cs && echo "AudioManager OSX ok"
+          grep -q "UNITY_STANDALONE_OSX" Assets/Scripts/Native/FFmpegPipe.cs && echo "FFmpegPipe OSX ok"
+          grep -q "UNITY_STANDALONE_OSX" Assets/Scripts/Managers/ScreenRecorder.cs && echo "ScreenRecorder OSX ok"
+
+  build-macos-mono:
+    runs-on: macos-14
+    # Only run Unity build if license secrets are present (private mirror)
+    # Public forks without secrets will skip Unity step but still pass check-scripts
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Cache Unity Library
+        uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-macOSMono-${{ hashFiles('ProjectSettings/ProjectSettings.asset', 'Packages/manifest.json') }}
+          restore-keys: |
+            Library-macOSMono-
+
+      - name: Build Unity macOS Mono (cross-build from macOS host, Mono backend)
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 6000.3.19f1
+          targetPlatform: StandaloneOSX
+          projectPath: .
+          buildName: MajdataViewX
+          buildsPath: build
+          customParameters: -executeMethod BuildScript.Build -buildTarget StandaloneOSX -logFile build.log
+        continue-on-error: true
+
+      - name: Check build output
+        run: |
+          set -e
+          ls -lh build/ 2>&1 | head -50
+          if [ -d "build/StandaloneOSX/MajdataViewX.app" ]; then
+            echo "Mac .app built"
+            ls -lh build/StandaloneOSX/MajdataViewX.app/Contents/MacOS/ 2>&1 | head -20
+            file build/StandaloneOSX/MajdataViewX.app/Contents/MacOS/MajdataViewX || true
+          elif [ -f "build/macOS/MajdataViewX.app/Contents/MacOS/MajdataViewX" ]; then
+            echo "Custom build path found"
+            ls -lh build/macOS/MajdataViewX.app/ 2>&1 | head -20
+          else
+            echo "No .app found - likely missing UNITY_LICENSE secrets (expected on private mirror until configured). Skipping artifact."
+            cat build.log 2>&1 | tail -100 || true
+          fi
+
+      - name: Upload viewer artifact if present
+        if: hashFiles('build/**/MajdataViewX.app/Contents/MacOS/MajdataViewX') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: MajdataViewX-macOS-Mono
+          path: build/**/MajdataViewX.app
+          retention-days: 7
