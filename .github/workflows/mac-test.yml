@@ -16,6 +16,7 @@ permissions:
 
 jobs:
   check-scripts:
+    if: github.repository == 'DavidScann/MajdataViewX-macos-private'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -29,6 +30,7 @@ jobs:
           grep -q "UNITY_STANDALONE_OSX" Assets/Scripts/Managers/ScreenRecorder.cs && echo "ScreenRecorder OSX ok"
 
   build-macos-mono:
+    if: github.repository == 'DavidScann/MajdataViewX-macos-private'
     runs-on: macos-14
     # Only run Unity build if license secrets are present (private mirror)
     # Public forks without secrets will skip Unity step but still pass check-scripts
