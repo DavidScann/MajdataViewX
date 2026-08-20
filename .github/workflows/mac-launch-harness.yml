@@ -134,9 +134,15 @@ jobs:
               exit 1
             fi
           done
-          # Probe via curl/wscat
+          # Probe via curl/wscat (no timeout on macOS, use gtimeout if available)
           if command -v websocat >/dev/null; then
-            timeout 3 websocat ws://127.0.0.1:8083 2>&1 | head -20 || true
+            if command -v gtimeout >/dev/null; then
+              gtimeout 3 websocat ws://127.0.0.1:8083 2>&1 | head -20 || true
+            elif command -v timeout >/dev/null; then
+              timeout 3 websocat ws://127.0.0.1:8083 2>&1 | head -20 || true
+            else
+              echo "websocat present but no timeout, skipping" || true
+            fi
           fi
           # Try plain TCP connect
           (echo "ping"; sleep 1) | nc 127.0.0.1 8083 2>&1 | head -20 || true
@@ -153,9 +159,8 @@ jobs:
           mkdir -p ~/Library/Application\ Support/MajdataEdit-Neo 2>&1 || true
           rm -f ~/Library/Application\ Support/MajdataEdit-Neo/crash.log 2>&1 || true
           echo "Launching editor $EDITOR_BIN ..."
-          # Preview launch - editor is GUI (Avalonia). On macOS runner it has WindowServer, but we run headless with timeout.
-          # Use open --args? Direct binary should work. Use timeout to avoid hanging CI.
-          timeout 10 "$EDITOR_BIN" > /tmp/editor.log 2>&1 &
+          # Avalonia GUI needs WindowServer but runner has it. Launch directly, manage lifetime via sleep/kill (no GNU timeout on macOS)
+          "$EDITOR_BIN" > /tmp/editor.log 2>&1 &
           EDITOR_PID=$!
           echo "EDITOR_PID=$EDITOR_PID"
           sleep 5
