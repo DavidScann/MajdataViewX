@@ -20,10 +20,15 @@ public static class BuildScript
         var outputPath = Environment.GetEnvironmentVariable("BUILD_OUTPUT_PATH") ?? "build/Linux/MajdataViewX";
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(outputPath))!);
 
-        // Windows builds use the Mono backend (the Windows Build Support (Mono)
-        // module has no IL2CPP toolchain); Linux keeps IL2CPP.
+        // Linux keeps IL2CPP; Windows/Mac cross-builds from a Linux host use Mono
+        // because those IL2CPP toolchains are not installed on Linux (mac-il2cpp and
+        // win-il2cpp are macOS/Windows-host-only). Behaviourally identical to Linux:
+        // set IL2CPP_MAC=1 when building on an actual macOS host to get native IL2CPP.
         var namedTarget = NamedBuildTarget.Standalone;
-        var useIl2Cpp = target is BuildTarget.StandaloneLinux64 or BuildTarget.StandaloneOSX;
+        var isMacHost = SystemInfo.operatingSystemFamily == OperatingSystemFamily.MacOSX;
+        var forceMacIl2Cpp = Environment.GetEnvironmentVariable("IL2CPP_MAC") == "1";
+        var useIl2Cpp = target is BuildTarget.StandaloneLinux64
+            || (target is BuildTarget.StandaloneOSX && (isMacHost || forceMacIl2Cpp));
         PlayerSettings.SetScriptingBackend(
             namedTarget,
             useIl2Cpp ? ScriptingImplementation.IL2CPP : ScriptingImplementation.Mono2x);
