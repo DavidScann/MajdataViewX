@@ -33,8 +33,69 @@ namespace MajdataViewX.Native
         private static string _decoderPrefix;
         private static bool _decoderProbed;
 
-        /// <summary>Binary resolved from PATH, matching the editor's ffmpeg usage.</summary>
-        public static string Binary => "ffmpeg";
+        private static string _resolvedBinary;
+        /// <summary>Binary resolved from PATH + homebrew fallbacks (macOS `open` loses PATH).</summary>
+        public static string Binary
+        {
+            get
+            {
+                if (_resolvedBinary != null) return _resolvedBinary;
+                _resolvedBinary = ResolveBinary();
+                if (_resolvedBinary != "ffmpeg")
+                    Debug.Log($"[FfmpegEncoder] resolved ffmpeg -> {_resolvedBinary}");
+                return _resolvedBinary;
+            }
+        }
+
+        private static string ResolveBinary()
+        {
+            // 1. bare `ffmpeg` in inherited PATH (editor-launched viewer has homebrew PATH)
+            // 2. explicit homebrew locations (when launched via Finder/open, PATH is minimal)
+            foreach (var cand in new[] { "ffmpeg", "/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg", "/opt/homebrew/sbin/ffmpeg" })
+            {
+                if (cand.Contains("/"))
+                {
+                    if (File.Exists(cand)) return cand;
+                }
+                else
+                {
+                    try
+                    {
+                        // `which` is cheap and respects PATH
+                        var psi = new System.Diagnostics.ProcessStartInfo("which", cand)
+                        {
+                            UseShellExecute = false, RedirectStandardOutput = true, CreateNoWindow = true
+                        };
+                        using var p = System.Diagnostics.Process.Start(psi);
+                        if (p != null)
+                        {
+                            var outp = p.StandardOutput.ReadToEnd().Trim();
+                            p.WaitForExit(2000);
+                            if (p.ExitCode == 0 && !string.IsNullOrWhiteSpace(outp) && File.Exists(outp))
+                                return outp;
+                        }
+                    }
+                    catch { }
+                    // Fallback: try spawning `ffmpeg -version` directly to see if bare name works
+                    try
+                    {
+                        var psi2 = new System.Diagnostics.ProcessStartInfo(cand, "-version")
+                        {
+                            UseShellExecute = false, RedirectStandardError = true, RedirectStandardOutput = true, CreateNoWindow = true
+                        };
+                        using var p2 = System.Diagnostics.Process.Start(psi2);
+                        if (p2 != null)
+                        {
+                            p2.WaitForExit(1000);
+                            if (p2.ExitCode == 0) return cand;
+                        }
+                    }
+                    catch { }
+                }
+            }
+            Debug.LogWarning("[FfmpegEncoder] ffmpeg not found in PATH or homebrew locations, using bare `ffmpeg`");
+            return "ffmpeg";
+        }
 
         /// <summary>
         /// ffmpeg arguments (everything between the rawvideo input and the output file)
