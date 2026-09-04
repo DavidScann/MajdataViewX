@@ -102,6 +102,19 @@ namespace MajdataViewX.Managers
 #if UNITY_STANDALONE_LINUX || UNITY_EDITOR_LINUX
             // ManagedBASS on Linux requires the full filename including ".so".
             Bass.PluginLoad("libbassopus.so");
+            // Also try absolute plugin dir (parity with Win/Mac).
+            var bassopusLinux = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MajdataViewX_Data", "Plugins", "x86_64", "libbassopus.so");
+            if (File.Exists(bassopusLinux)) try { Bass.PluginLoad(bassopusLinux); } catch { }
+#elif UNITY_STANDALONE_OSX || UNITY_EDITOR_OSX
+            // macOS parity with Linux: libbassopus.dylib in Plugins/x86_64 or Plugins/macOS, plus bare name.
+            try { Bass.PluginLoad("libbassopus.dylib"); } catch { }
+            foreach (var p in new[]
+            {
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MajdataViewX_Data", "Plugins", "x86_64", "libbassopus.dylib"),
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MajdataViewX_Data", "Plugins", "macOS", "libbassopus.dylib"),
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Contents", "Plugins", "x86_64", "libbassopus.dylib"),
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Contents", "Resources", "Data", "Plugins", "x86_64", "libbassopus.dylib"),
+            }) if (File.Exists(p)) try { Bass.PluginLoad(p); } catch { }
 #elif UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
             // Opus support on Windows. The plugin ships next to bass.dll in
             // MajdataViewX_Data/Plugins/x86_64/ and is resolved via the

@@ -16,5 +16,19 @@ namespace MajdataViewX.Base
 
         public static string GetPath(string relativePath) =>
             Path.Combine(MajBase, relativePath);
+
+#if UNITY_STANDALONE_OSX
+        // macOS Finder launch has minimal PATH (no homebrew). Augment once, parity with editor's MainWindow mac PATH fix.
+        static MajEnv()
+        {
+            try
+            {
+                var cur = System.Environment.GetEnvironmentVariable("PATH") ?? "";
+                if (!cur.Contains("/opt/homebrew/bin"))
+                    System.Environment.SetEnvironmentVariable("PATH", $"{cur}:/usr/local/bin:/opt/homebrew/bin:/opt/homebrew/sbin");
+            }
+            catch { }
+        }
+#endif
     }
 }

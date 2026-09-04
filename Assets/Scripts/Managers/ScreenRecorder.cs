@@ -228,7 +228,7 @@ namespace MajdataViewX.Managers
             };
             var encoder = IntPtr.Zero;
 
-#if UNITY_STANDALONE_LINUX || UNITY_EDITOR_LINUX
+#if UNITY_STANDALONE_LINUX || UNITY_EDITOR_LINUX || UNITY_STANDALONE_OSX || UNITY_EDITOR_OSX
             const string tempVideoName = "temp.mp4";
             const string tempWavName = "temp.wav";
             var tempVideoPath = Path.Combine(maidataPath, tempVideoName);
@@ -297,7 +297,7 @@ namespace MajdataViewX.Managers
                 if (encoder == IntPtr.Zero)
                     throw new InvalidOperationException(
                         "RenderingOut could not create the video encoder.");
-#elif UNITY_STANDALONE_LINUX || UNITY_EDITOR_LINUX
+#elif UNITY_STANDALONE_LINUX || UNITY_EDITOR_LINUX || UNITY_STANDALONE_OSX || UNITY_EDITOR_OSX
                 if (File.Exists(tempVideoPath)) File.Delete(tempVideoPath);
                 if (File.Exists(tempWavPath)) File.Delete(tempWavPath);
 
@@ -308,11 +308,11 @@ namespace MajdataViewX.Managers
                 pipeProc = FFmpegPipe.Spawn(videoCmd);
                 if (!pipeProc.IsValid)
                     throw new InvalidOperationException(
-                        "FFmpeg could not be started. Make sure ffmpeg is installed and in PATH.");
+                        "FFmpeg could not be started. Make sure ffmpeg is installed and in PATH (brew install ffmpeg on macOS).");
                 cpuTex = new Texture2D(width, height, TextureFormat.RGBA32, false);
 #else
                 throw new PlatformNotSupportedException(
-                    "Video export is only supported on Windows and Linux.");
+                    "Video export is only supported on Windows and Linux/macOS.");
 #endif
 
                 onStart?.Invoke();
@@ -363,7 +363,7 @@ namespace MajdataViewX.Managers
                     if (submitResult < 0)
                         throw new InvalidOperationException(
                             $"RenderingOut failed to encode a video frame ({submitResult}).");
-#elif UNITY_STANDALONE_LINUX || UNITY_EDITOR_LINUX
+#elif UNITY_STANDALONE_LINUX || UNITY_EDITOR_LINUX || UNITY_STANDALONE_OSX || UNITY_EDITOR_OSX
                     // ReadPixels from the camera's render target (bottom-up,
                     // hence the vflip in the ffmpeg args). The generic
                     // GetRawTextureData<byte> returns a zero-copy NativeArray
@@ -378,7 +378,7 @@ namespace MajdataViewX.Managers
                             "FFmpeg pipe write failed.");
 #else
                     throw new PlatformNotSupportedException(
-                        "Video export is only supported on Windows and Linux.");
+                        "Video export is only supported on Windows and Linux/macOS.");
 #endif
 
                     recordingElapsedTime = frameEndTime;
@@ -395,7 +395,7 @@ namespace MajdataViewX.Managers
 #if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
                 MuxRecordingAudio(encoder);
                 FreeEncoder(ref encoder);
-#elif UNITY_STANDALONE_LINUX || UNITY_EDITOR_LINUX
+#elif UNITY_STANDALONE_LINUX || UNITY_EDITOR_LINUX || UNITY_STANDALONE_OSX || UNITY_EDITOR_OSX
                 var tEnc = Time.realtimeSinceStartup;
                 FFmpegPipe.ClosePipe(pipeProc);
                 var exitCode = FFmpegPipe.Wait(pipeProc);
@@ -433,7 +433,7 @@ namespace MajdataViewX.Managers
                 if (File.Exists(tempWavPath)) File.Delete(tempWavPath);
 #else
                 throw new PlatformNotSupportedException(
-                    "Video export is only supported on Windows and Linux.");
+                    "Video export is only supported on Windows and Linux/macOS.");
 #endif
                 outputSucceeded = true;
             }
@@ -456,7 +456,7 @@ namespace MajdataViewX.Managers
                     errText.text = $"Finalizing the recording failed: {ex.Message}";
                 }
 
-#if UNITY_STANDALONE_LINUX || UNITY_EDITOR_LINUX
+#if UNITY_STANDALONE_LINUX || UNITY_EDITOR_LINUX || UNITY_STANDALONE_OSX || UNITY_EDITOR_OSX
                 if (pipeProc.IsValid)
                 {
                     try

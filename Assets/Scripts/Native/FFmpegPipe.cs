@@ -9,15 +9,14 @@ namespace MajdataViewX.Native
 {
     public static class FFmpegPipe
     {
-#if !UNITY_EDITOR
+        // macOS standalone does not yet ship a native pipe dylib; reuse the managed
+        // Process path (parity with Linux's ffmpeg-in-PATH fallback) until it does.
+#if !UNITY_EDITOR && (UNITY_STANDALONE_WIN || UNITY_STANDALONE_LINUX)
 #if UNITY_STANDALONE_WIN
         const string DllName = "ffmpeg_pipe";
 #elif UNITY_STANDALONE_LINUX
         // The shared library is deployed as libffmpeg_pipe.so next to the player.
         const string DllName = "libffmpeg_pipe";
-#else
-        // Other standalone platforms would link the plugin statically (IL2CPP).
-        const string DllName = "__Internal";
 #endif
 
         [DllImport(DllName)] static extern IntPtr ffmpeg_spawn(string command, out IntPtr stdin_fd);
@@ -34,7 +33,7 @@ namespace MajdataViewX.Native
 
         public struct PipeProcess
         {
-#if UNITY_EDITOR
+#if UNITY_EDITOR || UNITY_STANDALONE_OSX
             public Process Process;
             public Stream StdinStream;
             public Stream StdoutStream;
@@ -49,7 +48,7 @@ namespace MajdataViewX.Native
 
         public static PipeProcess Spawn(string command)
         {
-#if UNITY_EDITOR
+#if UNITY_EDITOR || UNITY_STANDALONE_OSX
             var parts = ParseCommand(command);
             var psi = new ProcessStartInfo(parts.FileName, parts.Arguments)
             {
@@ -72,7 +71,7 @@ namespace MajdataViewX.Native
         /// </summary>
         public static PipeProcess SpawnIo(string command)
         {
-#if UNITY_EDITOR
+#if UNITY_EDITOR || UNITY_STANDALONE_OSX
             var parts = ParseCommand(command);
             var psi = new ProcessStartInfo(parts.FileName, parts.Arguments)
             {
@@ -97,7 +96,7 @@ namespace MajdataViewX.Native
 
         public static PipeProcess SpawnSimple(string command)
         {
-#if UNITY_EDITOR
+#if UNITY_EDITOR || UNITY_STANDALONE_OSX
             var parts = ParseCommand(command);
             var psi = new ProcessStartInfo(parts.FileName, parts.Arguments)
             {
@@ -115,7 +114,7 @@ namespace MajdataViewX.Native
 
         public static int Write(PipeProcess proc, byte[] buf, int len)
         {
-#if UNITY_EDITOR
+#if UNITY_EDITOR || UNITY_STANDALONE_OSX
             if (proc.StdinStream == null) return -1;
             proc.StdinStream.Write(buf, 0, len);
             return len;
@@ -131,7 +130,7 @@ namespace MajdataViewX.Native
         /// </summary>
         public static int Write(PipeProcess proc, NativeArray<byte> buf)
         {
-#if UNITY_EDITOR
+#if UNITY_EDITOR || UNITY_STANDALONE_OSX
             unsafe
             {
                 var span = new ReadOnlySpan<byte>(
@@ -154,7 +153,7 @@ namespace MajdataViewX.Native
         /// </summary>
         public static int Read(PipeProcess proc, byte[] buf, int len)
         {
-#if UNITY_EDITOR
+#if UNITY_EDITOR || UNITY_STANDALONE_OSX
             if (proc.StdoutStream == null) return -1;
             return proc.StdoutStream.Read(buf, 0, len);
 #else
@@ -177,7 +176,7 @@ namespace MajdataViewX.Native
 
         public static int Read(PipeProcess proc, byte[] buf, int offset, int len)
         {
-#if UNITY_EDITOR
+#if UNITY_EDITOR || UNITY_STANDALONE_OSX
             if (proc.StdoutStream == null) return -1;
             return proc.StdoutStream.Read(buf, offset, len);
 #else
@@ -193,7 +192,7 @@ namespace MajdataViewX.Native
 
         public static void ClosePipe(PipeProcess proc)
         {
-#if UNITY_EDITOR
+#if UNITY_EDITOR || UNITY_STANDALONE_OSX
             proc.StdinStream?.Close();
             proc.StdoutStream?.Close();
 #else
@@ -204,7 +203,7 @@ namespace MajdataViewX.Native
 
         public static int Wait(PipeProcess proc)
         {
-#if UNITY_EDITOR
+#if UNITY_EDITOR || UNITY_STANDALONE_OSX
             if (proc.Process == null) return -1;
             proc.Process.WaitForExit();
             return proc.Process.ExitCode;
@@ -215,14 +214,14 @@ namespace MajdataViewX.Native
 
         public static void Kill(PipeProcess proc)
         {
-#if UNITY_EDITOR
+#if UNITY_EDITOR || UNITY_STANDALONE_OSX
             proc.Process?.Kill();
 #else
             ffmpeg_kill(proc.Handle);
 #endif
         }
 
-#if UNITY_EDITOR
+#if UNITY_EDITOR || UNITY_STANDALONE_OSX
         private static (string FileName, string Arguments, string WorkDir) ParseCommand(string command)
         {
             command = command.Trim();
