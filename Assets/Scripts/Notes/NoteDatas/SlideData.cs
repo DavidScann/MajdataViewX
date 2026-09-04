@@ -1,4 +1,3 @@
-#pragma warning disable CS8500 // 这会获取托管类型的地址、获取其大小或声明指向它的指针
 using MajdataViewX.Base;
 using MajdataViewX.Notes.SlideUtils;
 using MajdataViewX.Types.Input;
@@ -34,8 +33,8 @@ namespace MajdataViewX.Notes.NoteDatas
         public int endPos;
 
         public float LastFor;
-        public float speed;
-        public int sensorOrderIndex;
+        public float hspeed;
+        public readonly float speed => NoteHelper.Settings.TapSpeed * hspeed;
 
         public bool isEach;
         public bool isEx;
@@ -49,10 +48,6 @@ namespace MajdataViewX.Notes.NoteDatas
         public bool isFolded;
         public bool hasSlideGuide;
         public bool hasTapGuide;
-
-        public bool smoothSlideAnime;
-        public bool legacySlideLayer;
-        public bool mineAutoSlide;
 
         public int judgeQueueOffset;
         public unsafe SlideArea* judgeQueue;
@@ -221,6 +216,30 @@ namespace MajdataViewX.Notes.NoteDatas
             judgeTiming = shootTime + LastFor * (1f - Const);
         }
 
+        public void Reset()
+        {
+            currentOn = SensorType.Invalid;
+            currentOnL = SensorType.Invalid;
+            currentOnR = SensorType.Invalid;
+
+            isSoundPlayed = default;
+            isJudged = default;
+            judgeGrade = default;
+            isSlideEnd = default;
+            isEnd = default;
+            eaten = default;
+
+            process = default;
+            processIdx = default;
+            starScale = default;
+            judgeCurrent = default;
+            judgeL_Current = default;
+            judgeR_Current = default;
+
+
+            judgeTime = default;
+        }
+
         /// <summary>
         /// 只比较noteContent未包含的信息：
         /// tapTime + content->时长 = shootTime/LastFor
@@ -237,7 +256,6 @@ namespace MajdataViewX.Notes.NoteDatas
             isEach == other.isEach &&
             isEx == other.isEx &&
             isBreak == other.isBreak &&
-            isMine == other.isMine &&
-            mineAutoSlide == other.mineAutoSlide;
+            isMine == other.isMine;
     }
 }

@@ -25,7 +25,7 @@ namespace MajdataViewX.Notes.Updaters
         public void Execute(int index)
         {
             ref var el = ref eachLines.ElementRef(index);
-            if (el.isEnd) return;
+            if (el.isEnd && TimeData.IsStart) return;
 
             var timing = el.usingSV
                 ? TimeData.FakeNoteTime - TimeData.GetPositionAtTime(el.time)
@@ -33,17 +33,16 @@ namespace MajdataViewX.Notes.Updaters
 
             if (timing >= 0)
             {
-                el.isEnd = true;
+                if (TimeData.IsStart)
+                    el.isEnd = true;
                 return;
             }
 
-            var rawDistance = timing * el.speed + 4.8f;
+            var rawDistance = timing * NoteHelper.Settings.TapSpeed * el.hspeed + 4.8f;
             var clampedDistance = math.max(rawDistance, 1.225f);
             var destScale = math.min(rawDistance * 0.4f + 0.51f, 1f);
 
             if (destScale < 0f) return;
-
-            el.scale = clampedDistance / 4.8f;
 
             // sortTime (30 bits): [19 bits: time (87 mins wrap)] + [11 bits: index tie-breaker (2048 wrap)]
             var timePart = ((uint)math.max(0f, el.time * 100f)) & 0x7FFFF;
@@ -53,7 +52,7 @@ namespace MajdataViewX.Notes.Updaters
             eachLinesRender[idx] = new LineRenderData
             {
                 angRad = math.radians(el.ang),
-                scale = el.scale,
+                scale = clampedDistance / 4.8f,
                 spriteId = el.lineSprite,
                 sort = sortTime,
             };

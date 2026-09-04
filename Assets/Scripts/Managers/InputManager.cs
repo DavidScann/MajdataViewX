@@ -39,6 +39,7 @@ namespace MajdataViewX.Managers
         public const float DJAUTO_SLIDE_TAP_GUIDE_DELAY_SEC = 3 * FRAME_LENGTH_SEC;
 
         public const float DJAUTO_SLIDE_RELEASE_DELAY_SEC = 6 * FRAME_LENGTH_SEC;
+        public const float AUTOPLAY_START_SEC = 0f;
 
         public const float BUTTON_HIT_RENDER_RADIUS = 0.4f;
 
@@ -47,39 +48,18 @@ namespace MajdataViewX.Managers
             get => InputData.ShowHand;
             set => InputData.ShowHand = value;
         }
-        RenderGroup<HitRenderData> _hitGroup;
-        bool _isHitGroupLocked;
-
         public InputManager()
         {
             _inputManager = this;
             //get sensor positions
             for (var i = 0; i < SENSOR_COUNT; i++)
             {
-                InputData.SensorWorldPositions[i] = MajPos.GetSensorWorldPos((SensorType)i);
+                InputData.SensorWorldPositions[i] = MajPos.GetSensorJudgePos((SensorType)i);
             }
-            //REMEMBER TO FORCE INCLUDE
-            var matHit = new Material(Shader.Find("Custom/Hit"));
-            var hitMesh = MeshGenerator.CreateCircleMesh(8, 1f, true);
-            _hitGroup = new(matHit, hitMesh, 6); // priority larger than notes
         }
 
-        public unsafe void BeginHandler()
+        public void BeginHandler()
         {
-            // UPDATE MUST BE EARLIER THAN NoteManager's UPDATE!!
-            // (set in Script Execution Order)
-            _isHitGroupLocked = ShowHand;
-            if (_isHitGroupLocked)
-            {
-                _hitGroup.AdvanceWrite();
-                var hitRender = _hitGroup.LockForWrite();
-                _hitGroup.ResetCount();
-
-                InputData.hitRender = (HitRenderData*)hitRender.GetUnsafePtr();
-                InputData.HitWriteCountPtr = _hitGroup.WriteCountPtr;
-            }
-            InputData.BeginHandler(_isHitGroupLocked);
-
             var keyboard = Keyboard.current;
             if (keyboard != null)
             {
@@ -111,14 +91,8 @@ namespace MajdataViewX.Managers
         // wait for slide and other notes finish update
         public void EndHandler()
         {
-            InputData.EndHandler();
-            if (_isHitGroupLocked)
-            {
-                _hitGroup.UnlockWrite();
-                _hitGroup.Render();
-                _hitGroup.Swap();
-                _isHitGroupLocked = false;
-            }
+            InputData.OnLateUpdate();
+            // hitSwipeGroup 的 UnlockWrite/Render/Swap 由 NoteManager.LateUpdate 负责。
         }
 
         private void CheckButton(Keyboard keyboard)
@@ -137,18 +111,14 @@ namespace MajdataViewX.Managers
             var mainCamera = Camera.main;
             var pos = (Vector2)mainCamera.ScreenToWorldPoint(new Vector3(screenPos.x, screenPos.y, 10f));
 
-            InputData.HandleWorldPosInput(pos);
+            InputData.HandleWorldPosInput(pos, NoteManager.DJAUTO_HAND_RADIUS);
         }
 
 
-
-        public void ResetState()
-        {
-        }
 
         public void OnDestroy()
         {
-            _hitGroup?.Dispose();
+            // hitSwipeGroup 已迁移至 NoteManager，由其 OnDestroy 释放。
         }
     }
 
@@ -175,7 +145,6 @@ namespace MajdataViewX.Managers
     public unsafe struct InputDataB
     {
         public bool ShowHand;
-        bool _showHandThisFrame;
 
         public NativeArray<float2> SensorWorldPositions;
 
@@ -238,6 +207,10 @@ namespace MajdataViewX.Managers
         public readonly SensorState GetSensorState(SensorType type) => _sensorStates[(int)type];
 
 
+        // LastActiveDown/ActiveDown 的滚动改在 OnLateUpdate 帧末完成：
+        // 本帧由用户输入（Handle*）+ PlayUpdateJob（DJAuto）共同累积 ActiveDown，
+        // 供 note 判定 Job 读取边沿；帧末 OnLateUpdate 把 ActiveDown 归零、转入 LastActiveDown。
+
         // ======DJAuto Part======
         // DJAuto writes must happen after BeginHandler and before the render jobs (ordered by NoteManager.Update).
 
@@ -253,7 +226,7 @@ namespace MajdataViewX.Managers
             };
             if (!TryRequestDJAutoHand(hand, DJAutoHandVisualKind.None, out _)) return false;
 
-            SetThisFrameButtonOn(type);
+            SetButtonOn(type);
             return true;
         }
         /// <summary>
@@ -268,7 +241,7 @@ namespace MajdataViewX.Managers
             };
             if (!TryRequestDJAutoHand(hand, DJAutoHandVisualKind.None, out _)) return false;
 
-            SetThisFrameSensorOn(type);
+            SetSensorOn(type);
             return true;
         }
         /// <summary>
@@ -276,8 +249,8 @@ namespace MajdataViewX.Managers
         /// two-hand allocation model. Used for momentary tap/hold-head presses (the hand model only
         /// constrains continuous inputs: slides/touches).
         /// </summary>
-        public void DJAutoPressButton(SensorType type) => SetThisFrameButtonOn(type);
-        public void DJAutoPressSensor(SensorType type) => SetThisFrameSensorOn(type);
+        public void DJAutoPressButton(SensorType type) => SetButtonOn(type);
+        public void DJAutoPressSensor(SensorType type) => SetSensorOn(type);
         /// <summary>
         /// DJAuto处理Touch/TouchHold（寻找大手圆）
         /// </summary>
@@ -534,7 +507,7 @@ namespace MajdataViewX.Managers
             for (int sensorIndex = 0; sensorIndex < SENSOR_COUNT; sensorIndex++)
             {
                 if ((sensorMask & (1ul << sensorIndex)) != 0)
-                    SetThisFrameSensorOn((SensorType)sensorIndex);
+                    SetSensorOn((SensorType)sensorIndex);
             }
         }
 
@@ -618,54 +591,60 @@ namespace MajdataViewX.Managers
         {
             if (!status) return;
 
-            SetThisFrameButtonOn(type);
+            SetButtonOn(type);
         }
         /// <summary>
-        /// 处理世界坐标（手）输入
+        /// 处理世界坐标（手）输入（本帧立即生效）
         /// </summary>
-        public void HandleWorldPosInput(in float2 pos, float radius = InputManager.DJAUTO_HAND_RADIUS)
+        public void HandleWorldPosInput(in float2 pos, float radius)
         {
             for (int i = 0; i < SensorWorldPositions.Length; i++)
             {
                 var combinedR = radius + MajPos.GetSensorRadius((SensorType)i);
                 var combinedSq = combinedR * combinedR;
-                ref readonly var sp = ref SensorWorldPositions.ElementRef(i);
+                var sp = SensorWorldPositions[i];
                 var dx = pos.x - sp.x;
                 var dy = pos.y - sp.y;
                 var distSq = dx * dx + dy * dy;
 
                 if (distSq <= combinedSq)
-                    SetThisFrameSensorOn((SensorType)i);
+                    SetSensorOn((SensorType)i);
             }
-
-            if (_showHandThisFrame) // 本帧没有锁定渲染缓冲时不能写入指针
+            var r = math.length(pos);
+            if (r > MajPos.MAIN_RADIUS)
             {
-                var hit = new HitRenderData
+                // 坐标轴旋转，向上为0度，顺时针为正
+                var theta = math.atan2(pos.x, pos.y);
+                if (theta < 0) theta += math.PI * 2;
+                var key = (int)(theta / (math.PI / 4));
+                SetButtonOn((SensorType)key);
+            }
+            if (ShowHand)
+            {
+                var idx = Interlocked.Increment(ref *HitWriteCountPtr) - 1;
+                hitRender[idx] = new HitRenderData
                 {
                     pos = pos,
                     radius = radius,
                     color = new float4(1, 0, 0, 0.75f)
                 };
-
-                var idx = Interlocked.Increment(ref *HitWriteCountPtr) - 1;
-                hitRender[idx] = hit;
             }
         }
 
-        private void SetThisFrameButtonOn(SensorType type)
+        private void SetButtonOn(SensorType type)
         {
             ref var button = ref _buttonStates.ElementRef((int)type);
             Interlocked.Increment(ref button.ActiveDown);
         }
-        private void SetThisFrameSensorOn(SensorType type)
+        private void SetSensorOn(SensorType type)
         {
             ref var sensor = ref _sensorStates.ElementRef((int)type);
             Interlocked.Increment(ref sensor.ActiveDown);
         }
 
-        public void EndHandler()
+        public void OnLateUpdate()
         {
-            if (_showHandThisFrame)
+            if (ShowHand)
             {
                 for (int i = 0; i < BUTTON_COUNT; i++)
                 {
@@ -693,29 +672,22 @@ namespace MajdataViewX.Managers
                         };
                     }
                 }
+            }
 
-                for (int i = 0; i < math.min(*ActiveCoveragesCountPtr, ActiveCoverages.Length); i++)
-                {
-                    var cover = ActiveCoverages[i];
-                    var idx1 = Interlocked.Increment(ref *HitWriteCountPtr) - 1;
-                    hitRender[idx1] = new HitRenderData
-                    {
-                        pos = cover.Circle1.Center,
-                        radius = cover.Circle1.Radius,
-                        color = new float4(0.5f, 1f, 0.5f, 0.6f) // Light green
-                    };
 
-                    if (cover.Mode == CoverMode.DoubleCircleDirect || cover.Mode == CoverMode.DoubleCircleGroup || cover.Mode == CoverMode.DoubleCircleSlide)
-                    {
-                        var idx2 = Interlocked.Increment(ref *HitWriteCountPtr) - 1;
-                        hitRender[idx2] = new HitRenderData
-                        {
-                            pos = cover.Circle2.Center,
-                            radius = cover.Circle2.Radius,
-                            color = new float4(0.5f, 1f, 0.5f, 0.6f)
-                        };
-                    }
-                }
+            // 帧末滚动：本帧 ActiveDown（用户输入 + PlayUpdateJob 累积）转为下帧 LastActiveDown，
+            // ActiveDown 归零供下帧重新累积。note 判定 Job 在本帧已读完边沿，此处归零安全。
+            for (int i = 0; i < BUTTON_COUNT; i++)
+            {
+                ref var button = ref _buttonStates.ElementRef(i);
+                button.LastActiveDown = button.ActiveDown;
+                button.ActiveDown = 0;
+            }
+            for (int i = 0; i < SENSOR_COUNT; i++)
+            {
+                ref var sensor = ref _sensorStates.ElementRef(i);
+                sensor.LastActiveDown = sensor.ActiveDown;
+                sensor.ActiveDown = 0;
             }
         }
 

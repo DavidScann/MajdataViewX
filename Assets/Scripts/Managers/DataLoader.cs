@@ -19,7 +19,6 @@ namespace MajdataViewX.Managers
         public Text designText;
         public RawImage cardImage;
         public Color[] diffColors = new Color[7];
-        public Text errText;
 
         private void Awake()
         {
@@ -28,15 +27,9 @@ namespace MajdataViewX.Managers
 
         public async UniTask Load(
             SimaiChart chart,
-            double ignoreOffset,
             string title,
             string artist,
-            int diff,
-            float noteSpeed,
-            float touchSpeed,
-            bool smoothSlideAnime,
-            bool legacySlideLayer,
-            bool mineAutoSlide)
+            int diff)
         {
             titleText.text = title;
             artistText.text = artist;
@@ -45,17 +38,8 @@ namespace MajdataViewX.Managers
             levelText.text = chart.Level;
             designText.text = chart.Designer;
 
-            _objectCounter.CountNoteSum(chart);
-            _objectCounter.ReportMeterBpm(chart);
-
             _timeProvider.LoadSV(chart.CommaTimings);
 
-            _noteManager.NoteSpeed = noteSpeed;
-            _noteManager.TouchSpeed = touchSpeed;
-            _noteManager.SmoothSlideAnime = smoothSlideAnime;
-            _noteManager.LegacySlideLayer = legacySlideLayer;
-            _noteManager.Ignore = ignoreOffset;
-            _noteManager.MineAutoSlide = mineAutoSlide;
             _noteManager.Load(chart);
 
             await UniTask.Yield();
@@ -73,10 +57,5 @@ namespace MajdataViewX.Managers
                 6 => "ORIGINAL",
                 _ => "DEFAULT"
             };
-
-        public void ResetState()
-        {
-            // no need to do anything here, because all the state is managed by other managers
-        }
     }
 }

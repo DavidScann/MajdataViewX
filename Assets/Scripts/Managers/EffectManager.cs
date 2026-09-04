@@ -114,11 +114,6 @@ namespace MajdataViewX.Managers
             }
         }
 
-        private void Update()
-        {
-            ProcessEffectRequests();
-        }
-
         private void OnDestroy()
         {
             if (judgeEffectRequests.IsCreated) judgeEffectRequests.Dispose();

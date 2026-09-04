@@ -196,75 +196,68 @@ namespace MajdataViewX.Notes.SlideUtils
         /// <exception cref="ArgumentOutOfRangeException">Command type overflow</exception>
         public static ParametricSlidePath Parse(string code)
         {
-            try
+            var commands = ParseCommands(code);
+            var lastCmd = commands[0];
+            // The first command is guarantee to be 'A'
+            var generator = SlidePathConstructor.BeginAt(MajGeo.PointGroupA(lastCmd.Value));
+
+            for (var i = 1; i < commands.Count; i++)
             {
-                var commands = ParseCommands(code);
-                var lastCmd = commands[0];
-                // The first command is guarantee to be 'A'
-                var generator = SlidePathConstructor.BeginAt(MajGeo.PointGroupA(lastCmd.Value));
-
-                for (var i = 1; i < commands.Count; i++)
+                var cmd = commands[i];
+                switch (cmd.Type)
                 {
-                    var cmd = commands[i];
-                    switch (cmd.Type)
-                    {
-                        case CommandType.NodeA:
-                        case CommandType.NodeB:
-                        case CommandType.NodeC:
-                        case CommandType.NodeEnd:
+                    case CommandType.NodeA:
+                    case CommandType.NodeB:
+                    case CommandType.NodeC:
+                    case CommandType.NodeEnd:
+                        {
+                            switch (lastCmd.Type)
                             {
-                                switch (lastCmd.Type)
-                                {
-                                    case CommandType.NodeA:
-                                    case CommandType.NodeB:
-                                    case CommandType.NodeC:
-                                        NodeToNode(generator, lastCmd, cmd);
-                                        break;
-                                    case CommandType.OrbitCcw:
-                                    case CommandType.OrbitCw:
-                                        OrbitToNode(generator, lastCmd, cmd);
-                                        break;
-                                    case CommandType.NodeEnd:
-                                        throw new ArgumentException($"'K' should be the last command");
-                                    default:
-                                        throw new ArgumentOutOfRangeException();
-                                }
-                                break;
+                                case CommandType.NodeA:
+                                case CommandType.NodeB:
+                                case CommandType.NodeC:
+                                    NodeToNode(generator, lastCmd, cmd);
+                                    break;
+                                case CommandType.OrbitCcw:
+                                case CommandType.OrbitCw:
+                                    OrbitToNode(generator, lastCmd, cmd);
+                                    break;
+                                case CommandType.NodeEnd:
+                                    throw new ArgumentException($"'K' should be the last command");
+                                default:
+                                    throw new ArgumentOutOfRangeException();
                             }
-                        case CommandType.OrbitCcw:
-                        case CommandType.OrbitCw:
+                            break;
+                        }
+                    case CommandType.OrbitCcw:
+                    case CommandType.OrbitCw:
+                        {
+                            switch (lastCmd.Type)
                             {
-                                switch (lastCmd.Type)
-                                {
-                                    case CommandType.NodeA:
-                                    case CommandType.NodeB:
-                                    case CommandType.NodeC:
-                                        NodeToOrbit(generator, lastCmd, cmd);
-                                        break;
-                                    case CommandType.OrbitCcw:
-                                    case CommandType.OrbitCw:
-                                        OrbitToOrbit(generator, lastCmd, cmd);
-                                        break;
-                                    case CommandType.NodeEnd:
-                                        throw new ArgumentException($"'K' should be the last command");
-                                    default:
-                                        throw new ArgumentOutOfRangeException();
-                                }
-                                break;
+                                case CommandType.NodeA:
+                                case CommandType.NodeB:
+                                case CommandType.NodeC:
+                                    NodeToOrbit(generator, lastCmd, cmd);
+                                    break;
+                                case CommandType.OrbitCcw:
+                                case CommandType.OrbitCw:
+                                    OrbitToOrbit(generator, lastCmd, cmd);
+                                    break;
+                                case CommandType.NodeEnd:
+                                    throw new ArgumentException($"'K' should be the last command");
+                                default:
+                                    throw new ArgumentOutOfRangeException();
                             }
-                        default:
-                            throw new ArgumentOutOfRangeException();
-                    }
-
-                    lastCmd = cmd;
+                            break;
+                        }
+                    default:
+                        throw new ArgumentOutOfRangeException();
                 }
 
-                return generator.GeneratePath();
+                lastCmd = cmd;
             }
-            catch
-            {
-                return null;
-            }
+
+            return generator.GeneratePath();
         }
     }
 }

@@ -36,13 +36,98 @@ namespace MajdataViewX.Notes.Updaters
 
         [ReadOnly] public NativeArray<int> touchGroupTotalCounts;
         [NativeDisableParallelForRestriction] public NativeArray<int> touchGroupJudgedCounts;
-        [ReadOnly] public NativeArray<CoverResult> touchGroupCoverResults;
 
         public void Execute(int index)
         {
+            if (!TimeData.IsStart)
+            {
+                SeeOnlyUpdate(touches[index], index);
+                return;
+            }
             ref var touch = ref touches.ElementRef(index);
             TransformUpdate(ref touch, index);
+            AutoplayUpdate(ref touch);
             CheckUpdate(ref touch);
+        }
+        private void SeeOnlyUpdate(TouchData touch, int index)
+        {
+            if (touch.isFolded) return;
+
+            // sortTime (30 bits): [19 bits: time (87 mins wrap)] + [11 bits: index tie-breaker (2048 wrap)]
+            var timePart = ((uint)math.max(0f, touch.time * 100f)) & 0x7FFFF;
+            var sortTime = ((timePart << 11) | (uint)(index & 0x7FF)) & 0x3FFFFFFF;
+
+            var timing = touch.usingSV
+                ? TimeData.FakeNoteTime - TimeData.GetPositionAtTime(touch.time)
+                : TimeData.NoteTime - touch.time;
+            if (timing > 0) return;
+            var pow = -math.exp(8f * (timing * 0.43f / touch.moveDuration) - 0.85f) + 0.42f;
+            var fanDist = math.clamp(pow, 0f, 0.4f);
+
+            if (-timing > touch.wholeDuration)
+            {
+                return;
+            }
+            if (-timing < touch.wholeDuration && -timing >= touch.moveDuration)
+            {
+                touch.fanAlpha = 1 - math.saturate((-timing - touch.moveDuration) / touch.displayDuration);
+                fanDist = 0.4f;
+            }
+            else if (-timing <= touch.moveDuration)
+            {
+                touch.fanAlpha = 1f;
+            }
+
+            var centerPos = touch.centerPos;
+
+            var fanPositions = stackalloc float2[4]
+            {
+                centerPos + new float2(0.226f + fanDist, 0),
+                centerPos + new float2(0, 0.226f + fanDist),
+                centerPos + new float2(-(0.226f + fanDist), 0),
+                centerPos + new float2(0, -(0.226f + fanDist)),
+            };
+            for (int i = 0; i < 4; i++)
+            {
+                var tIdx = Interlocked.Increment(ref *TouchesWriteCountPtr) - 1;
+                touchesRender[tIdx] = new SimpleRenderData
+                {
+                    pos = fanPositions[i],
+                    angRad = math.radians(90f * (i + 1)),
+                    scale = new float2(1, 1),
+                    spriteId = touch.fanSprite,
+                    color = new float4(1, 1, 1, touch.fanAlpha),
+                    brightness = 1f,
+                    sort = (sortTime << 2) | 0x3,
+                };
+            }
+
+            var ptIdx = Interlocked.Increment(ref *TouchesWriteCountPtr) - 1;
+            touchesRender[ptIdx] = new SimpleRenderData
+            {
+                pos = centerPos,
+                angRad = 0,
+                scale = new float2(1, 1),
+                spriteId = touch.pointSprite,
+                color = new float4(1, 1, 1, touch.fanAlpha),
+                brightness = 1f,
+                sort = (sortTime << 2) | 0x2,
+            };
+
+            if (timing > -0.02f)
+            {
+                var justIdx = Interlocked.Increment(ref *TouchesWriteCountPtr) - 1;
+                touchesRender[justIdx] = new SimpleRenderData
+                {
+                    pos = centerPos,
+                    angRad = 0,
+                    scale = new float2(1, 1),
+                    spriteId = touch.justSprite,
+                    color = new float4(1),
+                    brightness = 1f,
+                    sort = (sortTime << 2) | 0x1,
+                };
+            }
         }
 
         private void TransformUpdate(ref TouchData touch, int index)
@@ -85,11 +170,11 @@ namespace MajdataViewX.Notes.Updaters
 
             var fanPositions = stackalloc float2[4]
             {
-            centerPos + new float2(0.226f + fanDist, 0),
-            centerPos + new float2(0, 0.226f + fanDist),
-            centerPos + new float2(-(0.226f + fanDist), 0),
-            centerPos + new float2(0, -(0.226f + fanDist)),
-        };
+                centerPos + new float2(0.226f + fanDist, 0),
+                centerPos + new float2(0, 0.226f + fanDist),
+                centerPos + new float2(-(0.226f + fanDist), 0),
+                centerPos + new float2(0, -(0.226f + fanDist)),
+            };
             for (int i = 0; i < 4; i++)
             {
                 var tIdx = Interlocked.Increment(ref *TouchesWriteCountPtr) - 1;
@@ -166,11 +251,43 @@ namespace MajdataViewX.Notes.Updaters
             }
         }
 
+        private void AutoplayUpdate(ref TouchData touch)
+        {
+            if (touch.isEnd) return;
+            if (NoteHelper.Settings.AutoPlayMode is AutoPlayMode.Disable) return;
+
+            var timing = TimeData.NoteTime - touch.time;
+            var autoplayStart = InputManager.AUTOPLAY_START_SEC;
+
+            if (timing < autoplayStart) return;
+
+            switch (NoteHelper.Settings.AutoPlayMode)
+            {
+                case AutoPlayMode.Enable:
+                    touch.judgeGrade = JudgeGrade.LateCritical;
+                    touch.isJudged = true;
+                    touch.diff = 0;
+                    EndNote(ref touch);
+                    break;
+                case AutoPlayMode.Random:
+                    var grade = (JudgeGrade)GlobalRandom.NextInt((int)JudgeGrade.FastGood, (int)JudgeGrade.Miss); ;
+                    touch.judgeGrade = touch.isMine
+                        ? (grade < JudgeGrade.FastPerfect3rd ? JudgeGrade.Miss : JudgeGrade.LateCritical)
+                        : grade;
+                    touch.isJudged = true;
+                    touch.diff = grade >= JudgeGrade.LateCritical ? 11.4514f : -11.4514f;
+                    EndNote(ref touch);
+                    break;
+            }
+        }
+
         private void CheckUpdate(ref TouchData touch)
         {
             if (touch.isJudged || touch.isEnd) return;
-            // DJAuto modes are judged by DJAutoSim on the sim tick; the render job only judges in Disable (human play).
-            if (NoteHelper.AutoPlayMode != AutoPlayMode.Disable) return;
+            // DJAutoSim-pressed notes (when the sim is attached) are judged
+            // from recorded press times below; otherwise simulated inputs
+            // judge through the normal path.
+            if (!NoteHelper.IsSimulated) return;
 
             // DJAuto input is emitted by DJAutoSim at exact times; judge with the recorded press time, render-FPS independent.
             if (touch.DjAutoPressed && !touch.isJudged)

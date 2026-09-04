@@ -1,5 +1,6 @@
 using MajdataViewX.Types.Input;
 using MajdataViewX.Types.Notes;
+using System.Runtime.CompilerServices;
 using Unity.Burst;
 using Unity.Mathematics;
 
@@ -12,7 +13,8 @@ namespace MajdataViewX.Notes.NoteDatas
     {
         public float time;
         public SensorType Key;
-        public float speed;
+        public float hspeed;
+        public readonly float speed => NoteHelper.Settings.TapSpeed * hspeed;
         public float LastFor;
         public int ButtonOrderIndex;
         public int SensorOrderIndex;
@@ -34,6 +36,7 @@ namespace MajdataViewX.Notes.NoteDatas
         public float holdEndScale;
 
         public NoteSp bodySprite;
+        public NoteSp _bodySpriteCache;
         public NoteSp endSprite;
         public NoteSp lineSprite;
         public NoteSp exSprite;
@@ -60,10 +63,6 @@ namespace MajdataViewX.Notes.NoteDatas
             pos = float2.zero;
             ang = -22.5f + -45f * (int)Key;
             scale = 1f;
-            stretchY = 0f;
-            holdEndPos = float2.zero;
-            holdEndScale = 0f;
-            brightness = 1f;
 
             bodySprite = NoteSp.HOLD;
             endSprite = NoteSp.HOLD_END;
@@ -94,12 +93,35 @@ namespace MajdataViewX.Notes.NoteDatas
                 exColor = Ex_Mine;
             }
 
-            // Each Tap Line优先级高于break低于mine
-            if (isEach && !isMine)
-                lineSprite = NoteSp.LINE_EACH;
+            // 缓存下来，重置要重置回去
+            _bodySpriteCache = bodySprite;
 
             // 一开始放开时间无穷大，按下后才能重置为0，避免一开始就小于release忽略时间
             lastReleaseTimeSec = float.PositiveInfinity;
+        }
+
+        public void Reset()
+        {
+            isEnd = default;
+
+            pos = float2.zero;
+            //ang = -22.5f + -45f * (int)Key;
+            scale = 1f;
+            brightness = 1f;
+
+            stretchY = default;
+            holdEndPos = default;
+            holdEndScale = default;
+
+            isHeadJudged = default;
+            headDiff = default;
+            judgeGrade = default;
+            isHolding = default;
+            holdPercent = default;
+            playerIdleTimeSec = default;
+            lastReleaseTimeSec = float.PositiveInfinity;
+
+            bodySprite = _bodySpriteCache;
         }
 
         public readonly bool IsFoldable(HoldData other) =>

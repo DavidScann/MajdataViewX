@@ -34,6 +34,7 @@ namespace MajdataViewX.Managers
                 var newCount = count + registers[s].Count;
                 _spans[s] = new()
                 {
+                    Start = count,
                     Current = count,
                     Count = newCount
                 };
@@ -48,6 +49,16 @@ namespace MajdataViewX.Managers
                     _registers[i] = r;
                     i++;
                 }
+        }
+
+        public void ResetMultTouchState()
+        {
+            for (var s = 0; s < SENSOR_COUNT; s++)
+            {
+                ref var span = ref _spans.ElementRef(s);
+                span.Current = span.Start;
+                _activeCounts[s] = 0;
+            }
         }
 
         public void Clear()
@@ -81,7 +92,7 @@ namespace MajdataViewX.Managers
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public readonly bool CanShowBorder(SensorType area, out bool isThree, out NoteSp sprite)
         {
-            ref readonly var span = ref _spans.ElementRef((int)area);
+            var span = _spans[(int)area];
             var diff = _activeCounts[(int)area];
             if (diff <= 1)
             {
@@ -138,6 +149,7 @@ namespace MajdataViewX.Managers
 
         struct NoteRegisterSpan
         {
+            public int Start;
             public int Current;
             public int Count;
         }

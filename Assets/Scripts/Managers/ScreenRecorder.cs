@@ -14,7 +14,6 @@ using static MajdataViewX.Base.MajCtx;
 
 namespace MajdataViewX.Managers
 {
-
     public class ScreenRecorder : MonoBehaviour
     {
         private const string EncoderDllName = "RenderingOut";
@@ -183,12 +182,6 @@ namespace MajdataViewX.Managers
             IsRecording = false;
         }
 
-        public void ResetState()
-        {
-            StopRecording();
-            errText.text = string.Empty;
-        }
-
         private async UniTask CaptureScreen(string maidataPath,
             int fps, ExportQuality quality, int exportWidth, int exportHeight, ExportCodec codec,
             double recordEndTime,
@@ -196,7 +189,7 @@ namespace MajdataViewX.Managers
         {
             if (fps <= 0)
             {
-                errText.text = "Encoding cannot start: Output frame rate must be greater than zero.";
+                _wsServer.Error("Encoding cannot start: Output frame rate must be greater than zero.");
                 return;
             }
 
@@ -206,6 +199,7 @@ namespace MajdataViewX.Managers
             if (width % 2 != 0 || height % 2 != 0)
             {
                 errText.text = $"Encoding cannot start: Resolution width and height must be even numbers. Current: {width}x{height}.";
+                _wsServer.Error($"Encoding cannot start: Resolution width and height must be even numbers. Current: {width}x{height}.");
                 return;
             }
 
@@ -440,7 +434,7 @@ namespace MajdataViewX.Managers
             catch (Exception e)
             {
                 Debug.LogException(e);
-                errText.text = $"Encoding failed: {e.Message}";
+                _wsServer.Error(e);
             }
             finally
             {
@@ -453,7 +447,7 @@ namespace MajdataViewX.Managers
                 {
                     outputSucceeded = false;
                     Debug.LogException(ex);
-                    errText.text = $"Finalizing the recording failed: {ex.Message}";
+                    _wsServer.Error(ex);
                 }
 
 #if UNITY_STANDALONE_LINUX || UNITY_EDITOR_LINUX

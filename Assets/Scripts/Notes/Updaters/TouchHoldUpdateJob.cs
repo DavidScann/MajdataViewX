@@ -42,16 +42,111 @@ namespace MajdataViewX.Notes.Updaters
 
         [ReadOnly] public NativeArray<int> touchGroupTotalCounts;
         [NativeDisableParallelForRestriction] public NativeArray<int> touchGroupJudgedCounts;
-        [ReadOnly] public NativeArray<CoverResult> touchGroupCoverResults;
         [ReadOnly] public NativeArray<int> touchHoldGroupTotalCounts;
         [ReadOnly] public NativeArray<int> touchHoldGroupPressedCounts;
-        [ReadOnly] public NativeArray<CoverResult> touchHoldGroupCoverResults;
 
         public void Execute(int index)
         {
+            if (!TimeData.IsStart)
+            {
+                SeeOnlyUpdate(touchHolds[index], index);
+                return;
+            }
             ref var th = ref touchHolds.ElementRef(index);
             TransformUpdate(ref th, index);
+            AutoplayUpdate(ref th);
             CheckUpdate(ref th);
+        }
+
+        private void SeeOnlyUpdate(TouchHoldData th, int index)
+        {
+            if (th.isFolded) return;
+
+            var timing = th.usingSV
+                ? TimeData.FakeNoteTime - TimeData.GetPositionAtTime(th.time)
+                : TimeData.NoteTime - th.time;
+            var lastFor = th.usingSV
+                ? TimeData.GetPositionAtTime(th.time + th.LastFor) - TimeData.GetPositionAtTime(th.time)
+                : th.LastFor;
+            if (timing > lastFor) return;
+
+            var pow = -math.exp(8f * (timing * 0.43f / th.moveDuration) - 0.85f) + 0.42f;
+            var fanDist = math.clamp(pow, 0f, 0.4f);
+
+            if (-timing > th.wholeDuration)
+            {
+                return;
+            }
+            else if (-timing <= th.wholeDuration && -timing > th.moveDuration)
+            {
+                var fadeT = (-timing - th.moveDuration) / th.displayDuration;
+                th.fanAlpha = math.saturate(1f - fadeT);
+            }
+            else if (-timing <= th.moveDuration)
+            {
+                th.fanAlpha = 1f;
+            }
+
+            if (timing >= 0)
+            {
+                th.maskProgress = math.clamp(timing / lastFor, 0f, 1f);
+            }
+
+            var centerPos = th.centerPos;
+            var color = new float4(1, 1, 1, th.fanAlpha);
+
+            var radius = 0.226f + fanDist;
+            var c = math.SQRT2 / 2f;
+            var fanPositions = stackalloc float2[4]
+            {
+                centerPos + new float2(radius * c, radius * c),
+                centerPos + new float2(radius * c, -radius * c),
+                centerPos + new float2(-radius * c, -radius * c),
+                centerPos + new float2(-radius * c, radius * c),
+            };
+
+            // sortTime (30 bits): [19 bits: time (87 mins wrap)] + [11 bits: index tie-breaker (2048 wrap)]
+            var timePart = ((uint)math.max(0f, th.time * 100f)) & 0x7FFFF;
+            var sortTime = ((timePart << 11) | (uint)(index & 0x7FF)) & 0x3FFFFFFF;
+
+            for (int i = 0; i < 4; i++)
+            {
+                var tIdx = Interlocked.Increment(ref *SimpleWriteCountPtr) - 1;
+                simpleRender[tIdx] = new SimpleRenderData
+                {
+                    pos = fanPositions[i],
+                    angRad = math.radians(135f - 90f * i),
+                    scale = new float2(1, 1),
+                    spriteId = th.fanSprite + (uint)i,
+                    color = color,
+                    brightness = 1f,
+                    sort = (sortTime << 2) | 0x3,
+                };
+            }
+
+            var ptIdx = Interlocked.Increment(ref *SimpleWriteCountPtr) - 1;
+            simpleRender[ptIdx] = new SimpleRenderData
+            {
+                pos = centerPos,
+                angRad = 0,
+                scale = new float2(1, 1),
+                spriteId = th.pointSprite,
+                color = color,
+                brightness = 1f,
+                sort = (sortTime << 2) | 0x2,
+            };
+
+            var borderIdx = Interlocked.Increment(ref *MaskWriteCountPtr) - 1;
+            maskRender[borderIdx] = new MaskRenderData
+            {
+                pos = centerPos,
+                angRad = 0,
+                scale = new float2(1, 1),
+                spriteId = th.borderSprite,
+                color = color,
+                maskCutoff = th.maskProgress,
+                sort = sortTime,
+            };
         }
 
         private void TransformUpdate(ref TouchHoldData th, int index)
@@ -97,11 +192,12 @@ namespace MajdataViewX.Notes.Updaters
             }
 
             // ---- hold effect ----
-            NoteHelper.SetHoldEffect(JudgeEffectRequests,
-                (int)th.sensor + 8,
-                th.judgeGrade,
-                th.isHolding
-            );
+            if (timing > 0) // 防止顶掉前面hold的特效
+                NoteHelper.SetHoldEffect(JudgeEffectRequests,
+                    (int)th.sensor + 8,
+                    th.judgeGrade,
+                    th.isHolding
+                );
             // NoteHelper.SetTouchHoldSound(SfxRequests, th.isHolding);
 
             // ---- hold on/off skin ----
@@ -172,11 +268,67 @@ namespace MajdataViewX.Notes.Updaters
             };
         }
 
+        private void AutoplayUpdate(ref TouchHoldData th)
+        {
+            if (th.isEnd) return;
+            if (NoteHelper.Settings.AutoPlayMode is AutoPlayMode.Disable) return;
+
+            var timing = TimeData.NoteTime - th.time;
+            if (timing < InputManager.AUTOPLAY_START_SEC) return;
+
+            switch (NoteHelper.Settings.AutoPlayMode)
+            {
+                case AutoPlayMode.Enable:
+                    if (!th.isHeadJudged)
+                    {
+                        th.judgeGrade = JudgeGrade.LateCritical;
+                        th.isHeadJudged = true;
+                        th.isHolding = true;
+                        th.headDiff = 0;
+                    }
+                    if (th.isHeadJudged)
+                    {
+                        var remaining = math.max(th.LastFor - timing, 0);
+                        if (remaining <= 0)
+                        {
+                            th.holdPercent = 1f;
+                            EndNote(ref th);
+                            return;
+                        }
+                    }
+                    break;
+                case AutoPlayMode.Random:
+                    if (!th.isHeadJudged)
+                    {
+                        var grade = (JudgeGrade)GlobalRandom.NextInt((int)JudgeGrade.FastGood, (int)JudgeGrade.Miss);
+                        th.judgeGrade = th.isMine
+                            ? (grade < JudgeGrade.FastPerfect3rd ? JudgeGrade.Miss : JudgeGrade.LateCritical)
+                            : grade;
+                        th.isHeadJudged = true;
+                        th.isHolding = true;
+                        th.headDiff = grade >= JudgeGrade.LateCritical ? 11.4514f : -11.4514f;
+                    }
+                    if (th.isHeadJudged)
+                    {
+                        var remaining = math.max(th.LastFor - timing, 0);
+                        if (remaining <= 0)
+                        {
+                            th.holdPercent = 1f;
+                            EndNote(ref th);
+                            return;
+                        }
+                    }
+                    break;
+            }
+        }
+
         private void CheckUpdate(ref TouchHoldData th)
         {
             if (th.isEnd) return;
-            // DJAuto modes are judged by DJAutoSim on the sim tick; the render job only judges in Disable (human play).
-            if (NoteHelper.AutoPlayMode != AutoPlayMode.Disable) return;
+            // DJAutoSim-pressed notes (when the sim is attached) are judged
+            // from recorded press times below; otherwise simulated inputs
+            // judge through the normal path.
+            if (!NoteHelper.IsSimulated) return;
 
             // DJAuto input is emitted by DJAutoSim at exact times; judge with the recorded press time, render-FPS independent.
             if (th.DjAutoPressed && !th.isHeadJudged && !th.isMine)

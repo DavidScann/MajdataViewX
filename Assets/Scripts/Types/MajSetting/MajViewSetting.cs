@@ -1,9 +1,11 @@
-﻿using MajdataViewX.Types.Enums;
+using MajdataViewX.Types.Enums;
 using MajdataViewX.Types.Rendering;
+using MemoryPack;
 
 namespace MajdataViewX.Types.MajSetting
 {
-    public class MajViewSetting
+    [MemoryPackable]
+    public partial class MajViewSetting
     {
         public float TapSpeed { get; set; } = 7.5f;
         public float TouchSpeed { get; set; } = 7.5f;

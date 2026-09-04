@@ -88,7 +88,7 @@ namespace MajdataViewX.Managers
         [SerializeField]
         private TMP_FontAsset TrgUIComboHeaderFont;
 
-        public void StartOutput(BgInfoDisplay mode, UIType type)
+        public void Setting(BgInfoDisplay mode, UIType type)
         {
             TextMode = mode;
             switch (mode)
@@ -124,7 +124,7 @@ namespace MajdataViewX.Managers
             }
             if (type is UIType.TrgUI)
             {
-                switch (NoteHelper.AutoPlayMode)
+                switch (NoteHelper.Settings.AutoPlayMode)
                 {
                     case AutoPlayMode.Enable:
                         objAutoMode.text = "ENABLED\nNONE";
@@ -366,7 +366,7 @@ namespace MajdataViewX.Managers
                 outputBuilder.Append(" / ");
                 outputBuilder.Append(NoteSum);
                 outputBuilder.Append("\nMOD: ");
-                outputBuilder.Append(NoteHelper.AutoPlayMode switch
+                outputBuilder.Append(NoteHelper.Settings.AutoPlayMode switch
                 {
                     AutoPlayMode.Enable => "Enable",
                     AutoPlayMode.DJAutoButton => "DJAuto (Btn)",

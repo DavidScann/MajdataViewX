@@ -91,7 +91,7 @@ namespace MajdataViewX.Managers
                 Debug.Log($"[dbg][sim] first tick simTime={simTime:F3}");
             if ((TotalTicks & 511) == 0)
                 Debug.Log($"[dbg][sim] tick={TotalTicks} simTime={simTime:F3}");
-            var mode = NoteHelper.AutoPlayMode;
+            var mode = NoteHelper.Settings.AutoPlayMode;
             // Always reset the per-tick counters (the Disable path self-cleans too, without relying on a mode-switch ResetState).
             InputData.BeginSimTick();
             if (mode == AutoPlayMode.Disable)

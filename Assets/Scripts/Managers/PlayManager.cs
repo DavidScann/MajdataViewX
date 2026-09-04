@@ -8,13 +8,17 @@ using MajdataViewX.Types.Enums;
 using MajdataViewX.Types.MajSetting;
 using MajdataViewX.Types.MajWs;
 using MajSimai;
+using MemoryPack;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.Design;
 using System.IO;
+using System.IO.MemoryMappedFiles;
 using System.Linq;
 using System.Threading;
 using Unity.Properties;
 using UnityEngine;
+using UnityEngine.SocialPlatforms;
 using static MajdataViewX.Base.MajCtx;
 
 namespace MajdataViewX.Managers
@@ -25,21 +29,19 @@ namespace MajdataViewX.Managers
         {
             State = _state,
             ErrMsg = _errMsg,
-            Timeline = _thisFrameSec
         };
 
-        public static bool IsReloading;
-
+        // 直接存储 MajSimai 原始类型：Update 从共享内存拿到已解析数据，Play 不再全量解析
+        private static SimaiFile _file = SimaiFile.Empty(string.Empty, string.Empty);
         private static SimaiChart _chart = SimaiChart.Empty;
+        private MemoryMappedFile mmfChartData;
+        private MemoryMappedViewAccessor mmvChartData;
 
         private static ViewStatus _state = ViewStatus.Idle;
         private static string _errMsg = string.Empty;
-        private static float _thisFrameSec = 0f;
 
         private static Thread? _audioManagerThread;
         private static int _audioManagerThreadRunning;
-
-        private static float? _speed;
 
         private static MajViewSetting _setting = new();
 
@@ -55,8 +57,6 @@ namespace MajdataViewX.Managers
         // 这里是游戏内部的东西的启动初始化
         private void Start()
         {
-            IsReloading = false;
-
             bgCover = GameObject.Find("BgCover").GetComponent<SpriteRenderer>();
             bgOutsideCover = GameObject.Find("BgOutsideCover").GetComponent<SpriteRenderer>();
             canvasButtons = GameObject.Find("CanvasButtons");
@@ -94,19 +94,28 @@ namespace MajdataViewX.Managers
 
             SlideTableNeo.InitializeStandardSlideTable();
 
-            _state = CheckIsLoaded() ? ViewStatus.Loaded : ViewStatus.Idle;
+            var mmfChartDataFileStream = new FileStream(
+                    MajEnv.MmfChartDataPath,
+                    FileMode.OpenOrCreate,
+                    FileAccess.ReadWrite,
+                    FileShare.ReadWrite
+                );
+            if (mmfChartDataFileStream.Length < MajEnv.MmfChartDataCapacity)
+                mmfChartDataFileStream.SetLength(MajEnv.MmfChartDataCapacity);
+            mmfChartData = MemoryMappedFile.CreateFromFile(
+                mmfChartDataFileStream,
+                null,
+                MajEnv.MmfChartDataCapacity,
+                MemoryMappedFileAccess.ReadWrite,
+                HandleInheritability.None,
+                false
+            );
+            mmvChartData = mmfChartData.CreateViewAccessor();
         }
 
         private bool CheckIsLoaded() => _audioManager.IsTrackLoaded &&
                                         _bgManager.IsBgLoaded &&
                                         _bgManager.IsVideoLoaded;
-
-        public void Setting(MajViewSetting setting, MajVolumeSetting volumeSetting)
-        {
-            _setting = setting;
-            _effectManager.SetDisplayMode(setting.JudgeDisplayMode);
-            _audioManager.Setting(setting.GlobalAudioOffset, volumeSetting);
-        }
 
         public async UniTask LoadAsync(string audioPath, string bgPath, string? pvPath)
         {
@@ -152,219 +161,213 @@ namespace MajdataViewX.Managers
             }
         }
 
-        public async UniTask<bool> PlayAsync(PlaybackMode playmode,
-            double startAt, float speed,
-            string title, string artist, float offset,
-            string designer, string level, string fumen,
-            IList<SimaiCommand> commands, int difficulty,
-            string? maidataPath = null)
+        public void Setting(MajViewSetting setting, MajVolumeSetting volumeSetting)
+        {
+            _setting = setting;
+
+            NoteHelper.NoteSettingsSS.Data = new NoteSettings()
+            {
+                AutoPlayMode = _setting.AutoMode,
+                TapSpeed = (float)(107.25 / (71.4184491 * Mathf.Pow(_setting.TapSpeed + 0.9975f, -0.985558604f))),
+                TouchSpeed = _setting.TouchSpeed,
+                LegacySlideLayer = _setting.LegacySlideLayer,
+                SmoothSlideAnime = _setting.SmoothSlideAnime,
+                MineAutoSlide = _setting.MineAutoSlide,
+            };
+            //audio
+            _audioManager.Setting(setting.GlobalAudioOffset, volumeSetting);
+            //simulate
+            _inputManager.ShowHand = _setting.ShowHand;
+            //counter
+            _objectCounter.Setting(_setting.ComboStatusType, _setting.UIType);
+            //bg
+            bgCover.color = new Color(0f, 0f, 0f, _setting.BackgroundDim);
+            bgOutsideCover.color = new Color(0f, 0f, 0f, _setting.BackgroundOutsideDim);
+            _bgManager.ResizeBg = _setting.ResizeBg;
+            //fork: Fast/Late judge display + realistic wide-hand DJAuto
+            _effectManager.SetDisplayMode(setting.JudgeDisplayMode);
+            InputManager.WideHands = _setting.WideHands;
+        }
+
+        public async UniTask UpdateAsync(long fileLength, long chartLength, int selectedDiff)
         {
             while (_state is ViewStatus.Busy)
                 await UniTask.Yield();
 
-            if (_state is not ViewStatus.Loaded)
-                return false;
-
+            var previousState = _state;
             _state = ViewStatus.Busy;
-            try
-            {
-                await UniTask.SwitchToMainThread();
 
-                var t0 = Time.realtimeSinceStartup;
-                //chart
-                _chart = await SimaiParser.ParseChartAsync(level, designer, fumen);
-                var t1 = Time.realtimeSinceStartup;
+            // 从共享内存读取 Edit 写入的两段 MemoryPack 字节并反序列化：
+            // [0..fileLength) = SimaiFile 元数据（Charts 已 Ignore），[fileLength..) = SimaiChart 时序
+            var fileBuffer = new byte[fileLength];
+            mmvChartData.ReadArray(0, fileBuffer, 0, (int)fileLength);
+            var chartBuffer = new byte[chartLength];
+            mmvChartData.ReadArray(fileLength, chartBuffer, 0, (int)chartLength);
 
-                var noteSpeed = (float)(107.25 / (71.4184491 * Mathf.Pow(_setting.TapSpeed + 0.9975f, -0.985558604f)));
-                var touchSpeed = _setting.TouchSpeed;
-                var ignoreOffset = startAt - offset;
-                //simulate
-                NoteHelper.AutoPlayModeSS.Data = _setting.AutoMode;
-                _inputManager.ShowHand = _setting.ShowHand;
-                InputManager.WideHands = _setting.WideHands;
-                //UI
-                _objectCounter.StartOutput(_setting.ComboStatusType, _setting.UIType);
-                //bg
-                bgCover.color = new Color(0f, 0f, 0f, _setting.BackgroundDim);
-                bgOutsideCover.color = new Color(0f, 0f, 0f, _setting.BackgroundOutsideDim);
-                _bgManager.ShowBG();
-                await _bgManager.ShowVideoAsync(_setting.ResizeBg, startAt);
-                var t2 = Time.realtimeSinceStartup;
-                //sfx
-                var clockCount = 0;
-                if (playmode != PlaybackMode.Normal)
-                {
-                    var clockCommand = commands.FirstOrDefault(c => c.Prefix == "clock_count");
-                    if (clockCommand != default) int.TryParse(clockCommand.Value, out clockCount);
-                }
-                _audioManager.GenerateAnswerSFX(_chart, ignoreOffset, clockCount);
-                var t3 = Time.realtimeSinceStartup;
+            var file = MemoryPackSerializer.Deserialize<SimaiFile>(fileBuffer) ?? SimaiFile.Empty(string.Empty, string.Empty);
+            var chart = MemoryPackSerializer.Deserialize<SimaiChart>(chartBuffer) ?? SimaiChart.Empty;
 
-                switch (playmode)
-                {
-                    case PlaybackMode.Normal:
-                        await _dataLoader.Load(
-                            _chart, ignoreOffset,
-                            title, artist, difficulty,
-                            noteSpeed, touchSpeed,
-                            _setting.SmoothSlideAnime,
-                            _setting.LegacySlideLayer,
-                            _setting.MineAutoSlide);
-                        var t4 = Time.realtimeSinceStartup;
-                        Debug.Log($"[PlayManager] play timing: parse={(t1 - t0) * 1000:F0}ms bg={(t2 - t1) * 1000:F0}ms sfx={(t3 - t2) * 1000:F0}ms noteLoad={(t4 - t3) * 1000:F0}ms");
+            _file = file;
+            _chart = chart;
 
-                        _allPerfectManager.enabled = false;
-                        _timeProvider.SetStartTime(startAt, offset, speed, playmode);
-                        _audioManager.PlayTrack();
-                        break;
-                    case PlaybackMode.IncludeOp:
-                        await _dataLoader.Load(
-                            _chart, ignoreOffset,
-                            title, artist, difficulty,
-                            noteSpeed, touchSpeed,
-                            _setting.SmoothSlideAnime,
-                            _setting.LegacySlideLayer,
-                            _setting.MineAutoSlide);
+            _timeProvider.offset = _file.Offset;
+            //answer
+            var clockCount = 0;
+            var clockCommand = file.Commands.FirstOrDefault(c => c.Prefix == "clock_count");
+            if (clockCommand != null) int.TryParse(clockCommand.Value, out clockCount);
+            _audioManager.GenerateAnswerSFX(_chart, clockCount);
 
-                        _bgManager.PlaySongDetail();
-                        _audioManager.noteSfxPlaybackRequests[AudioManager.TRACK_START] = true; //track_start
+            //counter
+            _objectCounter.ResetLoaded();
+            _objectCounter.CountNoteSum(_chart);
+            _objectCounter.ReportMeterBpm(_chart);
 
-                        _allPerfectManager.enabled = true;
-                        _timeProvider.SetStartTime(startAt, offset, speed, playmode);
-                        _audioManager.PlayTrack();
-                        break;
-                    case PlaybackMode.Record:
-                        canvasButtons.SetActive(false);
-                        if (!Directory.Exists(maidataPath))
-                        {
-                            throw new InvalidPathException($"maidata path is required");
-                        }
+            await _dataLoader.Load(_chart, file.Title, file.Artist, selectedDiff);
 
-                        await _dataLoader.Load(
-                            _chart, ignoreOffset,
-                            title, artist, difficulty,
-                            noteSpeed, touchSpeed,
-                            _setting.SmoothSlideAnime,
-                            _setting.LegacySlideLayer,
-                            _setting.MineAutoSlide);
-
-                        _bgManager.PlaySongDetail();
-
-                        _allPerfectManager.enabled = true;
-                        _state = ViewStatus.Playing;
-                        // The export ends at the last note's END plus the All
-                        // Perfect banner (the end marker): AllPerfectManager
-                        // stops the record there, so the record always includes
-                        // the full last note (holds/slides extend past their
-                        // timing). The loop's own cap is only a safety net for
-                        // the case where the banner never fires.
-                        const float ApShowSec = 3.5f;
-                        double lastNoteEnd = 0;
-                        for (var ti = 0; ti < _chart.NoteTimings.Length; ti++)
-                        {
-                            var timing = _chart.NoteTimings[ti];
-                            for (var ni = 0; ni < timing.Notes.Length; ni++)
-                            {
-                                var note = timing.Notes[ni];
-                                var end = note.Type switch
-                                {
-                                    SimaiNoteType.Hold or SimaiNoteType.TouchHold =>
-                                        timing.Timing + note.HoldTime,
-                                    // SlideStartTime is an absolute time (the
-                                    // loader uses it directly as shootTime),
-                                    // not an offset from timing.Timing.
-                                    SimaiNoteType.Slide =>
-                                        note.SlideStartTime + note.SlideTime,
-                                    _ => timing.Timing,
-                                };
-                                if (end > lastNoteEnd) lastNoteEnd = end;
-                            }
-                        }
-                        // lastNoteEnd is in chart time (first note = 0); the
-                        // record window runs in AudioTime (NoteTime + offset,
-                        // starting at startAt minus the 5s song-detail intro).
-                        // Convert both caps into AudioTime so the window ends
-                        // at the audio end or right after the AP banner tail.
-                        var recordEndTime = Math.Min(
-                            _audioManager.TrackLength + offset,
-                            lastNoteEnd + ApShowSec + offset);
-                        Debug.Log($"[PlayManager] record: TrackLength={_audioManager.TrackLength:F2}s " +
-                                  $"lastNoteEnd={lastNoteEnd:F2}s recordEndTime={recordEndTime:F2}s");
-                        if (recordEndTime <= 0)
-                        {
-                            // A failed track decode collapses the record window to
-                            // zero and ends the export after ~1s with no notes
-                            // judged. Run to the chart-derived end instead of
-                            // silently truncating the video.
-                            recordEndTime = lastNoteEnd + ApShowSec;
-                            Debug.LogWarning($"[PlayManager] track length unavailable ({_audioManager.TrackLength:F2}s); " +
-                                             $"export will run to the chart end ({recordEndTime:F2}s)");
-                        }
-                        _screenRecorder.StartRecording(maidataPath,
-                            _setting.OutputFps, _setting.ExportQuality,
-                            _setting.ExportWidth, _setting.ExportHeight, _setting.ExportCodec,
-                            recordEndTime,
-                            () =>
-                            {
-                                _timeProvider.SetStartTime(startAt, offset, speed, playmode, _setting.OutputFps);
-                            }).ContinueWith(() =>
-                        {
-                            canvasButtons.SetActive(true);
-                            _state = ViewStatus.Loaded;
-                            // The AP finish no longer stops the record (it runs
-                            // to the track end), so tell the editor the export
-                            // is complete here.
-                            _wsServer.SendStopResponse();
-                        }).Forget();
-                        return true; //directly return
-                }
-
-                //save last speed for resume
-                _speed = speed;
-
-                _state = ViewStatus.Playing;
-                return true;
-            }
-            catch (Exception ex)
-            {
-                _errMsg = ex.ToString();
-                _state = ViewStatus.Error;
-                return false;
-            }
+            _state = previousState;
         }
 
-        public async UniTask ResumeAsync()
-        {
-            await ResumeAsync(_speed!.Value);
-        }
-
-        public async UniTask ResumeAsync(float speed)
+        public async UniTask PlayAsync(PlaybackMode playmode, double startAt, float speed, string recordPath)
         {
             while (_state is ViewStatus.Busy)
                 await UniTask.Yield();
 
-            if (_state is not ViewStatus.Paused)
+            if (_state is not (ViewStatus.Loaded or ViewStatus.Paused))
                 return;
 
             _state = ViewStatus.Busy;
             try
             {
                 await UniTask.SwitchToMainThread();
+                var ignoreOffset = startAt - _file.Offset;
 
-                _timeProvider.Resume(speed);
+                //bg
+                _bgManager.ShowBG();
+                // Async: Linux decodes bg video via the ffmpeg pipe (Unity
+                // VideoPlayer has no H.264 decoder there); elsewhere this
+                // runs the VideoPlayer path.
+                await _bgManager.ShowVideoAsync(_setting.ResizeBg, startAt);
+                //sfx
+                _audioManager.ResetAnswerSFX(ignoreOffset);
+                //counter
+                _objectCounter.ResetCur();
+                _objectCounter.CountIgnoreNoteCountAsync(_chart, ignoreOffset);
+                //notes
+                //MajBurst.InputData.ResetState(); in ResetLoadedNote
+                _noteManager.ResetState(); //reset djauto hands (PlayUpdateJob is still running when IsStart==false)
+                _noteManager.ResetLoadedNote(ignoreOffset);
+                _noteManager.ResetLoadedPlay(ignoreOffset);
+                MajBurst.MultTouchHandler.ResetMultTouchState();
 
-                _bgManager.ContinueVideo();
+                switch (playmode)
+                {
+                    case PlaybackMode.Normal:
+                        _allPerfectManager.enabled = false;
 
-                _audioManager.PlayTrack();
-                _audioManager.ResumeTouchHoldSound();
+                        _timeProvider.SetStartTime(startAt, _file.Offset, speed, playmode);
+                        _audioManager.PlayTrack();
+                        break;
+                    case PlaybackMode.IncludeOp:
+                        _allPerfectManager.enabled = true;
+
+                        _bgManager.PlaySongDetail();
+                        _audioManager.noteSfxPlaybackRequests[AudioManager.TRACK_START] = true; //track_start
+
+                        _timeProvider.SetStartTime(startAt, _file.Offset, speed, playmode);
+                        _audioManager.PlayTrack();
+                        break;
+                    case PlaybackMode.Record:
+                        if (!Directory.Exists(recordPath))
+                        {
+                            throw new InvalidPathException($"maidata path is required");
+                        }
+
+                        canvasButtons.SetActive(false);
+                        _allPerfectManager.enabled = true;
+
+                        _bgManager.PlaySongDetail();
+                        // The export ends at the last note's END plus the All
+                        // Perfect banner tail (see ComputeRecordEndTime); the
+                        // loop's own overrun is only a safety net for a
+                        // missing/late banner.
+                        var recordEndTime = ComputeRecordEndTime();
+                        _screenRecorder.StartRecording(recordPath,
+                            _setting.OutputFps, _setting.ExportQuality,
+                            _setting.ExportWidth, _setting.ExportHeight, _setting.ExportCodec,
+                            recordEndTime,
+                            () =>
+                            {
+                                _timeProvider.SetStartTime(startAt, _file.Offset, speed, playmode, _setting.OutputFps);
+                            }).ContinueWith(() =>
+                        {
+                            canvasButtons.SetActive(true);
+                            _state = ViewStatus.Loaded;
+                            // The AP finish does not stop the record (it runs
+                            // to the chart end), so report completion here.
+                            _wsServer.SendStopResponse();
+                        }).Forget();
+                        break;
+                    case PlaybackMode.Preview:
+                        _allPerfectManager.enabled = false;
+                        _state = ViewStatus.Paused;
+                        return;
+                }
 
                 _state = ViewStatus.Playing;
+                return;
             }
             catch (Exception ex)
             {
                 _errMsg = ex.ToString();
                 _state = ViewStatus.Error;
+                return;
             }
+        }
+
+        /// <summary>
+        /// Record window end: last note's END plus the All Perfect banner
+        /// tail, capped at the audio end. Chart time and AudioTime share the
+        /// offset basis (first note = 0, AudioTime = NoteTime + offset), so
+        /// both caps convert the same way.
+        /// </summary>
+        private double ComputeRecordEndTime()
+        {
+            const float ApShowSec = 3.5f;
+            double lastNoteEnd = 0;
+            for (var ti = 0; ti < _chart.NoteTimings.Length; ti++)
+            {
+                var timing = _chart.NoteTimings[ti];
+                for (var ni = 0; ni < timing.Notes.Length; ni++)
+                {
+                    var note = timing.Notes[ni];
+                    var end = note.Type switch
+                    {
+                        SimaiNoteType.Hold or SimaiNoteType.TouchHold =>
+                            timing.Timing + note.HoldTime,
+                        // SlideStartTime is absolute (the loader uses it
+                        // directly as shootTime), not an offset.
+                        SimaiNoteType.Slide =>
+                            note.SlideStartTime + note.SlideTime,
+                        _ => timing.Timing,
+                    };
+                    if (end > lastNoteEnd) lastNoteEnd = end;
+                }
+            }
+            var recordEndTime = Math.Min(
+                _audioManager.TrackLength + _file.Offset,
+                lastNoteEnd + ApShowSec + _file.Offset);
+            Debug.Log($"[PlayManager] record: TrackLength={_audioManager.TrackLength:F2}s " +
+                      $"lastNoteEnd={lastNoteEnd:F2}s recordEndTime={recordEndTime:F2}s");
+            if (recordEndTime <= 0)
+            {
+                // A failed track decode collapses the record window to zero
+                // and ends the export after ~1s with no notes judged. Run to
+                // the chart-derived end instead of silently truncating.
+                recordEndTime = lastNoteEnd + ApShowSec;
+                Debug.LogWarning($"[PlayManager] track length unavailable ({_audioManager.TrackLength:F2}s); " +
+                                 $"export will run to the chart end ({recordEndTime:F2}s)");
+            }
+            return recordEndTime;
         }
 
         public async UniTask PauseAsync()
@@ -410,39 +413,22 @@ namespace MajdataViewX.Managers
                 await UniTask.SwitchToMainThread();
 
                 _screenRecorder.StopRecording();
-                //if not so, the last frame will be like after ResetAllManagers
                 await UniTask.Yield();
 
-                IsReloading = true;
-                ResetAllManagers();
-                // IsReloading = false;
-                // in NoteManager, wait for notes cleared
+                //_objectCounter.ResetCur();
+                _timeProvider.ResetState();
+                _audioManager.ResetState();
+                _bgManager.ResetState();
+                _effectManager.ResetState();
+                _allPerfectManager.ResetState();
+
+                _state = CheckIsLoaded() ? ViewStatus.Loaded : ViewStatus.Idle;
             }
             catch (Exception ex)
             {
                 _errMsg = ex.ToString();
                 _state = ViewStatus.Error;
             }
-        }
-
-        private void ResetAllManagers()
-        {
-            _screenRecorder.ResetState();
-            _objectCounter.ResetState();
-            MajBurst.InputData.ResetState();
-            _noteManager.ResetState();
-            _timeProvider.ResetState();
-            _audioManager.ResetState();
-            _bgManager.ResetState();
-            _effectManager.ResetState();
-            _inputManager.ResetState();
-            _allPerfectManager.ResetState();
-            _dataLoader.ResetState();
-
-            _state = CheckIsLoaded() ? ViewStatus.Loaded : ViewStatus.Idle;
-            bgCover.color = new Color(0f, 0f, 0f, 0f);
-
-            IsReloading = false;
         }
 
         private void OnDestroy()
@@ -458,6 +444,9 @@ namespace MajdataViewX.Managers
             _audioManager.OnDestroy();
             _inputManager.OnDestroy();
             MajBurst.InputData.Dispose();
+
+            mmvChartData?.Dispose();
+            mmfChartData?.Dispose();
         }
     }
 }

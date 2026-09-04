@@ -1,6 +1,9 @@
-﻿namespace MajdataViewX.Types.MajSetting
+using MemoryPack;
+
+namespace MajdataViewX.Types.MajSetting
 {
-    public class MajVolumeSetting
+    [MemoryPackable]
+    public partial class MajVolumeSetting
     {
         public float Track { get; set; } = 0.9f;
         public float Answer { get; set; } = 0.9f;

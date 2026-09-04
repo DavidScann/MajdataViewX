@@ -106,7 +106,9 @@ public static class DJAutoEval
         };
         MajBurst.InputData.Init();
         MajBurst.MultTouchHandler.Init();
-        NoteHelper.AutoPlayModeSS.Data = mode;
+        var noteSettings = NoteHelper.Settings;
+        noteSettings.AutoPlayMode = mode;
+        NoteHelper.NoteSettingsSS.Data = noteSettings;
         InputManager.WideHands = wide;
         // InputManager's constructor fills the sensor world positions; the harness has none, so set them manually
         // (else GetSensorMask uses all-zero coordinates and no cover ever covers a sensor).

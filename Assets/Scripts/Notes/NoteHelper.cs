@@ -13,17 +13,25 @@ using static MajdataViewX.Base.MajCtx;
 
 namespace MajdataViewX.Notes
 {
+    public struct NoteSettings
+    {
+        public AutoPlayMode AutoPlayMode;
+        public float TapSpeed;
+        public float TouchSpeed;
+        public bool LegacySlideLayer;
+        public bool SmoothSlideAnime;
+        public bool MineAutoSlide;
+    }
     [BurstCompile]
     public static unsafe class NoteHelper
     {
-        public static readonly SharedStatic<AutoPlayMode> AutoPlayModeSS =
-            SharedStatic<AutoPlayMode>.GetOrCreate<InputManager>();
-        public static AutoPlayMode AutoPlayMode =>
-            AutoPlayModeSS.Data;
+        public static readonly SharedStatic<NoteSettings> NoteSettingsSS =
+            SharedStatic<NoteSettings>.GetOrCreate<NoteSettings>();
+        public static NoteSettings Settings =>
+            NoteSettingsSS.Data;
 
-        public static bool IsSimulated => AutoPlayMode is
+        public static bool IsSimulated => Settings.AutoPlayMode is
             AutoPlayMode.DJAutoSensor or AutoPlayMode.DJAutoButton or AutoPlayMode.Disable;
-        // Force burst recompile
 
         // ---- Judgment constants ----
         public const float TAP_JUDGE_SEG_1ST_PERFECT_MSEC = 1 * FRAME_LENGTH_MSEC;

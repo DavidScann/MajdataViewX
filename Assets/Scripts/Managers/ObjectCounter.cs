@@ -13,7 +13,8 @@ namespace MajdataViewX.Managers
 
         private void Start()
         {
-            ResetState();
+            ResetCur();
+            ResetLoaded();
         }
 
         private void Update()

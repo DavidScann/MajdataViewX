@@ -2,6 +2,7 @@ using MajdataViewX.Base;
 using MajdataViewX.Notes;
 using MajdataViewX.Notes.NoteDatas;
 using MajdataViewX.Notes.Updaters;
+using MajdataViewX.Types.Input;
 using MajdataViewX.Types.Notes.RenderData;
 using MajdataViewX.Types.Rendering;
 using MajdataViewX.Utils;
@@ -35,13 +36,16 @@ namespace MajdataViewX.Managers
         NativeList<TouchData> touches = new(1024, Allocator.Persistent);
         NativeList<TouchHoldData> touchHolds = new(1024, Allocator.Persistent);
 
+        NativeList<DJAutoPlayData> plays = new(2048, Allocator.Persistent);
+
+        [SerializeField]
+        AnimationCurve DJAutoMoveCurve;
+
         NativeList<int> touchGroupTotalCounts = new(256, Allocator.Persistent);
         NativeList<int> touchGroupJudgedCounts = new(256, Allocator.Persistent);
-        NativeList<CoverResult> touchGroupCoverResults = new(256, Allocator.Persistent);
 
         NativeList<int> touchHoldGroupTotalCounts = new(256, Allocator.Persistent);
         NativeList<int> touchHoldGroupPressedCounts = new(256, Allocator.Persistent);
-        NativeList<CoverResult> touchHoldGroupCoverResults = new(256, Allocator.Persistent);
 
         RenderGroup<LineRenderData> _tapLineGroup;
         RenderGroup<LineRenderData> _eachLineGroup;
@@ -49,6 +53,11 @@ namespace MajdataViewX.Managers
         RenderGroup<NotesRenderData> _notesGroup;
         RenderGroup<MaskRenderData> _thBorderGroup;
         RenderGroup<SimpleRenderData> _touchGroup;
+        RenderGroup<HitRenderData> _hitSwipeGroup;
+        bool _isHitSwipeGroupLockedThisFrame;
+
+        Material _matHit;
+        Mesh _hitMesh;
 
         GraphicsBuffer _noteUvsBuffer;
         Material _matLine;
@@ -79,6 +88,8 @@ namespace MajdataViewX.Managers
             _matSimple = new Material(Shader.Find("Custom/NoteSimple"));
             _matNotes = new Material(Shader.Find("Custom/NoteRich"));
             _matMask = new Material(Shader.Find("Custom/NoteMask"));
+            _matHit = new Material(Shader.Find("Custom/Hit"));
+            _hitMesh = MeshGenerator.CreateCircleMesh(8, 1f, true);
 
             CreateRenderGroups(1);
 
@@ -105,6 +116,17 @@ namespace MajdataViewX.Managers
             SetupMaterial(_matSimple);
             SetupMaterial(_matNotes);
             SetupMaterial(_matMask);
+
+            _djAutoMoveCurve = new(DJAUTO_CURVE_RESOLUTION, Allocator.Persistent);
+            for (var i = 0; i < DJAUTO_CURVE_RESOLUTION; i++)
+            {
+                var t = i / (float)(DJAUTO_CURVE_RESOLUTION - 1);
+                _djAutoMoveCurve[i] = DJAutoMoveCurve.Evaluate(t);
+            }
+
+            // 字段初始化器只给全零(DJAutoHand)，首播前显式重置为正确的空闲初始态(CurIdx=-1)，
+            // 否则全零的 CurIdx=0 会让两手都误跟踪 hits[0]。
+            ResetDJAutoHands();
         }
 
         private void CreateRenderGroups(int capacityMultiplier)
@@ -119,6 +141,7 @@ namespace MajdataViewX.Managers
             _notesGroup = new RenderGroup<NotesRenderData>(_matNotes, _quadMesh, 3, capacity);
             _thBorderGroup = new RenderGroup<MaskRenderData>(_matMask, _quadMesh, 4, capacity);
             _touchGroup = new RenderGroup<SimpleRenderData>(_matSimple, _quadMesh, 5, capacity);
+            _hitSwipeGroup = new RenderGroup<HitRenderData>(_matHit, _hitMesh, 6, capacity);
         }
 
         private void DisposeRenderGroups()
@@ -129,6 +152,7 @@ namespace MajdataViewX.Managers
             _notesGroup?.Dispose();
             _thBorderGroup?.Dispose();
             _touchGroup?.Dispose();
+            _hitSwipeGroup?.Dispose();
         }
 
         private void ConfigureRenderCapacity(SimaiChart chart)
@@ -157,15 +181,30 @@ namespace MajdataViewX.Managers
 
         void Update()
         {
+            _prevChain.Complete();
+            // hitSwipeGroup 必须在 BeginHandler 之前锁定并设好 hitRender/HitWriteCountPtr：
+            // 用户输入（BeginHandler 内）与 PlayUpdateJob 都直接写这两个指针。
+            _isHitSwipeGroupLockedThisFrame = MajBurst.InputData.ShowHand;
+            if (_isHitSwipeGroupLockedThisFrame)
+            {
+                _hitSwipeGroup.AdvanceWrite();
+                var hitRenderArr = _hitSwipeGroup.LockForWrite();
+                _hitSwipeGroup.ResetCount();
+                unsafe
+                {
+                    MajBurst.InputData.hitRender = (HitRenderData*)hitRenderArr.GetUnsafePtr();
+                    MajBurst.InputData.HitWriteCountPtr = _hitSwipeGroup.WriteCountPtr;
+                }
+            }
+
             if (Time.unscaledTime - _lastDbgLog >= 1f)
             {
                 _lastDbgLog = Time.unscaledTime;
                 Debug.Log($"[dbg] f={Time.frameCount} t={_timeProvider.NoteTime:F3} " +
-                          $"mode={(int)NoteHelper.AutoPlayMode} " +
+                          $"mode={(int)NoteHelper.Settings.AutoPlayMode} " +
                           $"n={taps.Length + holds.Length + slides.Length + touches.Length + touchHolds.Length} " +
                           $"simTicks={_djAutoSim.TotalTicks}");
             }
-            _prevChain.Complete();
             _inputManager.BeginHandler(); // 这里牵扯到用户输入，需要一直调用
 
             unsafe
@@ -236,6 +275,17 @@ namespace MajdataViewX.Managers
 
                 JobHandle h = default;
 
+                if (plays.Length > 0)
+                {
+                    h = new PlayUpdateJob
+                    {
+                        _djAutoMoveCurve = _djAutoMoveCurve,
+                        plays = plays.AsArray(),
+                        hands = _djAutoHands,
+                    }.Schedule(h);
+                }
+
+                // DJAuto持续输入必须先续占下一帧的手，Tap/Touch 只能使用剩余额度，因此hold/slide类note先update
                 // DJAuto continuous inputs claim this tick's hands first; taps/touches use the rest, so holds/slides update first.
                 if (holds.Length > 0)
                     h = new HoldUpdateJob
@@ -276,10 +326,8 @@ namespace MajdataViewX.Managers
                         ReportResults = _objectCounter.ReportRequestsWriter,
                         touchGroupTotalCounts = touchGroupTotalCounts.AsArray(),
                         touchGroupJudgedCounts = touchGroupJudgedCounts.AsArray(),
-                        touchGroupCoverResults = touchGroupCoverResults.AsArray(),
                         touchHoldGroupTotalCounts = touchHoldGroupTotalCounts.AsArray(),
                         touchHoldGroupPressedCounts = touchHoldGroupPressedCounts.AsArray(),
-                        touchHoldGroupCoverResults = touchHoldGroupCoverResults.AsArray(),
                     }.Schedule(touchHolds.Length, 32, h);
 
                 if (taps.Length > 0)
@@ -316,7 +364,6 @@ namespace MajdataViewX.Managers
                         ReportResults = _objectCounter.ReportRequestsWriter,
                         touchGroupTotalCounts = touchGroupTotalCounts.AsArray(),
                         touchGroupJudgedCounts = touchGroupJudgedCounts.AsArray(),
-                        touchGroupCoverResults = touchGroupCoverResults.AsArray(),
                     }.Schedule(touches.Length, 32, h);
 
                 var tapLineSort = _tapLineGroup.ScheduleSort(h);
@@ -362,6 +409,7 @@ namespace MajdataViewX.Managers
                 _touchGroup.Swap();
 
                 _objectCounter.ProcessReportRequests();
+                _effectManager.ProcessEffectRequests();
                 MajBurst.InputData.ApplyNextIndices();
 
                 // 思来想去在th内做加减确实不比在这里遍历一次快
@@ -379,6 +427,13 @@ namespace MajdataViewX.Managers
             }
 
             _inputManager.EndHandler();
+            if (_isHitSwipeGroupLockedThisFrame)
+            {
+                _hitSwipeGroup.UnlockWrite(false);
+                _hitSwipeGroup.Render();
+                _hitSwipeGroup.Swap();
+                _isHitSwipeGroupLockedThisFrame = false;
+            }
         }
 
         void OnDestroy()
@@ -394,18 +449,22 @@ namespace MajdataViewX.Managers
             if (slides.IsCreated) slides.Dispose();
             if (touches.IsCreated) touches.Dispose();
             if (touchHolds.IsCreated) touchHolds.Dispose();
+            if (plays.IsCreated) plays.Dispose();
+            if (_djAutoHands.IsCreated) _djAutoHands.Dispose();
+            if (_djAutoTouchInfosThisTiming.IsCreated) _djAutoTouchInfosThisTiming.Dispose();
+            if (_djAutoMoveCurve.IsCreated) _djAutoMoveCurve.Dispose();
+            if (_touchComboCache.IsCreated) _touchComboCache.Dispose();
 
             if (touchGroupTotalCounts.IsCreated) touchGroupTotalCounts.Dispose();
             if (touchGroupJudgedCounts.IsCreated) touchGroupJudgedCounts.Dispose();
-            if (touchGroupCoverResults.IsCreated) touchGroupCoverResults.Dispose();
             if (touchHoldGroupTotalCounts.IsCreated) touchHoldGroupTotalCounts.Dispose();
             if (touchHoldGroupPressedCounts.IsCreated) touchHoldGroupPressedCounts.Dispose();
-            if (touchHoldGroupCoverResults.IsCreated) touchHoldGroupCoverResults.Dispose();
         }
 
         public void ResetState()
         {
             _prevChain.Complete();
+            ResetDJAutoHands();
             _djAutoSim.Reset();
             taps.Clear();
             eachLines.Clear();

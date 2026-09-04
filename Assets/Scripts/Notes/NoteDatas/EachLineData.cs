@@ -10,14 +10,13 @@ namespace MajdataViewX.Notes.NoteDatas
         public float time;
         public int key;
         public int curvLength;
-        public float speed;
+        public float hspeed;
         public bool usingSV;
 
         public bool isEnd;
 
         public NoteSp lineSprite;
         public float ang;
-        public float scale;
 
         public void Init()
         {
@@ -29,7 +28,7 @@ namespace MajdataViewX.Notes.NoteDatas
             time == other.time &&
             key == other.key &&
             curvLength == other.curvLength &&
-            speed == other.speed &&
+            hspeed == other.hspeed &&
             usingSV == other.usingSV;
     }
 }

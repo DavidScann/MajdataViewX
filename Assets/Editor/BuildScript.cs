@@ -51,8 +51,7 @@ public static class BuildScript
         {
             scenes = new[]
             {
-                "Assets/Scenes/Server.unity",
-                "Assets/Scenes/SampleScene.unity"
+                "Assets/Scenes/Game.unity"
             },
             locationPathName = outputPath,
             target = target,

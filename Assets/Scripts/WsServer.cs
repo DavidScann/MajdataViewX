@@ -4,9 +4,10 @@ using Cysharp.Threading.Tasks;
 using MajdataViewX.Managers;
 using MajdataViewX.Types.Enums;
 using MajdataViewX.Types.MajWs;
-using Newtonsoft.Json;
+using MemoryPack;
 using System;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Text;
 using System.Threading;
 using UnityEngine;
@@ -20,7 +21,7 @@ namespace MajdataViewX
 {
     public class WsServer : MonoBehaviour
     {
-        public static readonly ConcurrentQueue<string> MessageQueue = new();
+        public static readonly ConcurrentQueue<byte[]> MessageQueue = new();
         private WebSocketServer? webSocket;
         private CancellationToken _lifetimeCancellationToken;
 
@@ -32,8 +33,6 @@ namespace MajdataViewX
         // 这里是游戏及游戏外部的初始化
         void Start()
         {
-            SceneManager.LoadScene(1);
-
             QualitySettings.vSyncCount = 1;
 
             // Use port-based constructor: IL2CPP trimming removes the 'ws://' scheme
@@ -60,14 +59,13 @@ namespace MajdataViewX
             {
                 while (!cancellationToken.IsCancellationRequested)
                 {
-                    if (MessageQueue.TryDequeue(out var json))
+                    if (MessageQueue.TryDequeue(out var bytes))
                     {
                         while (_playManager == null ||
-                               PlayManager.Summary.State is ViewStatus.Busy)
+                               PlayManager.Summary.State == ViewStatus.Busy)
                             await UniTask.Yield(PlayerLoopTiming.Update, cancellationToken);
 
-                        Debug.Log($"dequeue: {json}");
-                        await HandleMessageAsync(json);
+                        await HandleMessageAsync(bytes);
                     }
                     else
                     {
@@ -99,75 +97,54 @@ namespace MajdataViewX
             }
         }
 
-        private async UniTask HandleMessageAsync(string json)
+        private async UniTask HandleMessageAsync(byte[] bytes)
         {
             try
             {
-                var req = JsonConvert.DeserializeObject<MajWsRequestBase>(json);
-                var payloadJson = req.requestData?.ToString() ?? string.Empty;
-                switch (req.requestType)
+                var req = MemoryPackSerializer.Deserialize<MajWsRequest>(bytes);
+                switch (req)
                 {
-                    case MajWsRequestType.Setting:
-                        {
-                            var payload = JsonConvert.DeserializeObject<MajWsRequestSetting>(payloadJson);
-                            _playManager.Setting(payload.ViewSetting, payload.VolumeSetting);
-                            Response(MajWsResponseType.Ok, PlayManager.Summary);
-                            Debug.Log("dequeued: Setting");
-                        }
+                    case MajWsSettingRequest r:
+                        _playManager.Setting(r.ViewSetting, r.VolumeSetting);
+                        Response(MajWsResponseType.Ok, PlayManager.Summary);
+                        Debug.Log("request finished: Setting");
                         break;
-                    case MajWsRequestType.Load:
-                        {
-                            var payload = JsonConvert.DeserializeObject<MajWsRequestLoad>(payloadJson);
-                            await _playManager.LoadAsync(payload.TrackPath, payload.ImagePath, payload.VideoPath);
-                            Response(MajWsResponseType.LoadOk, PlayManager.Summary);
-                            Debug.Log("dequeued: Load");
-                        }
+                    case MajWsLoadRequest r:
+                        await _playManager.LoadAsync(r.TrackPath, r.ImagePath, r.VideoPath);
+                        Response(MajWsResponseType.LoadOk, PlayManager.Summary);
+                        Debug.Log("request finished: Load");
                         break;
-                    case MajWsRequestType.Play:
-                        {
-                            var payload = JsonConvert.DeserializeObject<MajWsRequestPlay>(payloadJson);
-                            await _playManager.PlayAsync(payload.Mode,
-                                payload.StartAt, payload.Speed,
-                                payload.Title, payload.Artist, payload.Offset,
-                                payload.Designer, payload.Level, payload.Fumen,
-                                payload.Commands, payload.Difficulty, payload.MaidataPath);
-                            if (payload.Mode != PlaybackMode.Record)
-                                Response(MajWsResponseType.PlayStarted, PlayManager.Summary);
-                            Debug.Log("dequeued: Play");
-                        }
+                    case MajWsUpdateRequest r:
+                        // 图数据经共享内存传输：FileLength/ChartLength 即 Edit 写入的两段 MemoryPack 字节数
+                        await _playManager.UpdateAsync(r.FileLength, r.ChartLength, r.SelectedDifficulty);
+                        Response(MajWsResponseType.Ok, PlayManager.Summary);
+                        Debug.Log("request finished: Update");
                         break;
-                    case MajWsRequestType.Resume:
-                        {
-                            if (_screenRecorder.IsRecording) return;
-                            await _playManager.ResumeAsync();
-                            Response(MajWsResponseType.PlayResumed, PlayManager.Summary);
-                            Debug.Log("dequeued: Resume");
-                        }
+                    case MajWsPlayRequest r:
+                        await _playManager.PlayAsync(
+                            r.Mode, r.StartAt, r.Speed, r.MaidataPath ?? string.Empty);
+                        if (r.Mode != PlaybackMode.Record)
+                            Response(MajWsResponseType.PlayStarted, PlayManager.Summary);
+                        Debug.Log("request finished: Play");
                         break;
-                    case MajWsRequestType.Pause:
-                        {
-                            if (_screenRecorder.IsRecording) return;
-                            await _playManager.PauseAsync();
-                            Response(MajWsResponseType.PlayPaused, PlayManager.Summary);
-                            Debug.Log("dequeued: Pause");
-                        }
+                    case MajWsPauseRequest:
+                        if (_screenRecorder.IsRecording) break;
+                        await _playManager.PauseAsync();
+                        Response(MajWsResponseType.PlayPaused, PlayManager.Summary);
+                        Debug.Log("request finished: Pause");
                         break;
-                    case MajWsRequestType.Stop:
-                        {
-                            await _playManager.StopAsync();
-                            Response(MajWsResponseType.PlayStopped, PlayManager.Summary);
-                            Debug.Log("dequeued: Stop");
-                        }
+                    case MajWsStopRequest:
+                        await _playManager.StopAsync();
+                        Response(MajWsResponseType.PlayStopped, PlayManager.Summary);
+                        Debug.Log("request finished: Stop");
                         break;
-                    case MajWsRequestType.State:
-                        {
-                            Response(MajWsResponseType.Ok, PlayManager.Summary);
-                            Debug.Log("dequeued: State");
-                        }
+                    case MajWsStateRequest:
+                        Response(MajWsResponseType.Ok, PlayManager.Summary);
+                        Debug.Log("request finished: State");
                         break;
                     default:
                         Error("Not Supported");
-                        Debug.LogError("dequeue: Not Supported");
+                        Debug.LogError("request failed: Not Supported");
                         break;
                 }
             }
@@ -183,25 +160,26 @@ namespace MajdataViewX
             Response(MajWsResponseType.PlayStopped, PlayManager.Summary);
         }
 
-        private void Response(MajWsResponseType type, object? data = null)
+        private void Response(MajWsResponseType type, ViewSummary? summary = null, string? error = null)
         {
-            var rsp = new MajWsResponseBase
+            var rsp = new MajWsResponse
             {
-                responseType = type,
-                responseData = data ?? PlayManager.Summary
+                ResponseType = type,
+                Summary = summary ?? PlayManager.Summary,
+                Error = error
             };
             webSocket?.WebSocketServices["/majdata"].Sessions.
-                Broadcast(JsonConvert.SerializeObject(rsp));
+                Broadcast(MemoryPackSerializer.Serialize(rsp));
         }
 
         public void Error<T>(T exception) where T : Exception
         {
-            Response(MajWsResponseType.Error, exception.ToString());
+            Response(MajWsResponseType.Error, error: exception.ToString());
         }
 
         public void Error(string errMsg)
         {
-            Response(MajWsResponseType.Error, errMsg);
+            Response(MajWsResponseType.Error, error: errMsg);
         }
 
         void OnDestroy()
@@ -218,11 +196,12 @@ namespace MajdataViewX
     {
         protected override void OnMessage(MessageEventArgs e)
         {
-            var json = e.IsText ? e.Data : Encoding.UTF8.GetString(e.RawData);
-            if (string.IsNullOrWhiteSpace(json))
+            // 二进制帧为 MemoryPack 消息；旧文本帧按 UTF-8 编码后同样入队（反序列化会失败并回 Error）
+            var data = e.IsBinary ? e.RawData : Encoding.UTF8.GetBytes(e.Data);
+            if (data.Length == 0)
                 return;
 
-            WsServer.MessageQueue.Enqueue(json);
+            WsServer.MessageQueue.Enqueue(data);
         }
     }
 }

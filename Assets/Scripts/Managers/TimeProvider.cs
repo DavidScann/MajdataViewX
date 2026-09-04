@@ -1,3 +1,4 @@
+using MajdataViewX.Base;
 using MajdataViewX.Types.Enums;
 using MajSimai;
 using System;
@@ -30,7 +31,7 @@ namespace MajdataViewX.Managers
 
         private double startRealtime; //the beginning of the program is 0
         private float startAt; //the beginning of the audio is 0
-        private float offset;
+        public float offset;
         private float speed;
         //for pause and resume
         private double accumulated;
@@ -43,8 +44,7 @@ namespace MajdataViewX.Managers
         private readonly Stopwatch playbackClock = new();
 
 
-        private string mmfAudioTimePath =>
-            Path.Combine(Application.persistentDataPath, "majdata_time.dat");
+
         private MemoryMappedFile mmfAudioTime;
         private MemoryMappedViewAccessor mmvAudioTime;
 
@@ -56,7 +56,7 @@ namespace MajdataViewX.Managers
             ResetState();
 
             var mmfAudioTimeFileStream = new FileStream(
-                mmfAudioTimePath,
+                MajEnv.MmfAudioTimePath,
                 FileMode.OpenOrCreate,
                 FileAccess.ReadWrite,
                 FileShare.ReadWrite
@@ -78,7 +78,14 @@ namespace MajdataViewX.Managers
         {
             TimeData.IsStart = IsStart;
             TimeData.deltaTime = IsRecord ? recordFrameStep : Time.deltaTime;
-            if (!IsStart) return;
+            if (!IsStart)
+            {
+                mmvAudioTime.Read(0, out float time);
+                AudioTime = time;
+                NoteTime = AudioTime - offset;
+                TimeData.NoteTime = NoteTime;
+                return;
+            }
 
             if (IsRecord)
             {
@@ -142,7 +149,6 @@ namespace MajdataViewX.Managers
 
         public void SetStartTime(double _startAt, double _offset, float _speed, PlaybackMode mode, int fps = 60)
         {
-            IsStart = false;
             IsRecord = false;
             AudioTime = 0f;
             NoteTime = 0f;
@@ -254,6 +260,8 @@ namespace MajdataViewX.Managers
         public bool IsStart;
         public float NoteTime;
         public readonly float FakeNoteTime => GetPositionAtTime(NoteTime);
+        // 存在减少late的隐秘指令
+        public readonly float DJAutoTime => TimeData.NoteTime + 0.01f;
 
         /// <summary>
         /// 录制模式时恒为FRAME_LENGTH_SEC，因此无法与Time.xxx配合使用！！！
@@ -271,7 +279,6 @@ namespace MajdataViewX.Managers
         readonly unsafe ReadOnlySpan<(float k, float b)> SVFuncArgs => new(__SVFuncArgsPtr, __SVFuncArgsLength);
 
 
-        [BurstCompile]
         public readonly float GetPositionAtTime(float t)
         {
             if (SVList.Length == 0)

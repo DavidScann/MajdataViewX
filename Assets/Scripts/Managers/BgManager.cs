@@ -28,6 +28,8 @@ namespace MajdataViewX.Managers
         [SerializeField]
         private Material circledBgMaterial;
 
+        public bool ResizeBg;
+
         private RawImage jacketImage;
         private GameObject songDetail;
         private static readonly int ShowHash = Animator.StringToHash("show");
@@ -46,8 +48,8 @@ namespace MajdataViewX.Managers
         private float smoothRDelta;
         private double _recordLastRealTime;
 
-        const float CIRCLED_SCALE_X = 1.1f;
-        const float FULLSCREEN_SCALE_X = 1.777f;
+        private const float CIRCLED_SCALE_X = 1.1f;
+        private const float FULLSCREEN_SCALE_X = 1.777f;
 
         private Sprite? Bg { get; set; }
         private string? VideoUrl { get; set; }
@@ -60,6 +62,7 @@ namespace MajdataViewX.Managers
         public bool IsVideoLoaded => !hasVideo || !string.IsNullOrWhiteSpace(VideoUrl);
 
         private static Sprite? _emptySprite;
+        bool _videoPaused;
 
         private void Awake()
         {
@@ -90,6 +93,13 @@ namespace MajdataViewX.Managers
             }
 #endif
 
+            if (hasVideo && _videoPaused)
+            {
+                videoPlayer.time = _timeProvider.AudioTime;
+                videoPlayer.Play();
+                videoPlayer.Pause();
+                return;
+            }
             var delta = (float)videoPlayer.clockTime - _timeProvider.AudioTime;
             smoothRDelta += (Time.unscaledDeltaTime - smoothRDelta) * 0.01f;
             if (_timeProvider.AudioTime < 0) return;
@@ -259,6 +269,7 @@ namespace MajdataViewX.Managers
 
                 videoPlayer.Play();
                 videoPlayer.time = _timeProvider.AudioTime;
+                _videoPaused = false;
 
                 var scale = videoPlayer.height / (float)videoPlayer.width;
                 if (resizeBg)
@@ -273,6 +284,8 @@ namespace MajdataViewX.Managers
                 }
             }
         }
+
+        public void ShowVideo() => ShowVideoPlayer(ResizeBg);
 
         async Task ShowVideoPipeAsync(bool resizeBg, double startAt = 0)
         {
@@ -351,9 +364,11 @@ namespace MajdataViewX.Managers
             // Stopping the read lets ffmpeg's pipe fill and block: the video
             // freezes on its last frame without killing the process.
             videoPipe?.Pause();
+            _videoPaused = true;
             return;
 #else
             videoPlayer.Pause();
+            _videoPaused = true;
 #endif
         }
 
@@ -378,6 +393,7 @@ namespace MajdataViewX.Managers
                 _preloadTask = PreloadVideoAsync(VideoPath);
 #else
             videoPlayer.Stop();
+            _videoPaused = false;
 #endif
             // 销毁上一曲背景图(Texture2D/Sprite)，避免滞留到下次 LoadBG
             DestroyLoadedBackground();

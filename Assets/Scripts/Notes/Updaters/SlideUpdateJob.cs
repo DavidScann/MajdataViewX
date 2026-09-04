@@ -49,11 +49,49 @@ namespace MajdataViewX.Notes.Updaters
 
         public void Execute(int index)
         {
+            if (!TimeData.IsStart)
+            {
+                SeeOnlyUpdate(slides[index], index);
+                return;
+            }
             ref var slide = ref slides.ElementRef(index);
             TransformUpdate(ref slide, index);
+            AutoplayUpdate(ref slide);
             CheckUpdate(ref slide);
         }
 
+        private void SeeOnlyUpdate(SlideData slide, int index)
+        {
+            if (slide.isFolded) return;
+            if (TimeData.NoteTime < slide.tapTime ||
+                TimeData.NoteTime > slide.shootTime + slide.LastFor) return;
+            var timeVal = ((uint)math.max(0f, slide.tapTime * 100f)) & 0x7FFFF;
+            var timePart = NoteHelper.Settings.LegacySlideLayer ? (0x7FFFFu - timeVal) : timeVal;
+
+            var cnt = slide.slideArrowsCount;
+            var startIdx = 1;
+            var endIdx = slide.noLastArrow ? cnt - 2 : cnt - 1;
+            var writeCount = math.max(0, endIdx - startIdx);
+
+            if (writeCount <= 0) return;
+
+            var idx = Interlocked.Add(ref *SlidesWriteCountPtr, writeCount) - writeCount;
+            for (var i = startIdx; i < endIdx; i++)
+            {
+                var p = slide.slideArrows[i];
+
+                slidesRender[idx + i - startIdx] = new SimpleRenderData
+                {
+                    pos = new float2(p.X, p.Y),
+                    angRad = math.radians(p.RotZ),
+                    scale = new float2(1, 1),
+                    spriteId = slide.isWifi ? slide.slideSprite.Offset(i - 1) : slide.slideSprite,
+                    color = 1f,
+                    brightness = 1f,
+                    sort = (timePart << 13) | ((uint)(index & 0x1F) << 8) | ((uint)i & 0xFF),
+                };
+            }
+        }
         // 注意：RenderXXX都是需要每帧调用的
         private void TransformUpdate(ref SlideData slide, int index)
         {
@@ -124,7 +162,7 @@ namespace MajdataViewX.Notes.Updaters
 
             // sortTime (30 bits): [19 bits: time (87 mins wrap)] + [11 bits: index tie-breaker (2048 wrap)]
             var timeVal = ((uint)math.max(0f, slide.tapTime * 100f)) & 0x7FFFF;
-            var timePart = slide.legacySlideLayer ? (0x7FFFFu - timeVal) : timeVal;
+            var timePart = NoteHelper.Settings.LegacySlideLayer ? (0x7FFFFu - timeVal) : timeVal;
             var sortTime = ((timePart << 11) | (uint)(index & 0x7FF)) & 0x3FFFFFFF;
 
             // 第一个是路径起点，最后一个是路径终点，忽略不画，倒数第二个要看情况
@@ -173,7 +211,7 @@ namespace MajdataViewX.Notes.Updaters
             // =====渲染逻辑=====
             // sortTime (30 bits): [19 bits: time (87 mins wrap)] + [11 bits: index tie-breaker (2048 wrap)]
             var timeVal = ((uint)math.max(0f, slide.tapTime * 100f)) & 0x7FFFF;
-            var timePart = slide.legacySlideLayer ? (0x7FFFFu - timeVal) : timeVal;
+            var timePart = NoteHelper.Settings.LegacySlideLayer ? (0x7FFFFu - timeVal) : timeVal;
             var sortTime = ((timePart << 11) | (uint)(index & 0x7FF)) & 0x3FFFFFFF;
             if (!slide.isWifi)
             {
@@ -241,10 +279,146 @@ namespace MajdataViewX.Notes.Updaters
             }
         }
 
+        private void AutoplayUpdate(ref SlideData slide)
+        {
+            if (slide.isEnd || slide.isSlideEnd) return;
+            var timing = TimeData.NoteTime - slide.shootTime;
+            if (timing < InputManager.AUTOPLAY_START_SEC) return;
+            switch (NoteHelper.Settings.AutoPlayMode)
+            {
+                // 非模拟模式下星星可以正常走到尾再显示slideok并销毁
+                case AutoPlayMode.Enable:
+                case AutoPlayMode.Random:
+                    {
+                        if (NoteHelper.Settings.SmoothSlideAnime)
+                        {
+                            // 先前 RenderStar 的时候计算过 processIdx 可以直接拿来用
+                            slide.eaten = slide.processIdx - 1;
+                        }
+                        else
+                        {
+                            // slide 各判定区长度差异很大（conn slide更严重）所以直接 lerp 不是很好看
+                            // 这里借用一下 judgeCurrent 存储目前到哪个区了
+                            if (slide.processIdx > slide.judgeQueue[slide.judgeCurrent].ArrowProgressFinish)
+                            {
+                                slide.eaten = slide.judgeQueue[slide.judgeCurrent].ArrowProgressFinish;
+                                slide.judgeCurrent++;
+                            }
+                            else if (slide.processIdx > slide.judgeQueue[slide.judgeCurrent].ArrowProgressPush)
+                            {
+                                slide.eaten = slide.judgeQueue[slide.judgeCurrent].ArrowProgressPush;
+                            }
+                        }
+
+                        if (!slide.isSoundPlayed)
+                        {
+                            NoteHelper.PlaySlideSound(SfxRequests,
+                                slide.isBreak
+                            );
+                            slide.isSoundPlayed = true;
+                        }
+
+                        if (slide.process >= 1)
+                        {
+                            if (NoteHelper.Settings.AutoPlayMode is AutoPlayMode.Enable)
+                            {
+                                slide.judgeGrade = JudgeGrade.LateCritical;
+                            }
+                            else
+                            {
+                                // 这里起始点不用TooFast，兼容一下普通slide
+                                var grade = (JudgeGrade)GlobalRandom.NextInt((int)JudgeGrade.FastGood, (int)JudgeGrade.Miss);
+                                slide.judgeGrade = slide.isMine
+                                    ? (grade < JudgeGrade.FastPerfect3rd ? JudgeGrade.TooFast : JudgeGrade.LateCritical)
+                                    : grade;
+                            }
+                            // 非模拟模式下需要自行赋值finishJudgeTiming
+                            slide.finishJudgeTiming = TimeData.NoteTime;
+                            FinishJudgeSlide(ref slide);
+                            EndSlide(ref slide);
+                            if (slide.isFolded) EndNote(ref slide);
+                        }
+                        break;
+                    }
+                // 模拟模式下需要等待星星完全结束（isSlideEnd），但因为isJudged所以并不会把手黏在这里
+                case AutoPlayMode.DJAutoButton:
+                case AutoPlayMode.DJAutoSensor:
+                case AutoPlayMode.Disable: // disable也要处理mine情况
+                    {
+                        if (!slide.isMine || !NoteHelper.Settings.MineAutoSlide) break;
+
+                        // 目前判定到哪个区
+                        var idx = slide.judgeCurrent;
+                        if (slide.isWifi)
+                        {
+                            // wifi 的情况，取三支里剩的最长的
+                            idx = math.min(slide.judgeCurrent, math.min(slide.judgeL_Current, slide.judgeR_Current));
+                        }
+
+                        // 剩一个区就不动了，留给check表演
+                        if (idx >= slide.judgeQueueCount - 1) break;
+
+                        var newEaten = 0;
+                        // wifi 三支判定队列的 ArrowProgress 是一样的
+                        if (slide.processIdx > slide.judgeQueue[idx].ArrowProgressFinish)
+                        {
+                            // 如果引导星星已经走完这个区了，就推进一个区
+                            newEaten = slide.judgeQueue[idx].ArrowProgressFinish;
+
+                            if (slide.isWifi)
+                            {
+                                // wifi 的情况要分别检查三支各自是否需要推进
+                                if (slide.judgeCurrent <= idx)
+                                {
+                                    slide.judgeCurrent = idx + 1;
+                                    slide.currentOn = SensorType.Invalid;
+                                }
+
+                                if (slide.judgeL_Current <= idx)
+                                {
+                                    slide.judgeL_Current = idx + 1;
+                                    slide.currentOnL = SensorType.Invalid;
+                                }
+
+                                if (slide.judgeR_Current <= idx)
+                                {
+                                    slide.judgeR_Current = idx + 1;
+                                    slide.currentOnR = SensorType.Invalid;
+                                }
+                            }
+                            else
+                            {
+                                // 普通slide肯定需要推进了
+                                slide.currentOn = SensorType.Invalid;
+                                slide.judgeCurrent++;
+                            }
+                        }
+                        else if (slide.processIdx > slide.judgeQueue[idx].ArrowProgressPush)
+                        {
+                            newEaten = slide.judgeQueue[idx].ArrowProgressPush;
+                        }
+
+                        if (NoteHelper.Settings.SmoothSlideAnime)
+                        {
+                            newEaten = slide.processIdx - 1;
+                        }
+
+                        if (newEaten > slide.eaten)
+                        {
+                            slide.eaten = newEaten;
+                        }
+
+                        break;
+                    }
+            }
+        }
+
         private void CheckUpdate(ref SlideData slide)
         {
-            // DJAuto modes are judged by DJAutoSim on the sim tick; the render job only judges in Disable (human play).
-            if (NoteHelper.AutoPlayMode != AutoPlayMode.Disable) return;
+            // DJAutoSim-pressed notes (when the sim is attached) are judged
+            // from recorded press times below; otherwise simulated inputs
+            // judge through the normal path.
+            if (!NoteHelper.IsSimulated) return;
             if (slide.isEnd || slide.isSlideEnd || slide.isJudged) return;
 
             // slide的正解帧是 星星进入最后一个判定区的时间，所以判定部分受SV影响
@@ -520,7 +694,7 @@ namespace MajdataViewX.Notes.Updaters
 
         private void RenderSlideOK(ref SlideData slide)
         {
-            ref readonly var ok = ref slide.okPose;
+            var ok = slide.okPose;
 
             var baseJ = slide.okType switch
             {

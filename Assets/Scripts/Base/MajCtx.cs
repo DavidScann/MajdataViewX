@@ -30,7 +30,6 @@ namespace MajdataViewX.Base
         public const int BUTTON_COUNT = 8;
         public const int SENSOR_COUNT = 33;
 
-        [BurstCompile]
         public static SensorType GetSensor(char areaPos, int startPos)
         {
             return areaPos switch

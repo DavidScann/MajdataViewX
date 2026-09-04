@@ -38,9 +38,72 @@ namespace MajdataViewX.Notes.Updaters
 
         public void Execute(int index)
         {
+            if (!TimeData.IsStart)
+            {
+                SeeOnlyUpdate(taps[index], index);
+                return;
+            }
             ref var tap = ref taps.ElementRef(index);
             TransformUpdate(ref tap, index);
+            AutoplayUpdate(ref tap);
             CheckUpdate(ref tap);
+        }
+        private void SeeOnlyUpdate(TapData tap, int index)
+        {
+            if (tap.IsFolded) return;
+
+            var timing = tap.UsingSV
+                ? TimeData.FakeNoteTime - TimeData.GetPositionAtTime(tap.Time)
+                : TimeData.NoteTime - tap.Time;
+            if (timing > 0) return;
+
+            var rawDistance = timing * tap.Speed + 4.8f;
+            var clampedDistance = math.max(rawDistance, 1.225f);
+
+            var destScale = math.min(rawDistance * 0.4f + 0.51f, 1f);
+            var lineScale = clampedDistance / 4.8f;
+
+            if (destScale < 0f) return;
+
+            // sortTime (30 bits): [19 bits: time (87 mins wrap)] + [11 bits: index tie-breaker (2048 wrap)]
+            var timePart = ((uint)math.max(0f, tap.Time * 100f)) & 0x7FFFF;
+            var sortTime = ((timePart << 11) | (uint)(index & 0x7FF)) & 0x3FFFFFFF;
+
+            // show line
+            if (destScale > 0.3f)
+            {
+                var lineIdx = Interlocked.Increment(ref *tapLinesWriteCountPtr) - 1;
+                tapLinesRender[lineIdx] = new LineRenderData()
+                {
+                    angRad = math.radians(tap.AngleKey),
+                    scale = lineScale,
+                    spriteId = tap.LineSprite,
+                    sort = sortTime,
+                };
+            }
+
+            // show tap
+            NoteHelper.GetPosFromDistance(clampedDistance, tap.Key, out var pos);
+            tap.Pos = pos;
+            tap.Scale = destScale;
+
+            var tapIdx = Interlocked.Increment(ref *notesWriteCountPtr) - 1;
+            notesRender[tapIdx] = new NotesRenderData()
+            {
+                pos = tap.Pos,
+                angRad = math.radians(tap.AngleRot),
+                scale = tap.Scale,
+                stretchY = 0,
+                spriteId = tap.TapSprite,
+                color = new float4(1, 1, 1, 1),
+                brightness = 1f,
+
+                exSprite = tap.IsEx ? tap.ExSprite : 0,
+                exColor = tap.ExColor,
+                sliceBorder = float2.zero,
+
+                sort = sortTime,
+            };
         }
 
         private void TransformUpdate(ref TapData tap, int index)
@@ -112,11 +175,40 @@ namespace MajdataViewX.Notes.Updaters
             };
         }
 
+        private void AutoplayUpdate(ref TapData tap)
+        {
+            if (tap.IsEnd) return;
+            if (NoteHelper.Settings.AutoPlayMode is AutoPlayMode.Disable) return;
+
+            var timing = TimeData.NoteTime - tap.Time;
+            if (timing < InputManager.AUTOPLAY_START_SEC) return;
+            switch (NoteHelper.Settings.AutoPlayMode)
+            {
+                case AutoPlayMode.Enable:
+                    tap.JudgeGrade = JudgeGrade.LateCritical;
+                    tap.IsJudged = true;
+                    tap.Diff = 0;
+                    EndNote(ref tap);
+                    break;
+                case AutoPlayMode.Random:
+                    var grade = (JudgeGrade)GlobalRandom.NextInt((int)JudgeGrade.FastGood, (int)JudgeGrade.Miss);
+                    tap.JudgeGrade = tap.IsMine
+                        ? (grade < JudgeGrade.FastPerfect3rd ? JudgeGrade.Miss : JudgeGrade.LateCritical)
+                        : grade;
+                    tap.IsJudged = true;
+                    tap.Diff = grade >= JudgeGrade.LateCritical ? 11.4514f : -11.4514f;
+                    EndNote(ref tap);
+                    break;
+            }
+        }
+
         private void CheckUpdate(ref TapData tap)
         {
             if (tap.IsEnd) return;
-            // DJAuto modes are judged by DJAutoSim on the sim tick; the render job only judges in Disable (human play).
-            if (NoteHelper.AutoPlayMode != AutoPlayMode.Disable) return;
+            // DJAutoSim-pressed notes (when the sim is attached) are judged
+            // from recorded press times below; otherwise simulated inputs
+            // judge through the normal path.
+            if (!NoteHelper.IsSimulated) return;
 
             // DJAuto input is emitted by DJAutoSim at exact times; judge with the recorded press time, render-FPS independent.
             if (tap.DjAutoPressed && !tap.IsJudged)

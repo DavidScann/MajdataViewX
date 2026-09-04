@@ -53,11 +53,11 @@ namespace MajdataViewX.Managers
 
         double[] accRate = new double[5]
         {
-        0.00,
-        100.00,
-        101.0000,
-        100.0000,
-        0.0000,
+            0.00,
+            100.00,
+            101.0000,
+            100.0000,
+            0.0000,
         };
 
         private double ClassicRateFromCount
@@ -188,68 +188,78 @@ namespace MajdataViewX.Managers
             totalDXScore = NoteSum * 3;
         }
 
-        public void CountIgnoreNoteCountAsync(IEnumerable<SimaiNote> notes)
+        public void CountIgnoreNoteCountAsync(SimaiChart chart, double ignore)
         {
-            foreach (var note in notes)
+            foreach (var timing in chart.NoteTimings)
             {
-                if (!note.IsBreak)
+                if (timing.Timing >= ignore) continue;
+                foreach (var note in timing.Notes)
                 {
-                    switch (note.Type)
+                    if (!note.IsBreak)
                     {
-                        case SimaiNoteType.Tap:
-                            TapFinishedCount++;
-                            break;
-                        case SimaiNoteType.Hold:
-                        case SimaiNoteType.TouchHold:
-                            HoldFinishedCount++;
-                            break;
-                        case SimaiNoteType.Slide:
-                            if (!note.IsSlideNoHead)
+                        switch (note.Type)
+                        {
+                            case SimaiNoteType.Tap:
                                 TapFinishedCount++;
+                                break;
+                            case SimaiNoteType.Hold:
+                            case SimaiNoteType.TouchHold:
+                                HoldFinishedCount++;
+                                break;
+                            case SimaiNoteType.Slide:
+                                if (!note.IsSlideNoHead)
+                                    TapFinishedCount++;
+                                if (note.IsSlideBreak)
+                                    BreakFinishedCount++;
+                                else
+                                    SlideFinishedCount++;
+                                break;
+                            case SimaiNoteType.Touch:
+                                TouchFinishedCount++;
+                                break;
+                        }
+                    }
+                    else
+                    {
+                        if (note.Type == SimaiNoteType.Slide)
+                        {
+                            if (!note.IsSlideNoHead)
+                                BreakFinishedCount++;
                             if (note.IsSlideBreak)
                                 BreakFinishedCount++;
                             else
                                 SlideFinishedCount++;
-                            break;
-                        case SimaiNoteType.Touch:
-                            TouchFinishedCount++;
-                            break;
-                    }
-                }
-                else
-                {
-                    if (note.Type == SimaiNoteType.Slide)
-                    {
-                        if (!note.IsSlideNoHead)
-                            BreakFinishedCount++;
-                        if (note.IsSlideBreak)
-                            BreakFinishedCount++;
+                        }
                         else
-                            SlideFinishedCount++;
+                        {
+                            BreakFinishedCount++;
+                        }
                     }
-                    else
-                    {
-                        BreakFinishedCount++;
-                    }
-                }
 
-                if (NoteHelper.IsSimulated) continue;
-                // ReportResult
-                var type = note.Type;
-                var judge = JudgeGrade.LateCritical;
-                var isBreak = note.IsBreak;
-                if (NoteHelper.AutoPlayMode is Types.Enums.AutoPlayMode.Random)
-                {
-                    judge = (JudgeGrade)Base.MajBurst.GlobalRandom.NextInt((int)JudgeGrade.FastGood, (int)JudgeGrade.Miss);
-                    judge = note.IsMine
-                        ? judge < JudgeGrade.FastPerfect3rd
-                            ? JudgeGrade.Miss
-                            : JudgeGrade.LateCritical
-                        : judge;
+                    if (NoteHelper.IsSimulated) continue;
+                    // ReportResult
+                    var type = note.Type;
+                    var judge = JudgeGrade.LateCritical;
+                    var isBreak = note.IsBreak;
+                    if (NoteHelper.Settings.AutoPlayMode is Types.Enums.AutoPlayMode.Random)
+                    {
+                        judge = (JudgeGrade)Base.MajBurst.GlobalRandom.NextInt((int)JudgeGrade.FastGood, (int)JudgeGrade.Miss);
+                        judge = note.IsMine
+                            ? judge < JudgeGrade.FastPerfect3rd
+                                ? JudgeGrade.Miss
+                                : JudgeGrade.LateCritical
+                            : judge;
+                    }
+                    UpdateNoteScoreCount(type, judge, isBreak);
+                    UpdateJudgeCountAndDXScore(judge);
+                    UpdateFastLateCount(judge);
+                    if (type is SimaiNoteType.Slide && !note.IsSlideNoHead)
+                    {
+                        UpdateNoteScoreCount(SimaiNoteType.Tap, judge, isBreak);
+                        UpdateJudgeCountAndDXScore(judge);
+                        UpdateFastLateCount(judge);
+                    }
                 }
-                UpdateNoteScoreCount(type, judge, isBreak);
-                UpdateJudgeCountAndDXScore(judge);
-                UpdateFastLateCount(judge);
             }
         }
 
@@ -402,7 +412,7 @@ namespace MajdataViewX.Managers
             Span<decimal> newAccRate = stackalloc decimal[5];
 
             newAccRate[0] = CurrentNoteScoreClassic / (decimal)TotalNoteBaseScore;
-            newAccRate[1] = (CurrentNoteBaseScore - LostNoteBaseScore + CurrentNoteExtraScoreClassic) / (decimal)TotalNoteBaseScore;
+            newAccRate[1] = (TotalNoteBaseScore - LostNoteBaseScore + CurrentNoteExtraScoreClassic) / (decimal)TotalNoteBaseScore;
             newAccRate[2] = ((TotalNoteBaseScore - LostNoteBaseScore) / (decimal)TotalNoteBaseScore) + ((TotalNoteExtraScore - LostNoteExtraScore) / ((decimal)(TotalNoteExtraScore is 0 ? 1 : TotalNoteExtraScore) * 100));
             newAccRate[3] = ((TotalNoteBaseScore - LostNoteBaseScore) / (decimal)TotalNoteBaseScore) + ((CurrentNoteExtraScore) / ((decimal)(TotalNoteExtraScore is 0 ? 1 : TotalNoteExtraScore) * 100));
             newAccRate[4] = ((CurrentNoteBaseScore) / (decimal)TotalNoteBaseScore) + ((CurrentNoteExtraScore) / ((decimal)(TotalNoteExtraScore is 0 ? 1 : TotalNoteExtraScore) * 100));
@@ -511,7 +521,7 @@ namespace MajdataViewX.Managers
                 lateCount++;
         }
 
-        public void ResetState()
+        public void ResetCur()
         {
             for (var i = 0; i <= 15; i++)
             {
@@ -536,14 +546,6 @@ namespace MajdataViewX.Managers
             TouchFinishedCount = 0;
             BreakFinishedCount = 0;
 
-            TapSum = 0;
-            HoldSum = 0;
-            SlideSum = 0;
-            TouchSum = 0;
-            BreakSum = 0;
-
-            TotalNoteBaseScore = 0;
-            TotalNoteExtraScore = 0;
             CurrentNoteBaseScore = 0;
             CurrentNoteExtraScore = 0;
             CurrentNoteExtraScoreClassic = 0;
@@ -560,18 +562,27 @@ namespace MajdataViewX.Managers
             fastCount = 0;
             lateCount = 0;
 
-            totalDXScore = 0;
             curDXScore = 0;
             lostDXScore = 0;
 
             combo = 0;
+        }
+
+        public void ResetLoaded()
+        {
+            TapSum = 0;
+            HoldSum = 0;
+            SlideSum = 0;
+            TouchSum = 0;
+            BreakSum = 0;
+
+            TotalNoteBaseScore = 0;
+            TotalNoteExtraScore = 0;
+
+            totalDXScore = 0;
 
             meterList.Clear();
             bpmList.Clear();
-
-            statusAchievement.gameObject.SetActive(false);
-            statusCombo.gameObject.SetActive(false);
-            statusDXScore.gameObject.SetActive(false);
         }
     }
 

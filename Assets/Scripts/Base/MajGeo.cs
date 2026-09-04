@@ -52,7 +52,6 @@ namespace MajdataViewX.Base
         /// <p>A 区节点坐标（判定线上的八个点）</p>
         /// <p>Note: idx is 1-based, not 0-based</p>
         /// </summary>
-        [BurstCompile]
         public static Complex PointGroupA(int idx)
         {
             var radian = Math.PI * (5.0 / 8.0 - idx / 4.0);
@@ -63,7 +62,6 @@ namespace MajdataViewX.Base
         /// <p>B 区节点坐标（不是 B 区 Touch 的位置）</p>
         /// <p>Note: idx is 1-based, not 0-based</p>
         /// </summary>
-        [BurstCompile]
         public static Complex PointGroupB(int idx)
         {
             var radian = Math.PI * (5.0 / 8.0 - idx / 4.0);
@@ -73,7 +71,6 @@ namespace MajdataViewX.Base
         /// <summary>
         /// <p>C 区节点坐标（正中心）</p>
         /// </summary>
-        [BurstCompile]
         public static Complex PointCenter()
         {
             return Complex.Zero;
@@ -82,7 +79,6 @@ namespace MajdataViewX.Base
         /// <summary>
         /// 获取指定判定区对应节点的坐标，判定区符合<c>SensorType</c>的定义，可取范围 0~16
         /// </summary>
-        [BurstCompile]
         public static Complex GetPoint(int sensorIdx)
         {
             switch (sensorIdx)
@@ -104,7 +100,6 @@ namespace MajdataViewX.Base
         /// <p>idx 1~8 are ppqq circles passing D[idx] panel,</p>
         /// <p>idx 9 is outer circle (judge circle / &lt;&gt; circle)</p>
         /// </summary>
-        [BurstCompile]
         public static CircleStruct GetCircle(int idx)
         {
             if (idx == 0)
@@ -125,7 +120,6 @@ namespace MajdataViewX.Base
         /// <summary>
         /// 计算指定点进入指定圆的切线
         /// </summary>
-        [BurstCompile]
         public static double CalcTangentAngle(Complex point, CircleStruct circle, bool isCcw)
         {
             var hypot = point - circle.Center;
@@ -139,7 +133,6 @@ namespace MajdataViewX.Base
         /// <p>Note: idx is 1-based, not 0-based</p>
         /// </summary>
         /// <returns>CircleStruct TransferCircle, double TransferStartAngle, double TransferEndAngle</returns>
-        [BurstCompile]
         public static (CircleStruct, double, double) TransferOutData(int idx, bool isCcw)
         {
             var ppqqRad = Math.PI * (3.0 / 4.0 - idx / 4.0);
