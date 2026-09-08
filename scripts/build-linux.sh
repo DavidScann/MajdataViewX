@@ -52,7 +52,19 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# ---------- Stray-instance guard ----------
+# ---------- Helpers ----------
+log()  { printf '\033[1;34m[build]\033[0m %s\n' "$*"; }
+warn() { printf '\033[1;33m[warn]\033[0m %s\n' "$*" >&2; }
+die()  { printf '\033[1;31m[err ]\033[0m %s\n' "$*" >&2; exit 1; }
+run()  {
+  if [[ $DO_DRY_RUN -eq 1 ]]; then
+    printf '\033[1;36m[dry]\033[0m %s\n' "$*"
+  else
+    eval "$@"
+  fi
+}
+
+# ---------- Stray-instance guard (after Helpers: uses log()) ----------
 # A running MajdataEdit-Neo/MajdataViewX pair (the editor auto-launches the
 # View and neither terminates reliably) can block the build - e.g. dotnet
 # publish/zip touching files the editor has loaded. Kill strays by exact
@@ -67,18 +79,6 @@ kill_strays() {
   done
 }
 kill_strays
-
-# ---------- Helpers ----------
-log()  { printf '\033[1;34m[build]\033[0m %s\n' "$*"; }
-warn() { printf '\033[1;33m[warn]\033[0m %s\n' "$*" >&2; }
-die()  { printf '\033[1;31m[err ]\033[0m %s\n' "$*" >&2; exit 1; }
-run()  {
-  if [[ $DO_DRY_RUN -eq 1 ]]; then
-    printf '\033[1;36m[dry]\033[0m %s\n' "$*"
-  else
-    eval "$@"
-  fi
-}
 
 # Run only if not in dry-run mode (for [[ -f ... ]] checks)
 check() {
