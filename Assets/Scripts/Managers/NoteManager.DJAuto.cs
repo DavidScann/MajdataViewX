@@ -1012,13 +1012,16 @@ namespace MajdataViewX.Managers
                 return cost;
             }
 
-            /// <summary>渲染 + 触发：On 按当前 data 位置触发 sensor/按键并红手渲染，否则灰手。handSide 用于 wifi L/R 派生。</summary>
+            /// <summary>渲染 + 触发：On 按当前 data 位置触发 sensor/按键并红手渲染，否则灰手。handSide 用于 wifi L/R 派生。
+            /// AbsolutePerfect 下只渲染不触发：判级来自定步 sim 的精确时刻，
+            /// 手的帧量化边沿会抢先判级（例如 slide 尾同 sensor 的 tap）。</summary>
             private void RenderAndTrigger(int handIdx)
             {
                 var hand = hands[handIdx];
                 if (hand.State is DJAutoHandState.On or DJAutoHandState.OnMovingToBoundNext)
                 {
-                    InputData.HandleWorldPosInput(hand.Pos, hand.Radius);
+                    if (!NoteHelper.Settings.AbsolutePerfect)
+                        InputData.HandleWorldPosInput(hand.Pos, hand.Radius);
                 }
                 else
                 {
