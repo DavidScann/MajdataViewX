@@ -781,6 +781,10 @@ namespace MajdataViewX.Managers
             {
                 if (slide.judgeCurrent >= slide.judgeQueueCount) // all sections done
                 {
+                    // Zero/short-travel slides finish sections instantly; the
+                    // grade belongs to the slide END, so hold until then
+                    // instead of judging early. Mines keep immediate judging.
+                    if (!slide.isMine && simTime < slide.judgeTiming) return;
                     slide.judgeGrade = CalcSlideJudgeGrade(ref slide, simTime);
                     FinishJudgeSlide(ref slide, simTime);
                     return;
@@ -805,6 +809,8 @@ namespace MajdataViewX.Managers
                     slide.judgeL_Current >= slide.judgeQueueLCount &&
                     slide.judgeR_Current >= slide.judgeQueueRCount)
                 {
+                    // Same end-gate as above: grade at the slide end.
+                    if (!slide.isMine && simTime < slide.judgeTiming) return;
                     slide.judgeGrade = CalcSlideJudgeGrade(ref slide, simTime);
                     FinishJudgeSlide(ref slide, simTime);
                     return;
