@@ -15,6 +15,9 @@ namespace MajdataViewX.Types.MajSetting
         public BgInfoDisplay ComboStatusType { get; set; } = BgInfoDisplay.Combo;
         public JudgeDisplayMode JudgeDisplayMode { get; set; } = JudgeDisplayMode.Both;
         public AutoPlayMode AutoMode { get; set; } = AutoPlayMode.Enable;
+        /// <summary>Absolute perfect: the fixed-step sim grades autoplay with exact
+        /// tick times. Off = practical play: upstream hands perform within physical limits.</summary>
+        public bool AbsolutePerfect { get; set; } = true;
         public bool ShowHand { get; set; } = false;
         /// <summary>Wide hands: DJAuto's hands sweep adjacent sensors more easily (realistic sliding, DJAuto only).</summary>
         public bool WideHands { get; set; } = false;

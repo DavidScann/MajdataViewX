@@ -21,6 +21,7 @@ namespace MajdataViewX.Notes
         public bool LegacySlideLayer;
         public bool SmoothSlideAnime;
         public bool MineAutoSlide;
+        public bool AbsolutePerfect;
     }
     [BurstCompile]
     public static unsafe class NoteHelper

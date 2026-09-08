@@ -173,6 +173,7 @@ namespace MajdataViewX.Managers
                 LegacySlideLayer = _setting.LegacySlideLayer,
                 SmoothSlideAnime = _setting.SmoothSlideAnime,
                 MineAutoSlide = _setting.MineAutoSlide,
+                AbsolutePerfect = _setting.AbsolutePerfect,
             };
             //audio
             _audioManager.Setting(setting.GlobalAudioOffset, volumeSetting);

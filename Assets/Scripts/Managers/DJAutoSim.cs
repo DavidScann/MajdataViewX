@@ -99,6 +99,9 @@ namespace MajdataViewX.Managers
                 UpdateSlidesMine(simTime, ctx); // Disable mode only advances mine slides
                 return;
             }
+            // Practical play: upstream hands perform within physical limits,
+            // so the sim stands down (Disable mine advance above still runs).
+            if (!NoteHelper.Settings.AbsolutePerfect) return;
             if (ctx.Holds.IsCreated) UpdateHolds(simTime, mode, ctx);
             if (ctx.Slides.IsCreated) UpdateSlides(simTime, mode, ctx);
             if (ctx.TouchHolds.IsCreated) UpdateTouchHolds(simTime, mode, ctx);
@@ -616,7 +619,7 @@ namespace MajdataViewX.Managers
                     case AutoPlayMode.Enable:
                     case AutoPlayMode.Random:
                         {
-                            if (slide.smoothSlideAnime)
+                            if (NoteHelper.Settings.SmoothSlideAnime)
                             {
                                 // processIdx was already computed by RenderStar; reuse it
                                 slide.eaten = slide.processIdx - 1;
@@ -1002,7 +1005,7 @@ namespace MajdataViewX.Managers
 
         void MineSlideAutoAdvance(ref SlideData slide)
         {
-            if (!slide.mineAutoSlide) return;
+            if (!NoteHelper.Settings.MineAutoSlide) return;
 
             // which section the cursor is on
             var idx = slide.judgeCurrent;
@@ -1055,7 +1058,7 @@ namespace MajdataViewX.Managers
                 newEaten = slide.judgeQueue[idx].ArrowProgressPush;
             }
 
-            if (slide.smoothSlideAnime)
+            if (NoteHelper.Settings.SmoothSlideAnime)
             {
                 newEaten = slide.processIdx - 1;
             }

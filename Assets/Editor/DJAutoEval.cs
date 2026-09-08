@@ -108,13 +108,22 @@ public static class DJAutoEval
         MajBurst.MultTouchHandler.Init();
         var noteSettings = NoteHelper.Settings;
         noteSettings.AutoPlayMode = mode;
+        // Mirror game defaults (PlayManager.Setting): the sim reads speeds
+        // and slide flags from here since upstream 6.2.0.
+        noteSettings.TapSpeed = (float)(107.25 / (71.4184491 * System.Math.Pow(7.5 + 0.9975, -0.985558604)));
+        noteSettings.TouchSpeed = 7.5f;
+        noteSettings.LegacySlideLayer = false;
+        noteSettings.SmoothSlideAnime = false;
+        noteSettings.MineAutoSlide = true;
+        // The harness validates the sim: always test absolute-perfect grading.
+        noteSettings.AbsolutePerfect = true;
         NoteHelper.NoteSettingsSS.Data = noteSettings;
         InputManager.WideHands = wide;
         // InputManager's constructor fills the sensor world positions; the harness has none, so set them manually
         // (else GetSensorMask uses all-zero coordinates and no cover ever covers a sensor).
         for (var i = 0; i < MajCtx.SENSOR_COUNT; i++)
             MajBurst.InputData.SensorWorldPositions[i] =
-                MajdataViewX.Base.MajPos.GetSensorWorldPos((SensorType)i);
+                MajdataViewX.Base.MajPos.GetSensorJudgePos((SensorType)i);
 
         // ---- build notes with the real loader ----
         var nmGo = new GameObject("EvalNoteManager");
@@ -123,6 +132,9 @@ public static class DJAutoEval
         // so ConfigureRenderCapacity early-returns for low-density charts.
         F("_renderCapacityMultiplier").SetValue(nm, 1);
         nm.Load(chart);
+        // Upstream 6.2.0 pre-ends every note at load (cleared by
+        // ResetLoadedNote in game flow); without this the sim skips all notes.
+        nm.ResetLoadedNote(double.NegativeInfinity);
 
         var taps = (NativeList<TapData>)F("taps").GetValue(nm);
         var holds = (NativeList<HoldData>)F("holds").GetValue(nm);
@@ -225,7 +237,7 @@ public static class DJAutoEval
                 if (t.coverageId >= 0 && t.coverageId < tGroupCovers.Length && t.judgeGrade == JudgeGrade.LateGood)
                 {
                     var cov = tGroupCovers[t.coverageId];
-                    var sp = MajdataViewX.Base.MajPos.GetSensorWorldPos(t.sensor);
+                    var sp = MajdataViewX.Base.MajPos.GetSensorJudgePos(t.sensor);
                     var c1 = cov.Circle1.Center;
                     Debug.Log($"[eval] touch t={t.time:F2} s={(int)t.sensor} covMode={cov.Mode} " +
                               $"r1={cov.Circle1.Radius:F2} d1={UnityEngine.Mathf.Sqrt((sp.x-c1.x)*(sp.x-c1.x)+(sp.y-c1.y)*(sp.y-c1.y)):F2} " +
