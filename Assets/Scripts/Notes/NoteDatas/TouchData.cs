@@ -24,6 +24,7 @@ namespace MajdataViewX.Notes.NoteDatas
         public bool usingSV;
 
         public bool isFolded;
+        public bool isSlideGuide;
 
         public bool isAppeared;
         public bool isEnd;
@@ -49,10 +50,12 @@ namespace MajdataViewX.Notes.NoteDatas
         public float DjAutoPressTime { get; set; }
 
         public int groupId;
+        public int coverageId;
 
         public void Init()
         {
             groupId = -1;
+            coverageId = -1;
             fanAlpha = 0;
 
             centerPos = MajPos.GetAreaPos(sensor);

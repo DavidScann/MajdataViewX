@@ -52,8 +52,10 @@ namespace MajdataViewX.Managers
             _djAutoTouchInfosThisTiming.Clear();
             touchGroupTotalCounts.Clear();
             touchGroupJudgedCounts.Clear();
+            touchGroupCoverResults.Clear();
             touchHoldGroupTotalCounts.Clear();
             touchHoldGroupPressedCounts.Clear();
+            touchHoldGroupCoverResults.Clear();
 
             if (chart.IsEmpty) return; //涉及内存清空的就不干了没必要
 
@@ -147,6 +149,51 @@ namespace MajdataViewX.Managers
 
             MajBurst.MultTouchHandler.Clear();
             MajBurst.MultTouchHandler.Load(loadedTouches);
+
+            MarkSlideGuideTouches();
+        }
+
+        private static int GetSlideGuideTimeKey(float timing) =>
+            (int)math.round(timing * 1000f);
+
+        /// <summary>
+        /// Marks touches that coincide with a slide star as slide guides (the
+        /// slide judges them, not the touch path). Touch-only subset of the
+        /// old full marking: taps/slides keep upstream behavior.
+        /// </summary>
+        private void MarkSlideGuideTouches()
+        {
+            var touchLookup = new Dictionary<(int Time, SensorType Sensor), List<int>>();
+
+            for (int i = 0; i < touches.Length; i++)
+            {
+                var touch = touches[i];
+                if (touch.isMine) continue;
+
+                var key = (GetSlideGuideTimeKey(touch.time), touch.sensor);
+                if (!touchLookup.TryGetValue(key, out var indices))
+                    touchLookup.Add(key, indices = new List<int>());
+                indices.Add(i);
+            }
+
+            for (int i = 0; i < slides.Length; i++)
+            {
+                var slide = slides[i];
+                if (slide.isMine) continue;
+
+                var sensor = (SensorType)(slide.startPos - 1);
+                var key = (GetSlideGuideTimeKey(slide.shootTime), sensor);
+
+                if (touchLookup.TryGetValue(key, out var touchIndices))
+                {
+                    foreach (var touchIndex in touchIndices)
+                    {
+                        var touch = touches[touchIndex];
+                        touch.isSlideGuide = true;
+                        touches[touchIndex] = touch;
+                    }
+                }
+            }
         }
 
 
@@ -320,17 +367,22 @@ namespace MajdataViewX.Managers
         private struct TouchGroupBuild
         {
             public int[] MemberGroupIds;
+            public int CoverageId;
         }
 
         /// <summary>
         /// 把同 timing 的一批 touch 类 note 按传感器邻接关系聚成判定 group。
         /// 算法：去重(同 sensor 合并) -> BFS 连通分量 -> 分量内 ≥5 个 sensor 才建 group(多数通过)。
         /// group 的 totalCount 等计数由调用方传入的 list 承接，groupId 即追加时的下标。
+        /// DJAuto 覆盖由调用方传入的 list 承接：以 unique 传感器点位求解一个 cover，
+        /// coverageId 即追加时的下标。
         /// </summary>
         private static TouchGroupBuild BuildTouchGroups(
             IReadOnlyList<SensorType> sensors,
             NativeList<int> totalCountsOut,
-            NativeList<int> counterOut)
+            NativeList<int> counterOut,
+            NativeList<CoverResult> coverResultsOut,
+            bool allowSlide)
         {
             int count = sensors.Count;
             var memberGroupIds = new int[count];
@@ -356,12 +408,13 @@ namespace MajdataViewX.Managers
 
             int uniqueCount = uniqueIndices.Count;
             if (uniqueCount == 0)
-                return new TouchGroupBuild { MemberGroupIds = memberGroupIds };
+                return new TouchGroupBuild { MemberGroupIds = memberGroupIds, CoverageId = -1 };
 
             // 2. BFS 连通分量：TOUCH_GROUPS 邻接关系
             var visited = new bool[uniqueCount];
             var uniqueGroupIds = new int[uniqueCount];
             for (int i = 0; i < uniqueCount; i++) uniqueGroupIds[i] = -1;
+            var groups = new List<Group>();
 
             for (int i = 0; i < uniqueCount; i++)
             {
@@ -402,18 +455,35 @@ namespace MajdataViewX.Managers
                 totalCountsOut.Add(total);
                 counterOut.Add(0);
 
+                var groupDef = new Group { PointIndices = new int[component.Count] };
                 for (int k = 0; k < component.Count; k++)
                 {
                     int u = component[k];
                     uniqueGroupIds[u] = groupId;
+                    groupDef.PointIndices[k] = u;
                 }
+                groups.Add(groupDef);
             }
 
             // 4. 回填每个 member 的 groupId
             for (int i = 0; i < count; i++)
                 memberGroupIds[i] = uniqueGroupIds[memberToUnique[i]];
 
-            return new TouchGroupBuild { MemberGroupIds = memberGroupIds };
+            // 5. 算 DJAuto 覆盖（以 unique 传感器点位求解）
+            var points = new float2[uniqueCount];
+            var pointRadii = new float[uniqueCount];
+            for (int i = 0; i < uniqueCount; i++)
+            {
+                var sensor = sensors[uniqueIndices[i]];
+                points[i] = MajPos.GetSensorJudgePos(sensor);
+                pointRadii[i] = MajPos.GetSensorRadius(sensor);
+            }
+            var cover = CoverageSolver.Solve(points, pointRadii, groups, allowSlide: allowSlide);
+
+            int coverageId = coverResultsOut.Length;
+            coverResultsOut.Add(cover);
+
+            return new TouchGroupBuild { MemberGroupIds = memberGroupIds, CoverageId = coverageId };
         }
 
         /// <summary>
@@ -432,12 +502,13 @@ namespace MajdataViewX.Managers
                 idx.Add(i);
             }
 
-            var build = BuildTouchGroups(sensors, touchGroupTotalCounts, touchGroupJudgedCounts);
+            var build = BuildTouchGroups(sensors, touchGroupTotalCounts, touchGroupJudgedCounts, touchGroupCoverResults, allowSlide: true);
 
             for (int k = 0; k < idx.Count; k++)
             {
                 var t = touches[startIdx + idx[k]];
                 t.groupId = build.MemberGroupIds[k];
+                t.coverageId = build.CoverageId;
                 touches[startIdx + idx[k]] = t;
             }
         }
@@ -460,15 +531,17 @@ namespace MajdataViewX.Managers
             }
 
             // 头判 group：与 touch 头判分开，独立多数通过
-            var headBuild = BuildTouchGroups(sensors, touchGroupTotalCounts, touchGroupJudgedCounts);
+            var headBuild = BuildTouchGroups(sensors, touchGroupTotalCounts, touchGroupJudgedCounts, touchGroupCoverResults, allowSlide: true);
             // 按下 group：hold 期间多数按下
-            var holdBuild = BuildTouchGroups(sensors, touchHoldGroupTotalCounts, touchHoldGroupPressedCounts);
+            var holdBuild = BuildTouchGroups(sensors, touchHoldGroupTotalCounts, touchHoldGroupPressedCounts, touchHoldGroupCoverResults, allowSlide: false);
 
             for (int k = 0; k < idx.Count; k++)
             {
                 var t = touchHolds[startIdx + idx[k]];
                 t.headGroupId = headBuild.MemberGroupIds[k];
+                t.headCoverageId = headBuild.CoverageId;
                 t.groupId = holdBuild.MemberGroupIds[k];
+                t.coverageId = holdBuild.CoverageId;
                 touchHolds[startIdx + idx[k]] = t;
             }
         }

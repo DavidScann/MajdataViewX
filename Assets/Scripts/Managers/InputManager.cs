@@ -167,6 +167,7 @@ namespace MajdataViewX.Managers
         public int* ActiveCoveragesCountPtr;
 
         int _djAutoWorldHitCount;
+        bool _showHandThisFrame;
 
         [NativeDisableUnsafePtrRestriction]
         public HitRenderData* hitRender;

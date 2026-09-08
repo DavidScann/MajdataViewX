@@ -1,0 +1,7 @@
+<!-- IL2CPP byte-code stripping silently breaks MemoryPack deserialization
+     of the MajSimai chart types transferred editor -> player over shared
+     memory (the player then loads zero notes). Preserve the serializers. -->
+<linker>
+  <assembly fullname="MajSimai" preserve="all"/>
+  <assembly fullname="MemoryPack.Core" preserve="all"/>
+</linker>

@@ -43,9 +43,11 @@ namespace MajdataViewX.Managers
 
         NativeList<int> touchGroupTotalCounts = new(256, Allocator.Persistent);
         NativeList<int> touchGroupJudgedCounts = new(256, Allocator.Persistent);
+        NativeList<CoverResult> touchGroupCoverResults = new(256, Allocator.Persistent);
 
         NativeList<int> touchHoldGroupTotalCounts = new(256, Allocator.Persistent);
         NativeList<int> touchHoldGroupPressedCounts = new(256, Allocator.Persistent);
+        NativeList<CoverResult> touchHoldGroupCoverResults = new(256, Allocator.Persistent);
 
         RenderGroup<LineRenderData> _tapLineGroup;
         RenderGroup<LineRenderData> _eachLineGroup;
@@ -457,8 +459,10 @@ namespace MajdataViewX.Managers
 
             if (touchGroupTotalCounts.IsCreated) touchGroupTotalCounts.Dispose();
             if (touchGroupJudgedCounts.IsCreated) touchGroupJudgedCounts.Dispose();
+            if (touchGroupCoverResults.IsCreated) touchGroupCoverResults.Dispose();
             if (touchHoldGroupTotalCounts.IsCreated) touchHoldGroupTotalCounts.Dispose();
             if (touchHoldGroupPressedCounts.IsCreated) touchHoldGroupPressedCounts.Dispose();
+            if (touchHoldGroupCoverResults.IsCreated) touchHoldGroupCoverResults.Dispose();
         }
 
         public void ResetState()
@@ -466,29 +470,10 @@ namespace MajdataViewX.Managers
             _prevChain.Complete();
             ResetDJAutoHands();
             _djAutoSim.Reset();
-            taps.Clear();
-            eachLines.Clear();
-            holds.Clear();
-            slides.Clear();
-            touches.Clear();
-            touchHolds.Clear();
-
-            touchGroupTotalCounts.Clear();
-            touchGroupJudgedCounts.Clear();
-            touchGroupCoverResults.Clear();
-            touchHoldGroupTotalCounts.Clear();
-            touchHoldGroupPressedCounts.Clear();
-            touchHoldGroupCoverResults.Clear();
-            unsafe
-            {
-                if (slideAreaPool != null)
-                    UnsafeUtility.Free(slideAreaPool, Allocator.Persistent);
-                if (slidePosePool != null)
-                    UnsafeUtility.Free(slidePosePool, Allocator.Persistent);
-                slideAreaPool = null;
-                slidePosePool = null;
-            }
-            MajBurst.MultTouchHandler.Clear();
+            // NOTE: must NOT clear note/group lists here. Under the binary
+            // protocol Update->Load owns list lifetime (Load clears + fills);
+            // PlayAsync calls ResetState at play start, so clearing would wipe
+            // the loaded chart (n=0, timer ticks, nothing renders).
         }
     }
 }
