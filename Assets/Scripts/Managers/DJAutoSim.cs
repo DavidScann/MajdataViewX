@@ -411,6 +411,10 @@ namespace MajdataViewX.Managers
                         if (!touch.isJudged && !touch.isSlideGuide)
                         {
                             InputData.DJAutoAddGroupCoverage(ctx.TouchGroupCoverResults[touch.coverageId], timing);
+                            // Touches have no early judgment: paint may start early
+                            // (slide groups pre-position), but Absolute grades at
+                            // the beat (early hits still perfect, just on time).
+                            if (timing < 0) break;
                             // Level-based judging at tick precision; group majority auto-judges the rest
                             var down = InputData.GetSensorState(touch.sensor).Status;
                             if (!down && touch.groupId != -1 &&
@@ -539,6 +543,8 @@ namespace MajdataViewX.Managers
                         {
                             if (th.headCoverageId >= 0)
                                 InputData.DJAutoAddGroupCoverage(ctx.TouchGroupCoverResults[th.headCoverageId], timing);
+                            // Same on-beat rule as touches (mines judge on touch above).
+                            if (timing < 0) break;
                             // Level-based judging at tick precision; head-group majority auto-judges too
                             var down = InputData.GetSensorState(th.sensor).Status;
                             if (!down && th.headGroupId != -1 &&

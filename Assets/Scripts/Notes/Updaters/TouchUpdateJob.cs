@@ -330,6 +330,12 @@ namespace MajdataViewX.Notes.Updaters
                 return;
             }
 
+            // Absolute: touches have no early judgment (the sim grades at the
+            // beat); early hits stay allowed in practical/human play.
+            if (NoteHelper.Settings.AbsolutePerfect &&
+                NoteHelper.Settings.AutoPlayMode is AutoPlayMode.DJAutoButton or AutoPlayMode.DJAutoSensor &&
+                diffSec < 0) return;
+
             var clicked = InputData.GetSensorState(touch.sensor).IsPadDown;
 
             if (touch.groupId != -1)

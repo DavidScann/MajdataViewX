@@ -383,6 +383,11 @@ namespace MajdataViewX.Notes.Updaters
                     return;
                 }
 
+                // Absolute: no early head judgment (sim grades at the beat).
+                if (NoteHelper.Settings.AbsolutePerfect &&
+                    NoteHelper.Settings.AutoPlayMode is AutoPlayMode.DJAutoButton or AutoPlayMode.DJAutoSensor &&
+                    timing < 0) return;
+
                 var clicked = InputData.GetSensorState(th.sensor).IsPadDown;
                 if (th.headGroupId != -1)
                 {
