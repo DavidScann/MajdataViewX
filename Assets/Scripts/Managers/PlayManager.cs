@@ -39,6 +39,15 @@ namespace MajdataViewX.Managers
         private static float _currentOffset;
         private static SimaiChart? _chart;
 
+        // Last Update payload, kept so a stopped (default-view) player can
+        // re-load the chart for a preview or the next play without an Update.
+        private string _lastTitle = string.Empty;
+        private string _lastArtist = string.Empty;
+        private string _lastLevel = string.Empty;
+        private string _lastDesigner = string.Empty;
+        private int _lastDifficulty;
+        private bool _viewUnloaded;
+
         private SpriteRenderer _bgCover = null!;
         private SpriteRenderer _bgOutsideCover = null!;
         private GameObject _canvasButtons = null!;
@@ -188,6 +197,11 @@ namespace MajdataViewX.Managers
             _chart = chart;
             _currentOffset = offset;
             _timeProvider.offset = offset;
+            _lastTitle = title ?? string.Empty;
+            _lastArtist = artist ?? string.Empty;
+            _lastLevel = level ?? string.Empty;
+            _lastDesigner = designer ?? string.Empty;
+            _lastDifficulty = selectedDifficulty;
 
             //answer
             _audioManager.GenerateAnswerSFX(chart, clockCount);
@@ -198,8 +212,44 @@ namespace MajdataViewX.Managers
             _objectCounter.ReportMeterBpm(chart);
 
             await _dataLoader.Load(chart, title, artist, level, designer, selectedDifficulty);
+            _viewUnloaded = false;
 
             _state = previousState;
+        }
+
+        /// <summary>
+        /// Default view: unload the notes, reset the background and clear the
+        /// dark overlay. The chart and its metadata stay in memory so
+        /// EnsureViewLoadedAsync can restore the view for preview/play.
+        /// </summary>
+        private void UnloadView()
+        {
+            _noteManager.Unload();
+            _bgManager.ShowDefaultView();
+            _effectManager.ResetState();
+            MajBurst.InputData.ResetState();
+            _allPerfectManager.ResetState();
+            _timeProvider.ResetState();
+            _audioManager.ResetState();
+            _bgCover.color = new Color(0f, 0f, 0f, 0f);
+            _bgOutsideCover.color = new Color(0f, 0f, 0f, 0f);
+            _viewUnloaded = true;
+        }
+
+        /// <summary>Restore the chart view after UnloadView (notes, bg, overlay).</summary>
+        private async UniTask EnsureViewLoadedAsync()
+        {
+            if (!_viewUnloaded)
+                return;
+            _viewUnloaded = false;
+            if (_chart is null || _chart.IsDisposed)
+                return;
+
+            await _dataLoader.Load(
+                _chart, _lastTitle, _lastArtist, _lastLevel, _lastDesigner, _lastDifficulty);
+            _bgManager.ShowBg();
+            _bgCover.color = new Color(0f, 0f, 0f, _setting.BackgroundDim);
+            _bgOutsideCover.color = new Color(0f, 0f, 0f, _setting.BackgroundOutsideDim);
         }
 
         public async UniTask PlayAsync(PlaybackMode playmode, double startAt, float speed, string recordPath)
@@ -207,14 +257,38 @@ namespace MajdataViewX.Managers
             while (_state is ViewStatus.Busy)
                 await UniTask.Yield();
 
-            if (_state is not (ViewStatus.Loaded or ViewStatus.Paused))
+            // Preview may interrupt playback (the editor scrubs with the Alt
+            // preview modifier); the other modes require an idle/loaded view.
+            if (playmode is not PlaybackMode.Preview &&
+                _state is not (ViewStatus.Loaded or ViewStatus.Paused))
                 return;
 
+            var previousState = _state;
             _state = ViewStatus.Busy;
             try
             {
                 await UniTask.SwitchToMainThread();
+
+                if (playmode is PlaybackMode.Preview)
+                {
+                    // Chart preview: stop the clock/audio if playing, restore
+                    // the view after a default-view unload, then park in Paused.
+                    // The editor's shared clock drives the preview position.
+                    _allPerfectManager.enabled = false;
+                    if (previousState is ViewStatus.Playing)
+                    {
+                        _timeProvider.Pause();
+                        _bgManager.PauseVideo();
+                        _audioManager.PauseTrack();
+                        _audioManager.PauseTouchHoldSound();
+                    }
+                    await EnsureViewLoadedAsync();
+                    _state = ViewStatus.Paused;
+                    return;
+                }
+
                 var ignoreOffset = startAt - _currentOffset;
+                await EnsureViewLoadedAsync();
 
                 //bg
                 _bgManager.ShowBg();
@@ -283,9 +357,8 @@ namespace MajdataViewX.Managers
                         }).Forget();
                         break;
                     case PlaybackMode.Preview:
-                        _allPerfectManager.enabled = false;
-                        _state = ViewStatus.Paused;
-                        return;
+                        // Handled above (early return).
+                        break;
                     default:
                         throw new ArgumentOutOfRangeException(nameof(playmode), playmode, null);
                 }
@@ -397,12 +470,9 @@ namespace MajdataViewX.Managers
                 _screenRecorder.StopRecording();
                 await UniTask.Yield();
 
-                //_objectCounter.ResetCur();
-                _timeProvider.ResetState();
-                _audioManager.ResetState();
-                _bgManager.ResetState();
-                _effectManager.ResetState();
-                _allPerfectManager.ResetState();
+                // Default view: unload notes/background/overlay. The chart
+                // stays in memory for the next play or an Alt scrub preview.
+                UnloadView();
 
                 _state = CheckIsLoaded() ? ViewStatus.Loaded : ViewStatus.Idle;
             }

@@ -392,6 +392,28 @@ namespace MajdataViewX.Managers
 #endif
         }
 
+        /// <summary>
+        /// Default view: chart background/video hidden, default background
+        /// restored, but the loaded Bg sprite is kept so ShowBg() can restore
+        /// it for a preview or playback without re-reading the file.
+        /// </summary>
+        public void ShowDefaultView()
+        {
+#if UNITY_STANDALONE_LINUX || UNITY_EDITOR_LINUX
+            StopVideoPipe();
+#else
+            _videoPlayer.Stop();
+#endif
+            _videoPaused = false;
+            gameObject.transform.localScale = new Vector3(CIRCLED_SCALE_X, CIRCLED_SCALE_X, CIRCLED_SCALE_X);
+            _spriteRender.material = circledBgMaterial;
+            _spriteRender.sprite = defaultBg;
+            _smoothRDelta = 0f;
+
+            if (_songDetail != null)
+                _songDetail.SetActive(false);
+        }
+
         public void ResetState()
         {
 #if UNITY_STANDALONE_LINUX || UNITY_EDITOR_LINUX

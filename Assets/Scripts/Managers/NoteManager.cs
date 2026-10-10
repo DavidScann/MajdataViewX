@@ -475,5 +475,30 @@ namespace MajdataViewX.Managers
             // PlayAsync calls ResetState at play start, so clearing would wipe
             // the loaded chart (n=0, timer ticks, nothing renders).
         }
+
+        /// <summary>
+        /// Unload the chart: clears every note/group list so nothing renders
+        /// (the default view). Load() re-fills the lists from the kept chart.
+        /// </summary>
+        public void Unload()
+        {
+            _prevChain.Complete();
+            ResetDJAutoHands();
+            _djAutoSim.Reset();
+            taps.Clear();
+            eachLines.Clear();
+            holds.Clear();
+            slides.Clear();
+            touches.Clear();
+            touchHolds.Clear();
+
+            touchGroupTotalCounts.Clear();
+            touchGroupJudgedCounts.Clear();
+            touchGroupCoverResults.Clear();
+            touchHoldGroupTotalCounts.Clear();
+            touchHoldGroupPressedCounts.Clear();
+            touchHoldGroupCoverResults.Clear();
+            MajBurst.MultTouchHandler.Clear();
+        }
     }
 }
