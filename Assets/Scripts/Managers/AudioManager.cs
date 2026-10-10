@@ -1,16 +1,14 @@
-
 using Cysharp.Threading.Tasks;
 using JetBrains.Annotations;
 using MajdataViewX.Base;
 using MajdataViewX.Types.Audio;
 using MajdataViewX.Types.MajSetting;
 using MajdataViewX.Utils.Extensions;
-using MajSimai;
+using Cimai;
 using ManagedBass;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
@@ -24,31 +22,31 @@ namespace MajdataViewX.Managers
 {
     public class AudioManager
     {
-        public const int SFX_COUNT = 16;
+        private const int SFX_COUNT = 16;
 
         private int _dbgOnUpdateCount;
 
-        [CanBeNull] private AudioSample TrackSample;
+        [CanBeNull] private AudioSample _trackSample;
         [CanBeNull] private string _trackPath;
-        private float TrackSampleVolume;
-        [CanBeNull] private float[] TrackSampleData;
+        private float _trackSampleVolume;
+        [CanBeNull] private float[] _trackSampleData;
         // TrackSampleData 仅导出(Record)模式混音用，普通播放无需加载，
         // 故 IsTrackLoaded 只取决于 Bass 流是否就绪
-        public bool IsTrackLoaded => TrackSample != null;
-        public bool IsTrackPlaying => TrackSample != null && TrackSample.IsPlaying;
-        public double TrackCurrentSec => TrackSample != null ? TrackSample.CurrentSec : 0;
-        public double TrackLength => TrackSample != null ? TrackSample.Length : 0;
+        public bool IsTrackLoaded => _trackSample != null;
+        public bool IsTrackPlaying => _trackSample != null && _trackSample.IsPlaying;
+        public double TrackCurrentSec => _trackSample != null ? _trackSample.CurrentSec : 0;
+        public double TrackLength => _trackSample != null ? _trackSample.Length : 0;
 
-        //answer SFX gen
-        private readonly List<AnswerTimingPoint> answerTimingPoints = new();
-        private readonly object answerSfxLock = new();
-        //note SFX
-        //DO NOT USE THIS WHEN PLAY STARTED, MAY CAUSE AtomicSafetyHandle Exception, WE DONT CARE THIS
+        // answer SFX gen
+        private readonly List<AnswerTimingPoint> _answerTimingPoints = new();
+        private readonly object _answerSfxLock = new();
+        // note SFX
+        // DO NOT USE THIS WHEN PLAY STARTED, MAY CAUSE AtomicSafetyHandle Exception, WE DONT CARE THIS
         public NativeArray<bool> noteSfxPlaybackRequests = new(SFX_COUNT, Allocator.Persistent);
         // USE THIS
-        public unsafe bool* SfxRequestsPtr;
+        public readonly unsafe bool* SfxRequestsPtr;
 
-        List<AudioSample> NoteSfxs = new(SFX_COUNT);
+        private readonly List<AudioSample> _noteSfx = new(SFX_COUNT);
 
         //for recording
         private List<float[]> noteSfxSamplesData = new(SFX_COUNT);
@@ -123,7 +121,7 @@ namespace MajdataViewX.Managers
 
             //Note SFX
             var sfxPath = MajEnv.GetPath("SFX");
-            int sfxIndex = 0;
+            var sfxIndex = 0;
             foreach (var filename in new[]
                     {
                     "tap_perfect.wav",
@@ -170,7 +168,7 @@ namespace MajdataViewX.Managers
                 sfxPlayPointers[sfxIndex] = new int[maxNoOfPlaybacks];
                 sfxIndex++;
 
-                NoteSfxs.Add(sample);
+                _noteSfx.Add(sample);
 
                 //data
                 noteSfxSamplesData.Add(GetSampleDataFromFile(path));
@@ -183,7 +181,7 @@ namespace MajdataViewX.Managers
         {
             GlobalAudioOffset = globalAudioOffset;
 
-            foreach (var sample in NoteSfxs)
+            foreach (var sample in _noteSfx)
                 sample.Volume = sample.SampleType switch
                 {
                     SampleType.Track => v.Track,
@@ -197,16 +195,16 @@ namespace MajdataViewX.Managers
                     SampleType.Hanabi => v.Hanabi,
                     _ => v.Track,
                 };
-            TrackSampleVolume = v.Track;
+            _trackSampleVolume = v.Track;
         }
 
         public unsafe void UpdateAnswerSfx()
         {
-            lock (answerSfxLock)
+            lock (_answerSfxLock)
             {
-                for (var i = 0; i < answerTimingPoints.Count; i++)
+                for (var i = 0; i < _answerTimingPoints.Count; i++)
                 {
-                    var timing = answerTimingPoints[i];
+                    var timing = _answerTimingPoints[i];
 
                     if (timing.IsPlayed) continue;
 
@@ -247,76 +245,76 @@ namespace MajdataViewX.Managers
                 switch (i)
                 {
                     case TAP_PERFECT:
-                        if (isRequested) NoteSfxs[TAP_PERFECT].PlayOneShot();
+                        if (isRequested) _noteSfx[TAP_PERFECT].PlayOneShot();
                         break;
                     case TAP_GREAT:
-                        if (isRequested) NoteSfxs[TAP_GREAT].PlayOneShot();
+                        if (isRequested) _noteSfx[TAP_GREAT].PlayOneShot();
                         break;
                     case TAP_GOOD:
-                        if (isRequested) NoteSfxs[TAP_GOOD].PlayOneShot();
+                        if (isRequested) _noteSfx[TAP_GOOD].PlayOneShot();
                         break;
                     case TAP_EX:
-                        if (isRequested) NoteSfxs[TAP_EX].PlayOneShot();
+                        if (isRequested) _noteSfx[TAP_EX].PlayOneShot();
                         break;
                     case BREAK_JUDGE:
-                        if (isRequested) NoteSfxs[BREAK_JUDGE].PlayOneShot();
+                        if (isRequested) _noteSfx[BREAK_JUDGE].PlayOneShot();
                         break;
                     case BREAK_SFX:
-                        if (isRequested) NoteSfxs[BREAK_SFX].PlayOneShot();
+                        if (isRequested) _noteSfx[BREAK_SFX].PlayOneShot();
                         break;
                     case SLIDE:
-                        if (isRequested) NoteSfxs[SLIDE].PlayOneShot();
+                        if (isRequested) _noteSfx[SLIDE].PlayOneShot();
                         break;
                     case BREAK_SLIDE:
-                        if (isRequested) NoteSfxs[BREAK_SLIDE].PlayOneShot();
+                        if (isRequested) _noteSfx[BREAK_SLIDE].PlayOneShot();
                         break;
                     case BREAK_SLIDE_JUDGE:
                         if (isRequested)
                         {
-                            NoteSfxs[BREAK_SLIDE_JUDGE].PlayOneShot();
+                            _noteSfx[BREAK_SLIDE_JUDGE].PlayOneShot();
                             // NoteSfxs[BREAK_SFX].PlayOneShot();   // blame @LeZi9916
                         }
                         break;
                     case TOUCH:
-                        if (isRequested) NoteSfxs[TOUCH].PlayOneShot();
+                        if (isRequested) _noteSfx[TOUCH].PlayOneShot();
                         break;
                     case TOUCHHOLD:
                         // Handled at the end of OnUpdate based on ActiveTouchHoldCount
                         break;
                     case FIREWORK:
-                        if (isRequested) NoteSfxs[FIREWORK].PlayOneShot();
+                        if (isRequested) _noteSfx[FIREWORK].PlayOneShot();
                         break;
                     case ANSWER:
-                        if (isRequested) NoteSfxs[ANSWER].PlayOneShot();
+                        if (isRequested) _noteSfx[ANSWER].PlayOneShot();
                         break;
                     case ANSWER_CLOCK:
-                        if (isRequested) NoteSfxs[ANSWER_CLOCK].PlayOneShot();
+                        if (isRequested) _noteSfx[ANSWER_CLOCK].PlayOneShot();
                         break;
                     case TRACK_START:
-                        if (isRequested) NoteSfxs[TRACK_START].PlayOneShot();
+                        if (isRequested) _noteSfx[TRACK_START].PlayOneShot();
                         break;
                     case ALL_PERFECT:
-                        if (isRequested) NoteSfxs[ALL_PERFECT].PlayOneShot();
+                        if (isRequested) _noteSfx[ALL_PERFECT].PlayOneShot();
                         break;
                 }
             }
 
-            int currentCount = ActiveTouchHoldCount;
+            var currentCount = ActiveTouchHoldCount;
             if (currentCount > _prevActiveTouchHoldCount)
             {
-                NoteSfxs[TOUCHHOLD].PlayOneShot();
+                _noteSfx[TOUCHHOLD].PlayOneShot();
             }
             else if (currentCount == 0 && _prevActiveTouchHoldCount > 0)
             {
-                NoteSfxs[TOUCHHOLD].Stop();
+                _noteSfx[TOUCHHOLD].Stop();
             }
             _prevActiveTouchHoldCount = currentCount;
         }
 
         public void OnDestroy()
         {
-            TrackSample?.Dispose();
-            TrackSample = null;
+            _trackSample?.Dispose();
+            _trackSample = null;
             noteSfxPlaybackRequests.Dispose();
             ReleaseRecordingAudio();
             Bass.Stop();
@@ -329,22 +327,22 @@ namespace MajdataViewX.Managers
         public void LoadTrack(string path)
         {
             _trackPath = path;
-            TrackSample?.Dispose();
-            TrackSample = new AudioSample(path, 1)
+            _trackSample?.Dispose();
+            _trackSample = new AudioSample(path, 1)
             {
                 SampleType = SampleType.Track,
             };
-            Debug.Log($"[AudioManager] LoadTrack '{path}' -> length {TrackSample.Length:F2}s");
+            Debug.Log($"[AudioManager] LoadTrack '{path}' -> length {_trackSample.Length:F2}s");
             // 整首PCM(数十MB,落LOH)仅导出模式混音用，延迟到 BeginRecordingAudio 按需加载，
             // 避免普通播放模式持有大数组、切歌时靠GC延迟回收(表现为内存几十秒后才回落)
-            TrackSampleData = null;
+            _trackSampleData = null;
         }
 
         public void PlayTrack()
         {
-            if (TrackSample == null) return;
-            TrackSample.Speed = _timeProvider.CurrentSpeed;
-            TrackSample.Volume = TrackSampleVolume;
+            if (_trackSample == null) return;
+            _trackSample.Speed = _timeProvider.CurrentSpeed;
+            _trackSample.Volume = _trackSampleVolume;
 
             waitingForTrackAudioStart = true;
             WaitForTrackAudioStart().Forget();
@@ -358,44 +356,44 @@ namespace MajdataViewX.Managers
                     await UniTask.Yield();
                 }
 
-                TrackSample!.Play();
-                TrackSample!.CurrentSec = _timeProvider.AudioTime - offset;
+                _trackSample!.Play();
+                _trackSample!.CurrentSec = _timeProvider.AudioTime - offset;
                 waitingForTrackAudioStart = false;
             }
         }
 
-        public void PauseTrack() => TrackSample?.Pause();
+        public void PauseTrack() => _trackSample?.Pause();
 
         public void StopTrack()
         {
             waitingForTrackAudioStart = false;
-            TrackSample?.Stop();
+            _trackSample?.Stop();
         }
 
         //for pause resume
         public void PauseTouchHoldSound()
         {
             if (_prevActiveTouchHoldCount > 0)
-                NoteSfxs[TOUCHHOLD].Pause(); //seen as still playing
+                _noteSfx[TOUCHHOLD].Pause(); //seen as still playing
         }
         public void ResumeTouchHoldSound()
         {
             if (_prevActiveTouchHoldCount > 0)
-                NoteSfxs[TOUCHHOLD].Play();
+                _noteSfx[TOUCHHOLD].Play();
         }
 
         public unsafe void ResetState()
         {
             StopTrack();
             // 释放上一曲的音频资源：Bass非托管流立即释放，PCM大数组脱离引用以便GC回收
-            TrackSample?.Dispose();
-            TrackSample = null;
-            TrackSampleData = null;
+            _trackSample?.Dispose();
+            _trackSample = null;
+            _trackSampleData = null;
             //StopTouchHoldSound();
             //SfxRequestsPtr[TOUCHHOLD] = false;
             ActiveTouchHoldCount = 0;
             _prevActiveTouchHoldCount = 0;
-            NoteSfxs[TOUCHHOLD].Stop();
+            _noteSfx[TOUCHHOLD].Stop();
 
             for (var i = 0; i < SFX_COUNT; i++)
                 SfxRequestsPtr[i] = false;
@@ -407,23 +405,23 @@ namespace MajdataViewX.Managers
         public void GenerateAnswerSFX(SimaiChart chart, int clockCount = 0)
         {
             //Generate ClockSounds
-            if (chart.NoteTimings.IsEmpty)
+            if (chart.Timings.IsEmpty)
             {
-                answerTimingPoints.Clear();
+                _answerTimingPoints.Clear();
                 return;
             }
-            var firstBpm = chart.NoteTimings[0].Bpm;
+            var firstBpm = chart.Timings[0].Bpm;
 
-            lock (answerSfxLock)
+            lock (_answerSfxLock)
             {
-                answerTimingPoints.Clear();
+                _answerTimingPoints.Clear();
                 if (firstBpm > 0f)
                 {
                     var interval = 60 / firstBpm;
                     for (var i = 0; i < clockCount; i++)
                     {
                         var timing = i * interval;
-                        answerTimingPoints.Add(new AnswerTimingPoint(timing, true));
+                        _answerTimingPoints.Add(new AnswerTimingPoint(timing, true));
                     }
                 }
             }
@@ -431,25 +429,42 @@ namespace MajdataViewX.Managers
             //Generate AnswerSounds
             var rawTimings = new List<float>();
 
-            foreach (var timingPoint in chart.NoteTimings)
+            foreach (var timingPoint in chart.Timings)
             {
-                var startTiming = (float)timingPoint.Timing;
+                var startTime = (float)timingPoint.Time;
+                var addedStart = false;
+                var addedEnd = false;
 
-                if (!timingPoint.Notes.All              //无头别叫
-                                (o => o.Type is SimaiNoteType.Slide
-                                && o.IsSlideNoHead == true))
+                foreach (var note in timingPoint.Notes)
                 {
-                    rawTimings.Add(startTiming);
-                }
+                    switch (note.Type)
+                    {
+                        case SimaiNoteType.TAP:
+                        case SimaiNoteType.TOUCH:
+                            if (!addedStart)
+                            {
+                                rawTimings.Add(startTime);
+                                addedStart = true;
+                            }
+                            break;
+                        case SimaiNoteType.HOLD:
+                        case SimaiNoteType.TOUCHHOLD:
+                            if (!addedStart)
+                            {
+                                rawTimings.Add(startTime);
+                                addedStart = true;
+                            }
+                            if (!addedEnd)
+                            {
+                                var endTiming = (float)(timingPoint.Time + note.Duration);
+                                rawTimings.Add(endTiming);
+                                addedEnd = true;
+                            }
+                            break;
+                    }
 
-
-                var holds = Array.FindAll(timingPoint.Notes,
-                    o => o.Type is SimaiNoteType.Hold or SimaiNoteType.TouchHold);
-
-                foreach (var hold in holds)
-                {
-                    var endTiming = (float)(timingPoint.Timing + hold.HoldTime);
-                    rawTimings.Add(endTiming);
+                    if (addedStart && addedEnd)
+                        break;
                 }
             }
 
@@ -458,13 +473,13 @@ namespace MajdataViewX.Managers
             var lastAddedTime = -1f;
             var epsilon = 0.001f; // 1ms 阈值
 
-            lock (answerSfxLock)
+            lock (_answerSfxLock)
             {
                 foreach (var t in rawTimings)
                 {
                     if (lastAddedTime < 0 || t - lastAddedTime > epsilon)
                     {
-                        answerTimingPoints.Add(new AnswerTimingPoint(t, false));
+                        _answerTimingPoints.Add(new AnswerTimingPoint(t, false));
                         lastAddedTime = t;
                     }
                 }
@@ -473,7 +488,7 @@ namespace MajdataViewX.Managers
 
         public void ResetAnswerSFX(double ignoreOffset)
         {
-            foreach (var tp in answerTimingPoints)
+            foreach (var tp in _answerTimingPoints)
             {
                 if (tp.Timing < ignoreOffset) tp.IsPlayed = true;
                 else tp.IsPlayed = false;
@@ -491,8 +506,8 @@ namespace MajdataViewX.Managers
             var trackOutputStartTime = trackOffset - recordingInitialAudioTime;
             var leadAndTail = trackOutputStartTime
                 + TimeProvider.SONG_DETAIL_OFFSET
-                + NoteSfxs[ALL_PERFECT].Length;
-            var totalLen = TrackSample!.Length / recordingSpeed + leadAndTail; // 留给开头演出和结尾AP音效
+                + _noteSfx[ALL_PERFECT].Length;
+            var totalLen = _trackSample!.Length / recordingSpeed + leadAndTail; // 留给开头演出和结尾AP音效
             var size = (int)Math.Ceiling(Math.Max(0.1, totalLen) * SAMPLERATE) * CHANNELS;
             if (recordingBuffer.IsCreated) recordingBuffer.Dispose();
             recordingBuffer = new NativeArray<float>(size, Allocator.Persistent, NativeArrayOptions.ClearMemory);
@@ -507,7 +522,7 @@ namespace MajdataViewX.Managers
                 }
             }
             // 按需加载整首PCM：普通播放模式下 TrackSampleData 保持为null，仅导出模式走到这里
-            TrackSampleData ??= GetSampleDataFromFile(_trackPath);
+            _trackSampleData ??= GetSampleDataFromFile(_trackPath);
             // Mix sources whose timing is known before recording begins. Dynamic SFX
             // are added frame by frame, then the completed buffer is muxed at the end.
             MixStaticRecordingAudio();
@@ -576,9 +591,9 @@ namespace MajdataViewX.Managers
             var pointers = sfxPlayPointers[index];
             if (pointers == null || pointers.Length == 0) return;
 
-            int bestIdx = 0;
-            int maxProgress = -2;
-            for (int i = 0; i < pointers.Length; i++)
+            var bestIdx = 0;
+            var maxProgress = -2;
+            for (var i = 0; i < pointers.Length; i++)
             {
                 if (pointers[i] == -1)
                 {
@@ -599,7 +614,7 @@ namespace MajdataViewX.Managers
             var pointers = sfxPlayPointers[index];
             if (pointers != null)
             {
-                for (int i = 0; i < pointers.Length; i++)
+                for (var i = 0; i < pointers.Length; i++)
                     pointers[i] = -1;
             }
         }
@@ -620,7 +635,7 @@ namespace MajdataViewX.Managers
 
                 var pointers = sfxPlayPointers[i];
                 var sfxData = noteSfxSamplesData[i];
-                var vol = NoteSfxs[i].Volume;
+                var vol = _noteSfx[i].Volume;
 
                 for (var p = 0; p < pointers.Length; p++)
                 {
@@ -654,7 +669,7 @@ namespace MajdataViewX.Managers
         private int FinalizeRecordingBuffer(float recordingElapsedTime)
         {
             // Flush remaining playing SFXs and calculate max required time
-            float maxTime = recordingElapsedTime;
+            var maxTime = recordingElapsedTime;
 
             var bufferStartPos = (int)(recordingElapsedTime * SAMPLERATE) * CHANNELS;
             for (var i = 0; i < sfxPlayPointers.Length; i++)
@@ -662,17 +677,17 @@ namespace MajdataViewX.Managers
                 if (i == TRACK_START || sfxPlayPointers[i] == null) continue;
                 var pointers = sfxPlayPointers[i];
                 var sfxData = noteSfxSamplesData[i];
-                var vol = NoteSfxs[i].Volume;
+                var vol = _noteSfx[i].Volume;
 
                 for (var p = 0; p < pointers.Length; p++)
                 {
                     if (pointers[p] != -1)
                     {
-                        int remain = sfxData.Length - pointers[p];
-                        float endTime = recordingElapsedTime + ((float)remain / CHANNELS / SAMPLERATE);
+                        var remain = sfxData.Length - pointers[p];
+                        var endTime = recordingElapsedTime + ((float)remain / CHANNELS / SAMPLERATE);
                         if (endTime > maxTime) maxTime = endTime;
 
-                        for (int j = 0; j < remain; j++)
+                        for (var j = 0; j < remain; j++)
                         {
                             var dstIdx = bufferStartPos + j;
                             if (dstIdx >= 0 && dstIdx < recordingBuffer.Length)
@@ -701,7 +716,7 @@ namespace MajdataViewX.Managers
             {
                 if (i < recordingBuffer.Length)
                 {
-                    var mixed = recordingBuffer[i] + trackStartSampleData[i] * NoteSfxs[TRACK_START].Volume;
+                    var mixed = recordingBuffer[i] + trackStartSampleData[i] * _noteSfx[TRACK_START].Volume;
                     recordingBuffer[i] = Math.Clamp(mixed, -1.0f, 1.0f);
                 }
             }
@@ -712,26 +727,26 @@ namespace MajdataViewX.Managers
             // sample-accurate answers
             var answerData = noteSfxSamplesData[ANSWER];
             var answerClockData = noteSfxSamplesData[ANSWER_CLOCK];
-            var answerVol = NoteSfxs[ANSWER].Volume;
-            var answerClockVol = NoteSfxs[ANSWER_CLOCK].Volume;
+            var answerVol = _noteSfx[ANSWER].Volume;
+            var answerClockVol = _noteSfx[ANSWER_CLOCK].Volume;
 
-            foreach (var timing in answerTimingPoints)
+            foreach (var timing in _answerTimingPoints)
             {
                 // Mirror the real-time trigger at Update():
                 // NoteTime > timing + TRACK_ANSWER_PLAYBACK_OFFSET_SEC.
                 var triggerNoteTime = timing.Timing + TRACK_ANSWER_PLAYBACK_OFFSET_SEC;
-                float exactOutputSec = (triggerNoteTime - recordingInitialNoteTime) / recordingSpeed;
+                var exactOutputSec = (triggerNoteTime - recordingInitialNoteTime) / recordingSpeed;
                 if (exactOutputSec < 0) continue;
 
-                int startSample = (int)(exactOutputSec * SAMPLERATE);
-                int startIdx = startSample * CHANNELS;
+                var startSample = (int)(exactOutputSec * SAMPLERATE);
+                var startIdx = startSample * CHANNELS;
 
                 var sfxData = timing.IsClock ? answerClockData : answerData;
                 var vol = timing.IsClock ? answerClockVol : answerVol;
 
-                for (int i = 0; i < sfxData.Length; i++)
+                for (var i = 0; i < sfxData.Length; i++)
                 {
-                    int dstIdx = startIdx + i;
+                    var dstIdx = startIdx + i;
                     if (dstIdx >= 0 && dstIdx < recordingBuffer.Length)
                     {
                         var mixed = recordingBuffer[dstIdx] + sfxData[i] * vol;
@@ -740,7 +755,7 @@ namespace MajdataViewX.Managers
                 }
             }
             var trackStartFrameCount = (int)((initialTrackSec + TimeProvider.SONG_DETAIL_OFFSET) * SAMPLERATE);
-            var trackFrameCount = TrackSampleData.Length / CHANNELS;
+            var trackFrameCount = _trackSampleData.Length / CHANNELS;
             var recordingFrameCount = recordingBuffer.Length / CHANNELS;
 
             for (var dstFrame = 0; dstFrame < recordingFrameCount; dstFrame++)
@@ -757,8 +772,8 @@ namespace MajdataViewX.Managers
 
                 for (var ch = 0; ch < CHANNELS; ch++)
                 {
-                    var sample = Mathf.Lerp(TrackSampleData[srcIdx + ch], TrackSampleData[nextSrcIdx + ch], t);
-                    var mixed = recordingBuffer[dstIdx + ch] + sample * TrackSampleVolume;
+                    var sample = Mathf.Lerp(_trackSampleData[srcIdx + ch], _trackSampleData[nextSrcIdx + ch], t);
+                    var mixed = recordingBuffer[dstIdx + ch] + sample * _trackSampleVolume;
                     recordingBuffer[dstIdx + ch] = Math.Clamp(mixed, -1.0f, 1.0f);
                 }
             }
@@ -833,14 +848,14 @@ namespace MajdataViewX.Managers
 
             public void Execute(int index)
             {
-                float sourceIdx = index * Ratio;
-                int i1 = (int)math.floor(sourceIdx);
-                int i2 = (i1 < SrcFrameLimit) ? i1 + 1 : i1;
+                var sourceIdx = index * Ratio;
+                var i1 = (int)math.floor(sourceIdx);
+                var i2 = (i1 < SrcFrameLimit) ? i1 + 1 : i1;
 
-                float frac = sourceIdx - i1;
-                int s1 = i1 << 1;
-                int s2 = i2 << 1;
-                int d = index << 1;
+                var frac = sourceIdx - i1;
+                var s1 = i1 << 1;
+                var s2 = i2 << 1;
+                var d = index << 1;
 
                 Output[d] = math.lerp(Source[s1], Source[s2], frac);         // 左声道
                 Output[d + 1] = math.lerp(Source[s1 + 1], Source[s2 + 1], frac); // 右声道

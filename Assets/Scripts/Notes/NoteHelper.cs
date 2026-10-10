@@ -1,9 +1,9 @@
 
+using Cimai;
 using MajdataViewX.Managers;
 using MajdataViewX.Types.Enums;
 using MajdataViewX.Types.Input;
 using MajdataViewX.Types.Notes;
-using MajSimai;
 using System.Runtime.CompilerServices;
 using Unity.Burst;
 using Unity.Collections;

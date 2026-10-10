@@ -16,10 +16,10 @@ namespace MajdataViewX.Managers
         // never deactivates on its own).
         const float AP_SHOW_DURATION = 3.5f;
         [SerializeField]
-        private Animator AllPerfect;
+        private Animator allPerfect = null!;
 
-        private bool isPlayed;
-        private float apStartedAt;
+        private bool _isPlayed;
+        private float _apStartedAt;
 
         private void Awake()
         {
@@ -28,7 +28,7 @@ namespace MajdataViewX.Managers
 
         private void Start()
         {
-            AllPerfect.gameObject.SetActive(false);
+            allPerfect.gameObject.SetActive(false);
         }
 
         private void Update()
@@ -40,38 +40,34 @@ namespace MajdataViewX.Managers
             // Record/export mode: it triggers once all notes are judged,
             // regardless of whether a Perfect was lost, and the export stops
             // when the banner has played out.
-            if (_objectCounter.AllFinished)
+            if (!_objectCounter.AllFinished) return;
+            if (_isPlayed)
             {
-                if (isPlayed)
-                {
-                    if (Time.time - apStartedAt >= AP_SHOW_DURATION)
-                    {
-                        // In record mode the capture loop runs to
-                        // recordEndTime (last note + banner tail) and its
-                        // natural end sends PlayStopped; stopping here would
-                        // cut the export at the same instant the counter
-                        // fills, before the banner frames are captured.
-                        if (_timeProvider.IsRecord) return;
-                        _playManager.StopAsync().Forget();
-                        _wsServer.SendStopResponse();
-                    }
-                }
-                else
-                {
-                    AllPerfect.gameObject.SetActive(true);
-                    AllPerfect.SetTrigger(PlayAllPerfectHash);
-                    _audioManager.noteSfxPlaybackRequests[AudioManager.ALL_PERFECT] = true;
-                    isPlayed = true;
-                    apStartedAt = Time.time;
-                }
+                if (Time.time - _apStartedAt < AP_SHOW_DURATION) return;
+                // In record mode the capture loop runs to
+                // recordEndTime (last note + banner tail) and its
+                // natural end sends PlayStopped; stopping here would
+                // cut the export at the same instant the counter
+                // fills, before the banner frames are captured.
+                if (_timeProvider.IsRecord) return;
+                _playManager.StopAsync().Forget();
+                _wsServer.SendStopResponse();
+            }
+            else
+            {
+                allPerfect.gameObject.SetActive(true);
+                allPerfect.SetTrigger(PlayAllPerfectHash);
+                _audioManager.noteSfxPlaybackRequests[AudioManager.ALL_PERFECT] = true;
+                _isPlayed = true;
+                _apStartedAt = Time.time;
             }
         }
 
         public void ResetState()
         {
-            AllPerfect.gameObject.SetActive(false);
-            isPlayed = false;
-            apStartedAt = 0f;
+            allPerfect.gameObject.SetActive(false);
+            _isPlayed = false;
+            _apStartedAt = 0f;
         }
     }
 }

@@ -1,7 +1,7 @@
 #nullable enable
 
 using Cysharp.Threading.Tasks;
-using MajSimai;
+using Cimai;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -12,12 +12,12 @@ namespace MajdataViewX.Managers
     public class DataLoader : MonoBehaviour
     {
         //serialized field
-        public Text diffText;
-        public Text levelText;
-        public Text titleText;
-        public Text artistText;
-        public Text designText;
-        public RawImage cardImage;
+        public Text diffText = null!;
+        public Text levelText = null!;
+        public Text titleText = null!;
+        public Text artistText = null!;
+        public Text designText = null!;
+        public RawImage cardImage = null!;
         public Color[] diffColors = new Color[7];
 
         private void Awake()
@@ -29,17 +29,18 @@ namespace MajdataViewX.Managers
             SimaiChart chart,
             string title,
             string artist,
+            string level,
+            string designer,
             int diff)
         {
             titleText.text = title;
             artistText.text = artist;
             diffText.text = GetDifficultyText(diff);
             cardImage.color = diffColors[diff];
-            levelText.text = chart.Level;
-            designText.text = chart.Designer;
+            levelText.text = level;
+            designText.text = designer;
 
-            _timeProvider.LoadSV(chart.CommaTimings);
-
+            _timeProvider.LoadSV(chart.Timings);
             _noteManager.Load(chart);
 
             await UniTask.Yield();

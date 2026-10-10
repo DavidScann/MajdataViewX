@@ -32,7 +32,7 @@ using MajdataViewX.Types.Input;
 using MajdataViewX.Types.Notes;
 using MajdataViewX.Types.Notes.RenderData;
 using MajdataViewX.Utils;
-using MajSimai;
+using Cimai;
 
 public static class DJAutoEval
 {
@@ -71,28 +71,21 @@ public static class DJAutoEval
         }
         if (bestIdx < 0) { Debug.LogError("[eval] no &inote_ section"); return; }
 
-        var level = ""; var designer = "";
-        foreach (var l in lines)
-        {
-            if (l.StartsWith("&lv_5")) level = l.Split('=')[1].Trim();
-            else if (l.StartsWith("&des")) designer = l.Split('=')[1].Trim();
-        }
         var sb = new StringBuilder();
         var eq = lines[bestIdx].IndexOf('=');
         sb.AppendLine(lines[bestIdx].Substring(eq + 1));
         for (var i = bestIdx + 1; i < lines.Length && !lines[i].TrimStart().StartsWith("&"); i++)
             sb.AppendLine(lines[i]);
 
-        var chart = SimaiParser.ParseChartAsync(level, designer, sb.ToString())
-            .GetAwaiter().GetResult();
+        using var chart = SimaiChart.Parse(sb.ToString());
         var noteCount = 0;
         float lastTime = 0;
-        foreach (var timing in chart.NoteTimings)
+        foreach (var timing in chart.Timings)
         {
             noteCount += timing.Notes.Length;
-            lastTime = Mathf.Max(lastTime, (float)timing.Timing);
+            lastTime = Mathf.Max(lastTime, (float)timing.Time);
         }
-        Debug.Log($"[eval] parsed: {chart.NoteTimings.Length} timing points, {noteCount} notes, last={lastTime:F2}s");
+        Debug.Log($"[eval] parsed: {chart.Timings.Length} timing points, {noteCount} notes, last={lastTime:F2}s");
         Debug.Log($"[eval] fumen head: {sb.ToString().Substring(0, Mathf.Min(200, sb.Length)).Replace("\n", "\\n")}");
 
         // ---- statics (mirror PlayManager.Start) ----

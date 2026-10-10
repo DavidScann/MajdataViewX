@@ -4,7 +4,7 @@ using MajdataViewX.Types.Enums;
 using MajdataViewX.Types.Notes;
 using MajdataViewX.Types.Notes.RenderData;
 using MajdataViewX.Utils.Extensions;
-using MajSimai;
+using Cimai;
 using System.Threading;
 using Unity.Burst;
 using Unity.Collections;
@@ -52,9 +52,9 @@ namespace MajdataViewX.Notes.Updaters
         {
             if (tap.IsFolded) return;
 
-            var timing = tap.UsingSV
-                ? TimeData.FakeNoteTime - TimeData.GetPositionAtTime(tap.Time)
-                : TimeData.NoteTime - tap.Time;
+            var timing = tap.IsIgnoreSV
+                ? TimeData.NoteTime - tap.Time
+                : TimeData.FakeNoteTime - TimeData.GetPositionAtTime(tap.Time);
             if (timing > 0) return;
 
             var rawDistance = timing * tap.Speed + 4.8f;
@@ -111,9 +111,9 @@ namespace MajdataViewX.Notes.Updaters
             if (tap.IsFolded) return;
             if (tap.IsEnd) return;
 
-            var timing = tap.UsingSV
-                ? TimeData.FakeNoteTime - TimeData.GetPositionAtTime(tap.Time)
-                : TimeData.NoteTime - tap.Time;
+            var timing = tap.IsIgnoreSV
+                ? TimeData.NoteTime - tap.Time
+                : TimeData.FakeNoteTime - TimeData.GetPositionAtTime(tap.Time);
 
             var rawDistance = timing * tap.Speed + 4.8f;
             var clampedDistance = math.max(rawDistance, 1.225f);
@@ -289,7 +289,7 @@ namespace MajdataViewX.Notes.Updaters
             NoteHelper.ReportResult(ReportResults,
                 tap.JudgeGrade,
                 tap.IsBreak,
-                SimaiNoteType.Tap
+                SimaiNoteType.TAP
             );
             InputData.NextTapHold(
                 tap.Key

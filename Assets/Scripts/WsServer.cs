@@ -4,14 +4,12 @@ using Cysharp.Threading.Tasks;
 using MajdataViewX.Managers;
 using MajdataViewX.Types.Enums;
 using MajdataViewX.Types.MajWs;
-using MemoryPack;
 using System;
 using System.Collections.Concurrent;
-using System.Diagnostics;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 using WebSocketSharp;
 using WebSocketSharp.Server;
 using static MajdataViewX.Base.MajCtx;
@@ -21,8 +19,8 @@ namespace MajdataViewX
 {
     public class WsServer : MonoBehaviour
     {
-        public static readonly ConcurrentQueue<byte[]> MessageQueue = new();
-        private WebSocketServer? webSocket;
+        public static readonly ConcurrentQueue<string> MessageQueue = new();
+        private WebSocketServer? _webSocket;
         private CancellationToken _lifetimeCancellationToken;
 
         private void Awake()
@@ -38,9 +36,9 @@ namespace MajdataViewX
             // Use port-based constructor: IL2CPP trimming removes the 'ws://' scheme
             // from System.Uri, so the URL-based constructor throws
             // ArgumentException: 'A relative URI' on Linux (works fine on Windows/.NET).
-            webSocket = new WebSocketServer(8083, false);
-            webSocket.AddWebSocketService<MajdataWsService>("/majdata");
-            webSocket.Start();
+            _webSocket = new WebSocketServer(WsProtocol.PORT, false);
+            _webSocket.AddWebSocketService<MajdataWsService>(WsProtocol.SERVICE_PATH);
+            _webSocket.Start();
             _lifetimeCancellationToken = this.GetCancellationTokenOnDestroy();
             ProcessQueue(_lifetimeCancellationToken).Forget();
             BroadcastHeartbeat(_lifetimeCancellationToken).Forget();
@@ -59,13 +57,13 @@ namespace MajdataViewX
             {
                 while (!cancellationToken.IsCancellationRequested)
                 {
-                    if (MessageQueue.TryDequeue(out var bytes))
+                    if (MessageQueue.TryDequeue(out var json))
                     {
                         while (_playManager == null ||
                                PlayManager.Summary.State == ViewStatus.Busy)
                             await UniTask.Yield(PlayerLoopTiming.Update, cancellationToken);
 
-                        await HandleMessageAsync(bytes);
+                        await HandleMessageAsync(json);
                     }
                     else
                     {
@@ -97,48 +95,65 @@ namespace MajdataViewX
             }
         }
 
-        private async UniTask HandleMessageAsync(byte[] bytes)
+        private async Task HandleMessageAsync(string json)
         {
             try
             {
-                var req = MemoryPackSerializer.Deserialize<MajWsRequest>(bytes);
-                switch (req)
+                var req = WsJson.Deserialize<MajWsRequest>(json);
+                if (req is null)
                 {
-                    case MajWsSettingRequest r:
-                        _playManager.Setting(r.ViewSetting, r.VolumeSetting);
+                    Error("empty or invalid json");
+                    Debug.LogError($"request failed: invalid json");
+                    return;
+                }
+
+                switch (req.Type)
+                {
+                    case MajWsRequestType.Setting:
+                        _playManager.Setting(req.ViewSetting ?? new(), req.VolumeSetting ?? new());
                         Response(MajWsResponseType.Ok, PlayManager.Summary);
                         Debug.Log("request finished: Setting");
                         break;
-                    case MajWsLoadRequest r:
-                        await _playManager.LoadAsync(r.TrackPath, r.ImagePath, r.VideoPath);
+                    case MajWsRequestType.Load:
+                        await _playManager.LoadAsync(
+                            req.TrackPath ?? string.Empty,
+                            req.ImagePath ?? string.Empty,
+                            req.VideoPath);
                         Response(MajWsResponseType.LoadOk, PlayManager.Summary);
                         Debug.Log("request finished: Load");
                         break;
-                    case MajWsUpdateRequest r:
-                        // 图数据经共享内存传输：FileLength/ChartLength 即 Edit 写入的两段 MemoryPack 字节数
-                        await _playManager.UpdateAsync(r.FileLength, r.ChartLength, r.SelectedDifficulty);
+                    case MajWsRequestType.Update:
+                        await _playManager.UpdateAsync(
+                            req.ChartText,
+                            req.SelectedDifficulty,
+                            req.Title ?? string.Empty,
+                            req.Artist ?? string.Empty,
+                            req.Level ?? string.Empty,
+                            req.Designer ?? string.Empty,
+                            req.Offset,
+                            req.ClockCount);
                         Response(MajWsResponseType.Ok, PlayManager.Summary);
                         Debug.Log("request finished: Update");
                         break;
-                    case MajWsPlayRequest r:
+                    case MajWsRequestType.Play:
                         await _playManager.PlayAsync(
-                            r.Mode, r.StartAt, r.Speed, r.MaidataPath ?? string.Empty);
-                        if (r.Mode != PlaybackMode.Record)
+                            req.PlayMode, req.StartAt, req.Speed, req.MaidataPath ?? string.Empty);
+                        if (req.PlayMode != PlaybackMode.Record)
                             Response(MajWsResponseType.PlayStarted, PlayManager.Summary);
                         Debug.Log("request finished: Play");
                         break;
-                    case MajWsPauseRequest:
+                    case MajWsRequestType.Pause:
                         if (_screenRecorder.IsRecording) break;
                         await _playManager.PauseAsync();
                         Response(MajWsResponseType.PlayPaused, PlayManager.Summary);
                         Debug.Log("request finished: Pause");
                         break;
-                    case MajWsStopRequest:
+                    case MajWsRequestType.Stop:
                         await _playManager.StopAsync();
                         Response(MajWsResponseType.PlayStopped, PlayManager.Summary);
                         Debug.Log("request finished: Stop");
                         break;
-                    case MajWsStateRequest:
+                    case MajWsRequestType.State:
                         Response(MajWsResponseType.Ok, PlayManager.Summary);
                         Debug.Log("request finished: State");
                         break;
@@ -168,8 +183,8 @@ namespace MajdataViewX
                 Summary = summary ?? PlayManager.Summary,
                 Error = error
             };
-            webSocket?.WebSocketServices["/majdata"].Sessions.
-                Broadcast(MemoryPackSerializer.Serialize(rsp));
+            _webSocket?.WebSocketServices[WsProtocol.SERVICE_PATH].Sessions.
+                Broadcast(WsJson.SerializeToUtf8(rsp));
         }
 
         public void Error<T>(T exception) where T : Exception
@@ -182,13 +197,11 @@ namespace MajdataViewX
             Response(MajWsResponseType.Error, error: errMsg);
         }
 
-        void OnDestroy()
+        private void OnDestroy()
         {
-            if (webSocket is not null)
-            {
-                webSocket.RemoveWebSocketService("/majdata");
-                webSocket.Stop();
-            }
+            if (_webSocket is null) return;
+            _webSocket.RemoveWebSocketService(WsProtocol.SERVICE_PATH);
+            _webSocket.Stop();
         }
     }
 
@@ -196,12 +209,12 @@ namespace MajdataViewX
     {
         protected override void OnMessage(MessageEventArgs e)
         {
-            // 二进制帧为 MemoryPack 消息；旧文本帧按 UTF-8 编码后同样入队（反序列化会失败并回 Error）
-            var data = e.IsBinary ? e.RawData : Encoding.UTF8.GetBytes(e.Data);
-            if (data.Length == 0)
+            // 文本帧为 JSON 请求；二进制帧按 UTF-8 解码为 JSON（兼容老客户端误发二进制的情况）
+            var json = e.IsBinary ? Encoding.UTF8.GetString(e.RawData) : e.Data;
+            if (string.IsNullOrEmpty(json))
                 return;
 
-            WsServer.MessageQueue.Enqueue(data);
+            WsServer.MessageQueue.Enqueue(json);
         }
     }
 }

@@ -8,7 +8,7 @@ using MajdataViewX.Types.Notes;
 using MajdataViewX.Types.Notes.RenderData;
 using MajdataViewX.Utils;
 using MajdataViewX.Utils.Extensions;
-using MajSimai;
+using Cimai;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
@@ -186,7 +186,7 @@ namespace MajdataViewX.Managers
             NoteHelper.PlayTapEffect(ctx.JudgeEffectRequests,
                 (int)tap.Key, tap.JudgeGrade, tap.IsBreak, tap.IsMine);
             NoteHelper.ReportResult(ctx.ReportResults,
-                tap.JudgeGrade, tap.IsBreak, SimaiNoteType.Tap);
+                tap.JudgeGrade, tap.IsBreak, SimaiNoteType.TAP);
             InputData.NextTapHold(tap.Key);
             tap.IsEnd = true;
         }
@@ -352,7 +352,7 @@ namespace MajdataViewX.Managers
             NoteHelper.PlayTapEffect(ctx.JudgeEffectRequests,
                 (int)hold.Key, hold.judgeGrade, hold.isBreak, hold.isMine);
             NoteHelper.ReportResult(ctx.ReportResults,
-                hold.judgeGrade, hold.isBreak, SimaiNoteType.Hold);
+                hold.judgeGrade, hold.isBreak, SimaiNoteType.HOLD);
             InputData.NextTapHold(hold.Key);
             hold.isEnd = true;
         }
@@ -447,7 +447,7 @@ namespace MajdataViewX.Managers
                 (int)touch.sensor + 8,
                 touch.judgeGrade, touch.isBreak, touch.isHanabi, touch.isMine);
             NoteHelper.ReportResult(ctx.ReportResults,
-                touch.judgeGrade, touch.isBreak, SimaiNoteType.Touch);
+                touch.judgeGrade, touch.isBreak, SimaiNoteType.TOUCH);
 
             InputData.NextTouch(touch.sensor);
             MajBurst.MultTouchHandler.Unregister(touch.sensor);
@@ -590,7 +590,7 @@ namespace MajdataViewX.Managers
                 (int)th.sensor + 8,
                 th.judgeGrade, th.isBreak, th.isHanabi, th.isMine);
             NoteHelper.ReportResult(ctx.ReportResults,
-                th.judgeGrade, th.isBreak, SimaiNoteType.TouchHold);
+                th.judgeGrade, th.isBreak, SimaiNoteType.TOUCHHOLD);
 
             InputData.NextTouch(th.sensor);
             if (th.headGroupId != -1 && th.judgeGrade != JudgeGrade.Miss)
@@ -1103,7 +1103,7 @@ namespace MajdataViewX.Managers
             NoteHelper.ReportResult(ctx.ReportResults,
                 slide.judgeGrade,
                 slide.isBreak,
-                SimaiNoteType.Slide
+                SimaiNoteType.SLIDE
             );
         }
     }

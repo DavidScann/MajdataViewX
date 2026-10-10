@@ -8,11 +8,14 @@ namespace MajdataViewX.Managers
     public class ButtonsManager : MonoBehaviour
     {
         [SerializeField]
-        private Dropdown DDResolution;
+        private Dropdown ddResolution;
+
+        private const int FULLSCREEN_WIDTH = 512;
+        private const int FULLSCREEN_HEIGHT = 512;
 
         private void Start()
         {
-            DDResolution.gameObject.SetActive(false);
+            ddResolution.gameObject.SetActive(false);
         }
 
         private void Update()
@@ -27,13 +30,11 @@ namespace MajdataViewX.Managers
             var resolutions = Screen.resolutions;
             if (Screen.fullScreen)
             {
-                var width = 512;
-                var height = 512;
-                Screen.SetResolution(width, height, false);
+                Screen.SetResolution(FULLSCREEN_WIDTH, FULLSCREEN_HEIGHT, false);
             }
             else
             {
-                Screen.SetResolution(resolutions[resolutions.Length - 1].width, resolutions[resolutions.Length - 1].height, true);
+                Screen.SetResolution(resolutions[^1].width, resolutions[^1].height, true);
             }
 
             Screen.fullScreenMode = FullScreenMode.FullScreenWindow;
@@ -41,13 +42,13 @@ namespace MajdataViewX.Managers
 
         public void DisplayDropdown()
         {
-            DDResolution.value = 999;
-            DDResolution.gameObject.SetActive(true);
+            ddResolution.value = 999;
+            ddResolution.gameObject.SetActive(true);
         }
 
         public void SetResolution()
         {
-            var i = DDResolution.value;
+            var i = ddResolution.value;
             Debug.Log(i);
             switch (i)
             {
@@ -71,7 +72,7 @@ namespace MajdataViewX.Managers
                     break;
             }
 
-            DDResolution.gameObject.SetActive(false);
+            ddResolution.gameObject.SetActive(false);
         }
     }
 }

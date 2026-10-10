@@ -7,7 +7,7 @@ using MajdataViewX.Types.Input;
 using MajdataViewX.Types.Rendering;
 using MajdataViewX.Utils;
 using MajdataViewX.Utils.Extensions;
-using MajSimai;
+using Cimai;
 using System.Collections.Generic;
 using System.Threading;
 using Unity.Burst;

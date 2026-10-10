@@ -1,6 +1,6 @@
 using MajdataViewX.Notes;
 using MajdataViewX.Types.Notes;
-using MajSimai;
+using Cimai;
 using System;
 using System.Collections.Generic;
 using Unity.Collections;
@@ -136,7 +136,7 @@ namespace MajdataViewX.Managers
 
         public void CountNoteSum(SimaiChart chart)
         {
-            foreach (var timing in chart.NoteTimings)
+            foreach (var timing in chart.Timings)
             {
                 foreach (var note in timing.Notes)
                 {
@@ -144,41 +144,24 @@ namespace MajdataViewX.Managers
                     {
                         switch (note.Type)
                         {
-                            case SimaiNoteType.Tap:
+                            case SimaiNoteType.TAP:
                                 TapSum++;
                                 break;
-                            case SimaiNoteType.Hold:
-                            case SimaiNoteType.TouchHold:
+                            case SimaiNoteType.HOLD:
+                            case SimaiNoteType.TOUCHHOLD:
                                 HoldSum++;
                                 break;
-                            case SimaiNoteType.Slide:
-                                if (!note.IsSlideNoHead)
-                                    TapSum++;
-                                if (note.IsSlideBreak)
-                                    BreakSum++;
-                                else
-                                    SlideSum++;
+                            case SimaiNoteType.SLIDE:
+                                SlideSum++;
                                 break;
-                            case SimaiNoteType.Touch:
+                            case SimaiNoteType.TOUCH:
                                 TouchSum++;
                                 break;
                         }
                     }
                     else
                     {
-                        if (note.Type == SimaiNoteType.Slide)
-                        {
-                            if (!note.IsSlideNoHead)
-                                BreakSum++;
-                            if (note.IsSlideBreak)
-                                BreakSum++;
-                            else
-                                SlideSum++;
-                        }
-                        else
-                        {
-                            BreakSum++;
-                        }
+                        BreakSum++;
                     }
                 }
             }
@@ -190,50 +173,33 @@ namespace MajdataViewX.Managers
 
         public void CountIgnoreNoteCountAsync(SimaiChart chart, double ignore)
         {
-            foreach (var timing in chart.NoteTimings)
+            foreach (var timing in chart.Timings)
             {
-                if (timing.Timing >= ignore) continue;
+                if (timing.Time >= ignore) continue;
                 foreach (var note in timing.Notes)
                 {
                     if (!note.IsBreak)
                     {
                         switch (note.Type)
                         {
-                            case SimaiNoteType.Tap:
+                            case SimaiNoteType.TAP:
                                 TapFinishedCount++;
                                 break;
-                            case SimaiNoteType.Hold:
-                            case SimaiNoteType.TouchHold:
+                            case SimaiNoteType.HOLD:
+                            case SimaiNoteType.TOUCHHOLD:
                                 HoldFinishedCount++;
                                 break;
-                            case SimaiNoteType.Slide:
-                                if (!note.IsSlideNoHead)
-                                    TapFinishedCount++;
-                                if (note.IsSlideBreak)
-                                    BreakFinishedCount++;
-                                else
-                                    SlideFinishedCount++;
+                            case SimaiNoteType.SLIDE:
+                                SlideFinishedCount++;
                                 break;
-                            case SimaiNoteType.Touch:
+                            case SimaiNoteType.TOUCH:
                                 TouchFinishedCount++;
                                 break;
                         }
                     }
                     else
                     {
-                        if (note.Type == SimaiNoteType.Slide)
-                        {
-                            if (!note.IsSlideNoHead)
-                                BreakFinishedCount++;
-                            if (note.IsSlideBreak)
-                                BreakFinishedCount++;
-                            else
-                                SlideFinishedCount++;
-                        }
-                        else
-                        {
-                            BreakFinishedCount++;
-                        }
+                        BreakFinishedCount++;
                     }
 
                     if (NoteHelper.IsSimulated) continue;
@@ -253,12 +219,6 @@ namespace MajdataViewX.Managers
                     UpdateNoteScoreCount(type, judge, isBreak);
                     UpdateJudgeCountAndDXScore(judge);
                     UpdateFastLateCount(judge);
-                    if (type is SimaiNoteType.Slide && !note.IsSlideNoHead)
-                    {
-                        UpdateNoteScoreCount(SimaiNoteType.Tap, judge, isBreak);
-                        UpdateJudgeCountAndDXScore(judge);
-                        UpdateFastLateCount(judge);
-                    }
                 }
             }
         }
@@ -296,15 +256,15 @@ namespace MajdataViewX.Managers
 
             switch (type)
             {
-                case SimaiNoteType.Tap:
-                case SimaiNoteType.Touch:
+                case SimaiNoteType.TAP:
+                case SimaiNoteType.TOUCH:
                     baseScore = 500;
                     break;
-                case SimaiNoteType.Hold:
-                case SimaiNoteType.TouchHold:
+                case SimaiNoteType.HOLD:
+                case SimaiNoteType.TOUCHHOLD:
                     baseScore = 1000;
                     break;
-                case SimaiNoteType.Slide:
+                case SimaiNoteType.SLIDE:
                     baseScore = 1500;
                     break;
             }
@@ -434,31 +394,31 @@ namespace MajdataViewX.Managers
             {
                 switch (type)
                 {
-                    case SimaiNoteType.Tap:
+                    case SimaiNoteType.TAP:
                         {
                             judgedTapCount[judge]++;
                             TapFinishedCount++;
                         }
                         break;
-                    case SimaiNoteType.Slide:
+                    case SimaiNoteType.SLIDE:
                         {
                             judgedSlideCount[judge]++;
                             SlideFinishedCount++;
                         }
                         break;
-                    case SimaiNoteType.Hold:
+                    case SimaiNoteType.HOLD:
                         {
                             judgedHoldCount[judge]++;
                             HoldFinishedCount++;
                         }
                         break;
-                    case SimaiNoteType.Touch:
+                    case SimaiNoteType.TOUCH:
                         {
                             judgedTouchCount[judge]++;
                             TouchFinishedCount++;
                         }
                         break;
-                    case SimaiNoteType.TouchHold:
+                    case SimaiNoteType.TOUCHHOLD:
                         {
                             judgedTouchHoldCount[judge]++;
                             HoldFinishedCount++;

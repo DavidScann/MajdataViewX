@@ -8,6 +8,7 @@ using System.Collections;
 using System.IO;
 using System.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 using UnityEngine.Video;
 
@@ -19,23 +20,41 @@ namespace MajdataViewX.Managers
     public class BgManager : MonoBehaviour
     {
         [SerializeField]
-        private Sprite bgDummy;
+        private Sprite bgDummy = null!;
         [SerializeField]
-        private Sprite defaultBg;
+        private Sprite defaultBg = null!;
 
         [SerializeField]
-        private Material fullscreenBgMaterial;
+        private Material fullscreenBgMaterial = null!;
         [SerializeField]
-        private Material circledBgMaterial;
+        private Material circledBgMaterial = null!;
+        private static readonly int RadiusID = Shader.PropertyToID("_Radius");
 
-        public bool ResizeBg;
+        [FormerlySerializedAs("ResizeBg")] public bool resizeBg;
 
-        private RawImage jacketImage;
-        private GameObject songDetail;
+        private RawImage _jacketImage = null!;
+        private GameObject _songDetail = null!;
         private static readonly int ShowHash = Animator.StringToHash("show");
-        private Animator detailAnim;
-        private SpriteRenderer spriteRender;
-        private VideoPlayer videoPlayer;
+        private Animator _detailAnim = null!;
+        private SpriteRenderer _spriteRender = null!;
+        private VideoPlayer _videoPlayer = null!;
+
+        private float _smoothRDelta;
+
+        private const float CIRCLED_SCALE_X = 1.1f;
+        private const float FULLSCREEN_SCALE_X = 1.777f;
+
+        private Sprite? Bg { get; set; }
+        private string? VideoUrl { get; set; }
+
+        public static bool HasBg;
+        public static bool HasVideo;
+        public bool IsBgLoaded => !HasBg || Bg != null;
+        public bool IsVideoLoaded => !HasVideo || !string.IsNullOrWhiteSpace(VideoUrl);
+
+        private static Sprite? _emptySprite;
+        private bool _videoPaused;
+
         private BgVideoPipe? videoPipe;
 
         // Preloaded while the chart loads so pressing play starts the video
@@ -45,24 +64,10 @@ namespace MajdataViewX.Managers
         private Task? _preloadTask;
         private int _preloadGeneration;
 
-        private float smoothRDelta;
         private double _recordLastRealTime;
 
-        private const float CIRCLED_SCALE_X = 1.1f;
-        private const float FULLSCREEN_SCALE_X = 1.777f;
-
-        private Sprite? Bg { get; set; }
-        private string? VideoUrl { get; set; }
-        private string? VideoPath { get; set; }
+        private string? VideoPath;
         private bool _resizeBg;
-
-        public static bool hasBg;
-        public static bool hasVideo;
-        public bool IsBgLoaded => !hasBg || Bg != null;
-        public bool IsVideoLoaded => !hasVideo || !string.IsNullOrWhiteSpace(VideoUrl);
-
-        private static Sprite? _emptySprite;
-        bool _videoPaused;
 
         private void Awake()
         {
@@ -71,13 +76,13 @@ namespace MajdataViewX.Managers
 
         private void Start()
         {
-            jacketImage = GameObject.Find("Jacket").GetComponent<RawImage>();
-            songDetail = GameObject.Find("CanvasSongDetail");
-            songDetail.SetActive(false);
+            _jacketImage = GameObject.Find("Jacket").GetComponent<RawImage>();
+            _songDetail = GameObject.Find("CanvasSongDetail");
+            _songDetail.SetActive(false);
 
-            spriteRender = GetComponent<SpriteRenderer>();
-            videoPlayer = GetComponent<VideoPlayer>();
-            detailAnim = songDetail.GetComponent<Animator>();
+            _spriteRender = GetComponent<SpriteRenderer>();
+            _videoPlayer = GetComponent<VideoPlayer>();
+            _detailAnim = _songDetail.GetComponent<Animator>();
 
             _emptySprite = Sprite.Create(new Texture2D(1080, 1080), new Rect(0, 0, 1080, 1080), new Vector2(0.5f, 0.5f));
         }
@@ -88,20 +93,20 @@ namespace MajdataViewX.Managers
             if (videoPipe != null)
             {
                 videoPipe.UpdateFrame();
-                spriteRender.sprite = videoPipe.Sprite;
+                _spriteRender.sprite = videoPipe.Sprite;
                 return;
             }
 #endif
 
-            if (hasVideo && _videoPaused)
+            if (HasVideo && _videoPaused)
             {
-                videoPlayer.time = _timeProvider.AudioTime;
-                videoPlayer.Play();
-                videoPlayer.Pause();
+                _videoPlayer.time = _timeProvider.AudioTime;
+                _videoPlayer.Play();
+                _videoPlayer.Pause();
                 return;
             }
-            var delta = (float)videoPlayer.clockTime - _timeProvider.AudioTime;
-            smoothRDelta += (Time.unscaledDeltaTime - smoothRDelta) * 0.01f;
+            var delta = (float)_videoPlayer.clockTime - _timeProvider.AudioTime;
+            _smoothRDelta += (Time.unscaledDeltaTime - _smoothRDelta) * 0.01f;
             if (_timeProvider.AudioTime < 0) return;
 
             if (_timeProvider.IsRecord)
@@ -119,38 +124,38 @@ namespace MajdataViewX.Managers
                     : 1f;
                 if (songSpeed <= 16f)
                 {
-                    videoPlayer.playbackSpeed = Mathf.Clamp(songSpeed, 0.05f, 16f);
+                    _videoPlayer.playbackSpeed = Mathf.Clamp(songSpeed, 0.05f, 16f);
                 }
                 else if (Mathf.Abs(delta) > 0.05f)
                 {
-                    videoPlayer.time = Mathf.Max(0, _timeProvider.AudioTime);
+                    _videoPlayer.time = Mathf.Max(0, _timeProvider.AudioTime);
                 }
                 return;
             }
 
-            var realSpeed = Time.deltaTime / smoothRDelta;
+            var realSpeed = Time.deltaTime / _smoothRDelta;
 
             if (Time.captureFramerate != 0)
             {
-                videoPlayer.playbackSpeed = realSpeed - delta;
+                _videoPlayer.playbackSpeed = realSpeed - delta;
                 return;
             }
 
             if (delta < -0.01f)
-                videoPlayer.playbackSpeed = _timeProvider.CurrentSpeed + 0.2f;
+                _videoPlayer.playbackSpeed = _timeProvider.CurrentSpeed + 0.2f;
             else if (delta > 0.01f)
-                videoPlayer.playbackSpeed = _timeProvider.CurrentSpeed - 0.2f;
+                _videoPlayer.playbackSpeed = _timeProvider.CurrentSpeed - 0.2f;
             else
-                videoPlayer.playbackSpeed = _timeProvider.CurrentSpeed;
+                _videoPlayer.playbackSpeed = _timeProvider.CurrentSpeed;
         }
 
         public void PlaySongDetail()
         {
-            songDetail.SetActive(true);
-            detailAnim.SetTrigger(ShowHash);
+            _songDetail.SetActive(true);
+            _detailAnim.SetTrigger(ShowHash);
         }
 
-        public void LoadBG(string path)
+        public void LoadBg(string path)
         {
             DestroyLoadedBackground();
             Bg = TexLoader.LoadSprite(path);
@@ -168,17 +173,17 @@ namespace MajdataViewX.Managers
             }
         }
 
-        public void ShowBG()
+        public void ShowBg()
         {
-            if (Bg == null || !hasBg)
+            if (Bg == null || !HasBg)
             {
-                jacketImage.texture = bgDummy.texture;
-                spriteRender.sprite = defaultBg;
+                _jacketImage.texture = bgDummy.texture;
+                _spriteRender.sprite = defaultBg;
                 return;
             }
 
-            jacketImage.texture = Bg.texture;
-            spriteRender.sprite = Bg;
+            _jacketImage.texture = Bg.texture;
+            _spriteRender.sprite = Bg;
             var scale = 1140f / Bg.texture.width;
             gameObject.transform.localScale = new Vector3(scale, scale, scale);
         }
@@ -226,7 +231,7 @@ namespace MajdataViewX.Managers
 
         public Task ShowVideoAsync(bool resizeBg, double startAt = 0)
         {
-            if (!hasVideo) return Task.CompletedTask;
+            if (!HasVideo) return Task.CompletedTask;
             _resizeBg = resizeBg;
 
 #if UNITY_STANDALONE_LINUX || UNITY_EDITOR_LINUX
@@ -241,51 +246,55 @@ namespace MajdataViewX.Managers
 
         void ShowVideoPlayer(bool resizeBg)
         {
-            if (!hasVideo) return;
+            if (!HasVideo) return;
 
-            videoPlayer.url = VideoUrl;
+            _videoPlayer.url = VideoUrl;
             StartCoroutine(WaitFumenStart());
             IEnumerator WaitFumenStart()
             {
-                videoPlayer.Prepare();
+                _videoPlayer.Prepare();
 
                 //secret hack: if not so, the bg won't be set to defaultBg but full white
-                spriteRender.sprite = _emptySprite;
+                _spriteRender.sprite = _emptySprite;
 
                 while (_timeProvider.AudioTime <= 0) yield return new WaitForEndOfFrame();
 
                 // Don't hang forever if Prepare() fails (bad URL, unsupported codec).
                 var timeout = Time.realtimeSinceStartup + 15f;
-                while (!videoPlayer.isPrepared)
+                while (!_videoPlayer.isPrepared)
                 {
                     if (Time.realtimeSinceStartup > timeout)
                     {
-                        Debug.LogError($"[BgManager] Video prepare timed out: {videoPlayer.url}");
+                        Debug.LogError($"[BgManager] Video prepare timed out: {_videoPlayer.url}");
                         yield break;
                     }
                     yield return new WaitForEndOfFrame();
                 }
-                if (videoPlayer.isPlaying) videoPlayer.Stop();
+                if (_videoPlayer.isPlaying) _videoPlayer.Stop();
 
-                videoPlayer.Play();
-                videoPlayer.time = _timeProvider.AudioTime;
+                _videoPlayer.Play();
+                _videoPlayer.time = _timeProvider.AudioTime;
                 _videoPaused = false;
 
-                var scale = videoPlayer.height / (float)videoPlayer.width;
+                var scale = _videoPlayer.height / (float)_videoPlayer.width;
                 if (resizeBg)
                 {
                     gameObject.transform.localScale = new Vector3(FULLSCREEN_SCALE_X, FULLSCREEN_SCALE_X * scale);
-                    spriteRender.material = fullscreenBgMaterial;
+                    _spriteRender.material = fullscreenBgMaterial;
                 }
                 else
                 {
-                    gameObject.transform.localScale = new Vector3(CIRCLED_SCALE_X, CIRCLED_SCALE_X * scale);
-                    spriteRender.material = circledBgMaterial;
+                    var circleDiameter = circledBgMaterial.GetFloat(RadiusID) * 2f;
+                    var spriteSize = _spriteRender.sprite!.bounds.size;
+                    var longestSide = Mathf.Max(spriteSize.x, spriteSize.y * scale);
+                    var fitScale = circleDiameter / longestSide;
+                    gameObject.transform.localScale = new Vector3(fitScale, fitScale * scale, fitScale);
+                    _spriteRender.material = circledBgMaterial;
                 }
             }
         }
 
-        public void ShowVideo() => ShowVideoPlayer(ResizeBg);
+        public void ShowVideo() => ShowVideoPlayer(resizeBg);
 
         async Task ShowVideoPipeAsync(bool resizeBg, double startAt = 0)
         {
@@ -344,7 +353,7 @@ namespace MajdataViewX.Managers
             var aspect = (float)videoPipe.Height / videoPipe.Width;
             var s = Mathf.Min(1f, 1f / aspect);
             gameObject.transform.localScale = new Vector3(s, s);
-            spriteRender.material = circledBgMaterial;
+            _spriteRender.material = circledBgMaterial;
         }
 
         void StopVideoPipe()
@@ -354,12 +363,12 @@ namespace MajdataViewX.Managers
                 videoPipe.Dispose();
                 videoPipe = null;
             }
-            spriteRender.sprite = null;
+            _spriteRender.sprite = null;
         }
 
         public void PauseVideo()
         {
-            if (!hasVideo) return;
+            if (!HasVideo) return;
 #if UNITY_STANDALONE_LINUX || UNITY_EDITOR_LINUX
             // Stopping the read lets ffmpeg's pipe fill and block: the video
             // freezes on its last frame without killing the process.
@@ -367,19 +376,19 @@ namespace MajdataViewX.Managers
             _videoPaused = true;
             return;
 #else
-            videoPlayer.Pause();
+            _videoPlayer.Pause();
             _videoPaused = true;
 #endif
         }
 
         public void ContinueVideo()
         {
-            if (!hasVideo) return;
+            if (!HasVideo) return;
 #if UNITY_STANDALONE_LINUX || UNITY_EDITOR_LINUX
             videoPipe?.Resume();
             return;
 #else
-            videoPlayer.Play();
+            _videoPlayer.Play();
 #endif
         }
 
@@ -392,18 +401,18 @@ namespace MajdataViewX.Managers
             if (!string.IsNullOrWhiteSpace(VideoPath))
                 _preloadTask = PreloadVideoAsync(VideoPath);
 #else
-            videoPlayer.Stop();
+            _videoPlayer.Stop();
             _videoPaused = false;
 #endif
             // 销毁上一曲背景图(Texture2D/Sprite)，避免滞留到下次 LoadBG
             DestroyLoadedBackground();
             gameObject.transform.localScale = new Vector3(CIRCLED_SCALE_X, CIRCLED_SCALE_X, CIRCLED_SCALE_X);
-            spriteRender.material = circledBgMaterial;
-            spriteRender.sprite = defaultBg;
-            smoothRDelta = 0f;
+            _spriteRender.material = circledBgMaterial;
+            _spriteRender.sprite = defaultBg;
+            _smoothRDelta = 0f;
 
-            if (songDetail != null)
-                songDetail.SetActive(false);
+            if (_songDetail != null)
+                _songDetail.SetActive(false);
         }
 
         private void OnDestroy()

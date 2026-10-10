@@ -5,7 +5,7 @@ using MajdataViewX.Types.Notes;
 using MajdataViewX.Types.Notes.RenderData;
 using MajdataViewX.Utils;
 using MajdataViewX.Utils.Extensions;
-using MajSimai;
+using Cimai;
 using System.Threading;
 using Unity.Burst;
 using Unity.Collections;
@@ -62,12 +62,12 @@ namespace MajdataViewX.Notes.Updaters
         {
             if (th.isFolded) return;
 
-            var timing = th.usingSV
-                ? TimeData.FakeNoteTime - TimeData.GetPositionAtTime(th.time)
-                : TimeData.NoteTime - th.time;
-            var lastFor = th.usingSV
-                ? TimeData.GetPositionAtTime(th.time + th.LastFor) - TimeData.GetPositionAtTime(th.time)
-                : th.LastFor;
+            var timing = th.isIgnoreSV
+                ? TimeData.NoteTime - th.time
+                : TimeData.FakeNoteTime - TimeData.GetPositionAtTime(th.time);
+            var lastFor = th.isIgnoreSV
+                ? th.LastFor
+                : TimeData.GetPositionAtTime(th.time + th.LastFor) - TimeData.GetPositionAtTime(th.time);
             if (timing > lastFor) return;
 
             var pow = -math.exp(8f * (timing * 0.43f / th.moveDuration) - 0.85f) + 0.42f;
@@ -158,12 +158,12 @@ namespace MajdataViewX.Notes.Updaters
             var timePart = ((uint)math.max(0f, th.time * 100f)) & 0x7FFFF;
             var sortTime = ((timePart << 11) | (uint)(index & 0x7FF)) & 0x3FFFFFFF;
 
-            var timing = th.usingSV
-                ? TimeData.FakeNoteTime - TimeData.GetPositionAtTime(th.time)
-                : TimeData.NoteTime - th.time;
-            var lastFor = th.usingSV
-                ? TimeData.GetPositionAtTime(th.time + th.LastFor) - TimeData.GetPositionAtTime(th.time)
-                : th.LastFor;
+            var timing = th.isIgnoreSV
+                ? TimeData.NoteTime - th.time
+                : TimeData.FakeNoteTime - TimeData.GetPositionAtTime(th.time);
+            var lastFor = th.isIgnoreSV
+                ? th.LastFor
+                : TimeData.GetPositionAtTime(th.time + th.LastFor) - TimeData.GetPositionAtTime(th.time);
 
             var wholeDuration = 3.209385682f * math.pow(th.speed, -0.9549621752f);
             var moveDuration = 0.8f * wholeDuration;
@@ -494,7 +494,7 @@ namespace MajdataViewX.Notes.Updaters
             NoteHelper.ReportResult(ReportResults,
                 th.judgeGrade,
                 th.isBreak,
-                SimaiNoteType.TouchHold
+                SimaiNoteType.TOUCHHOLD
             );
 
             InputData.NextTouch(th.sensor);

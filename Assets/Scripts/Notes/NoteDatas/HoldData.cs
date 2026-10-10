@@ -23,7 +23,7 @@ namespace MajdataViewX.Notes.NoteDatas
         public bool isEx;
         public bool isBreak;
         public bool isMine;
-        public bool usingSV;
+        public bool isIgnoreSV;
 
         public bool isFolded;
 
@@ -123,17 +123,5 @@ namespace MajdataViewX.Notes.NoteDatas
 
             bodySprite = _bodySpriteCache;
         }
-
-        public readonly bool IsFoldable(HoldData other) =>
-            time == other.time &&
-            Key == other.Key &&
-            speed == other.speed &&
-            LastFor == other.LastFor &&
-
-            isEach == other.isEach &&
-            isEx == other.isEx &&
-            isBreak == other.isBreak &&
-            isMine == other.isMine &&
-            usingSV == other.usingSV;
     }
 }

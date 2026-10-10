@@ -195,13 +195,10 @@ namespace MajdataViewX.Managers
 
             var width = exportWidth > 0 ? exportWidth : Screen.width;
             var height = exportHeight > 0 ? exportHeight : Screen.height;
-
-            if (width % 2 != 0 || height % 2 != 0)
-            {
-                errText.text = $"Encoding cannot start: Resolution width and height must be even numbers. Current: {width}x{height}.";
-                _wsServer.Error($"Encoding cannot start: Resolution width and height must be even numbers. Current: {width}x{height}.");
-                return;
-            }
+            // H.264 (NV12) requires even dimensions; crop odd pixels so
+            // encoding always succeeds.
+            width &= ~1;
+            height &= ~1;
 
             const string finalName = "out.mp4";
 

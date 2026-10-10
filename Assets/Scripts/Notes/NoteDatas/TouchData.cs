@@ -21,7 +21,7 @@ namespace MajdataViewX.Notes.NoteDatas
         public bool isEx;
         public bool isBreak;
         public bool isMine;
-        public bool usingSV;
+        public bool isIgnoreSV;
 
         public bool isFolded;
         public bool isSlideGuide;
@@ -103,17 +103,5 @@ namespace MajdataViewX.Notes.NoteDatas
             judgeGrade = default;
             diff = default;
         }
-
-        public readonly bool IsFoldable(TouchData other) =>
-            time == other.time &&
-            sensor == other.sensor &&
-            speed == other.speed &&
-
-            isHanabi == other.isHanabi &&
-            isEach == other.isEach &&
-            isEx == other.isEx &&
-            isBreak == other.isBreak &&
-            isMine == other.isMine &&
-            usingSV == other.usingSV;
     }
 }

@@ -2,7 +2,7 @@ using Cysharp.Text;
 using MajdataViewX.Notes;
 using MajdataViewX.Types;
 using MajdataViewX.Types.Enums;
-using MajSimai;
+using Cimai;
 using System;
 using TMPro;
 using UnityEngine;
@@ -182,26 +182,26 @@ namespace MajdataViewX.Managers
             meterList.Clear();
             bpmList.Clear();
 
-            foreach (var timing in chart.CommaTimings)
+            foreach (var timing in chart.Timings)
             {
                 var lastNum = 0;
-                var lastDeno = 0;
+                var lastDen = 0;
                 if (meterList.Count > 0)
                 {
                     var lastMeter = meterList[^1];
                     lastNum = lastMeter.Numerator;
-                    lastDeno = lastMeter.Denominator;
+                    lastDen = lastMeter.Denominator;
                 }
 
-                if (timing.SignatureNumerator != lastNum || timing.SignatureDenominator != lastDeno)
+                if (timing.SignNum != lastNum || timing.SignDen != lastDen)
                     meterList.Add((
-                        timing.Timing,
-                        timing.SignatureNumerator,
-                        timing.SignatureDenominator));
+                        timing.Time,
+                        timing.SignNum,
+                        timing.SignDen));
 
                 var lastBpm = bpmList.Count > 0 ? bpmList[^1].Bpm : 0;
                 if (timing.Bpm != lastBpm)
-                    bpmList.Add((timing.Timing, timing.Bpm));
+                    bpmList.Add((timing.Time, timing.Bpm));
             }
 
             var min = bpmList.Count > 0 ? bpmList[0].Bpm : 0;

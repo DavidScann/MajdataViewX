@@ -1,6 +1,6 @@
+using Cimai;
 using MajdataViewX.Base;
 using MajdataViewX.Types.Enums;
-using MajSimai;
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -106,7 +106,7 @@ namespace MajdataViewX.Managers
             TimeData.NoteTime = NoteTime;
         }
 
-        public unsafe void LoadSV(ReadOnlySpan<SimaiTimingPoint> commaTimings)
+        public unsafe void LoadSV(ReadOnlySpan<SimaiTiming> commaTimings)
         {
             SVList.Clear();
             if (SVFuncArgs.IsCreated) SVFuncArgs.Dispose();
@@ -114,7 +114,7 @@ namespace MajdataViewX.Managers
             {
                 if (SVList.Length == 0 || SVList[^1].sVeloc != timing.SVeloc)
                 {
-                    SVList.Add(((float)timing.Timing, timing.SVeloc));
+                    SVList.Add(((float)timing.Time, timing.SVeloc));
                 }
             }
             if (SVList.Length == 0)

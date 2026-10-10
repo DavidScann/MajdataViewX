@@ -4,7 +4,7 @@ using MajdataViewX.Types.Enums;
 using MajdataViewX.Types.Notes;
 using MajdataViewX.Types.Notes.RenderData;
 using MajdataViewX.Utils.Extensions;
-using MajSimai;
+using Cimai;
 using System;
 using System.Threading;
 using Unity.Burst;
@@ -56,9 +56,9 @@ namespace MajdataViewX.Notes.Updaters
             if (hold.isFolded) return;
 
             // ---- body ----
-            var headTiming = hold.usingSV
-                ? TimeData.FakeNoteTime - TimeData.GetPositionAtTime(hold.time)
-                : TimeData.NoteTime - hold.time;
+            var headTiming = hold.isIgnoreSV
+                ? TimeData.NoteTime - hold.time
+                : TimeData.FakeNoteTime - TimeData.GetPositionAtTime(hold.time);
             var headDistance = headTiming * hold.speed + 4.8f;
             var clampedDistance = math.max(headDistance, 1.225f);
 
@@ -66,9 +66,9 @@ namespace MajdataViewX.Notes.Updaters
             var lineScale = math.min(clampedDistance / 4.8f, 1f);
 
             // ---- Tail (hold end) ----
-            var tailTiming = hold.usingSV
-                ? TimeData.FakeNoteTime - TimeData.GetPositionAtTime(hold.time + hold.LastFor)
-                : TimeData.NoteTime - (hold.time + hold.LastFor);
+            var tailTiming = hold.isIgnoreSV
+                ? TimeData.NoteTime - (hold.time + hold.LastFor)
+                : TimeData.FakeNoteTime - TimeData.GetPositionAtTime(hold.time + hold.LastFor);
             var tailDistance = tailTiming * hold.speed + 4.8f;
 
             if (tailTiming > 0) return;
@@ -171,9 +171,9 @@ namespace MajdataViewX.Notes.Updaters
             if (hold.isEnd) return;
 
             // ---- body ----
-            var headTiming = hold.usingSV
-                ? TimeData.FakeNoteTime - TimeData.GetPositionAtTime(hold.time)
-                : TimeData.NoteTime - hold.time;
+            var headTiming = hold.isIgnoreSV
+                ? TimeData.NoteTime - hold.time
+                : TimeData.FakeNoteTime - TimeData.GetPositionAtTime(hold.time);
             var headDistance = headTiming * hold.speed + 4.8f;
             var clampedDistance = math.max(headDistance, 1.225f);
 
@@ -181,9 +181,9 @@ namespace MajdataViewX.Notes.Updaters
             var lineScale = math.min(clampedDistance / 4.8f, 1f);
 
             // ---- Tail (hold end) ----
-            var tailTiming = hold.usingSV
-                ? TimeData.FakeNoteTime - TimeData.GetPositionAtTime(hold.time + hold.LastFor)
-                : TimeData.NoteTime - (hold.time + hold.LastFor);
+            var tailTiming = hold.isIgnoreSV
+                ? TimeData.NoteTime - (hold.time + hold.LastFor)
+                : TimeData.FakeNoteTime - TimeData.GetPositionAtTime(hold.time + hold.LastFor);
             var tailDistance = tailTiming * hold.speed + 4.8f;
 
             // ---- Invisible ----
@@ -538,7 +538,7 @@ namespace MajdataViewX.Notes.Updaters
             NoteHelper.ReportResult(ReportResults,
                 hold.judgeGrade,
                 hold.isBreak,
-                SimaiNoteType.Hold
+                SimaiNoteType.HOLD
             );
             InputData.NextTapHold(
                 hold.Key

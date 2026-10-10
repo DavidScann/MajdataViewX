@@ -7,13 +7,11 @@ using MajdataViewX.Notes.SlideUtils;
 using MajdataViewX.Types.Enums;
 using MajdataViewX.Types.MajSetting;
 using MajdataViewX.Types.MajWs;
-using MajSimai;
-using MemoryPack;
+using Cimai;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.Design;
 using System.IO;
-using System.IO.MemoryMappedFiles;
 using System.Linq;
 using System.Threading;
 using Unity.Properties;
@@ -31,12 +29,6 @@ namespace MajdataViewX.Managers
             ErrMsg = _errMsg,
         };
 
-        // 直接存储 MajSimai 原始类型：Update 从共享内存拿到已解析数据，Play 不再全量解析
-        private static SimaiFile _file = SimaiFile.Empty(string.Empty, string.Empty);
-        private static SimaiChart _chart = SimaiChart.Empty;
-        private MemoryMappedFile mmfChartData;
-        private MemoryMappedViewAccessor mmvChartData;
-
         private static ViewStatus _state = ViewStatus.Idle;
         private static string _errMsg = string.Empty;
 
@@ -44,10 +36,12 @@ namespace MajdataViewX.Managers
         private static int _audioManagerThreadRunning;
 
         private static MajViewSetting _setting = new();
+        private static float _currentOffset;
+        private static SimaiChart? _chart;
 
-        private SpriteRenderer bgCover;
-        private SpriteRenderer bgOutsideCover;
-        private GameObject canvasButtons;
+        private SpriteRenderer _bgCover = null!;
+        private SpriteRenderer _bgOutsideCover = null!;
+        private GameObject _canvasButtons = null!;
 
         private void Awake()
         {
@@ -57,9 +51,9 @@ namespace MajdataViewX.Managers
         // 这里是游戏内部的东西的启动初始化
         private void Start()
         {
-            bgCover = GameObject.Find("BgCover").GetComponent<SpriteRenderer>();
-            bgOutsideCover = GameObject.Find("BgOutsideCover").GetComponent<SpriteRenderer>();
-            canvasButtons = GameObject.Find("CanvasButtons");
+            _bgCover = GameObject.Find("BgCover").GetComponent<SpriteRenderer>();
+            _bgOutsideCover = GameObject.Find("BgOutsideCover").GetComponent<SpriteRenderer>();
+            _canvasButtons = GameObject.Find("CanvasButtons");
 
             _ = new AudioManager();
             Volatile.Write(ref _audioManagerThreadRunning, 1);
@@ -93,24 +87,6 @@ namespace MajdataViewX.Managers
 
 
             SlideTableNeo.InitializeStandardSlideTable();
-
-            var mmfChartDataFileStream = new FileStream(
-                    MajEnv.MmfChartDataPath,
-                    FileMode.OpenOrCreate,
-                    FileAccess.ReadWrite,
-                    FileShare.ReadWrite
-                );
-            if (mmfChartDataFileStream.Length < MajEnv.MmfChartDataCapacity)
-                mmfChartDataFileStream.SetLength(MajEnv.MmfChartDataCapacity);
-            mmfChartData = MemoryMappedFile.CreateFromFile(
-                mmfChartDataFileStream,
-                null,
-                MajEnv.MmfChartDataCapacity,
-                MemoryMappedFileAccess.ReadWrite,
-                HandleInheritability.None,
-                false
-            );
-            mmvChartData = mmfChartData.CreateViewAccessor();
         }
 
         private bool CheckIsLoaded() => _audioManager.IsTrackLoaded &&
@@ -133,23 +109,23 @@ namespace MajdataViewX.Managers
                 //bg
                 if (File.Exists(bgPath))
                 {
-                    BgManager.hasBg = true;
-                    _bgManager.LoadBG(bgPath);
+                    BgManager.HasBg = true;
+                    _bgManager.LoadBg(bgPath);
                 }
                 else
                 {
-                    BgManager.hasBg = false;
+                    BgManager.HasBg = false;
                 }
 
                 //video
                 if (pvPath is not null && File.Exists(pvPath))
                 {
-                    BgManager.hasVideo = true;
+                    BgManager.HasVideo = true;
                     _bgManager.LoadVideo(pvPath);
                 }
                 else
                 {
-                    BgManager.hasVideo = false;
+                    BgManager.HasVideo = false;
                 }
 
                 _state = ViewStatus.Loaded;
@@ -182,48 +158,46 @@ namespace MajdataViewX.Managers
             //counter
             _objectCounter.Setting(_setting.ComboStatusType, _setting.UIType);
             //bg
-            bgCover.color = new Color(0f, 0f, 0f, _setting.BackgroundDim);
-            bgOutsideCover.color = new Color(0f, 0f, 0f, _setting.BackgroundOutsideDim);
-            _bgManager.ResizeBg = _setting.ResizeBg;
+            _bgCover.color = new Color(0f, 0f, 0f, _setting.BackgroundDim);
+            _bgOutsideCover.color = new Color(0f, 0f, 0f, _setting.BackgroundOutsideDim);
+            _bgManager.resizeBg = _setting.ResizeBg;
             //fork: Fast/Late judge display + realistic wide-hand DJAuto
             _effectManager.SetDisplayMode(setting.JudgeDisplayMode);
             InputManager.WideHands = _setting.WideHands;
         }
 
-        public async UniTask UpdateAsync(long fileLength, long chartLength, int selectedDiff)
+        public async UniTask UpdateAsync(
+            string? chartText,
+            int selectedDifficulty,
+            string title,
+            string artist,
+            string level,
+            string designer,
+            float offset,
+            int clockCount)
         {
             while (_state is ViewStatus.Busy)
                 await UniTask.Yield();
 
             var previousState = _state;
             _state = ViewStatus.Busy;
+            
+            var chart = SimaiChart.Parse(chartText ?? string.Empty);
 
-            // 从共享内存读取 Edit 写入的两段 MemoryPack 字节并反序列化：
-            // [0..fileLength) = SimaiFile 元数据（Charts 已 Ignore），[fileLength..) = SimaiChart 时序
-            var fileBuffer = new byte[fileLength];
-            mmvChartData.ReadArray(0, fileBuffer, 0, (int)fileLength);
-            var chartBuffer = new byte[chartLength];
-            mmvChartData.ReadArray(fileLength, chartBuffer, 0, (int)chartLength);
-
-            var file = MemoryPackSerializer.Deserialize<SimaiFile>(fileBuffer) ?? SimaiFile.Empty(string.Empty, string.Empty);
-            var chart = MemoryPackSerializer.Deserialize<SimaiChart>(chartBuffer) ?? SimaiChart.Empty;
-
-            _file = file;
+            _chart?.Dispose();
             _chart = chart;
+            _currentOffset = offset;
+            _timeProvider.offset = offset;
 
-            _timeProvider.offset = _file.Offset;
             //answer
-            var clockCount = 0;
-            var clockCommand = file.Commands.FirstOrDefault(c => c.Prefix == "clock_count");
-            if (clockCommand != null) int.TryParse(clockCommand.Value, out clockCount);
-            _audioManager.GenerateAnswerSFX(_chart, clockCount);
+            _audioManager.GenerateAnswerSFX(chart, clockCount);
 
             //counter
             _objectCounter.ResetLoaded();
-            _objectCounter.CountNoteSum(_chart);
-            _objectCounter.ReportMeterBpm(_chart);
+            _objectCounter.CountNoteSum(chart);
+            _objectCounter.ReportMeterBpm(chart);
 
-            await _dataLoader.Load(_chart, file.Title, file.Artist, selectedDiff);
+            await _dataLoader.Load(chart, title, artist, level, designer, selectedDifficulty);
 
             _state = previousState;
         }
@@ -240,10 +214,10 @@ namespace MajdataViewX.Managers
             try
             {
                 await UniTask.SwitchToMainThread();
-                var ignoreOffset = startAt - _file.Offset;
+                var ignoreOffset = startAt - _currentOffset;
 
                 //bg
-                _bgManager.ShowBG();
+                _bgManager.ShowBg();
                 // Async: Linux decodes bg video via the ffmpeg pipe (Unity
                 // VideoPlayer has no H.264 decoder there); elsewhere this
                 // runs the VideoPlayer path.
@@ -255,7 +229,7 @@ namespace MajdataViewX.Managers
                 _objectCounter.CountIgnoreNoteCountAsync(_chart, ignoreOffset);
                 //notes
                 //MajBurst.InputData.ResetState(); in ResetLoadedNote
-                _noteManager.ResetState(); //reset djauto hands (PlayUpdateJob is still running when IsStart==false)
+                _noteManager.ResetState(); //reset DJAuto hands (PlayUpdateJob is still running when IsStart==false)
                 _noteManager.ResetLoadedNote(ignoreOffset);
                 _noteManager.ResetLoadedPlay(ignoreOffset);
                 MajBurst.MultTouchHandler.ResetMultTouchState();
@@ -265,7 +239,7 @@ namespace MajdataViewX.Managers
                     case PlaybackMode.Normal:
                         _allPerfectManager.enabled = false;
 
-                        _timeProvider.SetStartTime(startAt, _file.Offset, speed, playmode);
+                        _timeProvider.SetStartTime(startAt, _currentOffset, speed, playmode);
                         _audioManager.PlayTrack();
                         break;
                     case PlaybackMode.IncludeOp:
@@ -274,7 +248,7 @@ namespace MajdataViewX.Managers
                         _bgManager.PlaySongDetail();
                         _audioManager.noteSfxPlaybackRequests[AudioManager.TRACK_START] = true; //track_start
 
-                        _timeProvider.SetStartTime(startAt, _file.Offset, speed, playmode);
+                        _timeProvider.SetStartTime(startAt, _currentOffset, speed, playmode);
                         _audioManager.PlayTrack();
                         break;
                     case PlaybackMode.Record:
@@ -283,7 +257,7 @@ namespace MajdataViewX.Managers
                             throw new InvalidPathException($"maidata path is required");
                         }
 
-                        canvasButtons.SetActive(false);
+                        _canvasButtons.SetActive(false);
                         _allPerfectManager.enabled = true;
 
                         _bgManager.PlaySongDetail();
@@ -298,10 +272,10 @@ namespace MajdataViewX.Managers
                             recordEndTime,
                             () =>
                             {
-                                _timeProvider.SetStartTime(startAt, _file.Offset, speed, playmode, _setting.OutputFps);
+                                _timeProvider.SetStartTime(startAt, _currentOffset, speed, playmode, _setting.OutputFps);
                             }).ContinueWith(() =>
                         {
-                            canvasButtons.SetActive(true);
+                            _canvasButtons.SetActive(true);
                             _state = ViewStatus.Loaded;
                             // The AP finish does not stop the record (it runs
                             // to the chart end), so report completion here.
@@ -312,6 +286,8 @@ namespace MajdataViewX.Managers
                         _allPerfectManager.enabled = false;
                         _state = ViewStatus.Paused;
                         return;
+                    default:
+                        throw new ArgumentOutOfRangeException(nameof(playmode), playmode, null);
                 }
 
                 _state = ViewStatus.Playing;
@@ -335,28 +311,33 @@ namespace MajdataViewX.Managers
         {
             const float ApShowSec = 3.5f;
             double lastNoteEnd = 0;
-            for (var ti = 0; ti < _chart.NoteTimings.Length; ti++)
+            if (_chart is not null && !_chart.IsDisposed)
             {
-                var timing = _chart.NoteTimings[ti];
-                for (var ni = 0; ni < timing.Notes.Length; ni++)
+                var timings = _chart.Timings;
+                for (var ti = 0; ti < timings.Length; ti++)
                 {
-                    var note = timing.Notes[ni];
-                    var end = note.Type switch
+                    var timing = timings[ti];
+                    var notes = timing.Notes;
+                    for (var ni = 0; ni < notes.Length; ni++)
                     {
-                        SimaiNoteType.Hold or SimaiNoteType.TouchHold =>
-                            timing.Timing + note.HoldTime,
-                        // SlideStartTime is absolute (the loader uses it
-                        // directly as shootTime), not an offset.
-                        SimaiNoteType.Slide =>
-                            note.SlideStartTime + note.SlideTime,
-                        _ => timing.Timing,
-                    };
-                    if (end > lastNoteEnd) lastNoteEnd = end;
+                        var note = notes[ni];
+                        var end = note.Type switch
+                        {
+                            SimaiNoteType.HOLD or SimaiNoteType.TOUCHHOLD =>
+                                timing.Time + note.Duration,
+                            // Slide end = shoot time + slide duration, matching
+                            // NoteManager.Loader (shootTime = Time + SlideShootDelay).
+                            SimaiNoteType.SLIDE =>
+                                timing.Time + note.SlideShootDelay + note.Duration,
+                            _ => timing.Time,
+                        };
+                        if (end > lastNoteEnd) lastNoteEnd = end;
+                    }
                 }
             }
             var recordEndTime = Math.Min(
-                _audioManager.TrackLength + _file.Offset,
-                lastNoteEnd + ApShowSec + _file.Offset);
+                _audioManager.TrackLength + _currentOffset,
+                lastNoteEnd + ApShowSec + _currentOffset);
             Debug.Log($"[PlayManager] record: TrackLength={_audioManager.TrackLength:F2}s " +
                       $"lastNoteEnd={lastNoteEnd:F2}s recordEndTime={recordEndTime:F2}s");
             if (recordEndTime <= 0)
@@ -445,9 +426,6 @@ namespace MajdataViewX.Managers
             _audioManager.OnDestroy();
             _inputManager.OnDestroy();
             MajBurst.InputData.Dispose();
-
-            mmvChartData?.Dispose();
-            mmfChartData?.Dispose();
         }
     }
 }
