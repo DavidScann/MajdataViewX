@@ -42,6 +42,7 @@ namespace MajdataViewX.Managers
 
         private readonly Animator[] _judgeAnimators = new Animator[EFFECT_COUNT];
         private readonly SpriteRenderer[] _judgeRenderers = new SpriteRenderer[EFFECT_COUNT];
+        private readonly SpriteRenderer[] _judgeBreakCovers = new SpriteRenderer[EFFECT_COUNT];
 
         private readonly SpriteRenderer[] _fastLateRenderers = new SpriteRenderer[EFFECT_COUNT];
 
@@ -106,7 +107,8 @@ namespace MajdataViewX.Managers
                 var judgeEffect = effect.transform.GetChild(3).gameObject;
                 _judgeAnimators[i] = judgeEffect.GetComponent<Animator>();
                 _judgeRenderers[i] = judgeEffect.transform.GetChild(0).GetChild(0).gameObject.GetComponent<SpriteRenderer>();
-                judgeEffect.transform.GetChild(0).GetChild(1).gameObject.GetComponent<SpriteRenderer>().sprite = _noteSkinManager.JudgeText_BPerfect;
+                _judgeBreakCovers[i] = judgeEffect.transform.GetChild(0).GetChild(1).gameObject.GetComponent<SpriteRenderer>();
+                _judgeBreakCovers[i].sprite = _noteSkinManager.JudgeText_BPerfect;
                 _fastLateRenderers[i] = judgeEffect.transform.GetChild(1).GetChild(0).GetComponent<SpriteRenderer>();
 
                 _fireworkEffect = GameObject.Find("FireworkEffect");
@@ -175,6 +177,18 @@ namespace MajdataViewX.Managers
                 default:
                     showFL = showLevel = true;
                     break;
+            }
+
+            // The judge clip animates the active states of the level text and
+            // the fast/late text, so visibility is controlled by the sprites:
+            // keep the level text and its break cover blank in Fast/Late-only
+            // (and None) modes, where the shared clip still plays.
+            for (var i = 0; i < EFFECT_COUNT; i++)
+            {
+                if (_judgeRenderers[i] != null && !showLevel)
+                    _judgeRenderers[i].sprite = null;
+                if (_judgeBreakCovers[i] != null)
+                    _judgeBreakCovers[i].sprite = showLevel ? _noteSkinManager.JudgeText_BPerfect : null;
             }
         }
 
@@ -255,8 +269,12 @@ namespace MajdataViewX.Managers
                     break;
             }
 
-            // Judge Anim
-            if (showLevel)
+            if (!showLevel)
+                _judgeRenderers[pos].sprite = null;
+
+            // Judge Anim: the clip reveals the level text and the fast/late
+            // text together, so it must run whenever either is shown.
+            if (showLevel || showFL)
             {
                 if (isBreak && (judge is JudgeGrade.LateCritical or JudgeGrade.FastCritical))
                     _judgeAnimators[pos].SetTrigger(BPerfectHash);
@@ -279,6 +297,10 @@ namespace MajdataViewX.Managers
                     else
                         _fastLateRenderers[pos].sprite = _noteSkinManager.LateText;
                 }
+            }
+            else
+            {
+                _fastLateRenderers[pos].sprite = null;
             }
         }
 
@@ -323,8 +345,12 @@ namespace MajdataViewX.Managers
                     break;
             }
 
-            // Judge Anim
-            if (showLevel)
+            if (!showLevel)
+                _judgeRenderers[pos].sprite = null;
+
+            // Judge Anim: the clip reveals the level text and the fast/late
+            // text together, so it must run whenever either is shown.
+            if (showLevel || showFL)
             {
                 if (isBreak && (judge is JudgeGrade.LateCritical or JudgeGrade.FastCritical))
                     _judgeAnimators[pos].SetTrigger(BPerfectHash);
@@ -347,6 +373,10 @@ namespace MajdataViewX.Managers
                     else
                         _fastLateRenderers[pos].sprite = _noteSkinManager.LateText;
                 }
+            }
+            else
+            {
+                _fastLateRenderers[pos].sprite = null;
             }
         }
 
