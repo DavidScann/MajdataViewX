@@ -154,6 +154,11 @@ namespace MajdataViewX.Managers
         NativeArray<int> _nextSensorIndex;
         NativeArray<int> _nextButtonIndexNextFrame;
         NativeArray<int> _nextSensorIndexNextFrame;
+        // Input the sim wants pressed for the current frame (accumulated across its
+        // 240Hz ticks); re-asserted per frame (ReassertDJAutoInput) so no-tick
+        // frames keep the level stable.
+        ulong _djAutoSensorMask;
+        ulong _djAutoButtonMask;
 
         const int DJAUTO_MAX_CONCURRENT_INPUTS = 2;
         // per-tick world-hit budget (hand slots); actual writes are bounded by the render group capacity.
@@ -250,8 +255,16 @@ namespace MajdataViewX.Managers
         /// two-hand allocation model. Used for momentary tap/hold-head presses (the hand model only
         /// constrains continuous inputs: slides/touches).
         /// </summary>
-        public void DJAutoPressButton(SensorType type) => SetButtonOn(type);
-        public void DJAutoPressSensor(SensorType type) => SetSensorOn(type);
+        public void DJAutoPressButton(SensorType type)
+        {
+            SetButtonOn(type);
+            _djAutoButtonMask |= 1ul << (int)type;
+        }
+        public void DJAutoPressSensor(SensorType type)
+        {
+            SetSensorOn(type);
+            _djAutoSensorMask |= 1ul << (int)type;
+        }
         /// <summary>
         /// DJAuto处理Touch/TouchHold（寻找大手圆）
         /// </summary>
@@ -505,10 +518,30 @@ namespace MajdataViewX.Managers
 
         private void SetSensorsFromMask(ulong sensorMask)
         {
+            _djAutoSensorMask |= sensorMask;
             for (int sensorIndex = 0; sensorIndex < SENSOR_COUNT; sensorIndex++)
             {
                 if ((sensorMask & (1ul << sensorIndex)) != 0)
                     SetSensorOn((SensorType)sensorIndex);
+            }
+        }
+
+        /// <summary>
+        /// Re-assert the last sim tick's input for the current frame. The per-frame
+        /// state reset (BeginHandler) plus a frame that ran no 240Hz tick would
+        /// otherwise leave DJAuto-held sensors/buttons dark for a frame - a visible
+        /// flash flicker and a false release to the render jobs. The sim's input is
+        /// level-based, so carrying the last tick's intent across the frame is
+        /// exactly the non-Absolute behaviour (frame-stable levels).
+        /// </summary>
+        public void ReassertDJAutoInput()
+        {
+            if (_djAutoSensorMask != 0)
+                SetSensorsFromMask(_djAutoSensorMask);
+            for (int i = 0; i < BUTTON_COUNT; i++)
+            {
+                if ((_djAutoButtonMask & (1ul << i)) != 0)
+                    SetButtonOn((SensorType)i);
             }
         }
 
@@ -583,6 +616,18 @@ namespace MajdataViewX.Managers
             _djAutoInputCount = 0;
             *ActiveCoveragesCountPtr = 0;
             _djAutoWorldHitCount = 0;
+        }
+
+        /// <summary>
+        /// Clear the desired-input masks at the start of a frame's tick sequence.
+        /// Not per tick: a later tick in the same frame skips already-pressed
+        /// sensors (the <c>if (!Status)</c> guards), so per-tick clearing would
+        /// drop their bits and a no-tick frame would go dark.
+        /// </summary>
+        public void ResetSimInputMasks()
+        {
+            _djAutoSensorMask = 0;
+            _djAutoButtonMask = 0;
         }
 
         /// <summary>

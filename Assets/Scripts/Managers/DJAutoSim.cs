@@ -77,11 +77,18 @@ namespace MajdataViewX.Managers
             // MAX_CATCH_UP_SEC at normal FPS.
             var cap = math.max(MAX_CATCH_UP_SEC, delta + SIM_DT);
             _acc = math.min(_acc + delta, cap);
+            var ticks = 0;
             while (_acc >= SIM_DT)
             {
+                if (ticks == 0)
+                    InputData.ResetSimInputMasks();
                 Tick(noteTime - _acc, ctx);
                 _acc -= SIM_DT;
+                ticks++;
             }
+            // Frame-stable input: carry the frame's presses across the frame
+            // (a frame can legitimately run zero ticks at high FPS).
+            InputData.ReassertDJAutoInput();
         }
 
         void Tick(float simTime, in SimContext ctx)
