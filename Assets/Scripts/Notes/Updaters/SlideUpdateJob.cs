@@ -63,7 +63,9 @@ namespace MajdataViewX.Notes.Updaters
         private void SeeOnlyUpdate(SlideData slide, int index)
         {
             if (slide.isFolded) return;
-            if (TimeData.NoteTime < slide.tapTime ||
+            // Pause must also cover the fade-in window, or the slide vanishes
+            // when pausing mid-fade; lower bound matches TransformUpdate's playback clipping.
+            if (TimeData.NoteTime < slide.tapTime + slide.fadeInStartTiming ||
                 TimeData.NoteTime > slide.shootTime + slide.LastFor) return;
 
             var tapTiming = TimeData.NoteTime - slide.tapTime;
