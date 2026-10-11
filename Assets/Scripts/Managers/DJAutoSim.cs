@@ -610,14 +610,13 @@ namespace MajdataViewX.Managers
                    (slide.isJudged && simTime > slide.judgeTime + InputManager.DJAUTO_SLIDE_RELEASE_DELAY_SEC)
                 ) continue;
                 var timing = simTime - slide.shootTime;
-                // Sensor mode: the star fades in on the start sensor from tapTime, so the input
-                // follows it - the hand sits on the start (first sensor) from the fade-in.
-                // Button mode keeps its tap-guide delay.
+                // Button mode keeps its tap-guide delay. Sensor mode taps the head
+                // at shoot and lets go like the practical hands: no sitting on the
+                // start sensor through the fade-in (that pins a hand and the sensor
+                // up to a beat early while judging only starts at shoot).
                 var autoplayStart = mode == AutoPlayMode.DJAutoButton && slide.hasTapGuide
                     ? InputManager.DJAUTO_SLIDE_TAP_GUIDE_DELAY_SEC // button-mode DJAuto tap-guide delay
-                    : mode == AutoPlayMode.DJAutoSensor
-                        ? math.min(0f, slide.tapTime - slide.shootTime)
-                        : SIM_AUTOPLAY_START_SEC;
+                    : SIM_AUTOPLAY_START_SEC;
                 if (timing < autoplayStart) continue;
                 switch (mode)
                 {
