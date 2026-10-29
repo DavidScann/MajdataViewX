@@ -77,9 +77,7 @@ namespace MajdataViewX.Notes.Updaters
             {
                 var idxLast = slide.slideArrowsCount - 1;
                 var distance = slide.process * slide.slideArrows[idxLast].L;
-                slide.processIdx = 1;
-                while (slide.slideArrows[slide.processIdx].L < distance && slide.processIdx < idxLast)
-                    slide.processIdx++;
+                slide.processIdx = slide.FindArrowIndexAtDistance(distance);
             }
             else
             {

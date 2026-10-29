@@ -4,6 +4,7 @@ using MajdataViewX.Types;
 using MajdataViewX.Types.Enums;
 using Cimai;
 using System;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using static MajdataViewX.Base.MajCtx;
@@ -18,6 +19,7 @@ namespace MajdataViewX.Managers
             ZString.PrepareUtf16<long>("{0}");
 
         private Utf16ValueStringBuilder outputBuilder = ZString.CreateStringBuilder();
+        private readonly Dictionary<TMP_Text, char[]> outputTextCache = new();
 
         [SerializeField]
         Color AchievementDudColor;
@@ -457,27 +459,53 @@ namespace MajdataViewX.Managers
                 SetOutputText(objCombo);
 
                 var time = _timeProvider.NoteTime;
-                for (var i = meterList.Count - 1; i >= 0; i--)
+                var low = 0;
+                var high = meterList.Count - 1;
+                var meterIndex = -1;
+                while (low <= high)
                 {
-                    var meter = meterList[i];
-                    if (meter.Timing > time) continue;
-
+                    var mid = (low + high) >> 1;
+                    if (meterList[mid].Timing > time)
+                    {
+                        high = mid - 1;
+                    }
+                    else
+                    {
+                        meterIndex = mid;
+                        low = mid + 1;
+                    }
+                }
+                if (meterIndex >= 0)
+                {
+                    var meter = meterList[meterIndex];
                     outputBuilder.Clear();
                     outputBuilder.Append(meter.Numerator);
                     outputBuilder.Append('\n');
                     outputBuilder.Append(meter.Denominator);
                     SetOutputText(objMeter);
-                    break;
                 }
-                for (var i = bpmList.Count - 1; i >= 0; i--)
-                {
-                    var bpm = bpmList[i];
-                    if (bpm.Timing > time) continue;
 
+                low = 0;
+                high = bpmList.Count - 1;
+                var bpmIndex = -1;
+                while (low <= high)
+                {
+                    var mid = (low + high) >> 1;
+                    if (bpmList[mid].Timing > time)
+                    {
+                        high = mid - 1;
+                    }
+                    else
+                    {
+                        bpmIndex = mid;
+                        low = mid + 1;
+                    }
+                }
+                if (bpmIndex >= 0)
+                {
                     outputBuilder.Clear();
-                    outputBuilder.Append(bpm.Bpm);
+                    outputBuilder.Append(bpmList[bpmIndex].Bpm);
                     SetOutputText(objBpm);
-                    break;
                 }
             }
         }
@@ -520,7 +548,29 @@ namespace MajdataViewX.Managers
         private void SetOutputText(TMP_Text text)
         {
             var chars = outputBuilder.AsArraySegment();
+            if (outputTextCache.TryGetValue(text, out var cached) && cached.Length == chars.Count)
+            {
+                var unchanged = true;
+                for (var i = 0; i < chars.Count; i++)
+                {
+                    if (cached[i] == chars.Array[chars.Offset + i]) continue;
+                    unchanged = false;
+                    break;
+                }
+                if (unchanged) return;
+            }
+
+            // TMP rebuilds its text geometry even when assigned the same
+            // content. Only submit actual changes; keep a char buffer rather
+            // than allocating a string every frame for the comparison.
             text.SetCharArray(chars.Array, chars.Offset, chars.Count);
+            if (cached == null || cached.Length != chars.Count)
+            {
+                cached = new char[chars.Count];
+                outputTextCache[text] = cached;
+            }
+            if (chars.Count > 0)
+                Array.Copy(chars.Array, chars.Offset, cached, 0, chars.Count);
         }
     }
 }

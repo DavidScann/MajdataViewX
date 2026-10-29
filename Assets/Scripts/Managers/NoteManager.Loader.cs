@@ -39,6 +39,7 @@ namespace MajdataViewX.Managers
         public unsafe void Load(SimaiChart chart)
         {
             _prevChain.Complete();
+            _djAutoSim.ResetNoteScan();
 
             // 防御性清空：正常流程下 Stop 时 ResetCur 已清空，
             // 此处防止"未 Stop 就重新 Load"导致 NativeList 累积

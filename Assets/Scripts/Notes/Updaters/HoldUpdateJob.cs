@@ -56,9 +56,10 @@ namespace MajdataViewX.Notes.Updaters
             if (hold.isFolded) return;
 
             // ---- body ----
+            var fakeNoteTime = hold.isIgnoreSV ? 0f : TimeData.FakeNoteTime;
             var headTiming = hold.isIgnoreSV
                 ? TimeData.NoteTime - hold.time
-                : TimeData.FakeNoteTime - TimeData.GetPositionAtTime(hold.time);
+                : fakeNoteTime - TimeData.GetPositionAtTime(hold.time);
             var headDistance = headTiming * hold.speed + 4.8f;
             var clampedDistance = math.max(headDistance, 1.225f);
 
@@ -68,7 +69,7 @@ namespace MajdataViewX.Notes.Updaters
             // ---- Tail (hold end) ----
             var tailTiming = hold.isIgnoreSV
                 ? TimeData.NoteTime - (hold.time + hold.LastFor)
-                : TimeData.FakeNoteTime - TimeData.GetPositionAtTime(hold.time + hold.LastFor);
+                : fakeNoteTime - TimeData.GetPositionAtTime(hold.time + hold.LastFor);
             var tailDistance = tailTiming * hold.speed + 4.8f;
 
             if (tailTiming > 0) return;
@@ -171,9 +172,10 @@ namespace MajdataViewX.Notes.Updaters
             if (hold.isEnd) return;
 
             // ---- body ----
+            var fakeNoteTime = hold.isIgnoreSV ? 0f : TimeData.FakeNoteTime;
             var headTiming = hold.isIgnoreSV
                 ? TimeData.NoteTime - hold.time
-                : TimeData.FakeNoteTime - TimeData.GetPositionAtTime(hold.time);
+                : fakeNoteTime - TimeData.GetPositionAtTime(hold.time);
             var headDistance = headTiming * hold.speed + 4.8f;
             var clampedDistance = math.max(headDistance, 1.225f);
 
@@ -183,7 +185,7 @@ namespace MajdataViewX.Notes.Updaters
             // ---- Tail (hold end) ----
             var tailTiming = hold.isIgnoreSV
                 ? TimeData.NoteTime - (hold.time + hold.LastFor)
-                : TimeData.FakeNoteTime - TimeData.GetPositionAtTime(hold.time + hold.LastFor);
+                : fakeNoteTime - TimeData.GetPositionAtTime(hold.time + hold.LastFor);
             var tailDistance = tailTiming * hold.speed + 4.8f;
 
             // ---- Invisible ----

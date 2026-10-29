@@ -54,13 +54,28 @@ namespace MajdataViewX.Managers
 
         float _acc;
         float _lastSimNoteTime;
+        int _tapScanStart;
+        int _holdScanStart;
+        int _touchScanStart;
+        int _touchHoldScanStart;
+        int _slideScanStart;
         public long TotalTicks { get; private set; }
+
+        public void ResetNoteScan()
+        {
+            _tapScanStart = 0;
+            _holdScanStart = 0;
+            _touchScanStart = 0;
+            _touchHoldScanStart = 0;
+            _slideScanStart = 0;
+        }
 
         public void Reset()
         {
             _acc = 0;
             _lastSimNoteTime = 0;
             TotalTicks = 0;
+            ResetNoteScan();
         }
 
         /// <summary>Advance the fixed-step simulation. noteTime is TimeProvider's NoteTime.</summary>
@@ -68,7 +83,12 @@ namespace MajdataViewX.Managers
         {
             var delta = noteTime - _lastSimNoteTime;
             _lastSimNoteTime = noteTime;
-            if (delta <= 0 || delta > MAX_GAP_SEC) { _acc = 0; return; } // reset/seek: re-anchor
+            if (delta <= 0 || delta > MAX_GAP_SEC)
+            {
+                _acc = 0;
+                ResetNoteScan();
+                return;
+            } // reset/seek: re-anchor
             if (delta > 1.5f)
                 Debug.Log($"[dbg][sim] big catch-up delta={delta:F2}s");
 
@@ -103,7 +123,10 @@ namespace MajdataViewX.Managers
             InputData.BeginSimTick();
             if (mode == AutoPlayMode.Disable)
             {
-                UpdateSlidesMine(simTime, ctx); // Disable mode only advances mine slides
+                // MineSlideAutoAdvance is a no-op when this setting is off.
+                // Avoid scanning the whole chart at 240 Hz in that case.
+                if (NoteHelper.Settings.MineAutoSlide)
+                    UpdateSlidesMine(simTime, ctx); // Disable mode only advances mine slides
                 return;
             }
             // Practical play: upstream hands perform within physical limits,
@@ -118,13 +141,18 @@ namespace MajdataViewX.Managers
 
         void UpdateTaps(float simTime, AutoPlayMode mode, in SimContext ctx)
         {
-            for (int i = 0; i < ctx.Taps.Length; i++)
+            while (_tapScanStart < ctx.Taps.Length && ctx.Taps[_tapScanStart].IsEnd)
+                _tapScanStart++;
+
+            for (int i = _tapScanStart; i < ctx.Taps.Length; i++)
             {
                 ref var tap = ref ctx.Taps.ElementRef(i);
                 if (tap.IsEnd) continue;
                 var timing = simTime - tap.Time;
-                // Notes are time-ordered, so later notes could early-out; `continue` is used uniformly to match the other types.
-                if (timing < SIM_AUTOPLAY_START_SEC) continue;
+                // Notes are loaded in chart-time order. Later notes cannot be
+                // eligible yet either, so this is the same as continuing over
+                // the remainder without doing any work for them.
+                if (timing < SIM_AUTOPLAY_START_SEC) break;
 
                 switch (mode)
                 {
@@ -219,12 +247,15 @@ namespace MajdataViewX.Managers
 
         void UpdateHolds(float simTime, AutoPlayMode mode, in SimContext ctx)
         {
-            for (int i = 0; i < ctx.Holds.Length; i++)
+            while (_holdScanStart < ctx.Holds.Length && ctx.Holds[_holdScanStart].isEnd)
+                _holdScanStart++;
+
+            for (int i = _holdScanStart; i < ctx.Holds.Length; i++)
             {
                 ref var hold = ref ctx.Holds.ElementRef(i);
                 if (hold.isEnd) continue;
                 var timing = simTime - hold.time;
-                if (timing < SIM_AUTOPLAY_START_SEC) continue;
+                if (timing < SIM_AUTOPLAY_START_SEC) break;
 
                 switch (mode)
                 {
@@ -366,11 +397,21 @@ namespace MajdataViewX.Managers
 
         void UpdateTouches(float simTime, AutoPlayMode mode, in SimContext ctx)
         {
-            for (int i = 0; i < ctx.Touches.Length; i++)
+            while (_touchScanStart < ctx.Touches.Length && ctx.Touches[_touchScanStart].isEnd)
+                _touchScanStart++;
+
+            var earliestAutoplayStart = mode is AutoPlayMode.DJAutoButton or AutoPlayMode.DJAutoSensor
+                ? InputManager.DJAUTO_TOUCH_DOUBLE_CIRCLE_SLIDE_START_SEC
+                : SIM_AUTOPLAY_START_SEC;
+            for (int i = _touchScanStart; i < ctx.Touches.Length; i++)
             {
                 ref var touch = ref ctx.Touches.ElementRef(i);
                 if (touch.isEnd) continue;
                 var timing = simTime - touch.time;
+                // DoubleCircleSlide has the earliest possible start. If even
+                // that is still in the future, every later chart-time entry
+                // would take one of the existing continue paths as well.
+                if (timing < earliestAutoplayStart) break;
                 if (touch.coverageId < 0 && NoteHelper.IsSimulated) continue;
                 var autoplayStart = mode is AutoPlayMode.DJAutoButton or AutoPlayMode.DJAutoSensor &&
                                     ctx.TouchGroupCoverResults[touch.coverageId].Mode == CoverMode.DoubleCircleSlide
@@ -474,12 +515,15 @@ namespace MajdataViewX.Managers
 
         void UpdateTouchHolds(float simTime, AutoPlayMode mode, in SimContext ctx)
         {
-            for (int i = 0; i < ctx.TouchHolds.Length; i++)
+            while (_touchHoldScanStart < ctx.TouchHolds.Length && ctx.TouchHolds[_touchHoldScanStart].isEnd)
+                _touchHoldScanStart++;
+
+            for (int i = _touchHoldScanStart; i < ctx.TouchHolds.Length; i++)
             {
                 ref var th = ref ctx.TouchHolds.ElementRef(i);
                 if (th.isEnd) continue;
                 var timing = simTime - th.time;
-                if (timing < SIM_AUTOPLAY_START_SEC) continue;
+                if (timing < SIM_AUTOPLAY_START_SEC) break;
 
                 switch (mode)
                 {
@@ -610,7 +654,10 @@ namespace MajdataViewX.Managers
 
         void UpdateSlides(float simTime, AutoPlayMode mode, in SimContext ctx)
         {
-            for (int i = 0; i < ctx.Slides.Length; i++)
+            while (_slideScanStart < ctx.Slides.Length && ctx.Slides[_slideScanStart].isEnd)
+                _slideScanStart++;
+
+            for (int i = _slideScanStart; i < ctx.Slides.Length; i++)
             {
                 ref var slide = ref ctx.Slides.ElementRef(i);
                 if (slide.isEnd || slide.isSlideEnd ||
@@ -705,9 +752,7 @@ namespace MajdataViewX.Managers
                                     // slide.starPos lags a full frame at low FPS, lagging the hand and dropping sections (Miss).
                                     var lastIndex = slide.slideArrowsCount - 1;
                                     var distance = inputProcess * slide.slideArrows[lastIndex].L;
-                                    var nextIndex = 1;
-                                    while (nextIndex < lastIndex && slide.slideArrows[nextIndex].L < distance)
-                                        nextIndex++;
+                                    var nextIndex = slide.FindArrowIndexAtDistance(distance);
 
                                     var previous = slide.slideArrows[nextIndex - 1];
                                     var next = slide.slideArrows[nextIndex];
@@ -1007,7 +1052,10 @@ namespace MajdataViewX.Managers
         /// <summary>Disable mode only advances mine slides (no hand input at all).</summary>
         void UpdateSlidesMine(float simTime, in SimContext ctx)
         {
-            for (int i = 0; i < ctx.Slides.Length; i++)
+            while (_slideScanStart < ctx.Slides.Length && ctx.Slides[_slideScanStart].isEnd)
+                _slideScanStart++;
+
+            for (int i = _slideScanStart; i < ctx.Slides.Length; i++)
             {
                 ref var slide = ref ctx.Slides.ElementRef(i);
                 if (slide.isEnd || slide.isSlideEnd ||
