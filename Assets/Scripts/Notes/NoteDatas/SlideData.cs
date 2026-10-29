@@ -112,6 +112,25 @@ namespace MajdataViewX.Notes.NoteDatas
         public float slideOKAlpha; // 1->0
         public float brightness;
 
+        /// <summary>
+        /// Finds the first arrow at or after distance, capped at the final
+        /// arrow. This is the lower-bound equivalent of scanning from arrow 1.
+        /// </summary>
+        public readonly unsafe int FindArrowIndexAtDistance(float distance)
+        {
+            var low = 1;
+            var high = slideArrowsCount - 1;
+            while (low < high)
+            {
+                var mid = (low + high) >> 1;
+                if (slideArrows[mid].L < distance)
+                    low = mid + 1;
+                else
+                    high = mid;
+            }
+            return low;
+        }
+
         public void Init()
         {
             starAlpha = 0;

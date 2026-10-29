@@ -25,6 +25,7 @@ namespace MajdataViewX.Managers
         private static readonly int BGreatHash = Animator.StringToHash("bGreat");
         private static readonly int BGoodHash = Animator.StringToHash("bGood");
         private static readonly int FireHash = Animator.StringToHash("fire");
+        private static readonly int HoldingColorID = Shader.PropertyToID("_Color");
 
         [SerializeField] 
         private GameObject effectPrefab = null!;
@@ -36,6 +37,8 @@ namespace MajdataViewX.Managers
 
         private readonly GameObject[] _holdEffects = new GameObject[EFFECT_COUNT];
         private readonly Material[] _holdMaterials = new Material[EFFECT_COUNT];
+        private readonly bool[] _holdEffectActive = new bool[EFFECT_COUNT];
+        private readonly Color[] _holdMaterialColors = new Color[EFFECT_COUNT];
 
         private readonly GameObject[] _touchEffects = new GameObject[EFFECT_COUNT];
         private readonly Animator[] _touchAnimators = new Animator[EFFECT_COUNT];
@@ -97,6 +100,7 @@ namespace MajdataViewX.Managers
 
                 _holdEffects[i] = effect.transform.GetChild(1).gameObject;
                 _holdMaterials[i] = _holdEffects[i].GetComponent<ParticleSystemRenderer>().material;
+                _holdMaterialColors[i] = _holdMaterials[i].GetColor(HoldingColorID);
                 _holdEffects[i].SetActive(false);
 
                 _touchEffects[i] = effect.transform.GetChild(2).gameObject;
@@ -144,10 +148,15 @@ namespace MajdataViewX.Managers
                     }
                 }
 
-                _holdEffects[i].SetActive(req.HasHolding);
-                if (req.HasHolding)
+                if (_holdEffectActive[i] != req.HasHolding)
                 {
-                    _holdMaterials[i].SetColor("_Color", req.HoldingColor);
+                    _holdEffects[i].SetActive(req.HasHolding);
+                    _holdEffectActive[i] = req.HasHolding;
+                }
+                if (req.HasHolding && _holdMaterialColors[i] != req.HoldingColor)
+                {
+                    _holdMaterials[i].SetColor(HoldingColorID, req.HoldingColor);
+                    _holdMaterialColors[i] = req.HoldingColor;
                 }
             }
 

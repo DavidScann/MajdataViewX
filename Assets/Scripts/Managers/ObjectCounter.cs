@@ -27,6 +27,7 @@ namespace MajdataViewX.Managers
         private void OnDestroy()
         {
             if (reportRequests.IsCreated) reportRequests.Dispose();
+            outputTextCache.Clear();
             outputBuilder.Dispose();
         }
     }
